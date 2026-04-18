@@ -2,35 +2,70 @@
 (function () {
   'use strict';
 
+  var _syncing = false;
+
   function createContextMenus() {
-    chrome.contextMenus.create({
-      id: 'pentest-main',
-      title: 'VulnKit',
-      contexts: ['page', 'selection'],
-    });
-    chrome.contextMenus.create({
-      id: 'encode-selection',
-      parentId: 'pentest-main',
-      title: 'Base64 编码选中内容',
-      contexts: ['selection'],
-    });
-    chrome.contextMenus.create({
-      id: 'exif-image',
-      parentId: 'pentest-main',
-      title: '查看图片 EXIF',
-      contexts: ['image'],
+    chrome.contextMenus.removeAll(() => {
+      if (chrome.runtime.lastError) {
+        _syncing = false;
+        return;
+      }
+      chrome.contextMenus.create(
+        {
+          id: 'pentest-main',
+          title: 'VulnKit',
+          contexts: ['page', 'selection'],
+        },
+        () => {
+          if (chrome.runtime.lastError) {
+            _syncing = false;
+            return;
+          }
+          chrome.contextMenus.create(
+            {
+              id: 'encode-selection',
+              parentId: 'pentest-main',
+              title: 'Base64 编码选中内容',
+              contexts: ['selection'],
+            },
+            () => {
+              if (chrome.runtime.lastError) {
+                _syncing = false;
+                return;
+              }
+              chrome.contextMenus.create(
+                {
+                  id: 'exif-image',
+                  parentId: 'pentest-main',
+                  title: '查看图片 EXIF',
+                  contexts: ['image'],
+                },
+                () => {
+                  _syncing = false;
+                }
+              );
+            }
+          );
+        }
+      );
     });
   }
 
   function removeContextMenus() {
-    chrome.contextMenus.remove('exif-image', () => {});
-    chrome.contextMenus.remove('encode-selection', () => {});
-    chrome.contextMenus.remove('pentest-main', () => {});
+    chrome.contextMenus.removeAll(() => {
+      _syncing = false;
+    });
   }
 
   function syncContextMenu() {
+    if (_syncing) return;
+    _syncing = true;
     chrome.storage.local.get(['pentestSettings'], result => {
-      const enabled = result.pentestSettings?.enableContextMenu !== false;
+      if (chrome.runtime.lastError) {
+        _syncing = false;
+        return;
+      }
+      var enabled = result.pentestSettings && result.pentestSettings.enableContextMenu !== false;
       if (enabled) {
         createContextMenus();
       } else {

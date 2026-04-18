@@ -1835,6 +1835,13 @@ body {
   margin-bottom: 8px;
   font-weight: 500;
 }
+.perm-classify-danger { background: #F8D7DA; color: #721C24; }
+.perm-classify-warning { background: #FFF3CD; color: #856404; }
+.perm-classify-success { background: #D4EDDA; color: #155724; }
+.perm-classify-info { background: #E6F0FA; color: #1E3A5F; }
+.perm-classify-unknown { background: #F5F5F5; color: #666; }
+.compare-hint-title { background: #FFF3CD; color: #856404; }
+.compare-hint-text { color: #856404; }
 
 .perm-json-editor {
   min-height: 180px;

@@ -2240,6 +2240,23 @@
   let permCapturedData = [];
   let permSelectedIndex = -1;
   let permViewMode = 'list';
+  let permRefreshTimer = null;
+
+  function startPermAutoRefresh() {
+    stopPermAutoRefresh();
+    permRefreshTimer = setInterval(function () {
+      if (permInterceptActive && permViewMode === 'list') {
+        refreshPermCaptured();
+      }
+    }, 2000);
+  }
+
+  function stopPermAutoRefresh() {
+    if (permRefreshTimer) {
+      clearInterval(permRefreshTimer);
+      permRefreshTimer = null;
+    }
+  }
 
   async function detectVue() {
     const statusEl = utils.get('vue-status');
@@ -2263,7 +2280,13 @@
           const info = { detected: false, version: '', router: false, store: false, routes: [] };
 
           // Vue 3
-          const appEl = document.querySelector('#app') || document.querySelector('[data-v-app]');
+          const appEl =
+            document.querySelector('#app') ||
+            document.querySelector('[data-v-app]') ||
+            document.querySelector('[id^="app"]') ||
+            document.querySelector('#root') ||
+            document.querySelector('#application') ||
+            document.querySelector('#main');
           if (appEl && appEl.__vue_app__) {
             const app = appEl.__vue_app__;
             info.detected = true;
@@ -2276,6 +2299,25 @@
             const store = app.config.globalProperties.$pinia || app.config.globalProperties.$store;
             if (store) info.store = true;
             return info;
+          }
+
+          // Broader fallback: scan any element for __vue_app__
+          const allEls3 = document.querySelectorAll('*');
+          for (const el of allEls3) {
+            if (el.__vue_app__) {
+              const app = el.__vue_app__;
+              info.detected = true;
+              info.version = app.version || '3.x';
+              const router = app.config.globalProperties.$router;
+              if (router) {
+                info.router = true;
+                info.routes = router.options.routes || [];
+              }
+              const store =
+                app.config.globalProperties.$pinia || app.config.globalProperties.$store;
+              if (store) info.store = true;
+              return info;
+            }
           }
 
           // Vue 2: walk elements to find __vue__
@@ -2316,7 +2358,7 @@
       let html = '';
       html +=
         '<div class="vue-info-row"><span class="vue-info-label">版本</span><span class="vue-info-value"><span class="vue-badge vue-badge-ok">Vue ' +
-        data.version +
+        utils.escapeHtml(data.version) +
         '</span></span></div>';
       html +=
         '<div class="vue-info-row"><span class="vue-info-label">Vue Router</span><span class="vue-info-value">' +
@@ -2348,16 +2390,20 @@
     let html = '';
     if (!routes || !Array.isArray(routes)) return html;
     routes.forEach(route => {
-      const indent = depth * 16;
       html += '<div class="vue-route-item vue-depth-' + depth + '">';
       html += '<span class="vue-route-path">' + utils.escapeHtml(route.path || '/') + '</span>';
       if (route.name)
         html += '<span class="vue-route-name">' + utils.escapeHtml(route.name) + '</span>';
-      if (route.meta)
-        html +=
-          '<span class="vue-route-meta">meta: ' +
-          utils.escapeHtml(JSON.stringify(route.meta).substring(0, 60)) +
-          '</span>';
+      if (route.meta) {
+        try {
+          html +=
+            '<span class="vue-route-meta">meta: ' +
+            utils.escapeHtml(JSON.stringify(route.meta).substring(0, 60)) +
+            '</span>';
+        } catch (e) {
+          html += '<span class="vue-route-meta">meta: [无法序列化]</span>';
+        }
+      }
       html += '</div>';
       if (route.children && route.children.length > 0) {
         html += renderRouteTree(route.children, depth + 1);
@@ -2375,7 +2421,13 @@
         target: { tabId: tab.id },
         world: 'MAIN',
         func: () => {
-          const appEl = document.querySelector('#app') || document.querySelector('[data-v-app]');
+          const appEl =
+            document.querySelector('#app') ||
+            document.querySelector('[data-v-app]') ||
+            document.querySelector('[id^="app"]') ||
+            document.querySelector('#root') ||
+            document.querySelector('#application') ||
+            document.querySelector('#main');
           if (appEl && appEl.__vue_app__) {
             const router = appEl.__vue_app__.config.globalProperties.$router;
             if (router) return router.options.routes || [];
@@ -2416,15 +2468,31 @@
         world: 'MAIN',
         func: () => {
           // Vue 3
-          const appEl = document.querySelector('#app') || document.querySelector('[data-v-app]');
+          const appEl =
+            document.querySelector('#app') ||
+            document.querySelector('[data-v-app]') ||
+            document.querySelector('[id^="app"]') ||
+            document.querySelector('#root') ||
+            document.querySelector('#application') ||
+            document.querySelector('#main');
           if (appEl && appEl.__vue_app__) {
             const router = appEl.__vue_app__.config.globalProperties.$router;
             if (router) {
-              router.beforeEach.length = 0;
-              router.beforeResolve.length = 0;
-              router.afterEach.length = 0;
-              router.beforeGuards.length = 0;
-              router.afterGuards.length = 0;
+              // Vue Router 4: clear internal guard arrays
+              if (Array.isArray(router.beforeGuards)) router.beforeGuards.length = 0;
+              if (Array.isArray(router.afterGuards)) router.afterGuards.length = 0;
+              if (Array.isArray(router.beforeResolveGuards)) router.beforeResolveGuards.length = 0;
+              // Clear per-route beforeEnter guards
+              if (router.options && Array.isArray(router.options.routes)) {
+                (function clearRouteGuards(routes) {
+                  for (var i = 0; i < routes.length; i++) {
+                    if (typeof routes[i].beforeEnter === 'function') {
+                      routes[i].beforeEnter = undefined;
+                    }
+                    if (routes[i].children) clearRouteGuards(routes[i].children);
+                  }
+                })(router.options.routes);
+              }
               return 'vue3';
             }
           }
@@ -2434,9 +2502,10 @@
             if (el.__vue__) {
               const vm = el.__vue__.$root || el.__vue__;
               if (vm.$router) {
-                vm.$router.beforeHooks.length = 0;
-                vm.$router.afterHooks.length = 0;
-                vm.$router.beforeResolveHooks.length = 0;
+                if (Array.isArray(vm.$router.beforeHooks)) vm.$router.beforeHooks.length = 0;
+                if (Array.isArray(vm.$router.afterHooks)) vm.$router.afterHooks.length = 0;
+                if (Array.isArray(vm.$router.beforeResolveHooks))
+                  vm.$router.beforeResolveHooks.length = 0;
                 return 'vue2';
               }
             }
@@ -2680,12 +2749,204 @@
       utils.get('perm-stop-btn').disabled = false;
       if (statusEl) statusEl.textContent = '拦截中... 请操作页面触发菜单API请求，或刷新页面';
       utils.showToast('拦截已启动，请操作页面或刷新页面', 'success');
+      // Try to read already-loaded data from Vue/Pinia/Vuex stores
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: function () {
+            if (!window.__PERM_INTERCEPTOR__) return;
+            var MENU_KEYWORDS = [
+              'menu',
+              'menulist',
+              'menuList',
+              'menuData',
+              'permission',
+              'permissions',
+              'permList',
+              'menuIds',
+              'isAdmin',
+              'isadmin',
+              'role',
+              'roles',
+              'navList',
+              'sideMenu',
+              'sidebar',
+            ];
+            function classifyStr(str, url) {
+              var urlLower = (url || '').toLowerCase();
+              if (/permission/i.test(urlLower)) return 'permission';
+              if (/role/i.test(urlLower)) return 'role';
+              if (/menu/i.test(urlLower)) return 'menu';
+              for (var i = 0; i < MENU_KEYWORDS.length; i++) {
+                if (str.indexOf(MENU_KEYWORDS[i]) !== -1) return 'menu';
+              }
+              return 'other';
+            }
+            function sanitizeForTransfer(obj, depth) {
+              if (obj === null || obj === undefined) return obj;
+              if (typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean')
+                return obj;
+              if (typeof obj === 'function') return '[function]';
+              if (obj instanceof HTMLElement) return '[HTMLElement]';
+              if (obj instanceof RegExp) return '[RegExp]';
+              if (depth > 12) return '[max-depth]';
+              if (Array.isArray(obj)) {
+                return obj.map(function (item) {
+                  return sanitizeForTransfer(item, depth + 1);
+                });
+              }
+              if (typeof obj === 'object') {
+                var skipKeys = {
+                  component: 1,
+                  _Ctor: 1,
+                  _compiled: 1,
+                  _scopeId: 1,
+                  staticRenderFns: 1,
+                  render: 1,
+                  beforeCreate: 1,
+                  created: 1,
+                  beforeMount: 1,
+                  mounted: 1,
+                  beforeUpdate: 1,
+                  updated: 1,
+                  beforeDestroy: 1,
+                  destroyed: 1,
+                  activated: 1,
+                  deactivated: 1,
+                  mixins: 1,
+                  extends: 1,
+                  directives: 1,
+                  filters: 1,
+                  _ssrRegister: 1,
+                  __file: 1,
+                  _functional: 1,
+                  _inject: 1,
+                  _provided: 1,
+                  model: 1,
+                  inheritAttrs: 1,
+                  comments: 1,
+                };
+                var result = {};
+                try {
+                  var keys = Object.keys(obj);
+                  for (var i = 0; i < keys.length; i++) {
+                    var k = keys[i];
+                    if (skipKeys[k]) {
+                      if (k === 'component') {
+                        var v = obj[k];
+                        result[k] =
+                          v && (v.name || v.__name || v.displayName)
+                            ? '[component: ' + (v.name || v.__name || v.displayName) + ']'
+                            : '[component]';
+                      }
+                      continue;
+                    }
+                    result[k] = sanitizeForTransfer(obj[k], depth + 1);
+                  }
+                } catch (e) {
+                  return '[error-reading-keys]';
+                }
+                return result;
+              }
+              return String(obj);
+            }
+            function tryAdd(data, url) {
+              if (!data || typeof data === 'string') return;
+              var cap = window.__PERM_INTERCEPTOR__.captured;
+              for (var di = 0; di < cap.length; di++) {
+                if (cap[di].url === url && cap[di].method === 'store-read') return;
+              }
+              var clean = sanitizeForTransfer(data, 0);
+              var str = JSON.stringify(clean);
+              var type = classifyStr(str, url);
+              if (type !== 'other') {
+                cap.push({
+                  url: url,
+                  type: type,
+                  subtype: null,
+                  data: clean,
+                  rawText: str,
+                  size: str.length,
+                  timestamp: Date.now(),
+                  method: 'store-read',
+                });
+              }
+            }
+            // Check Vue 3 Pinia stores
+            var appEl =
+              document.querySelector('#app') ||
+              document.querySelector('[data-v-app]') ||
+              document.querySelector('[id^="app"]') ||
+              document.querySelector('#root') ||
+              document.querySelector('#application') ||
+              document.querySelector('#main');
+            if (appEl && appEl.__vue_app__) {
+              var pinia = appEl.__vue_app__.config.globalProperties.$pinia;
+              if (pinia && pinia._s) {
+                pinia._s.forEach(function (store, id) {
+                  var state = store.$state;
+                  for (var key in state) {
+                    if (
+                      /menu|permission|nav|route|sidebar/i.test(key) &&
+                      (Array.isArray(state[key]) ||
+                        (typeof state[key] === 'object' && state[key] !== null))
+                    ) {
+                      tryAdd(state[key], 'pinia://' + id + '/' + key);
+                    }
+                  }
+                });
+              }
+            }
+            // Check Vue 2 Vuex store
+            var allEls = document.querySelectorAll('*');
+            for (var i = 0; i < allEls.length; i++) {
+              if (allEls[i].__vue__) {
+                var vm = allEls[i].__vue__.$root || allEls[i].__vue__;
+                if (vm.$store && vm.$store.state) {
+                  for (var key in vm.$store.state) {
+                    if (
+                      /menu|permission|nav|route|sidebar/i.test(key) &&
+                      (Array.isArray(vm.$store.state[key]) ||
+                        (typeof vm.$store.state[key] === 'object' && vm.$store.state[key] !== null))
+                    ) {
+                      tryAdd(vm.$store.state[key], 'vuex://state/' + key);
+                    }
+                  }
+                }
+                break;
+              }
+            }
+            // Check localStorage for menu-like keys
+            var storagePrefixes = ['menu', 'permission', 'routes', 'nav', 'sidebar'];
+            for (var s = 0; s < localStorage.length; s++) {
+              var storageKey = localStorage.key(s);
+              if (storageKey) {
+                for (var p = 0; p < storagePrefixes.length; p++) {
+                  if (storageKey.toLowerCase().indexOf(storagePrefixes[p]) !== -1) {
+                    try {
+                      var parsed = JSON.parse(localStorage.getItem(storageKey));
+                      tryAdd(parsed, 'localStorage://' + storageKey);
+                    } catch (e) {}
+                    break;
+                  }
+                }
+              }
+            }
+          },
+        });
+      } catch (e) {
+        // Non-critical: store reading is best-effort
+      }
+      renderPermList();
+      startPermAutoRefresh();
     } catch (e) {
       if (statusEl) statusEl.textContent = '启动失败: ' + e.message;
     }
   }
 
   async function stopPermInterception() {
+    stopPermAutoRefresh();
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       await chrome.scripting.executeScript({
@@ -2702,7 +2963,13 @@
       var statusEl = utils.get('perm-status');
       if (statusEl) statusEl.textContent = '拦截已停止';
       utils.showToast('拦截已停止', 'info');
-    } catch (e) {}
+    } catch (e) {
+      permInterceptActive = false;
+      chrome.storage.local.remove('permInterceptTabId');
+      var statusEl = utils.get('perm-status');
+      if (statusEl) statusEl.textContent = '停止失败: ' + (e.message || '未知错误');
+      utils.showToast('停止拦截失败', 'error');
+    }
   }
 
   async function refreshPermCaptured() {
@@ -2785,8 +3052,7 @@
     var classification = classifyPermType(item.data);
     var classifyEl = utils.get('perm-classify');
     classifyEl.textContent = classification.label;
-    classifyEl.style.background = classification.bgColor;
-    classifyEl.style.color = classification.textColor;
+    classifyEl.className = 'perm-classify ' + classification.cssClass;
 
     utils.get('perm-json-editor').value = JSON.stringify(item.data, null, 2);
   }
@@ -2801,14 +3067,12 @@
           if (val === 0 || val === false) {
             return {
               label: '特殊0开放 - ' + keys[k] + '=' + val + '，可修改为1/true',
-              bgColor: '#F8D7DA',
-              textColor: '#721C24',
+              cssClass: 'perm-classify-danger',
             };
           }
           return {
             label: '特殊0开放 - 检测到角色控制字段',
-            bgColor: '#FFF3CD',
-            textColor: '#856404',
+            cssClass: 'perm-classify-warning',
           };
         }
       }
@@ -2838,23 +3102,20 @@
         if (hasHidden) {
           return {
             label: '全开放 - 所有菜单已返回，部分标记为隐藏 (isshow/display)',
-            bgColor: '#D4EDDA',
-            textColor: '#155724',
+            cssClass: 'perm-classify-success',
           };
         }
         return {
           label: '全开放 - 所有菜单已返回且均已显示',
-          bgColor: '#D4EDDA',
-          textColor: '#155724',
+          cssClass: 'perm-classify-success',
         };
       }
-      return { label: '半开放 - 返回了部分菜单列表', bgColor: '#E6F0FA', textColor: '#1E3A5F' };
+      return { label: '半开放 - 返回了部分菜单列表', cssClass: 'perm-classify-info' };
     }
     if (Array.isArray(data) && data.length === 0) {
       return {
         label: '0开放 - 菜单返回为空，需要搜索JS源码',
-        bgColor: '#F8D7DA',
-        textColor: '#721C24',
+        cssClass: 'perm-classify-danger',
       };
     }
     if (data && typeof data === 'object' && !Array.isArray(data)) {
@@ -2862,12 +3123,11 @@
       if (Array.isArray(inner) && inner.length === 0) {
         return {
           label: '0开放 - 菜单返回为空，需要搜索JS源码',
-          bgColor: '#F8D7DA',
-          textColor: '#721C24',
+          cssClass: 'perm-classify-danger',
         };
       }
     }
-    return { label: '未知类型 - 请手动检查数据结构', bgColor: '#F5F5F5', textColor: '#666' };
+    return { label: '未知类型 - 请手动检查数据结构', cssClass: 'perm-classify-unknown' };
   }
 
   function transformShowAll(data) {
@@ -2964,7 +3224,13 @@
           if (!window.__PERM_INTERCEPTOR__) return false;
           window.__PERM_INTERCEPTOR__.setOverride(overrideData);
           // Also try to update Vue/Pinia reactive state
-          var appEl = document.querySelector('#app') || document.querySelector('[data-v-app]');
+          var appEl =
+            document.querySelector('#app') ||
+            document.querySelector('[data-v-app]') ||
+            document.querySelector('[id^="app"]') ||
+            document.querySelector('#root') ||
+            document.querySelector('#application') ||
+            document.querySelector('#main');
           if (appEl && appEl.__vue_app__) {
             var pinia = appEl.__vue_app__.config.globalProperties.$pinia;
             if (pinia && pinia._s) {
@@ -3023,8 +3289,8 @@
               var idx = lines[j].indexOf(kw);
               while (idx !== -1) {
                 var start = Math.max(0, idx - 40);
-                var end = Math.min(text.length, idx + kw.length + 60);
-                var context = text.substring(start, end).replace(/^\S*\s*/, '');
+                var end = Math.min(lines[j].length, idx + kw.length + 60);
+                var context = lines[j].substring(start, end).replace(/^\S*\s*/, '');
                 var key = i + ':' + idx;
                 if (!seen[key]) {
                   seen[key] = true;
@@ -3055,30 +3321,40 @@
       var matchList = inlineData.matches || [];
       var extUrls = inlineData.extUrls || [];
 
-      // 2. Search external scripts via background fetch proxy
-      for (var u = 0; u < extUrls.length && matchList.length < 50; u++) {
-        var url = extUrls[u];
-        try {
-          var resp = await chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url });
-          if (!resp || resp.error) continue;
+      // 2. Search external scripts via background fetch proxy (parallel batches)
+      var CONCURRENCY = 5;
+      for (
+        var batchStart = 0;
+        batchStart < extUrls.length && matchList.length < 50;
+        batchStart += CONCURRENCY
+      ) {
+        var batch = extUrls.slice(batchStart, batchStart + CONCURRENCY);
+        var batchResults = await Promise.all(
+          batch.map(function (url) {
+            return chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url }).catch(function () {
+              return null;
+            });
+          })
+        );
+        for (var b = 0; b < batchResults.length && matchList.length < 50; b++) {
+          var resp = batchResults[b];
+          if (!resp || resp.error || !resp.data) continue;
           var text = resp.data;
           if (text && text.indexOf(keyword) !== -1) {
-            var shortUrl = url;
+            var shortUrl = batch[b];
             if (shortUrl.length > 60) shortUrl = '...' + shortUrl.substring(shortUrl.length - 57);
             var lines = text.split('\n');
             for (var j = 0; j < lines.length && matchList.length < 50; j++) {
               var idx = lines[j].indexOf(keyword);
               while (idx !== -1 && matchList.length < 50) {
                 var start = Math.max(0, idx - 40);
-                var end = Math.min(text.length, idx + keyword.length + 60);
-                var context = text.substring(start, end).replace(/^\S*\s*/, '');
+                var end = Math.min(lines[j].length, idx + keyword.length + 60);
+                var context = lines[j].substring(start, end).replace(/^\S*\s*/, '');
                 matchList.push({ source: shortUrl, line: j + 1, context: context });
                 idx = lines[j].indexOf(keyword, idx + 1);
               }
             }
           }
-        } catch (e) {
-          /* skip failed fetch */
         }
       }
 
@@ -3095,10 +3371,8 @@
       for (var i = 0; i < matchList.length; i++) {
         var m = matchList[i];
         var kwRegex = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        var highlighted = m.context.replace(
-          new RegExp('(' + kwRegex + ')', 'gi'),
-          '<mark>$1</mark>'
-        );
+        var escaped = utils.escapeHtml(m.context);
+        var highlighted = escaped.replace(new RegExp('(' + kwRegex + ')', 'gi'), '<mark>$1</mark>');
         html += '<div class="jssearch-match">';
         html +=
           '<div class="jssearch-match-source">' +
@@ -3138,7 +3412,11 @@
     var iter = menuPaths.values();
     var mp = iter.next();
     while (!mp.done) {
-      if (routePath.indexOf(mp.value) === 0 && routePath !== mp.value) return true;
+      var menuPath = mp.value;
+      if (routePath.indexOf(menuPath) === 0 && routePath !== menuPath) {
+        var nextChar = routePath.charAt(menuPath.length);
+        if (nextChar === '/' || !nextChar) return true;
+      }
       mp = iter.next();
     }
     return false;
@@ -3158,12 +3436,26 @@
           var routes = [];
           function extract(rts, prefix) {
             rts.forEach(function (r) {
-              var path = prefix + (r.path || '/');
+              var childPath = r.path || '/';
+              var path;
+              if (childPath.charAt(0) === '/') {
+                path = childPath;
+              } else if (prefix === '' || prefix === '/') {
+                path = '/' + childPath;
+              } else {
+                path = prefix + '/' + childPath;
+              }
               if (r.path && r.path !== '*') routes.push({ path: path, name: r.name || '' });
-              if (r.children) extract(r.children, path === '/' ? '/' : path + '/');
+              if (r.children) extract(r.children, path === '/' ? '/' : path);
             });
           }
-          var appEl = document.querySelector('#app') || document.querySelector('[data-v-app]');
+          var appEl =
+            document.querySelector('#app') ||
+            document.querySelector('[data-v-app]') ||
+            document.querySelector('[id^="app"]') ||
+            document.querySelector('#root') ||
+            document.querySelector('#application') ||
+            document.querySelector('#main');
           if (appEl && appEl.__vue_app__) {
             var router = appEl.__vue_app__.config.globalProperties.$router;
             if (router) extract(router.options.routes || [], '');
@@ -3254,10 +3546,9 @@
         }
       }
       if (captured.length === 0) {
+        html += '<div class="compare-section-title compare-hint-title">提示</div>';
         html +=
-          '<div class="compare-section-title" style="background:#FFF3CD;color:#856404">提示</div>';
-        html +=
-          '<div class="compare-route-item" style="color:#856404">未捕获菜单数据。请先在「权限菜单」标签中开始拦截，然后刷新页面。</div>';
+          '<div class="compare-route-item compare-hint-text">未捕获菜单数据。请先在「权限菜单」标签中开始拦截，然后刷新页面。</div>';
       }
 
       if (statusEl)
@@ -4031,6 +4322,9 @@
             if (stopBtn) stopBtn.disabled = false;
             const statusEl = utils.get('perm-status');
             if (statusEl) statusEl.textContent = '拦截中... 页面刷新后会自动重新注入';
+            // Fetch captured data and start auto-refresh
+            refreshPermCaptured();
+            startPermAutoRefresh();
           } else {
             chrome.storage.local.remove('permInterceptTabId');
           }
