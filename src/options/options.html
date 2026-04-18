@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PenTest Tools - 设置</title>
+    <link rel="stylesheet" href="../styles/options.css">
+</head>
+<body>
+    <div class="container">
+        <h1>PenTest Tools 设置</h1>
+        <p>版本: <span id="version"></span></p>
+
+        <div class="section">
+            <h3>通用设置</h3>
+            <div class="setting">
+                <label>
+                    <input type="checkbox" id="enableNotifications" checked>
+                    启用通知提醒
+                </label>
+            </div>
+            <div class="setting">
+                <label>
+                    <input type="checkbox" id="enableContextMenu" checked>
+                    启用右键菜单
+                </label>
+            </div>
+            <div class="setting">
+                <label for="theme">主题选择:</label>
+                <select id="theme">
+                    <option value="auto">自动</option>
+                    <option value="light">浅色</option>
+                    <option value="dark">深色</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>隐私设置</h3>
+            <div class="setting">
+                <label>
+                    <input type="checkbox" id="storeHistory" checked>
+                    保存操作历史
+                </label>
+            </div>
+            <div class="setting">
+                <label>
+                    <input type="checkbox" id="analytics">
+                    启用使用统计
+                </label>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>工具设置</h3>
+            <div class="setting">
+                <label for="defaultEncoding">默认编码类型:</label>
+                <select id="defaultEncoding">
+                    <option value="base64">Base64</option>
+                    <option value="url">URL编码</option>
+                    <option value="html">HTML实体</option>
+                    <option value="hex">十六进制</option>
+                </select>
+            </div>
+            <div class="setting">
+                <label for="defaultHash">默认哈希算法:</label>
+                <select id="defaultHash">
+                    <option value="SHA256">SHA-256</option>
+                    <option value="SHA1">SHA-1</option>
+                    <option value="MD5">MD5 (不推荐)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>数据管理</h3>
+            <button id="export-btn">导出设置</button>
+            <button id="import-btn">导入设置</button>
+            <button id="clear-btn">清除所有数据</button>
+            <button id="reset-btn">重置为默认设置</button>
+        </div>
+
+        <div id="status" class="status status-hidden"></div>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+</html>

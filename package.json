@@ -1,0 +1,179 @@
+{
+  "name": "pentest-tools-chrome-extension",
+  "version": "3.0.0",
+  "description": "Professional penetration testing and security analysis Chrome extension",
+  "main": "src/background/background.ts",
+  "scripts": {
+    "dev": "webpack --mode development --config build/webpack.config.js --watch",
+    "build": "webpack --mode production --config build/webpack.config.js",
+    "build:dev": "webpack --mode development --config build/webpack.config.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,html}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,html}\"",
+    "type-check": "tsc --noEmit",
+    "clean": "rimraf dist build",
+    "prebuild": "npm run clean && npm run type-check && npm run lint",
+    "prepare": "npm run build",
+    "start": "npm run dev"
+  },
+  "keywords": [
+    "chrome-extension",
+    "penetration-testing",
+    "security",
+    "cybersecurity",
+    "vulnerability-scanner",
+    "web-security",
+    "testing",
+    "hacking-tools"
+  ],
+  "author": {
+    "name": "PenTest Tools Team",
+    "email": "support@pentest-tools.com",
+    "url": "https://pentest-tools.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pentest-tools/pentest-chrome-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pentest-tools/pentest-chrome-extension/issues"
+  },
+  "homepage": "https://pentest-tools.com",
+  "devDependencies": {
+    "@types/chrome": "^0.0.260",
+    "@types/jest": "^29.5.5",
+    "@types/node": "^20.8.0",
+    "@types/webpack-env": "^1.18.2",
+    "@typescript-eslint/eslint-plugin": "^6.7.4",
+    "@typescript-eslint/parser": "^6.7.4",
+    "copy-webpack-plugin": "^11.0.0",
+    "css-loader": "^6.8.1",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "html-webpack-plugin": "^5.5.3",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jest-transform-stub": "^2.0.0",
+    "mini-css-extract-plugin": "^2.7.6",
+    "postcss": "^8.4.31",
+    "postcss-loader": "^7.3.3",
+    "postcss-preset-env": "^9.2.0",
+    "prettier": "^3.0.3",
+    "rimraf": "^5.0.5",
+    "style-loader": "^3.3.3",
+    "ts-jest": "^29.1.1",
+    "ts-loader": "^9.4.4",
+    "typescript": "^5.9.3",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.11.1"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "browserslist": [
+    "Chrome >= 120",
+    "Edge >= 120",
+    "Firefox >= 115",
+    "Safari >= 16"
+  ],
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "jsdom",
+    "roots": [
+      "<rootDir>/src",
+      "<rootDir>/test"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.ts",
+      "**/?(*.)+(spec|test).ts"
+    ],
+    "transform": {
+      "^.+\\.css$": "jest-transform-stub"
+    },
+    "collectCoverageFrom": [
+      "src/**/*.{ts,tsx}",
+      "!src/**/*.d.ts",
+      "!src/**/index.ts"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/test/setup.ts"
+    ],
+    "moduleNameMapping": {
+      "^@/(.*)$": "<rootDir>/src/$1"
+    },
+    "testTimeout": 10000
+  },
+  "eslintConfig": {
+    "env": {
+      "browser": true,
+      "es6": true,
+      "node": true,
+      "webextensions": true
+    },
+    "extends": [
+      "eslint:recommended",
+      "@typescript-eslint/recommended",
+      "prettier"
+    ],
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "ecmaVersion": 2020,
+      "sourceType": "module",
+      "project": "./tsconfig.json"
+    },
+    "plugins": [
+      "@typescript-eslint",
+      "prettier"
+    ],
+    "rules": {
+      "no-console": "warn",
+      "no-debugger": "error",
+      "@typescript-eslint/no-unused-vars": "error",
+      "@typescript-eslint/explicit-function-return-type": "off",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-non-null-assertion": "warn",
+      "prefer-const": "error",
+      "no-var": "error"
+    },
+    "ignorePatterns": [
+      "dist/",
+      "build/",
+      "coverage/",
+      "node_modules/",
+      "*.config.js"
+    ]
+  },
+  "prettier": {
+    "semi": true,
+    "trailingComma": "es5",
+    "singleQuote": true,
+    "printWidth": 100,
+    "tabWidth": 2,
+    "useTabs": false,
+    "bracketSpacing": true,
+    "arrowParens": "avoid",
+    "endOfLine": "lf"
+  },
+  "postcss": {
+    "plugins": [
+      "postcss-preset-env"
+    ]
+  },
+  "dependencies": {
+    "exifr": "^7.1.3"
+  }
+}

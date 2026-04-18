@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "VulnKit",
+  "version": "5.0.0",
+  "description": "漏洞工具包 - 编码解码、图标识别、资产测绘、信息收集、权限分析",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "clipboardWrite",
+    "scripting",
+    "contextMenus",
+    "declarativeNetRequest",
+    "cookies"
+  ],
+  "host_permissions": [
+    "https://web.archive.org/*",
+    "https://fofa.info/*",
+    "https://api.zoomeye.org/*",
+    "https://api.shodan.io/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "dist/background/background.js"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "VulnKit - 漏洞工具包"
+  },
+  "options_page": "src/options/options.html",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self';"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
