@@ -1,262 +1,38 @@
-# PenTest Tools v3.0.0
+# VulnKit
 
-A comprehensive Chrome extension for penetration testing and security research, featuring modern architecture, AI-powered analysis, and enterprise-grade security tools.
+Chrome 渗透测试辅助工具包，集成常见安全测试功能于一体。
 
-## 🚀 Features
+## 功能
 
-### Core Tools
-- **Encoding Tools**: Base64, URL, HTML, Hex encoding/decoding
-- **Hashing Tools**: SHA-256, SHA-1, SHA-512, MD5 generation
-- **JWT Tools**: Parse, validate, and analyze JSON Web Tokens
-- **JSON Tools**: Format, validate, and manipulate JSON data
-- **Regex Tools**: Test and debug regular expressions
-- **URL Tools**: Parse, validate, and security-analyze URLs
-- **Generator Tools**: Password, UUID, random string generation
+- **编码工具** — Base64 / URL / HTML / Hex 编解码，SHA-256 / SHA-1 / SHA-512 / MD5 哈希生成
+- **Favicon 识别** — 提取网站图标并计算 Favicon Hash，用于资产测绘关联
+- **信息收集** — 一键提取当前页面的接口地址、域名、敏感信息（Token/邮箱/Cookie）、内网 IP
+- **资产测绘** — 集成 FOFA / ZoomEye / Shodan 进行子域名和资产搜索
+- **链接提取** — 提取页面中所有链接、图片、脚本地址，支持关键词筛选
+- **URL 多开** — 批量打开 URL 列表，支持前缀/后缀追加
+- **EXIF 查看** — 查看图片 EXIF 元数据（GPS/相机/时间等）
+- **Cookie 管理** — 查看、编辑、删除当前站点 Cookie
+- **安全头分析** — 检测响应头安全配置（CSP / HSTS / X-Frame 等）
+- **历史档案** — 查询站点在 Web Archive 的历史快照
+- **Vue 分析** — 检测 Vue 应用、导出路由、绕过路由守卫、拦截权限菜单、JS 关键字搜索、路由对比
+- **JS 控制** — 禁用/恢复页面 JavaScript
+- **UA 伪装** — 自定义 User-Agent 请求头
+- **Header 伪造** — 伪造 X-Forwarded-For / Referer / Client-IP 等请求头
+- **反调试检测** — 检测页面反调试手段并提供绕过方案
 
-### Security Analysis
-- **Network Scanner**: Port scanning and network reconnaissance
-- **Vulnerability Scanner**: XSS, SQL injection, directory traversal detection
-- **AI Analysis**: Machine learning-powered vulnerability detection
-- **Content Security**: In-page security analysis and highlighting
+## 安装
 
-### User Interface
-- **Modern Popup**: Compact 420px interface with 7 tool categories
-- **Professional Sidebar**: Full-screen workspace with 16 security tools
-- **Responsive Design**: Mobile-friendly and accessible
-- **Theme System**: Dark, light, and system theme support
+1. 打开 Chrome，进入 `chrome://extensions/`
+2. 开启「开发者模式」
+3. 点击「加载已解压的扩展程序」，选择本项目目录
 
-## 🛠️ Installation
+## 权限说明
 
-### From Chrome Web Store
-1. Visit the Chrome Web Store
-2. Search for "PenTest Tools"
-3. Click "Add to Chrome"
-4. Grant necessary permissions
-
-### Manual Installation
-1. Clone this repository
-2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable "Developer mode"
-4. Click "Load unpacked extension"
-5. Select the project directory
-
-## 📖 Usage
-
-### Popup Interface
-- Click the PenTest Tools icon in your browser toolbar
-- Select a tool category from the navigation tabs
-- Use the input fields to enter data
-- Click action buttons to perform operations
-- Copy results using the copy button
-
-### Sidebar Interface
-- Right-click on any page and select "Inspect"
-- Click the PenTest Tools icon in the developer tools
-- Select from 16 available security tools
-- Use the workspace area for detailed analysis
-- View results in the dedicated output panels
-
-### Context Menu
-- Right-click on selected text to encode/decode
-- Right-click on links to analyze URLs
-- Right-click on pages for security analysis
-
-## 🏗️ Architecture
-
-### Modern Tech Stack
-- **TypeScript**: Full type safety and modern JavaScript features
-- **ES6 Modules**: Clean module imports and exports
-- **Webpack**: Professional build system with code splitting
-- **CSS3**: Modern styling with CSS variables and animations
-
-### Project Structure
-```
-pentest-tools/
-├── src/
-│   ├── core/           # Core application logic
-│   ├── modules/        # Individual tool modules
-│   ├── ui/             # UI components
-│   ├── styles/         # CSS stylesheets
-│   ├── popup/          # Popup interface
-│   ├── sidebar/        # Sidebar interface
-│   ├── background/     # Background service worker
-│   ├── content/        # Content scripts
-│   └── options/        # Options page
-├── test/               # Test files
-├── assets/             # Static assets
-└── build/              # Build configuration
-```
-
-### Module System
-- **CoreManager**: Application lifecycle management
-- **ModuleManager**: Dynamic module loading and dependency management
-- **EventBus**: Centralized event communication system
-- **Component**: Reusable UI component base class
-
-## 🔧 Development
-
-### Prerequisites
-- Node.js 16+ and npm
-- Chrome 120+ for Manifest V3 support
-- Basic knowledge of TypeScript and Chrome extensions
-
-### Setup
-```bash
-# Clone the repository
-git clone https://github.com/your-org/pentest-tools.git
-cd pentest-tools
-
-# Install dependencies
-npm install
-
-# Development mode
-npm run dev
-
-# Build for production
-npm run build
-
-# Run tests
-npm test
-
-# Lint code
-npm run lint
-```
-
-### Development Workflow
-1. Make changes to source code
-2. Test using `npm run dev`
-3. Run tests with `npm test`
-4. Build with `npm run build`
-5. Load unpacked extension in Chrome
-6. Test functionality
-7. Commit changes
-
-### Testing
-- **Unit Tests**: Individual module testing
-- **Integration Tests**: Cross-module functionality testing
-- **Performance Tests**: Response time and memory usage testing
-- **Browser Tests**: Cross-browser compatibility testing
-
-## 📊 Performance
-
-### Benchmarks
-- **Initialization**: < 500ms
-- **Tool Operations**: < 100ms average
-- **Memory Usage**: < 10MB runtime
-- **Bundle Size**: < 2MB minified
-
-### Optimization Features
-- Code splitting and lazy loading
-- Efficient DOM manipulation
-- Memory leak prevention
-- Performance monitoring
-
-## 🔒 Security
-
-### Features
-- Content Security Policy (CSP) compliance
-- Input validation and sanitization
-- Secure coding practices
-- OWASP guidelines adherence
-- Regular security audits
-
-### Permissions
-- `activeTab`: Access current tab content
-- `storage`: Save user preferences and history
-- `scripting`: Inject content scripts
-- `webNavigation`: Monitor navigation events
-- `contextMenus`: Add context menu options
-
-## 🌍 Browser Support
-
-### Compatible Browsers
-- Chrome 120+
-- Edge 120+
-- Firefox 115+ (with modifications)
-- Safari 16+ (with modifications)
-
-### Manifest V3
-- Service worker background scripts
-- Enhanced content security policies
-- Improved security model
-- Better performance characteristics
-
-## 📚 Documentation
-
-### API Documentation
-- [Module API](./docs/api.md)
-- [Component Reference](./docs/components.md)
-- [Extension Architecture](./docs/architecture.md)
-
-### User Guide
-- [Getting Started](./docs/user-guide.md)
-- [Tool Tutorials](./docs/tutorials.md)
-- [Security Best Practices](./docs/security.md)
-
-### Developer Guide
-- [Contributing Guidelines](./docs/contributing.md)
-- [Code Style Guide](./docs/style-guide.md)
-- [Testing Guidelines](./docs/testing.md)
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](./docs/contributing.md) for details.
-
-### Development Process
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Update documentation
-6. Submit a pull request
-
-### Code Standards
-- TypeScript strict mode
-- ESLint configuration
-- Prettier formatting
-- 80%+ test coverage
-- Comprehensive documentation
-
-## 📝 Changelog
-
-### v3.0.0 (Current)
-- Complete rewrite with modern architecture
-- TypeScript implementation
-- New AI-powered vulnerability detection
-- Enhanced user interfaces
-- Performance optimizations
-- Security improvements
-
-### Previous Versions
-- [v2.0.0](https://github.com/your-org/pentest-tools/releases/tag/v2.0.0)
-- [v1.1.0](https://github.com/your-org/pentest-tools/releases/tag/v1.1.0)
-- [v1.0.0](https://github.com/your-org/pentest-tools/releases/tag/v1.0.0)
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- OWASP Foundation for security guidelines
-- Chrome Extension documentation team
-- Security researchers and penetration testers
-- Open source contributors
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/your-org/pentest-tools/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/pentest-tools/discussions)
-- **Email**: support@pentest-tools.com
-- **Twitter**: [@pentesttools](https://twitter.com/pentesttools)
-
-## 🔗 Related Projects
-
-- [OWASP ZAP](https://github.com/zaproxy/zaproxy)
-- [Burp Suite Community Edition](https://portswigger.net/burp/communitydownload)
-- [Nikto](https://github.com/sullo/nikto)
-- [SQLMap](https://github.com/sqlmapproject/sqlmap)
-
----
-
-**Built with ❤️ by the PenTest Tools Team**
+| 权限 | 用途 |
+|------|------|
+| activeTab | 访问当前标签页内容 |
+| storage | 保存用户配置和缓存数据 |
+| scripting | 注入脚本到页面 |
+| contextMenus | 右键菜单 |
+| declarativeNetRequest | 修改请求头（UA/Referer 等） |
+| cookies | 读取和修改 Cookie |
