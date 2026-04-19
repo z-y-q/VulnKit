@@ -463,11 +463,13 @@
             </div>
             <div class="perm-detail-actions">
               <button class="btn btn-sm btn-secondary" id="perm-open-all">全部显示</button>
-              <button class="btn btn-sm btn-secondary" id="perm-change-admin">修改isAdmin</button>
+              <button class="btn btn-sm btn-secondary" id="perm-change-admin">提权至管理员</button>
+              <button class="btn btn-sm btn-secondary" id="perm-expand-ids">展开menuIds</button>
               <button class="btn btn-sm btn-primary" id="perm-apply-btn">应用修改</button>
               <button class="btn btn-sm btn-outline" id="perm-copy-json">复制JSON</button>
             </div>
             <div class="perm-classify" id="perm-classify"></div>
+            <div class="perm-suggestions hidden" id="perm-suggestions"></div>
             <textarea class="textarea perm-json-editor" id="perm-json-editor" rows="12" placeholder="权限菜单 JSON 数据"></textarea>
           </div>
         </div>
@@ -499,6 +501,7 @@
           <div class="compare-actions">
             <button class="btn btn-primary" id="compare-btn">开始对比</button>
             <button class="btn btn-sm btn-outline" id="compare-copy-hidden">复制隐藏路由</button>
+            <button class="btn btn-sm btn-primary" id="compare-inject-btn">一键补全到菜单</button>
           </div>
           <div class="compare-status" id="compare-status"></div>
           <div class="compare-results" id="compare-results">

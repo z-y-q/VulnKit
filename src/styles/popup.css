@@ -1764,7 +1764,17 @@ body {
   text-align: center;
   padding: 2px 4px;
   border-radius: 3px;
-  margin-right: 8px;
+  margin-right: 6px;
+}
+
+.perm-item-cls {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin-right: 6px;
+  white-space: nowrap;
 }
 
 .type-menu { background: #4A90E2; }
@@ -1840,6 +1850,19 @@ body {
 .perm-classify-success { background: #D4EDDA; color: #155724; }
 .perm-classify-info { background: #E6F0FA; color: #1E3A5F; }
 .perm-classify-unknown { background: #F5F5F5; color: #666; }
+.perm-suggestions { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px; background: #F0F4FF; border-radius: 6px; border: 1px dashed #B8C9E8; margin-bottom: 8px; align-items: center; }
+.perm-suggestions.hidden { display: none; }
+.perm-suggestion-hint { font-size: 11px; color: #888; margin-right: 4px; }
+
+.btn-suggested {
+  animation: suggest-pulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.4);
+}
+@keyframes suggest-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(74, 144, 226, 0.15); }
+}
+[data-theme='dark'] .perm-suggestions { background: var(--bg-tertiary, #2a2a3e); border-color: var(--border-color, #444); }
 .compare-hint-title { background: #FFF3CD; color: #856404; }
 .compare-hint-text { color: #856404; }
 
@@ -1997,6 +2020,11 @@ body {
 [data-theme='dark'] .perm-detail-url { color: var(--accent); }
 [data-theme='dark'] .perm-detail-type { background: var(--bg-tertiary); color: var(--accent); }
 [data-theme='dark'] .perm-classify { background: var(--bg-tertiary); color: #f59e0b; }
+[data-theme='dark'] .perm-item-cls.perm-classify-success { background: #1a3a2a; color: #6ee7b7; }
+[data-theme='dark'] .perm-item-cls.perm-classify-info { background: #1e2d4a; color: #93c5fd; }
+[data-theme='dark'] .perm-item-cls.perm-classify-danger { background: #3a1a1a; color: #fca5a5; }
+[data-theme='dark'] .perm-item-cls.perm-classify-warning { background: #3a2e1a; color: #fcd34d; }
+[data-theme='dark'] .perm-item-cls.perm-classify-unknown { background: var(--bg-tertiary); color: var(--text-secondary); }
 [data-theme='dark'] .jssearch-match { border-color: var(--border-color); }
 [data-theme='dark'] .jssearch-match:hover { background: var(--bg-tertiary); }
 [data-theme='dark'] .jssearch-match-source { color: var(--text-secondary); }

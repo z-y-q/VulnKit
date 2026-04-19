@@ -36,7 +36,7 @@
     showToast: (() => {
       let current = null;
       const types = ['success', 'error', 'warning', 'info'];
-      return function (message, type) {
+      return function (message, type, duration) {
         if (current && current.parentNode) current.parentNode.removeChild(current);
         current = document.createElement('div');
         current.className = 'toast toast-' + (types.includes(type) ? type : 'info');
@@ -55,7 +55,7 @@
               }
             }, 200);
           }
-        }, 2000);
+        }, duration || 2000);
       };
     })(),
   };
@@ -2241,6 +2241,9 @@
   let permSelectedIndex = -1;
   let permViewMode = 'list';
   let permRefreshTimer = null;
+  let lastCompareHiddenRoutes = [];
+  let lastJsMatchContexts = [];
+  let jsSearchFoundPaths = [];
 
   function startPermAutoRefresh() {
     stopPermAutoRefresh();
@@ -2279,6 +2282,84 @@
         func: () => {
           const info = { detected: false, version: '', router: false, store: false, routes: [] };
 
+          function safeSerialize(obj) {
+            try {
+              return JSON.parse(JSON.stringify(obj));
+            } catch (e) {
+              return null;
+            }
+          }
+
+          function normalizeRoute(r) {
+            return {
+              path: r.path,
+              name: r.name || '',
+              meta: safeSerialize(r.meta) || {},
+              children: [],
+            };
+          }
+
+          function buildRouteTree(routes) {
+            if (!routes || !Array.isArray(routes)) return [];
+            return routes.map(function (r) {
+              var node = normalizeRoute(r);
+              if (r.children && r.children.length > 0) {
+                node.children = buildRouteTree(r.children);
+              }
+              return node;
+            });
+          }
+
+          function collectTreePaths(routes, prefix) {
+            var paths = {};
+            if (!routes) return paths;
+            routes.forEach(function (r) {
+              var p = r.path || '';
+              if (p.charAt(0) !== '/' && prefix && prefix !== '/') {
+                p = prefix + '/' + p;
+              }
+              if (r.children && r.children.length > 0) {
+                var childPaths = collectTreePaths(r.children, p === '/' ? '/' : p);
+                for (var k in childPaths) paths[k] = childPaths[k];
+              }
+              if (p) paths[p] = true;
+            });
+            return paths;
+          }
+
+          function getVue3Routes(router) {
+            if (!router) return [];
+            var treeRoutes = safeSerialize(router.options && router.options.routes) || [];
+            var tree = buildRouteTree(treeRoutes);
+            if (typeof router.getRoutes === 'function') {
+              var flatRoutes = router.getRoutes();
+              var existingPaths = collectTreePaths(tree, '');
+              flatRoutes.forEach(function (r) {
+                if (r.path && !existingPaths[r.path]) {
+                  tree.push(normalizeRoute(r));
+                }
+              });
+            }
+            return tree;
+          }
+
+          function getVue2Routes(router) {
+            if (!router) return [];
+            var opts = router.options;
+            var treeRoutes = opts ? safeSerialize(opts.routes) || [] : [];
+            var tree = buildRouteTree(treeRoutes);
+            if (typeof router.getRoutes === 'function') {
+              var flatRoutes = router.getRoutes();
+              var existingPaths = collectTreePaths(tree, '');
+              flatRoutes.forEach(function (r) {
+                if (r.path && !existingPaths[r.path]) {
+                  tree.push(normalizeRoute(r));
+                }
+              });
+            }
+            return tree;
+          }
+
           // Vue 3
           const appEl =
             document.querySelector('#app') ||
@@ -2294,16 +2375,16 @@
             const router = app.config.globalProperties.$router;
             if (router) {
               info.router = true;
-              info.routes = router.options.routes || [];
+              info.routes = getVue3Routes(router);
             }
             const store = app.config.globalProperties.$pinia || app.config.globalProperties.$store;
             if (store) info.store = true;
             return info;
           }
 
-          // Broader fallback: scan any element for __vue_app__
-          const allEls3 = document.querySelectorAll('*');
-          for (const el of allEls3) {
+          // Broader fallback: single-pass scan for Vue 3 and Vue 2
+          const allEls = document.querySelectorAll('*');
+          for (const el of allEls) {
             if (el.__vue_app__) {
               const app = el.__vue_app__;
               info.detected = true;
@@ -2311,18 +2392,13 @@
               const router = app.config.globalProperties.$router;
               if (router) {
                 info.router = true;
-                info.routes = router.options.routes || [];
+                info.routes = getVue3Routes(router);
               }
               const store =
                 app.config.globalProperties.$pinia || app.config.globalProperties.$store;
               if (store) info.store = true;
               return info;
             }
-          }
-
-          // Vue 2: walk elements to find __vue__
-          const allEls = document.querySelectorAll('*');
-          for (const el of allEls) {
             if (el.__vue__) {
               const vm = el.__vue__.$root || el.__vue__;
               info.detected = true;
@@ -2330,10 +2406,10 @@
               const router = vm.$router;
               if (router) {
                 info.router = true;
-                info.routes = router.options ? router.options.routes || [] : [];
+                info.routes = getVue2Routes(router);
               }
               if (vm.$store) info.store = true;
-              break;
+              return info;
             }
           }
 
@@ -2379,7 +2455,6 @@
 
       resultsEl.innerHTML = html;
       lastVueResult = JSON.stringify(data, null, 2);
-      permLastRoutes = data.routes || [];
     } catch (e) {
       statusEl.textContent = '检测出错';
       resultsEl.innerHTML = '<div class="empty-state">' + utils.escapeHtml(e.message) + '</div>';
@@ -2388,7 +2463,7 @@
 
   function renderRouteTree(routes, depth) {
     let html = '';
-    if (!routes || !Array.isArray(routes)) return html;
+    if (!routes || !Array.isArray(routes) || depth > 10) return html;
     routes.forEach(route => {
       html += '<div class="vue-route-item vue-depth-' + depth + '">';
       html += '<span class="vue-route-path">' + utils.escapeHtml(route.path || '/') + '</span>';
@@ -2421,6 +2496,22 @@
         target: { tabId: tab.id },
         world: 'MAIN',
         func: () => {
+          function safeSerialize(obj) {
+            try {
+              return JSON.parse(JSON.stringify(obj));
+            } catch (e) {
+              return null;
+            }
+          }
+          function getRoutes(router) {
+            if (!router) return null;
+            if (typeof router.getRoutes === 'function') {
+              return router.getRoutes().map(function (r) {
+                return { path: r.path, name: r.name || '', meta: safeSerialize(r.meta) || {} };
+              });
+            }
+            return router.options ? safeSerialize(router.options.routes) || null : null;
+          }
           const appEl =
             document.querySelector('#app') ||
             document.querySelector('[data-v-app]') ||
@@ -2429,14 +2520,15 @@
             document.querySelector('#application') ||
             document.querySelector('#main');
           if (appEl && appEl.__vue_app__) {
-            const router = appEl.__vue_app__.config.globalProperties.$router;
-            if (router) return router.options.routes || [];
+            var r = getRoutes(appEl.__vue_app__.config.globalProperties.$router);
+            if (r) return r;
           }
           const allEls = document.querySelectorAll('*');
           for (const el of allEls) {
             if (el.__vue__) {
               const vm = el.__vue__.$root || el.__vue__;
-              if (vm.$router && vm.$router.options) return vm.$router.options.routes || [];
+              var r2 = getRoutes(vm.$router);
+              if (r2) return r2;
             }
           }
           return null;
@@ -2526,7 +2618,6 @@
   }
 
   // ====== Vue Sub-tab Switching ======
-  let permLastRoutes = [];
 
   function switchVueSubTab(tab) {
     document.querySelectorAll('.vue-stab').forEach(function (b) {
@@ -2577,33 +2668,39 @@
       /\/api\/.*user.*info/i,
       /\/api\/.*auth/i,
       /\/api\/.*nav/i,
-      /\/menu/,
-      /\/permission/,
+      /\/menu(?:\/|$|[?#])/i,
+      /\/permission(?:\/|$|[?#])/i,
       /\/getMenu/i,
       /\/getUserInfo/i,
       /\/getRouters/i,
-      /\/getRoutes/,
+      /\/getRoutes(?:\/|$|[?#])/i,
     ];
 
     function classifyResponse(data, url) {
-      var str = typeof data === 'string' ? data : JSON.stringify(data);
       var urlLower = url.toLowerCase();
       try {
         var json = typeof data === 'string' ? JSON.parse(data) : data;
         if (json && typeof json === 'object' && !Array.isArray(json)) {
           var keys = Object.keys(json);
           for (var k = 0; k < keys.length; k++) {
-            if (/^(isadmin|admin|is_superuser)$/i.test(keys[k]))
+            if (
+              /^(isadmin|admin|is_superuser|isvip|vip|role|isSuperAdmin|userType|user_type|level|grade)$/i.test(
+                keys[k]
+              )
+            )
               return { type: 'role', subtype: 'special_zero' };
+          }
+          for (var k = 0; k < keys.length; k++) {
+            for (var i = 0; i < MENU_KEYWORDS.length; i++) {
+              if (keys[k].toLowerCase() === MENU_KEYWORDS[i].toLowerCase())
+                return { type: 'menu', subtype: null };
+            }
           }
         }
       } catch (e) {}
       if (/permission/i.test(urlLower)) return { type: 'permission', subtype: null };
       if (/role/i.test(urlLower)) return { type: 'role', subtype: null };
       if (/menu/i.test(urlLower)) return { type: 'menu', subtype: null };
-      for (var i = 0; i < MENU_KEYWORDS.length; i++) {
-        if (str.indexOf(MENU_KEYWORDS[i]) !== -1) return { type: 'menu', subtype: null };
-      }
       return { type: 'other', subtype: null };
     }
 
@@ -2627,36 +2724,69 @@
     var originalFetch = window.fetch;
     window.fetch = function () {
       var args = arguments;
-      return originalFetch.apply(this, args).then(function (response) {
-        if (window.__PERM_INTERCEPTOR__ && window.__PERM_INTERCEPTOR__.active) {
-          var url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
-          var isMenuApi = URL_MENU_PATTERNS.some(function (p) {
-            return p.test(url);
-          });
-          if (isMenuApi) {
-            var cloned = response.clone();
-            cloned.text().then(function (text) {
-              try {
-                var parsed = parseBody(text);
-                var info = classifyResponse(parsed, url);
-                if (info.type !== 'other') {
-                  captured.push({
-                    url: url,
-                    type: info.type,
-                    subtype: info.subtype,
-                    data: parsed,
-                    rawText: text,
-                    size: text.length,
-                    timestamp: Date.now(),
-                    method: 'fetch',
-                  });
-                }
-              } catch (e) {}
+      return originalFetch
+        .apply(this, args)
+        .then(function (response) {
+          if (window.__PERM_INTERCEPTOR__ && window.__PERM_INTERCEPTOR__.active) {
+            var url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+            var isMenuApi = URL_MENU_PATTERNS.some(function (p) {
+              return p.test(url);
             });
+            if (isMenuApi) {
+              var override = window.__PERM_INTERCEPTOR__._overrideData;
+              if (override !== null && override !== undefined) {
+                var overrideBody = JSON.stringify(override);
+                try {
+                  var info = classifyResponse(override, url);
+                  if (info.type !== 'other') {
+                    captured.push({
+                      url: url,
+                      type: info.type,
+                      subtype: info.subtype,
+                      data: override,
+                      rawText: overrideBody,
+                      size: overrideBody.length,
+                      timestamp: Date.now(),
+                      method: 'fetch-override',
+                    });
+                  }
+                } catch (e) {}
+                return new Response(overrideBody, {
+                  status: response.status,
+                  statusText: response.statusText,
+                  headers: response.headers,
+                });
+              } else {
+                var cloned = response.clone();
+                cloned
+                  .text()
+                  .then(function (text) {
+                    try {
+                      var parsed = parseBody(text);
+                      var info = classifyResponse(parsed, url);
+                      if (info.type !== 'other') {
+                        captured.push({
+                          url: url,
+                          type: info.type,
+                          subtype: info.subtype,
+                          data: parsed,
+                          rawText: text,
+                          size: text.length,
+                          timestamp: Date.now(),
+                          method: 'fetch',
+                        });
+                      }
+                    } catch (e) {}
+                  })
+                  .catch(function () {});
+              }
+            }
           }
-        }
-        return response;
-      });
+          return response;
+        })
+        .catch(function (err) {
+          throw err;
+        });
     };
 
     var origOpen = XMLHttpRequest.prototype.open;
@@ -2673,25 +2803,47 @@
           return p.test(url);
         });
         if (isMenuApi) {
-          this.addEventListener('load', function () {
-            try {
-              var text = self.responseText;
-              if (!text) return;
-              var parsed = parseBody(text);
-              var info = classifyResponse(parsed, url);
-              if (info.type !== 'other') {
-                captured.push({
-                  url: url,
-                  type: info.type,
-                  subtype: info.subtype,
-                  data: parsed,
-                  rawText: text,
-                  size: text.length,
-                  timestamp: Date.now(),
-                  method: 'xhr',
-                });
+          this.addEventListener('readystatechange', function () {
+            if (self.readyState === 4) {
+              var override = window.__PERM_INTERCEPTOR__._overrideData;
+              var originalText = self.responseText;
+              if (override !== null && override !== undefined) {
+                try {
+                  var overrideBody = JSON.stringify(override);
+                  Object.defineProperty(self, 'responseText', {
+                    value: overrideBody,
+                    writable: true,
+                    configurable: true,
+                  });
+                  Object.defineProperty(self, 'response', {
+                    value: overrideBody,
+                    writable: true,
+                    configurable: true,
+                  });
+                } catch (e) {}
               }
-            } catch (e) {}
+              try {
+                var text =
+                  override !== null && override !== undefined
+                    ? JSON.stringify(override)
+                    : originalText;
+                if (!text) return;
+                var parsed = parseBody(text);
+                var info = classifyResponse(parsed, url);
+                if (info.type !== 'other') {
+                  captured.push({
+                    url: url,
+                    type: info.type,
+                    subtype: info.subtype,
+                    data: parsed,
+                    rawText: text,
+                    size: text.length,
+                    timestamp: Date.now(),
+                    method: override != null ? 'xhr-override' : 'xhr',
+                  });
+                }
+              } catch (e) {}
+            }
           });
         }
       }
@@ -2728,6 +2880,10 @@
     var statusEl = utils.get('perm-status');
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) {
+        if (statusEl) statusEl.textContent = '无法获取当前标签页';
+        return;
+      }
       var results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: 'MAIN',
@@ -2949,6 +3105,7 @@
     stopPermAutoRefresh();
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return;
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: 'MAIN',
@@ -2975,6 +3132,7 @@
   async function refreshPermCaptured() {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return;
       var results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: 'MAIN',
@@ -3021,8 +3179,11 @@
     for (var i = 0; i < filtered.length; i++) {
       var item = filtered[i];
       var realIdx = permCapturedData.indexOf(item);
+      var cls = classifyPermType(item.data);
+      var clsLabel = cls.label.split(' - ')[0];
       html += '<div class="perm-item" data-idx="' + realIdx + '">';
       html += '<span class="perm-item-type type-' + item.type + '">' + item.type + '</span>';
+      html += '<span class="perm-item-cls ' + cls.cssClass + '">' + clsLabel + '</span>';
       html += '<span class="perm-item-url" title="' + utils.escapeHtml(item.url) + '">';
       html += utils.escapeHtml(item.url) + '</span>';
       html += '<span class="perm-item-size">' + (item.size / 1024).toFixed(1) + 'KB</span>';
@@ -3054,26 +3215,74 @@
     classifyEl.textContent = classification.label;
     classifyEl.className = 'perm-classify ' + classification.cssClass;
 
+    if (typeof showPermSuggestions === 'function') showPermSuggestions(classification);
+
     utils.get('perm-json-editor').value = JSON.stringify(item.data, null, 2);
   }
 
   function classifyPermType(data) {
-    var str = JSON.stringify(data);
     if (data && typeof data === 'object' && !Array.isArray(data)) {
       var keys = Object.keys(data);
       for (var k = 0; k < keys.length; k++) {
-        if (/^(isadmin|admin|is_superuser)$/i.test(keys[k])) {
+        if (
+          /^(isadmin|admin|is_superuser|isvip|vip|role|isSuperAdmin|userType|user_type|level|grade)$/i.test(
+            keys[k]
+          )
+        ) {
           var val = data[keys[k]];
-          if (val === 0 || val === false) {
+          if (val === 0 || val === false || val === '0' || val === '' || val === null) {
             return {
-              label: '特殊0开放 - ' + keys[k] + '=' + val + '，可修改为1/true',
+              label: '特殊0开放 - ' + keys[k] + '=' + val + '，可修改为1/true/admin',
               cssClass: 'perm-classify-danger',
+              type: 'special-zero',
             };
           }
           return {
             label: '特殊0开放 - 检测到角色控制字段',
             cssClass: 'perm-classify-warning',
+            type: 'special-zero',
           };
+        }
+      }
+      for (var kt = 0; kt < keys.length; kt++) {
+        if (/^type$/i.test(keys[kt])) {
+          var tval = data[keys[kt]];
+          var roleVals = /^(admin|superadmin|user|vip|normal|guest|member|manager)$/i;
+          if (
+            (typeof tval === 'string' && roleVals.test(tval)) ||
+            (typeof tval === 'number' && tval >= 0 && tval <= 10)
+          ) {
+            if (tval === 0 || /^(user|normal|guest)$/i.test(String(tval))) {
+              return {
+                label: '特殊0开放 - ' + keys[kt] + '=' + tval + '，可修改为admin/1',
+                cssClass: 'perm-classify-danger',
+                type: 'special-zero',
+              };
+            }
+            return {
+              label: '特殊0开放 - 检测到角色控制字段 type=' + tval,
+              cssClass: 'perm-classify-warning',
+              type: 'special-zero',
+            };
+          }
+        }
+      }
+      for (var k2 = 0; k2 < keys.length; k2++) {
+        if (/menuIds|menu_ids|menuIdList|permissionIds|permIds/i.test(keys[k2])) {
+          var arr = data[keys[k2]];
+          if (
+            Array.isArray(arr) &&
+            arr.length > 0 &&
+            arr.every(function (v) {
+              return typeof v === 'number';
+            })
+          ) {
+            return {
+              label: '菜单ID限制 - ' + keys[k2] + ': [' + arr.join(',') + ']，可展开范围',
+              cssClass: 'perm-classify-info',
+              type: 'menuid-limit',
+            };
+          }
         }
       }
     }
@@ -3103,19 +3312,26 @@
           return {
             label: '全开放 - 所有菜单已返回，部分标记为隐藏 (isshow/display)',
             cssClass: 'perm-classify-success',
+            type: 'full-open',
           };
         }
         return {
           label: '全开放 - 所有菜单已返回且均已显示',
           cssClass: 'perm-classify-success',
+          type: 'full-open',
         };
       }
-      return { label: '半开放 - 返回了部分菜单列表', cssClass: 'perm-classify-info' };
+      return {
+        label: '半开放 - 返回了部分菜单列表',
+        cssClass: 'perm-classify-info',
+        type: 'semi-open',
+      };
     }
     if (Array.isArray(data) && data.length === 0) {
       return {
         label: '0开放 - 菜单返回为空，需要搜索JS源码',
         cssClass: 'perm-classify-danger',
+        type: 'zero-open',
       };
     }
     if (data && typeof data === 'object' && !Array.isArray(data)) {
@@ -3124,10 +3340,77 @@
         return {
           label: '0开放 - 菜单返回为空，需要搜索JS源码',
           cssClass: 'perm-classify-danger',
+          type: 'zero-open',
         };
       }
     }
-    return { label: '未知类型 - 请手动检查数据结构', cssClass: 'perm-classify-unknown' };
+    return {
+      label: '未知类型 - 请手动检查数据结构',
+      cssClass: 'perm-classify-unknown',
+      type: 'unknown',
+    };
+  }
+
+  function showPermSuggestions(classification) {
+    var sugEl = utils.get('perm-suggestions');
+    if (!sugEl) return;
+    var cType = classification.type || 'unknown';
+    var html = '<span class="perm-suggestion-hint">建议操作：</span>';
+
+    // Reset highlight on all action buttons
+    var actionBtns = document.querySelectorAll('.perm-detail-actions .btn');
+    actionBtns.forEach(function (b) {
+      b.classList.remove('btn-suggested');
+    });
+
+    if (cType === 'full-open') {
+      // Highlight existing "全部显示" button instead of duplicating
+      var openAllBtn = utils.get('perm-open-all');
+      if (openAllBtn) openAllBtn.classList.add('btn-suggested');
+      html += '<span class="perm-suggestion-hint">点击下方高亮的「全部显示」按钮</span>';
+    } else if (cType === 'semi-open') {
+      html +=
+        '<button class="btn btn-sm btn-primary" id="sug-compare-inject">对比并补全缺失菜单</button>';
+    } else if (cType === 'zero-open') {
+      html +=
+        '<button class="btn btn-sm btn-primary" id="sug-auto-search">自动搜索JS菜单定义</button>';
+    } else if (cType === 'special-zero') {
+      // Highlight existing "提权至管理员" button
+      var adminBtn = utils.get('perm-change-admin');
+      if (adminBtn) adminBtn.classList.add('btn-suggested');
+      html += '<span class="perm-suggestion-hint">点击下方高亮的「提权至管理员」按钮</span>';
+    } else if (cType === 'menuid-limit') {
+      // Highlight existing "展开menuIds" button
+      var expandBtn = utils.get('perm-expand-ids');
+      if (expandBtn) expandBtn.classList.add('btn-suggested');
+      html += '<span class="perm-suggestion-hint">点击下方高亮的「展开menuIds」按钮</span>';
+    } else {
+      sugEl.innerHTML = '';
+      sugEl.classList.add('hidden');
+      return;
+    }
+    sugEl.innerHTML = html;
+    sugEl.classList.remove('hidden');
+
+    var sugCompareInject = utils.get('sug-compare-inject');
+    if (sugCompareInject)
+      sugCompareInject.addEventListener('click', async function () {
+        switchVueSubTab('compare');
+        await compareRoutesAndMenu();
+        if (lastCompareHiddenRoutes.length > 0) {
+          switchVueSubTab('perm');
+          if (permSelectedIndex < 0 && permCapturedData.length > 0) {
+            permSelectedIndex = 0;
+            showPermDetail(0);
+          }
+          autoInjectHiddenRoutes();
+        } else {
+          utils.showToast('路由对比未发现隐藏路由', 'info');
+          switchVueSubTab('perm');
+        }
+      });
+    var sugAutoSearch = utils.get('sug-auto-search');
+    if (sugAutoSearch) sugAutoSearch.addEventListener('click', autoSearchForZeroOpen);
   }
 
   function transformShowAll(data) {
@@ -3180,10 +3463,25 @@
     var c = {};
     for (var k in data) {
       if (!data.hasOwnProperty(k)) continue;
-      if (/^(isadmin|admin|is_superuser)$/i.test(k)) {
+      if (
+        /^(isadmin|admin|is_superuser|isvip|vip|role|isSuperAdmin|userType|user_type|level|grade)$/i.test(
+          k
+        )
+      ) {
         c[k] = typeof data[k] === 'string' ? '1' : 1;
       } else if (k === 'roleId' || k === 'role_id') {
         c[k] = 1;
+      } else if (/^type$/i.test(k)) {
+        var tv = data[k];
+        var roleVals = /^(admin|superadmin|user|vip|normal|guest|member|manager)$/i;
+        if (
+          (typeof tv === 'string' && roleVals.test(tv)) ||
+          (typeof tv === 'number' && tv >= 0 && tv <= 10)
+        ) {
+          c[k] = typeof tv === 'string' ? 'admin' : 1;
+        } else {
+          c[k] = tv;
+        }
       } else if (typeof data[k] === 'object') {
         c[k] = transformAdmin(data[k]);
       } else {
@@ -3199,7 +3497,51 @@
       var data = JSON.parse(editor.value);
       data = transformAdmin(data);
       editor.value = JSON.stringify(data, null, 2);
-      utils.showToast('已修改管理员/角色字段', 'success');
+      utils.showToast('已提权：角色/管理员字段已修改', 'success');
+    } catch (e) {
+      utils.showToast('JSON 解析失败', 'error');
+    }
+  }
+
+  function expandMenuIds(data) {
+    if (typeof data !== 'object' || data === null) return data;
+    if (Array.isArray(data)) return data.map(expandMenuIds);
+    var c = {};
+    for (var k in data) {
+      if (!data.hasOwnProperty(k)) continue;
+      if (/menuIds|menu_ids|menuIdList|permissionIds|permIds/i.test(k) && Array.isArray(data[k])) {
+        var allNum = data[k].every(function (v) {
+          return typeof v === 'number';
+        });
+        if (allNum && data[k].length > 0) {
+          var max = Math.max.apply(null, data[k]);
+          var end = Math.max(max, 50);
+          var expanded = [];
+          for (var i = 1; i <= end; i++) expanded.push(i);
+          c[k] = expanded;
+          if (data.hasOwnProperty('total') || data.hasOwnProperty('Total')) {
+            var tKey = data.hasOwnProperty('total') ? 'total' : 'Total';
+            c[tKey] = expanded.length;
+          }
+          continue;
+        }
+      }
+      if (typeof data[k] === 'object') {
+        c[k] = expandMenuIds(data[k]);
+      } else {
+        c[k] = data[k];
+      }
+    }
+    return c;
+  }
+
+  function permExpandMenuIds() {
+    var editor = utils.get('perm-json-editor');
+    try {
+      var data = JSON.parse(editor.value);
+      data = expandMenuIds(data);
+      editor.value = JSON.stringify(data, null, 2);
+      utils.showToast('已展开菜单ID范围', 'success');
     } catch (e) {
       utils.showToast('JSON 解析失败', 'error');
     }
@@ -3217,13 +3559,46 @@
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      await chrome.scripting.executeScript({
+      if (!tab?.id) {
+        utils.showToast('无法获取当前标签页', 'error');
+        return;
+      }
+      var results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: 'MAIN',
         func: function (overrideData) {
           if (!window.__PERM_INTERCEPTOR__) return false;
           window.__PERM_INTERCEPTOR__.setOverride(overrideData);
-          // Also try to update Vue/Pinia reactive state
+
+          function patchDeepState(state, override) {
+            if (!state || typeof state !== 'object' || Array.isArray(state)) return false;
+            for (var key in state) {
+              if (!state.hasOwnProperty(key)) continue;
+              if (!/menu|permission|route|nav|sidebar/i.test(key)) continue;
+              var val = state[key];
+              if (Array.isArray(val)) {
+                if (typeof state.__ob__ === 'object' && state.__ob__) {
+                  try {
+                    state[key].splice(0, state[key].length);
+                  } catch (e) {}
+                  try {
+                    override.forEach(function (item) {
+                      state[key].push(item);
+                    });
+                  } catch (e) {}
+                } else {
+                  state[key] = override;
+                }
+                return true;
+              }
+              if (val && typeof val === 'object' && !Array.isArray(val)) {
+                if (patchDeepState(val, override)) return true;
+              }
+            }
+            return false;
+          }
+
+          // Vue 3 + Pinia
           var appEl =
             document.querySelector('#app') ||
             document.querySelector('[data-v-app]') ||
@@ -3234,10 +3609,13 @@
           if (appEl && appEl.__vue_app__) {
             var pinia = appEl.__vue_app__.config.globalProperties.$pinia;
             if (pinia && pinia._s) {
-              pinia._s.forEach(function (store, id) {
+              pinia._s.forEach(function (store) {
                 var state = store.$state;
                 for (var key in state) {
-                  if (/menu|permission|route|nav/i.test(key) && Array.isArray(state[key])) {
+                  if (!state.hasOwnProperty(key)) continue;
+                  if (!/menu|permission|route|nav|sidebar/i.test(key)) continue;
+                  var val = state[key];
+                  if (Array.isArray(val)) {
                     if (store.$patch) {
                       var patch = {};
                       patch[key] = overrideData;
@@ -3245,16 +3623,88 @@
                     } else {
                       state[key] = overrideData;
                     }
+                  } else if (val && typeof val === 'object') {
+                    patchDeepState(val, overrideData);
                   }
                 }
               });
             }
           }
-          return true;
+
+          // Vue 2 + Vuex
+          var allEls = document.querySelectorAll('*');
+          for (var i = 0; i < allEls.length; i++) {
+            if (allEls[i].__vue__) {
+              var vm = allEls[i].__vue__.$root || allEls[i].__vue__;
+              if (vm.$store && vm.$store.state) {
+                patchDeepState(vm.$store.state, overrideData);
+              }
+              break;
+            }
+          }
+
+          // Patch localStorage and sessionStorage menu caches
+          var storagePatchCount = 0;
+          var storagePrefixes = ['menu', 'permission', 'routes', 'nav', 'sidebar', 'role', 'auth'];
+          var storageTargets = [localStorage, sessionStorage];
+          for (var st = 0; st < storageTargets.length; st++) {
+            var storage = storageTargets[st];
+            try {
+              for (var si = 0; si < storage.length; si++) {
+                var sKey = storage.key(si);
+                if (!sKey) continue;
+                var sKeyLower = sKey.toLowerCase();
+                var matched = false;
+                for (var sp = 0; sp < storagePrefixes.length; sp++) {
+                  if (sKeyLower.indexOf(storagePrefixes[sp]) !== -1) {
+                    matched = true;
+                    break;
+                  }
+                }
+                if (!matched) continue;
+                try {
+                  var sVal = storage.getItem(sKey);
+                  var sParsed = JSON.parse(sVal);
+                  if (Array.isArray(sParsed)) {
+                    storage.setItem(sKey, JSON.stringify(overrideData));
+                    storagePatchCount++;
+                  } else if (sParsed && typeof sParsed === 'object' && !Array.isArray(sParsed)) {
+                    var patched = false;
+                    for (var sk in sParsed) {
+                      if (!sParsed.hasOwnProperty(sk)) continue;
+                      if (
+                        /menu|permission|route|nav|sidebar/i.test(sk) &&
+                        Array.isArray(sParsed[sk])
+                      ) {
+                        sParsed[sk] = overrideData;
+                        patched = true;
+                      }
+                    }
+                    if (patched) {
+                      storage.setItem(sKey, JSON.stringify(sParsed));
+                      storagePatchCount++;
+                    }
+                  }
+                } catch (e) {}
+              }
+            } catch (e) {}
+          }
+
+          return { success: true, storagePatchCount: storagePatchCount };
         },
         args: [modifiedData],
       });
-      utils.showToast('已应用修改，请刷新页面或重新操作触发', 'success');
+      var overrideResult = results && results[0] && results[0].result;
+      if (!overrideResult || !overrideResult.success) {
+        utils.showToast('拦截器未注入，请先启动权限拦截', 'error');
+        return;
+      }
+      var msg = '已应用修改（拦截器 + Vue存储';
+      if (overrideResult.storagePatchCount > 0) {
+        msg += ' + ' + overrideResult.storagePatchCount + '个本地缓存';
+      }
+      msg += '）→ 请在页面上点击菜单或刷新页面，检查是否出现新菜单项';
+      utils.showToast(msg, 'success', 5000);
     } catch (e) {
       utils.showToast('应用失败: ' + e.message, 'error');
     }
@@ -3269,6 +3719,7 @@
       return;
     }
     if (statusEl) statusEl.textContent = '搜索中...';
+    lastJsMatchContexts = [];
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -3370,6 +3821,7 @@
       var html = '';
       for (var i = 0; i < matchList.length; i++) {
         var m = matchList[i];
+        lastJsMatchContexts.push(m.context);
         var kwRegex = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         var escaped = utils.escapeHtml(m.context);
         var highlighted = escaped.replace(new RegExp('(' + kwRegex + ')', 'gi'), '<mark>$1</mark>');
@@ -3390,21 +3842,179 @@
     }
   }
 
+  function extractPathsFromJsResults() {
+    var found = new Set();
+    var pathRegex = /(?:path|url|href|route|component)\s*[:=]\s*['"`](\/[a-zA-Z0-9_\-\/]+)['"`]/gi;
+    var genericRegex = /['"`](\/[a-zA-Z0-9_\-]+(?:\/[a-zA-Z0-9_\-]+)+)['"`]/g;
+    for (var i = 0; i < lastJsMatchContexts.length; i++) {
+      var ctx = lastJsMatchContexts[i];
+      var m;
+      pathRegex.lastIndex = 0;
+      while ((m = pathRegex.exec(ctx)) !== null) {
+        var p = m[1];
+        if (p.indexOf('/api/') === -1 && p.length > 2) found.add(p);
+      }
+      genericRegex.lastIndex = 0;
+      while ((m = genericRegex.exec(ctx)) !== null) {
+        var p2 = m[1];
+        if (
+          p2.indexOf('/api/') === -1 &&
+          p2.length > 3 &&
+          !/^\.(js|css|png|jpg|svg|ico|woff)/.test(p2)
+        )
+          found.add(p2);
+      }
+    }
+    jsSearchFoundPaths = Array.from(found);
+    return jsSearchFoundPaths;
+  }
+
+  function autoFillFromJsPaths() {
+    if (jsSearchFoundPaths.length === 0) {
+      extractPathsFromJsResults();
+    }
+    if (jsSearchFoundPaths.length === 0) {
+      utils.showToast('未找到JS路径，请先搜索关键词', 'warning');
+      return;
+    }
+    var editor = utils.get('perm-json-editor');
+    if (!editor) return;
+    var text = editor.value;
+    if (!text) {
+      utils.showToast('请先选择一条捕获数据', 'warning');
+      return;
+    }
+    try {
+      var parsed = JSON.parse(text);
+    } catch (e) {
+      utils.showToast('JSON 格式错误', 'error');
+      return;
+    }
+    var template = getTemplateFromMenuData(parsed);
+    var targetArray = Array.isArray(parsed) ? parsed : findMenuArray(parsed);
+    if (!targetArray) {
+      utils.showToast('无法定位菜单数组，请检查 JSON 结构', 'warning');
+      return;
+    }
+    var menuPaths = new Set();
+    extractMenuPaths(parsed, menuPaths);
+    var injected = 0;
+    for (var p = 0; p < jsSearchFoundPaths.length; p++) {
+      var routePath = jsSearchFoundPaths[p];
+      if (!menuPaths.has(routePath)) {
+        var newItem = constructMenuItemFromRoute({ path: routePath, name: routePath }, template);
+        targetArray.push(newItem);
+        menuPaths.add(routePath);
+        injected++;
+      }
+    }
+    editor.value = JSON.stringify(parsed, null, 2);
+    utils.showToast('已注入 ' + injected + ' 条JS路径到菜单数据', 'success');
+  }
+
+  function extractKeywordsFromCapturedUrls() {
+    var keywords = [];
+    var seen = {};
+    if (!permCapturedData || permCapturedData.length === 0) return keywords;
+
+    for (var i = 0; i < permCapturedData.length; i++) {
+      var item = permCapturedData[i];
+      if (!item || !item.url) continue;
+      var url = item.url;
+      var segments = url.split(/[\/?#]/);
+      var processed = 0;
+      for (var s = segments.length - 1; s >= 0 && processed < 2; s--) {
+        var seg = segments[s].trim();
+        if (!seg || seg.length < 3) continue;
+        if (
+          /^(api|v1|v2|v3|v4|index|list|detail|page|id|json|html|js|css|get|post|put|delete)$/i.test(
+            seg
+          )
+        )
+          continue;
+        if (/^\d+$/.test(seg)) continue;
+
+        var words = seg.replace(/([a-z])([A-Z])/g, '$1 $2').split(/[\s_\-]+/);
+        for (var w = 0; w < words.length; w++) {
+          var word = words[w];
+          if (word.length < 4) continue;
+          if (!seen[word.toLowerCase()]) {
+            seen[word.toLowerCase()] = true;
+            keywords.push(word);
+          }
+        }
+        if (!seen[seg.toLowerCase()]) {
+          seen[seg.toLowerCase()] = true;
+          keywords.push(seg);
+        }
+        processed++;
+      }
+    }
+    return keywords.slice(0, 8);
+  }
+
+  async function autoSearchForZeroOpen() {
+    lastJsMatchContexts = [];
+    var allContexts = [];
+    var classifyEl = utils.get('perm-classify');
+
+    if (classifyEl) classifyEl.textContent = '正在搜索: menu...';
+    await searchJsKeywords('menu');
+    allContexts = allContexts.concat(lastJsMatchContexts);
+
+    if (classifyEl) classifyEl.textContent = '正在搜索: routes... (' + allContexts.length + ' 条)';
+    await searchJsKeywords('routes');
+    allContexts = allContexts.concat(lastJsMatchContexts);
+
+    var urlKeywords = extractKeywordsFromCapturedUrls();
+    for (var uk = 0; uk < urlKeywords.length; uk++) {
+      if (allContexts.length >= 50) break;
+      var kw = urlKeywords[uk];
+      if (/^(menu|routes|route|permission)$/i.test(kw)) continue;
+      if (classifyEl)
+        classifyEl.textContent = '正在搜索: ' + kw + '... (' + allContexts.length + ' 条)';
+      lastJsMatchContexts = [];
+      await searchJsKeywords(kw);
+      allContexts = allContexts.concat(lastJsMatchContexts);
+    }
+
+    if (classifyEl) classifyEl.textContent = '搜索完成，共 ' + allContexts.length + ' 条结果';
+
+    lastJsMatchContexts = allContexts;
+    extractPathsFromJsResults();
+    if (jsSearchFoundPaths.length > 0) {
+      utils.showToast(
+        '找到 ' + jsSearchFoundPaths.length + ' 条路径，可点击「应用修改」注入',
+        'success'
+      );
+      switchVueSubTab('perm');
+      var editor = utils.get('perm-json-editor');
+      if (editor && editor.value) {
+        autoFillFromJsPaths();
+      }
+    } else {
+      utils.showToast('未从JS中提取到路径，请手动搜索关键词', 'warning');
+    }
+  }
+
   // ====== Route vs Menu Comparison ======
   function extractMenuPaths(data, paths) {
     if (typeof data !== 'object' || data === null) return;
-    var pathKeys = ['path', 'url', 'href', 'component', 'menuUrl', 'menuPath', 'link', 'index'];
+    var pathKeys = ['path', 'url', 'href', 'menuUrl', 'menuPath', 'link', 'index'];
     if (Array.isArray(data)) {
       for (var i = 0; i < data.length; i++) extractMenuPaths(data[i], paths);
       return;
     }
     for (var k = 0; k < pathKeys.length; k++) {
       var val = data[pathKeys[k]];
-      if (val && typeof val === 'string' && /^\//.test(val)) paths.add(val);
+      if (val && typeof val === 'string' && (val === '/' || /^\/[a-zA-Z0-9_\-]/.test(val)))
+        paths.add(val);
     }
     if (data.children) extractMenuPaths(data.children, paths);
     if (data.subList) extractMenuPaths(data.subList, paths);
     if (data.child) extractMenuPaths(data.child, paths);
+    if (data.childList) extractMenuPaths(data.childList, paths);
+    if (data.items) extractMenuPaths(data.items, paths);
   }
 
   function isPathInMenu(routePath, menuPaths) {
@@ -3422,6 +4032,134 @@
     return false;
   }
 
+  function findMenuArray(data, depth) {
+    if (depth === undefined) depth = 0;
+    if (depth > 3 || data === null || data === undefined) return null;
+    if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && data[0] !== null) {
+      return data;
+    }
+    if (typeof data === 'object' && !Array.isArray(data)) {
+      var keys = Object.keys(data);
+      for (var i = 0; i < keys.length; i++) {
+        if (
+          Array.isArray(data[keys[i]]) &&
+          data[keys[i]].length > 0 &&
+          typeof data[keys[i]][0] === 'object' &&
+          data[keys[i]][0] !== null
+        ) {
+          return data[keys[i]];
+        }
+      }
+      for (var j = 0; j < keys.length; j++) {
+        if (
+          typeof data[keys[j]] === 'object' &&
+          data[keys[j]] !== null &&
+          !Array.isArray(data[keys[j]])
+        ) {
+          var found = findMenuArray(data[keys[j]], depth + 1);
+          if (found) return found;
+        }
+      }
+    }
+    return null;
+  }
+
+  function getTemplateFromMenuData(data) {
+    var arr = findMenuArray(data);
+    if (!arr || arr.length === 0) return null;
+    var item = {};
+    for (var k in arr[0]) {
+      if (arr[0].hasOwnProperty(k)) item[k] = arr[0][k];
+    }
+    return item;
+  }
+
+  function constructMenuItemFromRoute(route, templateItem) {
+    if (!templateItem || typeof templateItem !== 'object') {
+      return {
+        path: route.path,
+        name: route.name || route.path,
+        title: route.name || route.path,
+        isshow: '1',
+        status: 1,
+      };
+    }
+    var item = {};
+    for (var k in templateItem) {
+      if (!templateItem.hasOwnProperty(k)) continue;
+      if (k === 'path' || k === 'url' || k === 'href' || k === 'menuUrl' || k === 'menuPath') {
+        item[k] = route.path;
+      } else if (k === 'name' || k === 'menuName') {
+        item[k] = route.name || route.path;
+      } else if (k === 'title' || k === 'label' || k === 'text') {
+        item[k] = route.name || route.path;
+      } else if (k === 'id' || k === 'menuId' || k === 'key') {
+        item[k] = Math.floor(Math.random() * 90000) + 10000;
+      } else if (k === 'isshow' || k === 'isShow') {
+        item[k] = '1';
+      } else if (k === 'hidden') {
+        item[k] = false;
+      } else if (k === 'display' || k === 'visible') {
+        item[k] = true;
+      } else if (k === 'status') {
+        item[k] = 1;
+      } else if (
+        k === 'children' ||
+        k === 'child' ||
+        k === 'subList' ||
+        k === 'childList' ||
+        k === 'items'
+      ) {
+        item[k] = [];
+      } else if (k === 'meta' || k === 'component') {
+        continue;
+      } else {
+        item[k] = templateItem[k];
+      }
+    }
+    if (!item.path) item.path = route.path;
+    return item;
+  }
+
+  function autoInjectHiddenRoutes() {
+    var editor = utils.get('perm-json-editor');
+    if (!editor) return;
+    var text = editor.value;
+    if (!text) {
+      utils.showToast('请先选择一条捕获数据', 'warning');
+      return;
+    }
+    if (lastCompareHiddenRoutes.length === 0) {
+      utils.showToast('无缓存的路由对比结果，请先执行「路由对比」', 'warning');
+      return;
+    }
+    try {
+      var parsed = JSON.parse(text);
+    } catch (e) {
+      utils.showToast('JSON 格式错误', 'error');
+      return;
+    }
+    var template = getTemplateFromMenuData(parsed);
+    var targetArray = Array.isArray(parsed) ? parsed : findMenuArray(parsed);
+    if (!targetArray) {
+      utils.showToast('无法定位菜单数组，请检查 JSON 结构', 'warning');
+      return;
+    }
+    var menuPaths = new Set();
+    extractMenuPaths(parsed, menuPaths);
+    var injected = 0;
+    for (var h = 0; h < lastCompareHiddenRoutes.length; h++) {
+      var route = lastCompareHiddenRoutes[h];
+      if (!isPathInMenu(route.path, menuPaths)) {
+        var newItem = constructMenuItemFromRoute(route, template);
+        targetArray.push(newItem);
+        injected++;
+      }
+    }
+    editor.value = JSON.stringify(parsed, null, 2);
+    utils.showToast('已注入 ' + injected + ' 条缺失路由到菜单数据', 'success');
+  }
+
   async function compareRoutesAndMenu() {
     var statusEl = utils.get('compare-status');
     var resultsEl = utils.get('compare-results');
@@ -3429,11 +4167,16 @@
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) {
+        if (statusEl) statusEl.textContent = '无法获取当前标签页';
+        return;
+      }
       var routeResults = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: 'MAIN',
         func: function () {
           var routes = [];
+          var seen = {};
           function extract(rts, prefix) {
             rts.forEach(function (r) {
               var childPath = r.path || '/';
@@ -3445,9 +4188,27 @@
               } else {
                 path = prefix + '/' + childPath;
               }
-              if (r.path && r.path !== '*') routes.push({ path: path, name: r.name || '' });
+              if (r.path && r.path !== '*' && !seen[path]) {
+                seen[path] = true;
+                routes.push({ path: path, name: r.name || '' });
+              }
               if (r.children) extract(r.children, path === '/' ? '/' : path);
             });
+          }
+          function getAndExtract(router) {
+            if (!router) return;
+            if (typeof router.getRoutes === 'function') {
+              var flat = router.getRoutes();
+              for (var i = 0; i < flat.length; i++) {
+                var p = flat[i].path;
+                if (p && p !== '*' && !seen[p]) {
+                  seen[p] = true;
+                  routes.push({ path: p, name: flat[i].name || '' });
+                }
+              }
+            } else if (router.options && router.options.routes) {
+              extract(router.options.routes, '');
+            }
           }
           var appEl =
             document.querySelector('#app') ||
@@ -3457,17 +4218,14 @@
             document.querySelector('#application') ||
             document.querySelector('#main');
           if (appEl && appEl.__vue_app__) {
-            var router = appEl.__vue_app__.config.globalProperties.$router;
-            if (router) extract(router.options.routes || [], '');
+            getAndExtract(appEl.__vue_app__.config.globalProperties.$router);
           } else {
             var els = document.querySelectorAll('*');
             for (var i = 0; i < els.length; i++) {
               if (els[i].__vue__) {
                 var vm = els[i].__vue__.$root || els[i].__vue__;
-                if (vm.$router && vm.$router.options) {
-                  extract(vm.$router.options.routes || [], '');
-                  break;
-                }
+                getAndExtract(vm.$router);
+                if (routes.length > 0) break;
               }
             }
           }
@@ -3505,6 +4263,7 @@
           hiddenRoutes.push(r);
         }
       }
+      lastCompareHiddenRoutes = hiddenRoutes.slice();
 
       var html = '';
       if (hiddenRoutes.length > 0) {
@@ -4253,6 +5012,22 @@
         }
         utils.copyText(val);
         utils.showToast('已复制', 'success');
+      });
+
+    const permExpandIdsBtn = utils.get('perm-expand-ids');
+    if (permExpandIdsBtn) permExpandIdsBtn.addEventListener('click', permExpandMenuIds);
+
+    const compareInjectBtn = utils.get('compare-inject-btn');
+    if (compareInjectBtn)
+      compareInjectBtn.addEventListener('click', () => {
+        switchVueSubTab('perm');
+        if (permSelectedIndex < 0 && permCapturedData.length > 0) {
+          permSelectedIndex = 0;
+          showPermDetail(0);
+        } else if (permSelectedIndex >= 0) {
+          showPermDetail(permSelectedIndex);
+        }
+        autoInjectHiddenRoutes();
       });
 
     // JS keyword search
