@@ -507,6 +507,31 @@
           <div class="compare-results" id="compare-results">
             <div class="empty-state">点击「开始对比」比较路由与权限菜单的差异</div>
           </div>
+          <div class="traverse-section" id="traverse-section">
+            <div class="traverse-header">自动遍历路由</div>
+            <div class="traverse-desc">自动逐个访问隐藏路由，配合 Burpsuite 抓包检测未授权访问</div>
+            <div class="traverse-controls">
+              <div class="traverse-delay-row">
+                <label>间隔</label>
+                <select id="traverse-delay" class="select-filter">
+                  <option value="2000">2 秒</option>
+                  <option value="3000" selected>3 秒</option>
+                  <option value="5000">5 秒</option>
+                  <option value="8000">8 秒</option>
+                </select>
+                <label class="traverse-scope-label">
+                  <input type="checkbox" id="traverse-hidden-only" checked>
+                  仅隐藏路由
+                </label>
+              </div>
+              <div class="traverse-btn-row">
+                <button class="btn btn-sm btn-primary" id="traverse-start-btn">开始遍历</button>
+                <button class="btn btn-sm btn-secondary" id="traverse-stop-btn" disabled>停止</button>
+                <span class="traverse-progress" id="traverse-progress"></span>
+              </div>
+            </div>
+            <div class="traverse-log" id="traverse-log"></div>
+          </div>
         </div>
       </div>
     </div>

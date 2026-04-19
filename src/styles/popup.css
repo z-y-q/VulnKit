@@ -1998,6 +1998,89 @@ body {
   margin-left: 6px;
 }
 
+/* Auto-traverse section */
+.traverse-section {
+  margin-top: 10px;
+  border-top: 1px solid #E0E0E0;
+  padding-top: 10px;
+}
+.traverse-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 2px;
+}
+.traverse-desc {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 8px;
+}
+.traverse-controls { display: flex; flex-direction: column; gap: 6px; }
+.traverse-delay-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #555;
+}
+.traverse-delay-row label { white-space: nowrap; }
+.traverse-delay-row .select-filter { width: 70px; }
+.traverse-scope-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  cursor: pointer;
+}
+.traverse-scope-label input[type="checkbox"] { margin: 0; }
+.traverse-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.traverse-progress {
+  font-size: 12px;
+  color: #2563eb;
+  font-weight: 500;
+}
+.traverse-log {
+  max-height: 120px;
+  overflow-y: auto;
+  margin-top: 6px;
+  font-size: 11px;
+  font-family: 'Menlo', 'Consolas', monospace;
+}
+.traverse-log-entry {
+  padding: 2px 0;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.traverse-log-entry .log-idx {
+  color: #999;
+  min-width: 24px;
+}
+.traverse-log-entry .log-path {
+  color: #333;
+  word-break: break-all;
+}
+.traverse-log-entry .log-ok { color: #10b981; }
+.traverse-log-entry .log-fail { color: #ef4444; }
+.traverse-log-entry .log-skip { color: #f59e0b; }
+.traverse-log::-webkit-scrollbar { width: 4px; }
+.traverse-log::-webkit-scrollbar-track { background: transparent; }
+.traverse-log::-webkit-scrollbar-thumb { background: #D0D0D0; border-radius: 2px; }
+
+[data-theme='dark'] .traverse-section { border-top-color: var(--border-color); }
+[data-theme='dark'] .traverse-header { color: var(--text-primary); }
+[data-theme='dark'] .traverse-desc { color: var(--text-secondary); }
+[data-theme='dark'] .traverse-delay-row { color: var(--text-secondary); }
+[data-theme='dark'] .traverse-progress { color: var(--accent); }
+[data-theme='dark'] .traverse-log-entry { border-bottom-color: var(--border-color); }
+[data-theme='dark'] .traverse-log-entry .log-path { color: var(--text-primary); }
+[data-theme='dark'] .traverse-log::-webkit-scrollbar-thumb { background: #3A3A5E; }
+
 /* Scrollbar for new panels */
 .perm-captured-list::-webkit-scrollbar,
 .jssearch-results::-webkit-scrollbar,

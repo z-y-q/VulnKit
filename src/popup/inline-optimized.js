@@ -4160,6 +4160,262 @@
     utils.showToast('已注入 ' + injected + ' 条缺失路由到菜单数据', 'success');
   }
 
+  // ====== Auto-traverse routes ======
+  var traverseActive = false;
+  var traversePort = null;
+
+  function addTraverseLog(idx, path, status) {
+    var logEl = utils.get('traverse-log');
+    if (!logEl) return;
+    var statusClass = status === 'ok' ? 'log-ok' : status === 'fail' ? 'log-fail' : 'log-skip';
+    var statusText = status === 'ok' ? '✓' : status === 'fail' ? '✗' : '–';
+    var div = document.createElement('div');
+    div.className = 'traverse-log-entry';
+    div.innerHTML =
+      '<span class="log-idx">' +
+      idx +
+      '</span>' +
+      '<span class="log-path">' +
+      utils.escapeHtml(path) +
+      '</span>' +
+      '<span class="' +
+      statusClass +
+      '">' +
+      statusText +
+      '</span>';
+    logEl.appendChild(div);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function updateTraverseProgress(current, total, path) {
+    var progressEl = utils.get('traverse-progress');
+    if (progressEl) progressEl.textContent = current + '/' + total + (path ? ' → ' + path : '');
+  }
+
+  function stopTraverse() {
+    traverseActive = false;
+    if (traversePort) {
+      try {
+        traversePort.disconnect();
+      } catch (e) {}
+      traversePort = null;
+    }
+    var startBtn = utils.get('traverse-start-btn');
+    var stopBtn = utils.get('traverse-stop-btn');
+    if (startBtn) startBtn.disabled = false;
+    if (stopBtn) stopBtn.disabled = true;
+    var progressEl = utils.get('traverse-progress');
+    if (progressEl && !progressEl.textContent.includes('完成')) {
+      progressEl.textContent += ' (已停止)';
+    }
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      if (!tabs[0]?.id) return;
+      chrome.scripting
+        .executeScript({
+          target: { tabId: tabs[0].id },
+          world: 'MAIN',
+          func: function () {
+            window.__VULN_TRAVERSE_ACTIVE__ = false;
+          },
+        })
+        .catch(function () {});
+    });
+  }
+
+  async function startTraverseRoutes() {
+    if (traverseActive) return;
+
+    var hiddenOnly = utils.get('traverse-hidden-only');
+    var useHiddenOnly = hiddenOnly ? hiddenOnly.checked : true;
+    var delaySelect = utils.get('traverse-delay');
+    var delay = delaySelect ? parseInt(delaySelect.value) : 3000;
+
+    var routes = [];
+    if (useHiddenOnly) {
+      if (lastCompareHiddenRoutes.length === 0) {
+        utils.showToast('没有隐藏路由，请先执行「路由对比」', 'warning');
+        return;
+      }
+      routes = lastCompareHiddenRoutes.map(function (r) {
+        return r.path;
+      });
+    } else {
+      // Fetch all routes from page
+      try {
+        var [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) {
+          utils.showToast('无法获取当前标签页', 'error');
+          return;
+        }
+        var routeResults = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: function () {
+            var routes = [];
+            var seen = {};
+            function extract(rts, prefix) {
+              rts.forEach(function (r) {
+                var childPath = r.path || '/';
+                var path;
+                if (childPath.charAt(0) === '/') path = childPath;
+                else if (prefix === '' || prefix === '/') path = '/' + childPath;
+                else path = prefix + '/' + childPath;
+                if (r.path && r.path !== '*' && !seen[path]) {
+                  seen[path] = true;
+                  routes.push(path);
+                }
+                if (r.children) extract(r.children, path === '/' ? '/' : path);
+              });
+            }
+            var appEl =
+              document.querySelector('#app') ||
+              document.querySelector('[data-v-app]') ||
+              document.querySelector('#root') ||
+              document.querySelector('#main');
+            if (appEl && appEl.__vue_app__) {
+              var router = appEl.__vue_app__.config.globalProperties.$router;
+              if (router && typeof router.getRoutes === 'function') {
+                router.getRoutes().forEach(function (r) {
+                  if (r.path && r.path !== '*' && !seen[r.path]) {
+                    seen[r.path] = true;
+                    routes.push(r.path);
+                  }
+                });
+              } else if (router && router.options && router.options.routes) {
+                extract(router.options.routes, '');
+              }
+            } else {
+              var els = document.querySelectorAll('*');
+              for (var i = 0; i < els.length; i++) {
+                if (els[i].__vue__) {
+                  var vm = els[i].__vue__.$root || els[i].__vue__;
+                  if (vm.$router) {
+                    if (typeof vm.$router.getRoutes === 'function') {
+                      vm.$router.getRoutes().forEach(function (r) {
+                        if (r.path && r.path !== '*' && !seen[r.path]) {
+                          seen[r.path] = true;
+                          routes.push(r.path);
+                        }
+                      });
+                    } else if (vm.$router.options && vm.$router.options.routes) {
+                      extract(vm.$router.options.routes, '');
+                    }
+                  }
+                  if (routes.length > 0) break;
+                }
+              }
+            }
+            return routes;
+          },
+        });
+        routes = (routeResults && routeResults[0] && routeResults[0].result) || [];
+      } catch (e) {
+        utils.showToast('获取路由失败: ' + e.message, 'error');
+        return;
+      }
+      if (routes.length === 0) {
+        utils.showToast('未检测到路由，请先在「基础检测」中检测 Vue', 'warning');
+        return;
+      }
+    }
+
+    traverseActive = true;
+    var startBtn = utils.get('traverse-start-btn');
+    var stopBtn = utils.get('traverse-stop-btn');
+    var logEl = utils.get('traverse-log');
+    if (startBtn) startBtn.disabled = true;
+    if (stopBtn) stopBtn.disabled = false;
+    if (logEl) logEl.innerHTML = '';
+    updateTraverseProgress(0, routes.length, '准备中...');
+
+    var [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) {
+      stopTraverse();
+      utils.showToast('无法获取当前标签页', 'error');
+      return;
+    }
+
+    // Use chrome.tabs messaging for progress updates
+    var tabId = tab.id;
+    var currentIdx = 0;
+    var total = routes.length;
+
+    function navigateNext() {
+      if (!traverseActive || currentIdx >= total) {
+        if (traverseActive) {
+          updateTraverseProgress(total, total, '遍历完成');
+          var progressEl = utils.get('traverse-progress');
+          if (progressEl) progressEl.textContent = total + '/' + total + ' 完成';
+          utils.showToast('路由遍历完成，共 ' + total + ' 条', 'success');
+        }
+        stopTraverse();
+        return;
+      }
+
+      var path = routes[currentIdx];
+      updateTraverseProgress(currentIdx + 1, total, path);
+
+      chrome.scripting
+        .executeScript({
+          target: { tabId: tabId },
+          world: 'MAIN',
+          func: function (p) {
+            var router = null;
+            var appEl =
+              document.querySelector('#app') ||
+              document.querySelector('[data-v-app]') ||
+              document.querySelector('#root') ||
+              document.querySelector('#main');
+            if (appEl && appEl.__vue_app__) {
+              router = appEl.__vue_app__.config.globalProperties.$router;
+            } else {
+              var els = document.querySelectorAll('*');
+              for (var i = 0; i < els.length; i++) {
+                if (els[i].__vue__) {
+                  var vm = els[i].__vue__.$root || els[i].__vue__;
+                  if (vm.$router) {
+                    router = vm.$router;
+                    break;
+                  }
+                }
+              }
+            }
+            if (router) {
+              try {
+                router.push(p);
+                return { path: p, ok: true };
+              } catch (e) {
+                return { path: p, ok: false, error: e.message };
+              }
+            }
+            return { path: p, ok: false, error: 'no router' };
+          },
+          args: [path],
+        })
+        .then(function (results) {
+          var res = results && results[0] && results[0].result;
+          if (res && res.ok) {
+            addTraverseLog(currentIdx + 1, path, 'ok');
+          } else {
+            addTraverseLog(currentIdx + 1, path, res && res.error ? 'fail' : 'fail');
+          }
+          currentIdx++;
+          if (traverseActive) {
+            setTimeout(navigateNext, delay);
+          }
+        })
+        .catch(function (err) {
+          addTraverseLog(currentIdx + 1, path, 'fail');
+          currentIdx++;
+          if (traverseActive) {
+            setTimeout(navigateNext, delay);
+          }
+        });
+    }
+
+    navigateNext();
+  }
+
   async function compareRoutesAndMenu() {
     var statusEl = utils.get('compare-status');
     var resultsEl = utils.get('compare-results');
@@ -5069,6 +5325,12 @@
         utils.copyText(hiddenPaths.join('\n'));
         utils.showToast('已复制 ' + hiddenPaths.length + ' 条隐藏路由', 'success');
       });
+
+    // Auto-traverse routes
+    const traverseStartBtn = utils.get('traverse-start-btn');
+    if (traverseStartBtn) traverseStartBtn.addEventListener('click', startTraverseRoutes);
+    const traverseStopBtn = utils.get('traverse-stop-btn');
+    if (traverseStopBtn) traverseStopBtn.addEventListener('click', stopTraverse);
 
     // JS Control
     document.querySelectorAll('.jsctrl-tab').forEach(btn => {
