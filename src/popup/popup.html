@@ -20,6 +20,7 @@
       <button class="tab-btn" data-panel="spoof">请求伪造</button>
       <button class="tab-btn" data-panel="vue">Vue分析</button>
       <button class="tab-btn" data-panel="jsctrl">JS控制</button>
+      <button class="tab-btn" data-panel="payload">Payload</button>
     </div>
   </div>
 
@@ -611,6 +612,111 @@
             <span class="js-toggle-label" id="uncopy-indicator-label">尚未解除限制</span>
           </div>
           <div class="uncopy-log" id="uncopy-log"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payload面板 -->
+    <div id="panel-payload" class="panel">
+      <div class="content-card">
+        <div class="card-title">Payload 工具</div>
+        <div class="payload-tabs">
+          <button class="payload-tab active" data-ptab="xss">XSS</button>
+          <button class="payload-tab" data-ptab="sqli">SQL注入</button>
+          <button class="payload-tab" data-ptab="lfi">LFI/RFI</button>
+          <button class="payload-tab" data-ptab="revshell">反弹Shell</button>
+          <button class="payload-tab" data-ptab="webshell">WebShell</button>
+          <button class="payload-tab" data-ptab="cmdref">常用命令</button>
+        </div>
+
+        <!-- XSS -->
+        <div id="ptab-xss" class="payload-panel active">
+          <div class="payload-status" id="xss-status">共 6 个分类</div>
+          <div class="payload-category-list" id="xss-categories"></div>
+        </div>
+
+        <!-- SQL注入 -->
+        <div id="ptab-sqli" class="payload-panel">
+          <div class="sqli-params">
+            <div class="form-group">
+              <label>列数 (N)</label>
+              <input type="number" id="sqli-columns" class="input" value="3" min="1" max="20">
+            </div>
+            <div class="form-group">
+              <label>表名</label>
+              <input type="text" id="sqli-table" class="input" value="users" placeholder="表名">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-sm btn-secondary" id="sqli-regen-btn">重新生成</button>
+          </div>
+          <div class="payload-category-list" id="sqli-categories"></div>
+        </div>
+
+        <!-- LFI/RFI -->
+        <div id="ptab-lfi" class="payload-panel">
+          <div class="payload-status">LFI / RFI Payload 及常用敏感文件路径</div>
+          <div class="payload-category-list" id="lfi-categories"></div>
+        </div>
+
+        <!-- 反弹Shell -->
+        <div id="ptab-revshell" class="payload-panel">
+          <div class="revshell-inputs">
+            <div class="form-group">
+              <label>IP 地址</label>
+              <input type="text" id="revshell-ip" class="input" placeholder="192.168.1.100">
+            </div>
+            <div class="form-group">
+              <label>端口</label>
+              <input type="text" id="revshell-port" class="input" value="4444" placeholder="4444">
+            </div>
+            <div class="form-group">
+              <label>Shell 类型</label>
+              <select id="revshell-type" class="select-filter">
+                <option value="bash">Bash</option>
+                <option value="netcat">Netcat (mkfifo)</option>
+                <option value="nc-e">Netcat -e</option>
+                <option value="ncat">Ncat</option>
+                <option value="python">Python</option>
+                <option value="python3">Python3</option>
+                <option value="perl">Perl</option>
+                <option value="php">PHP</option>
+                <option value="ruby">Ruby</option>
+                <option value="powershell">PowerShell</option>
+                <option value="powershell-tls">PowerShell TLS</option>
+                <option value="nodejs">Node.js</option>
+                <option value="java">Java</option>
+                <option value="socat">Socat</option>
+                <option value="telnet">Telnet</option>
+                <option value="zsh">Zsh</option>
+                <option value="lua">Lua</option>
+                <option value="golang">Golang</option>
+                <option value="awk">Awk</option>
+                <option value="dart">Dart</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="revshell-gen-btn">生成命令</button>
+            <button class="btn btn-outline" id="revshell-copy-btn">复制命令</button>
+          </div>
+          <div class="card-spacing">
+            <label class="payload-output-label">生成的命令</label>
+            <textarea class="textarea" id="revshell-output" readonly rows="4" placeholder="输入 IP 和端口后点击生成"></textarea>
+          </div>
+          <div class="revshell-all" id="revshell-all"></div>
+        </div>
+
+        <!-- WebShell -->
+        <div id="ptab-webshell" class="payload-panel">
+          <div class="payload-status">PHP WebShell / 一句话木马</div>
+          <div class="payload-category-list" id="webshell-categories"></div>
+        </div>
+
+        <!-- 常用命令 -->
+        <div id="ptab-cmdref" class="payload-panel">
+          <div class="payload-status">Linux 提权 / Windows / TTY 命令参考</div>
+          <div class="payload-category-list" id="cmdref-categories"></div>
         </div>
       </div>
     </div>
