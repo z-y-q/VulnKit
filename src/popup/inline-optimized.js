@@ -6199,6 +6199,642 @@
     renderPayloadCategories('sqli-categories', buildSqliPayloads(n, table), false);
   }
 
+  // ====== Webpack Module Mapping (Source Map Scan v2) ======
+  let sourcemapModules = [];
+  let sourcemapSearchTerm = '';
+  let sourcemapCurrentModule = null;
+  let sourcemapSourceCache = {};
+  let sourcemapMapCache = {};
+
+  async function smBatchFetch(urls, concurrency) {
+    concurrency = concurrency || 5;
+    var results = [];
+    for (var i = 0; i < urls.length; i += concurrency) {
+      var batch = urls.slice(i, i + concurrency);
+      var batchResults = await Promise.all(
+        batch.map(function (url) {
+          return chrome.runtime
+            .sendMessage({ type: 'FETCH_URL', url: url })
+            .then(function (r) {
+              return r && !r.error ? r.data : null;
+            })
+            .catch(function () {
+              return null;
+            });
+        })
+      );
+      results = results.concat(batchResults);
+    }
+    return results;
+  }
+
+  function smResolveUrl(relative, base) {
+    try {
+      return new URL(relative, base).href;
+    } catch (e) {
+      return relative;
+    }
+  }
+
+  async function scanWebpackModules() {
+    var statusEl = utils.get('sourcemap-status');
+    var scanBtn = utils.get('sourcemap-scan-btn');
+    var resultsEl = utils.get('sourcemap-results');
+    if (!statusEl) return;
+
+    sourcemapModules = [];
+    sourcemapSourceCache = {};
+    sourcemapMapCache = {};
+    if (scanBtn) {
+      scanBtn.disabled = true;
+      scanBtn.textContent = '扫描中...';
+    }
+    resultsEl.innerHTML = '';
+
+    try {
+      var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      var tab = tabs[0];
+      if (!tab || !tab.id || !tab.url || tab.url.startsWith('chrome')) {
+        statusEl.textContent = '无法扫描此页面';
+        if (scanBtn) {
+          scanBtn.disabled = false;
+          scanBtn.textContent = '扫描[v2]';
+        }
+        return;
+      }
+
+      var allModules = [];
+      var sourceMapUrls = [];
+      var scriptUrls = [];
+
+      // Phase 1: MAIN world — access webpack runtime
+      statusEl.textContent = 'Phase 1: 检测 Webpack 运行时...';
+      try {
+        var wpResults = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: function () {
+            var modules = [];
+            var hasWebpack = false;
+
+            // Webpack 4: __webpack_require__.c (module cache)
+            if (typeof __webpack_require__ !== 'undefined' && __webpack_require__.c) {
+              hasWebpack = true;
+              var cache = __webpack_require__.c;
+              for (var id in cache) {
+                if (!cache.hasOwnProperty(id)) continue;
+                var mod = cache[id];
+                var path = '';
+                if (mod.l) path = mod.l;
+                var deps = [];
+                if (mod.a && Array.isArray(mod.a)) deps = mod.a.slice();
+                modules.push({ id: id, path: path, deps: deps, source: 'runtime' });
+              }
+            }
+
+            // Webpack 4: __webpack_modules__
+            if (typeof __webpack_modules__ !== 'undefined') {
+              hasWebpack = true;
+              for (var mid in __webpack_modules__) {
+                if (!__webpack_modules__.hasOwnProperty(mid)) continue;
+                var found = false;
+                for (var k = 0; k < modules.length; k++) {
+                  if (modules[k].id === mid) {
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) modules.push({ id: mid, path: '', deps: [], source: 'runtime' });
+              }
+            }
+
+            // Webpack 5: webpackChunk* arrays
+            for (var key in window) {
+              if (key.indexOf('webpackChunk') === 0 && Array.isArray(window[key])) {
+                hasWebpack = true;
+                var chunk = window[key];
+                for (var ci = 0; ci < chunk.length; ci++) {
+                  var item = chunk[ci];
+                  if (!item || !Array.isArray(item) || item.length < 2) continue;
+                  var modObj = item[1];
+                  if (typeof modObj !== 'object' || modObj === null) continue;
+                  for (var mId in modObj) {
+                    if (!modObj.hasOwnProperty(mId)) continue;
+                    var exists = false;
+                    for (var e = 0; e < modules.length; e++) {
+                      if (modules[e].id === mId) {
+                        exists = true;
+                        break;
+                      }
+                    }
+                    if (!exists) modules.push({ id: mId, path: mId, deps: [], source: 'runtime' });
+                  }
+                }
+              }
+            }
+
+            return { modules: modules, hasWebpack: hasWebpack };
+          },
+        });
+        if (wpResults && wpResults[0] && wpResults[0].result) {
+          var wpData = wpResults[0].result;
+          if (wpData.modules && wpData.modules.length > 0) {
+            allModules = allModules.concat(wpData.modules);
+          }
+        }
+      } catch (e) {
+        // MAIN world may fail on some pages, continue with fallback
+      }
+
+      // Phase 2: ISOLATED world — collect script URLs + extract source map URLs
+      statusEl.textContent = 'Phase 2: 收集脚本和 Source Map...';
+      try {
+        var domResults = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: function () {
+            var extUrls = [];
+            var inlineScripts = [];
+            document.querySelectorAll('script[src]').forEach(function (s) {
+              extUrls.push(s.src);
+            });
+            document.querySelectorAll('script:not([src])').forEach(function (s) {
+              var text = s.textContent || '';
+              if (text.length > 10 && text.length < 500000) inlineScripts.push(text);
+            });
+            return { extUrls: extUrls, inlineScripts: inlineScripts };
+          },
+        });
+        if (domResults && domResults[0] && domResults[0].result) {
+          var domData = domResults[0].result;
+          scriptUrls = domData.extUrls || [];
+
+          // Extract source map URLs from inline scripts
+          var mapRegex = /[/#][@]\s*sourceMappingURL\s*=\s*(\S+)/gi;
+          (domData.inlineScripts || []).forEach(function (script) {
+            var match;
+            while ((match = mapRegex.exec(script)) !== null) {
+              var url = match[1];
+              if (url.indexOf('data:') !== 0) {
+                sourceMapUrls.push(smResolveUrl(url, tab.url));
+              }
+            }
+          });
+        }
+      } catch (e) {
+        // continue
+      }
+
+      // Also extract source map URLs from external script tags via link headers
+      // Fetch script contents to find sourceMappingURL comments
+      if (scriptUrls.length > 0 && sourceMapUrls.length < 5) {
+        statusEl.textContent =
+          'Phase 2: 解析脚本 Source Map URL (' + scriptUrls.length + ' 个文件)...';
+        var scriptContents = await smBatchFetch(scriptUrls.slice(0, 15));
+        for (var si = 0; si < scriptContents.length; si++) {
+          if (!scriptContents[si]) continue;
+          var content = scriptContents[si];
+          var lastNewline = content.lastIndexOf('\n');
+          var tail =
+            lastNewline >= 0
+              ? content.substring(lastNewline)
+              : content.substring(content.length - 200);
+          var mapMatch = tail.match(/[/#][@]\s*sourceMappingURL\s*=\s*(\S+)/);
+          if (mapMatch && mapMatch[1].indexOf('data:') !== 0) {
+            var mapUrl = smResolveUrl(mapMatch[1], scriptUrls[si]);
+            if (sourceMapUrls.indexOf(mapUrl) === -1) sourceMapUrls.push(mapUrl);
+          }
+        }
+      }
+
+      // Fetch and parse source map files
+      if (sourceMapUrls.length > 0) {
+        statusEl.textContent = 'Phase 2: 解析 ' + sourceMapUrls.length + ' 个 Source Map 文件...';
+        var mapContents = await smBatchFetch(sourceMapUrls.slice(0, 20));
+        for (var mi = 0; mi < mapContents.length; mi++) {
+          if (!mapContents[mi]) continue;
+          try {
+            var mapJson = JSON.parse(mapContents[mi]);
+            sourcemapMapCache[sourceMapUrls[mi]] = mapJson;
+            var sources = mapJson.sources || [];
+            var sourcesContent = mapJson.sourcesContent || [];
+            var mapBaseUrl = sourceMapUrls[mi].substring(0, sourceMapUrls[mi].lastIndexOf('/') + 1);
+            for (var sIdx = 0; sIdx < sources.length; sIdx++) {
+              var srcPath = sources[sIdx];
+              // Normalize webpack:// prefix
+              if (srcPath.indexOf('webpack://') === 0) srcPath = srcPath.replace('webpack://', '');
+              var existingPath = false;
+              for (var ep = 0; ep < allModules.length; ep++) {
+                if (allModules[ep].path === srcPath) {
+                  existingPath = true;
+                  break;
+                }
+              }
+              if (!existingPath) {
+                var resolved = sourcesContent[sIdx] !== undefined && sourcesContent[sIdx] !== null;
+                var mod = {
+                  id: 'sm-' + sIdx,
+                  path: srcPath,
+                  deps: [],
+                  source: 'sourcemap',
+                  resolved: resolved,
+                  sourceUrl: sourceMapUrls[mi],
+                };
+                if (resolved) sourcemapSourceCache[srcPath] = sourcesContent[sIdx];
+                allModules.push(mod);
+              }
+            }
+          } catch (parseErr) {
+            // skip invalid source map
+          }
+        }
+      }
+
+      // Phase 3: Fallback — parse JS files for webpack paths
+      if (allModules.length === 0 && scriptUrls.length > 0) {
+        statusEl.textContent = 'Phase 3: 解析 JS 文件中的模块路径...';
+        var jsContents = await smBatchFetch(scriptUrls.slice(0, 10));
+        for (var ji = 0; ji < jsContents.length; ji++) {
+          if (!jsContents[ji]) continue;
+          var jsText = jsContents[ji];
+          // Match webpack:// paths in module definitions
+          var wpPathRegex =
+            /webpack:\/\/[^\s"']+|\.[\/]?[a-zA-Z_][\w.\/-]*(?:\.vue|\.js|\.ts|\.jsx|\.tsx)/g;
+          var pathMatch;
+          var seen = {};
+          while ((pathMatch = wpPathRegex.exec(jsText)) !== null) {
+            var p = pathMatch[0].replace('webpack://', '');
+            if (seen[p]) continue;
+            seen[p] = true;
+            allModules.push({
+              id: 'ch-' + Object.keys(seen).length,
+              path: p,
+              deps: [],
+              source: 'chunk',
+            });
+          }
+        }
+      }
+
+      // Build reverse deps and finalize
+      for (var di = 0; di < allModules.length; di++) {
+        allModules[di].reverseDeps = [];
+      }
+      for (var di2 = 0; di2 < allModules.length; di2++) {
+        var modDeps = allModules[di2].deps || [];
+        for (var dd = 0; dd < modDeps.length; dd++) {
+          var depId = String(modDeps[dd]);
+          for (var dr = 0; dr < allModules.length; dr++) {
+            if (allModules[dr].id === depId) {
+              allModules[dr].reverseDeps.push(allModules[di2].id);
+              break;
+            }
+          }
+        }
+      }
+
+      // Deduplicate by path
+      var seenPaths = {};
+      var deduped = [];
+      for (var ui = 0; ui < allModules.length; ui++) {
+        var m = allModules[ui];
+        if (!m.path) continue;
+        if (seenPaths[m.path]) continue;
+        seenPaths[m.path] = true;
+        deduped.push(m);
+      }
+
+      sourcemapModules = deduped.slice(0, 2000);
+      statusEl.textContent = '找到 ' + sourcemapModules.length + ' 个模块';
+      renderSourcemapModules();
+    } catch (err) {
+      statusEl.textContent = '扫描失败: ' + (err.message || '未知错误');
+    } finally {
+      if (scanBtn) {
+        scanBtn.disabled = false;
+        scanBtn.textContent = '扫描[v2]';
+      }
+    }
+  }
+
+  function renderSourcemapModules() {
+    var container = utils.get('sourcemap-results');
+    if (!container) return;
+
+    if (sourcemapModules.length === 0) {
+      container.innerHTML = '<div class="empty-state">未找到 Webpack 模块</div>';
+      return;
+    }
+
+    // Filter
+    var filtered = sourcemapModules;
+    if (sourcemapSearchTerm) {
+      filtered = sourcemapModules.filter(function (m) {
+        return m.path.toLowerCase().indexOf(sourcemapSearchTerm) !== -1;
+      });
+    }
+
+    // Group by source
+    var groups = { runtime: [], sourcemap: [], chunk: [] };
+    for (var i = 0; i < filtered.length; i++) {
+      var g = groups[filtered[i].source] || groups.chunk;
+      g.push({ module: filtered[i], index: sourcemapModules.indexOf(filtered[i]) });
+    }
+
+    var html =
+      '<div class="sourcemap-stats-bar">共 ' +
+      sourcemapModules.length +
+      ' 个模块' +
+      (filtered.length !== sourcemapModules.length ? '，显示 ' + filtered.length : '') +
+      '</div>';
+
+    var groupLabels = { runtime: 'Webpack 运行时', sourcemap: 'Source Map', chunk: 'JS 文件解析' };
+    var groupClasses = {
+      runtime: 'sourcemap-section',
+      sourcemap: 'sourcemap-section sourcemap-section-resolved',
+      chunk: 'sourcemap-section sourcemap-section-numeric',
+    };
+
+    ['runtime', 'sourcemap', 'chunk'].forEach(function (key) {
+      var items = groups[key];
+      if (items.length === 0) return;
+      html += '<div class="' + groupClasses[key] + '">';
+      html +=
+        '<div class="sourcemap-section-title">' +
+        utils.escapeHtml(groupLabels[key]) +
+        ' (' +
+        items.length +
+        ')</div>';
+      items.forEach(function (item) {
+        var m = item.module;
+        var badges =
+          '<span class="sourcemap-item-source">' +
+          (m.source === 'runtime' ? 'RT' : m.source === 'sourcemap' ? 'SM' : 'CH') +
+          '</span>';
+        if (m.resolved) badges += '<span class="sourcemap-item-resolved">SRC</span>';
+        var meta = '';
+        if (m.deps && m.deps.length > 0) meta += '(' + m.deps.length + ' deps)';
+        if (m.reverseDeps && m.reverseDeps.length > 0)
+          meta += (meta ? ' ' : '') + '(' + m.reverseDeps.length + ' used)';
+        html += '<div class="sourcemap-item" data-idx="' + item.index + '">';
+        html +=
+          '<span class="sourcemap-item-name" title="' +
+          utils.escapeHtml(m.path) +
+          '">' +
+          utils.escapeHtml(m.path) +
+          '</span>';
+        html +=
+          '<span class="sourcemap-item-meta">' + badges + ' ' + utils.escapeHtml(meta) + '</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    });
+
+    container.innerHTML = html;
+
+    // Hide detail card, show results
+    var detailCard = utils.get('sourcemap-detail-card');
+    if (detailCard) detailCard.classList.add('hidden');
+    container.classList.remove('hidden');
+
+    // Bind click handlers
+    container.querySelectorAll('.sourcemap-item').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var idx = parseInt(this.dataset.idx);
+        if (!isNaN(idx)) showSourcemapModuleDetail(idx);
+      });
+    });
+  }
+
+  async function showSourcemapModuleDetail(index) {
+    var mod = sourcemapModules[index];
+    if (!mod) return;
+    sourcemapCurrentModule = index;
+
+    var detailCard = utils.get('sourcemap-detail-card');
+    var resultsEl = utils.get('sourcemap-results');
+    var titleEl = utils.get('sourcemap-detail-title');
+    var depsEl = utils.get('sourcemap-deps-info');
+    var codeEl = utils.get('sourcemap-source-code');
+
+    if (!detailCard || !resultsEl) return;
+
+    resultsEl.classList.add('hidden');
+    detailCard.classList.remove('hidden');
+    titleEl.textContent = mod.path;
+
+    // Render deps
+    var depsHtml = '';
+    if (mod.deps && mod.deps.length > 0) {
+      depsHtml +=
+        '<div class="sourcemap-deps-section"><span class="sourcemap-deps-label">依赖:</span>';
+      mod.deps.forEach(function (depId) {
+        var depMod = null;
+        for (var d = 0; d < sourcemapModules.length; d++) {
+          if (sourcemapModules[d].id === String(depId)) {
+            depMod = sourcemapModules[d];
+            break;
+          }
+        }
+        var label = depMod ? depMod.path : depId;
+        depsHtml +=
+          '<span class="sourcemap-dep-tag" title="' +
+          utils.escapeHtml(label) +
+          '">' +
+          utils.escapeHtml(label.length > 40 ? label.substring(0, 40) + '...' : label) +
+          '</span>';
+      });
+      depsHtml += '</div>';
+    }
+    if (mod.reverseDeps && mod.reverseDeps.length > 0) {
+      depsHtml +=
+        '<div class="sourcemap-deps-section"><span class="sourcemap-deps-label">被引用:</span>';
+      mod.reverseDeps.forEach(function (rdepId) {
+        var rMod = null;
+        for (var r = 0; r < sourcemapModules.length; r++) {
+          if (sourcemapModules[r].id === rdepId) {
+            rMod = sourcemapModules[r];
+            break;
+          }
+        }
+        var label = rMod ? rMod.path : rdepId;
+        depsHtml +=
+          '<span class="sourcemap-dep-tag sourcemap-dep-tag-reverse" title="' +
+          utils.escapeHtml(label) +
+          '">' +
+          utils.escapeHtml(label.length > 40 ? label.substring(0, 40) + '...' : label) +
+          '</span>';
+      });
+      depsHtml += '</div>';
+    }
+    depsEl.innerHTML = depsHtml;
+
+    // Load source code
+    codeEl.value = '';
+    var source = sourcemapSourceCache[mod.path];
+    if (source) {
+      codeEl.value = source;
+    } else if (mod.sourceUrl) {
+      codeEl.value = '正在加载源码...';
+      try {
+        var mapJson = sourcemapMapCache[mod.sourceUrl];
+        if (mapJson && mapJson.sourcesContent) {
+          var srcIdx = mapJson.sources.indexOf(mod.path);
+          if (srcIdx === -1) srcIdx = mapJson.sources.indexOf('webpack://' + mod.path);
+          if (srcIdx >= 0 && mapJson.sourcesContent[srcIdx]) {
+            source = mapJson.sourcesContent[srcIdx];
+            sourcemapSourceCache[mod.path] = source;
+            codeEl.value = source;
+            mod.resolved = true;
+          } else {
+            codeEl.value = '// 源码未包含在 Source Map 中';
+          }
+        } else {
+          codeEl.value = '// 源码不可用';
+        }
+      } catch (e) {
+        codeEl.value = '// 加载失败: ' + e.message;
+      }
+    } else {
+      codeEl.value = '// 源码不可用（仅运行时检测到模块 ID）';
+    }
+  }
+
+  function backToSourcemapList() {
+    sourcemapCurrentModule = null;
+    var detailCard = utils.get('sourcemap-detail-card');
+    var resultsEl = utils.get('sourcemap-results');
+    if (detailCard) detailCard.classList.add('hidden');
+    if (resultsEl) resultsEl.classList.remove('hidden');
+  }
+
+  function copyAllSourcemapPaths() {
+    if (sourcemapModules.length === 0) {
+      utils.showToast('没有模块路径', 'warning');
+      return;
+    }
+    var paths = sourcemapModules
+      .map(function (m) {
+        return m.path;
+      })
+      .filter(Boolean)
+      .join('\n');
+    utils.copyText(paths);
+    utils.showToast('已复制 ' + sourcemapModules.length + ' 个路径', 'success');
+  }
+
+  function generateSourcemapTree() {
+    if (sourcemapModules.length === 0) {
+      utils.showToast('没有模块路径', 'warning');
+      return;
+    }
+    var tree = {};
+    sourcemapModules.forEach(function (m) {
+      if (!m.path) return;
+      var parts = m.path.replace(/^\.\/?/, '').split('/');
+      var node = tree;
+      for (var i = 0; i < parts.length; i++) {
+        if (!node[parts[i]]) node[parts[i]] = {};
+        node = node[parts[i]];
+      }
+    });
+
+    function renderTree(obj, prefix, isLast) {
+      var lines = [];
+      var keys = Object.keys(obj).sort();
+      keys.forEach(function (key, idx) {
+        var last = idx === keys.length - 1;
+        var connector = last ? '└── ' : '├── ';
+        var childPrefix = last ? '    ' : '│   ';
+        lines.push(prefix + connector + key);
+        if (Object.keys(obj[key]).length > 0) {
+          lines = lines.concat(renderTree(obj[key], prefix + childPrefix, last));
+        }
+      });
+      return lines;
+    }
+
+    var treeLines = renderTree(tree, '', true);
+    var output = treeLines.join('\n');
+    utils.copyText(output);
+    utils.showToast('目录树已复制', 'success');
+  }
+
+  async function loadSourcesToDevTools() {
+    var mapUrls = [];
+    sourcemapModules.forEach(function (m) {
+      if (m.sourceUrl && mapUrls.indexOf(m.sourceUrl) === -1) mapUrls.push(m.sourceUrl);
+    });
+    if (mapUrls.length === 0) {
+      utils.showToast('未找到 Source Map URL', 'warning');
+      return;
+    }
+    utils.copyText(mapUrls.join('\n'));
+    if (mapUrls.length > 0) {
+      chrome.tabs.create({ url: mapUrls[0], active: false });
+    }
+    utils.showToast(mapUrls.length + ' 个 Source Map URL 已复制', 'success');
+  }
+
+  async function downloadAllSourcemapSources() {
+    var resolved = sourcemapModules.filter(function (m) {
+      return m.resolved || sourcemapSourceCache[m.path];
+    });
+    if (resolved.length === 0) {
+      utils.showToast('没有可下载的源码', 'warning');
+      return;
+    }
+    var content = '';
+    resolved.forEach(function (m) {
+      var src = sourcemapSourceCache[m.path] || '';
+      content += '='.repeat(60) + '\n';
+      content += 'FILE: ' + m.path + '\n';
+      content += 'MODULE: ' + m.id + '\n';
+      content += '='.repeat(60) + '\n';
+      content += src + '\n\n';
+    });
+    var blob = new Blob([content], { type: 'text/plain' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'webpack-sources-' + Date.now() + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () {
+      URL.revokeObjectURL(url);
+    }, 1000);
+    utils.showToast('已下载 ' + resolved.length + ' 个源文件', 'success');
+  }
+
+  function downloadSingleModule(index) {
+    var mod = sourcemapModules[index];
+    if (!mod) return;
+    var source = sourcemapSourceCache[mod.path] || '';
+    if (!source) {
+      utils.showToast('该模块没有可用的源码', 'warning');
+      return;
+    }
+    var fileName = mod.path.split('/').pop() || 'module.js';
+    var blob = new Blob([source], { type: 'text/javascript' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    utils.showToast('已下载 ' + fileName, 'success');
+  }
+
+  function copyModuleSource() {
+    var codeEl = utils.get('sourcemap-source-code');
+    if (codeEl && codeEl.value) {
+      utils.copyText(codeEl.value);
+      utils.showToast('已复制源码', 'success');
+    }
+  }
+
   // ====== Init ======
   function initApp() {
     // Main panel tabs
@@ -6905,6 +7541,38 @@
     if (sqliColumns) sqliColumns.addEventListener('change', renderSqliPayloads);
     const sqliTable = utils.get('sqli-table');
     if (sqliTable) sqliTable.addEventListener('input', renderSqliPayloads);
+
+    // Webpack Module Mapping (Source Map Scan)
+    var smScanBtn = utils.get('sourcemap-scan-btn');
+    if (smScanBtn) smScanBtn.addEventListener('click', scanWebpackModules);
+    var smCopyAllBtn = utils.get('sourcemap-copy-all-btn');
+    if (smCopyAllBtn) smCopyAllBtn.addEventListener('click', copyAllSourcemapPaths);
+    var smCopyTreeBtn = utils.get('sourcemap-copy-tree-btn');
+    if (smCopyTreeBtn) smCopyTreeBtn.addEventListener('click', generateSourcemapTree);
+    var smLoadBtn = utils.get('sourcemap-load-sources-btn');
+    if (smLoadBtn) smLoadBtn.addEventListener('click', loadSourcesToDevTools);
+    var smDlAllBtn = utils.get('sourcemap-download-all-btn');
+    if (smDlAllBtn) smDlAllBtn.addEventListener('click', downloadAllSourcemapSources);
+    var smBackBtn = utils.get('sourcemap-detail-back');
+    if (smBackBtn) smBackBtn.addEventListener('click', backToSourcemapList);
+    var smCopySrcBtn = utils.get('sourcemap-copy-src-btn');
+    if (smCopySrcBtn) smCopySrcBtn.addEventListener('click', copyModuleSource);
+    var smDlBtn = utils.get('sourcemap-download-btn');
+    if (smDlBtn)
+      smDlBtn.addEventListener('click', function () {
+        if (sourcemapCurrentModule !== null) downloadSingleModule(sourcemapCurrentModule);
+      });
+    var smSearch = utils.get('sourcemap-search-input');
+    if (smSearch) {
+      var smSearchTimer = null;
+      smSearch.addEventListener('input', function () {
+        clearTimeout(smSearchTimer);
+        smSearchTimer = setTimeout(function () {
+          sourcemapSearchTerm = smSearch.value.trim().toLowerCase();
+          renderSourcemapModules();
+        }, 200);
+      });
+    }
 
     // Status bar clock
     const statusTime = utils.get('status-time');

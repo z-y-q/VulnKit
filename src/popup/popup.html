@@ -21,6 +21,7 @@
       <button class="tab-btn" data-panel="vue">Vue分析</button>
       <button class="tab-btn" data-panel="jsctrl">JS控制</button>
       <button class="tab-btn" data-panel="payload">Payload</button>
+      <button class="tab-btn" data-panel="sourcemap">Source Map</button>
     </div>
   </div>
 
@@ -867,6 +868,43 @@
         </div>
       </div>
     </div>
+
+    <!-- Webpack 映射面板 -->
+    <div id="panel-sourcemap" class="panel">
+      <div class="content-card">
+        <div class="card-title">Webpack 模块映射</div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="sourcemap-scan-btn">扫描[v2]</button>
+          <button class="btn btn-sm btn-outline" id="sourcemap-copy-all-btn">复制路径</button>
+          <button class="btn btn-sm btn-outline" id="sourcemap-copy-tree-btn">目录树</button>
+          <button class="btn btn-sm btn-outline" id="sourcemap-load-sources-btn">加载到Sources</button>
+          <button class="btn btn-sm btn-outline" id="sourcemap-download-all-btn">下载全部</button>
+        </div>
+        <div class="sourcemap-status" id="sourcemap-status"></div>
+
+        <!-- 搜索过滤 -->
+        <input type="text" class="input sourcemap-search-input" id="sourcemap-search-input" placeholder="搜索模块路径..." />
+
+        <!-- 扫描结果列表 -->
+        <div id="sourcemap-results" class="sourcemap-results">
+          <div class="empty-state">点击「扫描当前页面」提取 Webpack 模块映射</div>
+        </div>
+
+        <!-- 文件详情（点击模块后显示） -->
+        <div class="content-card card-spacing hidden" id="sourcemap-detail-card">
+          <div class="sourcemap-detail-header">
+            <div class="card-title card-title-flat" id="sourcemap-detail-title">模块源码</div>
+            <button class="btn btn-sm btn-outline" id="sourcemap-detail-back">返回列表</button>
+          </div>
+          <div id="sourcemap-deps-info"></div>
+          <div class="panel-actions">
+            <button class="btn btn-sm btn-outline" id="sourcemap-copy-src-btn">复制源码</button>
+            <button class="btn btn-sm btn-outline" id="sourcemap-download-btn">下载文件</button>
+          </div>
+          <textarea class="textarea" id="sourcemap-source-code" readonly rows="18" placeholder="模块源码将显示在此处"></textarea>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="status-bar">
@@ -895,6 +933,6 @@
 <script src="lib/sm4.js"></script>
 <script src="lib/bcrypt.min.js"></script>
 <script src="lib/exifr.full.js"></script>
-<script src="inline-optimized.js"></script>
+<script src="inline-optimized.js?v=20260420b"></script>
 </body>
 </html>
