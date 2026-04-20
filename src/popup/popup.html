@@ -543,29 +543,58 @@
         <div class="jsctrl-tabs">
           <button class="jsctrl-tab active" data-ctrl="jstoggle">JS 开关</button>
           <button class="jsctrl-tab" data-ctrl="antidebug">反调试绕过</button>
+          <button class="jsctrl-tab" data-ctrl="uncopy">复制限制</button>
         </div>
 
         <!-- JS 开关 -->
         <div id="jsctrl-jstoggle" class="jsctrl-panel active">
-          <div class="js-toggle-status" id="js-toggle-status"></div>
+          <div class="js-toggle-indicator" id="js-toggle-indicator">
+            <span class="js-toggle-dot js-toggle-dot-on" id="js-toggle-dot"></span>
+            <span class="js-toggle-label" id="js-toggle-label">JavaScript 正常运行</span>
+          </div>
           <div class="form-actions">
             <button class="btn btn-primary" id="js-disable-btn">禁用 JavaScript</button>
-            <button class="btn btn-secondary" id="js-enable-btn">启用 JavaScript</button>
+            <button class="btn btn-secondary" id="js-enable-btn" disabled>启用 JavaScript</button>
           </div>
-          <div class="js-toggle-hint">禁用后刷新页面生效，启用后同样需要刷新。规则仅在当前标签页生效。</div>
+          <div class="js-toggle-hint">禁用/启用后需<strong>刷新页面</strong>才能生效。规则仅在当前标签页生效。</div>
         </div>
 
         <!-- 反调试绕过 -->
         <div id="jsctrl-antidebug" class="jsctrl-panel">
+          <div class="js-toggle-indicator" id="antidebug-indicator">
+            <span class="js-toggle-dot js-toggle-dot-on" id="antidebug-indicator-dot"></span>
+            <span class="js-toggle-label" id="antidebug-indicator-label">未检测 / 未绕过</span>
+          </div>
           <div class="antidebug-status" id="antidebug-status"></div>
           <div class="form-actions">
             <button class="btn btn-primary" id="antidebug-scan-btn">扫描反调试</button>
-            <button class="btn btn-sm btn-secondary" id="antidebug-bypass-btn">一键绕过</button>
-            <button class="btn btn-sm btn-outline" id="antidebug-clear-btn">清除脚本拦截</button>
+            <button class="btn btn-sm btn-secondary" id="antidebug-bypass-btn" disabled>一键绕过</button>
+            <button class="btn btn-sm btn-outline" id="antidebug-clear-btn" disabled>清除脚本拦截</button>
           </div>
           <div class="antidebug-results" id="antidebug-results">
             <div class="empty-state">点击「扫描反调试」检测页面中的反调试手段</div>
           </div>
+        </div>
+
+        <!-- 复制限制 -->
+        <div id="jsctrl-uncopy" class="jsctrl-panel">
+          <div class="uncopy-desc">解除网页中的复制、选中文本、右键菜单等限制，适用于以下防护类型：</div>
+          <div class="uncopy-types">
+            <div class="uncopy-type-item">CSS <code>user-select: none</code></div>
+            <div class="uncopy-type-item">JS <code>oncopy / oncut / onpaste</code> 拦截</div>
+            <div class="uncopy-type-item">JS <code>oncontextmenu</code> 右键禁用</div>
+            <div class="uncopy-type-item">JS <code>onselectstart</code> 选区禁用</div>
+            <div class="uncopy-type-item">CSS <code>pointer-events: none</code> 遮罩层</div>
+            <div class="uncopy-type-item"><code>-webkit-user-drag: none</code> 拖拽禁用</div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="uncopy-btn">一键解除限制</button>
+          </div>
+          <div class="js-toggle-indicator" id="uncopy-indicator">
+            <span class="js-toggle-dot js-toggle-dot-on" id="uncopy-indicator-dot"></span>
+            <span class="js-toggle-label" id="uncopy-indicator-label">尚未解除限制</span>
+          </div>
+          <div class="uncopy-log" id="uncopy-log"></div>
         </div>
       </div>
     </div>

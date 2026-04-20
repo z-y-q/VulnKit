@@ -20,7 +20,7 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "dist/background/background.js"
+    "service_worker": "src/background/background.js"
   },
   "action": {
     "default_popup": "src/popup/popup.html",

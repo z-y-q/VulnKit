@@ -4579,6 +4579,8 @@
   // ====== JS Control ======
   let currentJsCtrlTab = 'jstoggle';
   let jsBlocked = false;
+  let antiDebugBypassActive = false;
+  let antiDebugScanned = false;
 
   function switchJsCtrlTab(tab) {
     currentJsCtrlTab = tab;
@@ -4591,17 +4593,64 @@
   }
 
   function updateJsToggleStatus() {
-    const el = utils.get('js-toggle-status');
-    if (!el) return;
-    el.innerHTML = jsBlocked ? '<span class="spoof-status-active">JavaScript 已禁用</span>' : '';
+    var dot = utils.get('js-toggle-dot');
+    var label = utils.get('js-toggle-label');
+    var disableBtn = utils.get('js-disable-btn');
+    var enableBtn = utils.get('js-enable-btn');
+    if (dot && label) {
+      if (jsBlocked) {
+        dot.className = 'js-toggle-dot js-toggle-dot-off';
+        label.textContent = 'JavaScript 已禁用（请刷新页面生效）';
+      } else {
+        dot.className = 'js-toggle-dot js-toggle-dot-on';
+        label.textContent = 'JavaScript 正常运行';
+      }
+    }
+    if (disableBtn) disableBtn.disabled = jsBlocked;
+    if (enableBtn) enableBtn.disabled = !jsBlocked;
+  }
+
+  function updateAntidebugIndicator(state, text) {
+    var dot = utils.get('antidebug-indicator-dot');
+    var label = utils.get('antidebug-indicator-label');
+    var bypassBtn = utils.get('antidebug-bypass-btn');
+    var clearBtn = utils.get('antidebug-clear-btn');
+    if (dot && label) {
+      if (state === 'danger') {
+        dot.className = 'js-toggle-dot js-toggle-dot-warn';
+      } else if (state === 'off') {
+        dot.className = 'js-toggle-dot js-toggle-dot-off';
+      } else {
+        dot.className = 'js-toggle-dot js-toggle-dot-on';
+      }
+      label.textContent = text;
+    }
+    if (bypassBtn) bypassBtn.disabled = !antiDebugScanned;
+    if (clearBtn) clearBtn.disabled = !antiDebugBypassActive;
   }
 
   async function disableJs() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) return;
+    var disableBtn = utils.get('js-disable-btn');
+    if (disableBtn) disableBtn.disabled = true;
+    var dot = utils.get('js-toggle-dot');
+    var label = utils.get('js-toggle-label');
+    if (dot && label) {
+      dot.className = 'js-toggle-dot js-toggle-dot-warn';
+      label.textContent = '正在禁用...';
+    }
+
+    var tab;
+    try {
+      tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    } catch (e) {}
+    if (!tab?.id) {
+      updateJsToggleStatus();
+      utils.showToast('无法获取当前标签页', 'error');
+      return;
+    }
 
     try {
-      const response = await chrome.runtime.sendMessage({
+      var response = await chrome.runtime.sendMessage({
         type: 'TOGGLE_JS',
         tabId: tab.id,
         url: tab.url,
@@ -4611,21 +4660,39 @@
         jsBlocked = true;
         chrome.storage.local.set({ js_blocked_tabId: tab.id });
         updateJsToggleStatus();
-        utils.showToast('JavaScript 已禁用，刷新页面生效', 'success');
+        utils.showToast('已禁用 JavaScript，请刷新页面', 'success');
       } else {
-        utils.showToast('操作失败: ' + (response?.error || '未知错误'), 'error');
+        updateJsToggleStatus();
+        utils.showToast('禁用失败: ' + (response?.error || '未知错误'), 'error');
       }
     } catch (e) {
-      utils.showToast('操作失败: ' + e.message, 'error');
+      updateJsToggleStatus();
+      utils.showToast('禁用失败: ' + e.message, 'error');
     }
   }
 
   async function enableJs() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) return;
+    var enableBtn = utils.get('js-enable-btn');
+    if (enableBtn) enableBtn.disabled = true;
+    var dot = utils.get('js-toggle-dot');
+    var label = utils.get('js-toggle-label');
+    if (dot && label) {
+      dot.className = 'js-toggle-dot js-toggle-dot-warn';
+      label.textContent = '正在启用...';
+    }
+
+    var tab;
+    try {
+      tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    } catch (e) {}
+    if (!tab?.id) {
+      updateJsToggleStatus();
+      utils.showToast('无法获取当前标签页', 'error');
+      return;
+    }
 
     try {
-      const response = await chrome.runtime.sendMessage({
+      var response = await chrome.runtime.sendMessage({
         type: 'TOGGLE_JS',
         tabId: tab.id,
         url: tab.url,
@@ -4635,12 +4702,14 @@
         jsBlocked = false;
         chrome.storage.local.remove('js_blocked_tabId');
         updateJsToggleStatus();
-        utils.showToast('JavaScript 已启用，刷新页面生效', 'success');
+        utils.showToast('已启用 JavaScript，请刷新页面', 'success');
       } else {
-        utils.showToast('操作失败: ' + (response?.error || '未知错误'), 'error');
+        updateJsToggleStatus();
+        utils.showToast('启用失败: ' + (response?.error || '未知错误'), 'error');
       }
     } catch (e) {
-      utils.showToast('操作失败: ' + e.message, 'error');
+      updateJsToggleStatus();
+      utils.showToast('启用失败: ' + e.message, 'error');
     }
   }
 
@@ -4649,22 +4718,29 @@
     const resultsEl = utils.get('antidebug-results');
     if (!statusEl || !resultsEl) return;
 
-    statusEl.textContent = '扫描中...';
+    antiDebugScanned = false;
+    antiDebugBypassActive = false;
+    statusEl.textContent = '扫描中（内联脚本 + 外部 JS）...';
+    updateAntidebugIndicator('warn', '正在扫描...');
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return;
 
-      const results = await chrome.scripting.executeScript({
+      // Phase 1: inline script scan (MAIN world)
+      const inlineResults = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: 'MAIN',
         func: () => {
-          const detections = [];
+          var detections = [];
+          var isNative = function (fn) {
+            return /\[native code\]/.test(Function.prototype.toString.call(fn));
+          };
 
-          // Check for debugger statement in scripts
-          const scripts = document.querySelectorAll('script');
-          for (const s of scripts) {
-            if (s.textContent && s.textContent.includes('debugger')) {
+          // Check for debugger statement in inline scripts
+          var scripts = document.querySelectorAll('script');
+          for (var i = 0; i < scripts.length; i++) {
+            if (scripts[i].textContent && scripts[i].textContent.indexOf('debugger') !== -1) {
               detections.push({
                 type: 'debugger语句',
                 desc: '检测到 inline script 中的 debugger 语句',
@@ -4674,11 +4750,7 @@
           }
 
           // Check for Function constructor abuse
-          const originalToString = Function.prototype.toString;
-          const fnStr = originalToString.call(Function.prototype.constructor);
-          if (fnStr === 'function () { [native code] }') {
-            // Not overridden
-          } else {
+          if (!isNative(Function.prototype.constructor)) {
             detections.push({
               type: 'Function劫持',
               desc: 'Function.prototype.constructor 已被重写',
@@ -4686,59 +4758,146 @@
           }
 
           // Check for setInterval/setTimeout debugger loops
-          const origIntervalStr = originalToString.call(setInterval);
-          if (origIntervalStr !== 'function setInterval() { [native code] }') {
+          if (!isNative(setInterval)) {
             detections.push({ type: '定时器劫持', desc: 'setInterval 已被重写，可能用于反调试' });
+          }
+          if (!isNative(setTimeout)) {
+            detections.push({ type: '定时器劫持', desc: 'setTimeout 已被重写，可能用于反调试' });
           }
 
           // Check for console overrides
-          const consoleStr = originalToString.call(console.log);
-          if (
-            consoleStr !== 'function log() { [native code] }' &&
-            consoleStr !== 'function () { [native code] }'
-          ) {
+          if (!isNative(console.log)) {
             detections.push({ type: 'Console劫持', desc: 'console.log 已被重写' });
           }
 
-          // Check for devtools detection via window.outerWidth/innerWidth
-          const scripts2 = document.querySelectorAll('script');
-          for (const s of scripts2) {
-            if (s.textContent && /outerWidth\s*-\s*innerWidth\s*>\s*\d+/.test(s.textContent)) {
+          // Check for devtools detection in inline scripts
+          for (var j = 0; j < scripts.length; j++) {
+            var text = scripts[j].textContent || '';
+            if (/outerWidth\s*-\s*innerWidth\s*>\s*\d+/.test(text)) {
               detections.push({ type: 'DevTools检测', desc: '通过窗口尺寸差检测开发者工具' });
               break;
             }
-            if (s.textContent && /Firebug|firebug|chrome\.devtools/.test(s.textContent)) {
+            if (/Firebug|firebug|chrome\.devtools/.test(text)) {
               detections.push({ type: 'DevTools检测', desc: '检测到 Firebug/DevTools 探测代码' });
               break;
             }
-            if (s.textContent && /new\s+Image.*onerror.*devtools/i.test(s.textContent)) {
+            if (/new\s+Image.*onerror.*devtools/i.test(text)) {
               detections.push({ type: 'DevTools检测', desc: '通过 Image.onerror 检测开发者工具' });
               break;
             }
           }
 
-          return detections;
+          // Collect external JS URLs for phase 2
+          var externalUrls = [];
+          for (var k = 0; k < scripts.length; k++) {
+            if (scripts[k].src) externalUrls.push(scripts[k].src);
+          }
+          return { detections: detections, externalUrls: externalUrls };
         },
       });
 
-      const detections = results?.[0]?.result || [];
+      var inline = inlineResults?.[0]?.result || { detections: [], externalUrls: [] };
+      var detections = inline.detections || [];
+
+      // Phase 2: scan external JS files via background fetch
+      var externalUrls = inline.externalUrls || [];
+      var scannedCount = 0;
+      var maxScan = 10;
+      var antiDebugPatterns = [
+        { regex: /\bdebugger\b/g, type: 'debugger语句', desc: '外部 JS 中包含 debugger 语句' },
+        {
+          regex: /outerWidth\s*-\s*innerWidth\s*>\s*\d+/g,
+          type: 'DevTools检测',
+          desc: '外部 JS 通过窗口尺寸差检测 DevTools',
+        },
+        {
+          regex: /Firebug|firebug|chrome\.devtools/g,
+          type: 'DevTools检测',
+          desc: '外部 JS 包含 Firebug/DevTools 探测',
+        },
+        {
+          regex: /new\s+Image.*onerror.*devtools/gi,
+          type: 'DevTools检测',
+          desc: '外部 JS 通过 Image.onerror 检测 DevTools',
+        },
+        {
+          regex: /setInterval\s*\(\s*function\s*\([^)]*\)\s*\{[^}]*debugger/g,
+          type: 'debugger循环',
+          desc: '外部 JS 包含 setInterval + debugger 循环',
+        },
+        {
+          regex: /constructor\s*=\s*function/g,
+          type: 'Function劫持',
+          desc: '外部 JS 包含 constructor 重写代码',
+        },
+      ];
+
+      var seenTypes = {};
+      for (var d = 0; d < detections.length; d++) seenTypes[detections[d].type] = true;
+
+      for (var u = 0; u < externalUrls.length && scannedCount < maxScan; u++) {
+        try {
+          var fetchResult = await new Promise(function (resolve) {
+            chrome.runtime.sendMessage(
+              { type: 'FETCH_URL', url: externalUrls[u] },
+              function (resp) {
+                resolve(resp);
+              }
+            );
+          });
+          if (fetchResult && fetchResult.data && fetchResult.data.length > 0) {
+            scannedCount++;
+            var code = fetchResult.data;
+            for (var p = 0; p < antiDebugPatterns.length; p++) {
+              var pattern = antiDebugPatterns[p];
+              if (pattern.regex.test(code) && !seenTypes[pattern.type]) {
+                seenTypes[pattern.type] = true;
+                detections.push({ type: pattern.type, desc: pattern.desc });
+              }
+            }
+          }
+        } catch (e) {
+          // Skip failed fetches
+        }
+      }
+
       if (detections.length === 0) {
-        statusEl.textContent = '未检测到反调试';
-        resultsEl.innerHTML = '<div class="empty-state">未发现常见的反调试手段</div>';
+        antiDebugScanned = true;
+        antiDebugBypassActive = false;
+        statusEl.textContent = '';
+        resultsEl.innerHTML =
+          '<div class="empty-state">未发现常见的反调试手段（已扫描 ' +
+          scannedCount +
+          ' 个外部 JS）</div>';
+        updateAntidebugIndicator('on', '扫描完成 — 未检测到反调试');
       } else {
+        antiDebugScanned = true;
+        antiDebugBypassActive = false;
         statusEl.textContent = '检测到 ' + detections.length + ' 项反调试';
-        let html = '';
-        detections.forEach(d => {
+        var html = '';
+        detections.forEach(function (d) {
           html += '<div class="antidebug-item">';
           html += '<span class="antidebug-type">' + utils.escapeHtml(d.type) + '</span>';
           html += '<span class="antidebug-desc">' + utils.escapeHtml(d.desc) + '</span>';
           html += '</div>';
         });
+        if (scannedCount > 0) {
+          html +=
+            '<div class="antidebug-item"><span class="antidebug-desc">已扫描 ' +
+            scannedCount +
+            ' 个外部 JS 文件</span></div>';
+        }
         resultsEl.innerHTML = html;
+        updateAntidebugIndicator(
+          'danger',
+          '检测到 ' + detections.length + ' 项反调试 — 可点击绕过'
+        );
       }
     } catch (e) {
+      antiDebugScanned = false;
       statusEl.textContent = '扫描失败';
       resultsEl.innerHTML = '<div class="empty-state">' + utils.escapeHtml(e.message) + '</div>';
+      updateAntidebugIndicator('off', '扫描失败');
     }
   }
 
@@ -4817,8 +4976,12 @@
         },
       });
 
-      utils.showToast('反调试绕过已注入，刷新页面后生效', 'success');
+      antiDebugBypassActive = true;
+      updateAntidebugIndicator('on', '反调试绕过已生效（刷新页面后失效）');
+      utils.showToast('反调试绕过已注入，对当前页面立即生效（刷新后会丢失）', 'success');
     } catch (e) {
+      antiDebugBypassActive = false;
+      updateAntidebugIndicator('off', '绕过注入失败');
       utils.showToast('注入失败: ' + e.message, 'error');
     }
   }
@@ -4835,10 +4998,217 @@
         enable: true,
       });
       jsBlocked = false;
+      antiDebugBypassActive = false;
+      antiDebugScanned = false;
       chrome.storage.local.remove('js_blocked_tabId');
       updateJsToggleStatus();
+      updateAntidebugIndicator('on', '未检测 / 未绕过');
+      var statusEl = utils.get('antidebug-status');
+      if (statusEl) statusEl.textContent = '';
+      var resultsEl = utils.get('antidebug-results');
+      if (resultsEl)
+        resultsEl.innerHTML =
+          '<div class="empty-state">点击「扫描反调试」检测页面中的反调试手段</div>';
       utils.showToast('已清除所有脚本拦截规则', 'success');
     } catch (e) {
+      utils.showToast('操作失败: ' + e.message, 'error');
+    }
+  }
+
+  // ====== Remove Copy Restrictions ======
+  var uncopyActive = false;
+
+  function updateUncopyIndicator(state, text) {
+    var dot = utils.get('uncopy-indicator-dot');
+    var label = utils.get('uncopy-indicator-label');
+    if (dot && label) {
+      if (state === 'warn') dot.className = 'js-toggle-dot js-toggle-dot-warn';
+      else if (state === 'off') dot.className = 'js-toggle-dot js-toggle-dot-off';
+      else dot.className = 'js-toggle-dot js-toggle-dot-on';
+      label.textContent = text;
+    }
+  }
+
+  async function removeCopyRestrictions() {
+    var btn = utils.get('uncopy-btn');
+    if (btn) btn.disabled = true;
+    updateUncopyIndicator('warn', '正在解除...');
+
+    var tab;
+    try {
+      tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    } catch (e) {}
+    if (!tab?.id) {
+      updateUncopyIndicator('off', '无法获取当前标签页');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    try {
+      var results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        world: 'MAIN',
+        func: function () {
+          var log = {};
+
+          // 1. Remove user-select: none from all elements
+          var allEls = document.querySelectorAll('*');
+          var userSelectCount = 0;
+          for (var i = 0; i < allEls.length; i++) {
+            var el = allEls[i];
+            var style = window.getComputedStyle(el);
+            var us = style.getPropertyValue('user-select') || style.webkitUserSelect;
+            if (us === 'none' || us === '-webkit-none') {
+              el.style.setProperty('user-select', 'auto', 'important');
+              el.style.setProperty('-webkit-user-select', 'auto', 'important');
+              el.style.webkitUserSelect = 'auto';
+              userSelectCount++;
+            }
+          }
+          log.userSelect = userSelectCount;
+
+          // 2. Remove inline oncopy/oncut/onpaste/onselectstart/oncontextmenu/ondragstart
+          var eventAttrs = [
+            'oncopy',
+            'oncut',
+            'onpaste',
+            'onselectstart',
+            'oncontextmenu',
+            'ondragstart',
+            'onbeforecopy',
+            'onbeforecut',
+            'onbeforepaste',
+          ];
+          var inlineAttrCount = 0;
+          for (var j = 0; j < allEls.length; j++) {
+            for (var a = 0; a < eventAttrs.length; a++) {
+              if (allEls[j].hasAttribute(eventAttrs[a])) {
+                allEls[j].removeAttribute(eventAttrs[a]);
+                inlineAttrCount++;
+              }
+            }
+          }
+          log.inlineAttrs = inlineAttrCount;
+
+          // 3. Remove body-level event listeners via addEventListener capture override
+          var blockEvents = ['copy', 'cut', 'paste', 'selectstart', 'contextmenu', 'dragstart'];
+          var listenerCount = 0;
+          blockEvents.forEach(function (evt) {
+            document.addEventListener(
+              evt,
+              function (e) {
+                e.stopImmediatePropagation();
+              },
+              true
+            );
+            document.body.addEventListener(
+              evt,
+              function (e) {
+                e.stopImmediatePropagation();
+              },
+              true
+            );
+            listenerCount++;
+          });
+          log.captureListeners = blockEvents.length;
+
+          // 4. Override preventDefault on document level events
+          var origPreventDefault = Event.prototype.preventDefault;
+          var blockTypes = {};
+          blockEvents.forEach(function (t) {
+            blockTypes[t] = true;
+          });
+          Event.prototype.preventDefault = function () {
+            if (this.type && blockTypes[this.type]) return;
+            origPreventDefault.call(this);
+          };
+          log.preventOverride = true;
+
+          // 5. Remove pointer-events: none overlays
+          var pointerCount = 0;
+          for (var k = 0; k < allEls.length; k++) {
+            var s = window.getComputedStyle(allEls[k]);
+            if (s.getPropertyValue('pointer-events') === 'none') {
+              var tag = allEls[k].tagName.toLowerCase();
+              var isTransparent =
+                s.getPropertyValue('opacity') === '0' ||
+                s.getPropertyValue('background') === 'rgba(0, 0, 0, 0)' ||
+                s.backgroundColor === 'transparent';
+              if (
+                isTransparent &&
+                (tag === 'div' || tag === 'span' || tag === 'a' || tag === 'img')
+              ) {
+                allEls[k].style.setProperty('pointer-events', 'auto', 'important');
+                allEls[k].style.display = 'none';
+                pointerCount++;
+              }
+            }
+          }
+          log.pointerOverlays = pointerCount;
+
+          // 6. Remove -webkit-user-drag: none
+          var dragCount = 0;
+          for (var m = 0; m < allEls.length; m++) {
+            if (allEls[m].style.webkitUserDrag === 'none') {
+              allEls[m].style.webkitUserDrag = 'auto';
+              dragCount++;
+            }
+          }
+          log.dragRestrictions = dragCount;
+
+          return log;
+        },
+      });
+
+      var log = results?.[0]?.result;
+      if (!log) {
+        updateUncopyIndicator('off', '注入失败');
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      // Render log
+      var logEl = utils.get('uncopy-log');
+      if (logEl) {
+        var html = '';
+        if (log.userSelect > 0)
+          html +=
+            '<div class="uncopy-log-entry"><span class="log-ok">+</span> 解除 <span class="log-count">' +
+            log.userSelect +
+            '</span> 个元素的 user-select: none</div>';
+        if (log.inlineAttrs > 0)
+          html +=
+            '<div class="uncopy-log-entry"><span class="log-ok">+</span> 移除 <span class="log-count">' +
+            log.inlineAttrs +
+            '</span> 个内联事件拦截</div>';
+        if (log.pointerOverlays > 0)
+          html +=
+            '<div class="uncopy-log-entry"><span class="log-ok">+</span> 隐藏 <span class="log-count">' +
+            log.pointerOverlays +
+            '</span> 个透明遮罩层</div>';
+        if (log.dragRestrictions > 0)
+          html +=
+            '<div class="uncopy-log-entry"><span class="log-ok">+</span> 解除 <span class="log-count">' +
+            log.dragRestrictions +
+            '</span> 个拖拽限制</div>';
+        if (log.captureListeners)
+          html +=
+            '<div class="uncopy-log-entry"><span class="log-ok">+</span> 注册 <span class="log-count">' +
+            log.captureListeners +
+            '</span> 种 capture 事件拦截</div>';
+        if (log.preventOverride)
+          html +=
+            '<div class="uncopy-log-entry"><span class="log-ok">+</span> 覆写 preventDefault 拦截</div>';
+        if (!html) html = '<div class="uncopy-log-entry">页面无复制限制</div>';
+        logEl.innerHTML = html;
+      }
+
+      uncopyActive = true;
+      updateUncopyIndicator('on', '复制限制已解除');
+      utils.showToast('复制限制已解除', 'success');
+    } catch (e) {
+      uncopyActive = false;
+      updateUncopyIndicator('off', '操作失败');
       utils.showToast('操作失败: ' + e.message, 'error');
     }
   }
@@ -5346,6 +5716,10 @@
     if (antidebugBypassBtn) antidebugBypassBtn.addEventListener('click', bypassAntiDebug);
     const antidebugClearBtn = utils.get('antidebug-clear-btn');
     if (antidebugClearBtn) antidebugClearBtn.addEventListener('click', clearScriptBlock);
+
+    // Remove copy restrictions
+    const uncopyBtn = utils.get('uncopy-btn');
+    if (uncopyBtn) uncopyBtn.addEventListener('click', removeCopyRestrictions);
 
     // Restore perm intercept state
     chrome.storage.local.get(['permInterceptTabId'], result => {
