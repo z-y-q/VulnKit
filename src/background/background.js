@@ -14,7 +14,7 @@ let spoofState = {
 };
 
 // Restore spoof state from storage on startup
-chrome.storage.local.get(['pentest_spoof'], (result) => {
+chrome.storage.local.get(['pentest_spoof'], result => {
   if (result.pentest_spoof) {
     spoofState = result.pentest_spoof;
   }
@@ -111,7 +111,7 @@ async function addHeaderRules(tabId, url, headers) {
     requestHeaders.push({ header: 'X-Real-IP', operation: 'set', value: headers.clientIp });
   }
   if (headers.custom && headers.custom.length > 0) {
-    headers.custom.forEach((h) => {
+    headers.custom.forEach(h => {
       if (h.name && h.value) {
         requestHeaders.push({ header: h.name, operation: 'set', value: h.value });
       }
@@ -132,12 +132,7 @@ async function addHeaderRules(tabId, url, headers) {
     action: { type: 'modifyHeaders', requestHeaders: [h] },
     condition: {
       urlFilter: urlFilter,
-      resourceTypes: [
-        'main_frame',
-        'sub_frame',
-        'xmlhttprequest',
-        'other',
-      ],
+      resourceTypes: ['main_frame', 'sub_frame', 'xmlhttprequest', 'other'],
     },
   }));
 
@@ -158,10 +153,14 @@ async function removeAllHeaderRules() {
 }
 
 // ====== Fetch helpers ======
-async function fetchUrl(url) {
+async function fetchUrl(url, tailOnly) {
   try {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var opts = {};
+    if (tailOnly) {
+      opts.headers = { Range: 'bytes=-500' };
+    }
+    const resp = await fetch(url, opts);
+    if (!resp.ok && resp.status !== 206) throw new Error('HTTP ' + resp.status);
     const data = await resp.text();
     return { success: true, data };
   } catch (e) {
@@ -207,11 +206,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.enable) {
         removeJsBlockRule()
           .then(() => sendResponse({ success: true }))
-          .catch((e) => sendResponse({ success: false, error: e.message }));
+          .catch(e => sendResponse({ success: false, error: e.message }));
       } else {
         addJsBlockRule()
           .then(() => sendResponse({ success: true }))
-          .catch((e) => sendResponse({ success: false, error: e.message }));
+          .catch(e => sendResponse({ success: false, error: e.message }));
       }
       return true; // async sendResponse
 
@@ -220,7 +219,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         spoofState.ua = { enabled: true, current: message.userAgent };
         addUaRule(message.tabId, message.url, message.userAgent)
           .then(() => sendResponse({ success: true }))
-          .catch((e) => sendResponse({ success: false, error: e.message }));
+          .catch(e => sendResponse({ success: false, error: e.message }));
       } else {
         sendResponse({ success: false, error: 'Missing url or userAgent' });
       }
@@ -230,7 +229,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       spoofState.ua = { enabled: false, current: '' };
       removeUaRule()
         .then(() => sendResponse({ success: true }))
-        .catch((e) => sendResponse({ success: false, error: e.message }));
+        .catch(e => sendResponse({ success: false, error: e.message }));
       return true;
 
     case 'SPOOF_HEADERS':
@@ -238,7 +237,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         spoofState.headers = message.headers;
         addHeaderRules(message.tabId, message.url, message.headers)
           .then(() => sendResponse({ success: true }))
-          .catch((e) => sendResponse({ success: false, error: e.message }));
+          .catch(e => sendResponse({ success: false, error: e.message }));
       } else {
         sendResponse({ success: false, error: 'Missing headers' });
       }
@@ -248,23 +247,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       spoofState.headers = { xff: '', referer: '', clientIp: '', custom: [] };
       removeAllHeaderRules()
         .then(() => sendResponse({ success: true }))
-        .catch((e) => sendResponse({ success: false, error: e.message }));
+        .catch(e => sendResponse({ success: false, error: e.message }));
       return true;
 
     case 'FETCH_URL':
-      fetchUrl(message.url).then((result) => {
+      fetchUrl(message.url, message.tailOnly).then(result => {
         sendResponse(result.success ? { data: result.data } : { error: result.error });
       });
       return true;
 
     case 'FETCH_URL_AUTH':
-      fetchUrlAuth(message.url, message.key, message.header).then((result) => {
+      fetchUrlAuth(message.url, message.key, message.header).then(result => {
         sendResponse(result.success ? { data: result.data } : { error: result.error });
       });
       return true;
 
     case 'FETCH_IMAGE':
-      fetchImage(message.url).then((result) => {
+      fetchImage(message.url).then(result => {
         sendResponse(result.success ? { data: result.data } : { error: result.error });
       });
       return true;

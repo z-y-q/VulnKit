@@ -2540,6 +2540,186 @@ body {
   border-color: var(--border-color);
 }
 
+/* ====== Webpack Progress Bar ====== */
+.sm-progress {
+  height: 4px;
+  background: #eee;
+  border-radius: 2px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.sm-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4A90E2, #667EEA);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+[data-theme='dark'] .sm-progress { background: #333; }
+
+.sm-phases {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 8px;
+}
+.sm-phase.active { color: #4A90E2; font-weight: 600; }
+.sm-phase.done { color: #2E7D32; }
+.sm-phase-divider { color: #ccc; }
+[data-theme='dark'] .sm-phase.active { color: var(--accent); }
+[data-theme='dark'] .sm-phase.done { color: #81C784; }
+[data-theme='dark'] .sm-phase-divider { color: #555; }
+
+/* ====== Webpack Ext Badge ====== */
+.sm-ext-badge {
+  display: inline-block;
+  font-size: 9px;
+  color: #fff;
+  padding: 1px 4px;
+  border-radius: 2px;
+  margin-left: 4px;
+  font-weight: 600;
+  line-height: 14px;
+  vertical-align: middle;
+}
+
+/* ====== Webpack Enhanced Stats ====== */
+.sm-stats-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #F8F9FA;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  border: 1px solid #eee;
+}
+[data-theme='dark'] .sm-stats-bar {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+.sm-stat-item {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #E8E8E8;
+  color: #555;
+}
+.sm-stat-total { background: #E0E0E0; color: #333; }
+.sm-stat-rt { background: #E6F0FA; color: #1565C0; }
+.sm-stat-sm { background: #E8F5E9; color: #2E7D32; }
+.sm-stat-ch { background: #FFF3E0; color: #E65100; }
+.sm-stat-src { background: #F3E5F5; color: #7B1FA2; }
+[data-theme='dark'] .sm-stat-item { background: #2a2a3e; color: #ccc; }
+[data-theme='dark'] .sm-stat-rt { background: #1E3A5F; color: #90CAF9; }
+[data-theme='dark'] .sm-stat-sm { background: #1a3a2a; color: #81C784; }
+[data-theme='dark'] .sm-stat-ch { background: #3a2e1a; color: #FFB74D; }
+[data-theme='dark'] .sm-stat-src { background: #2D1B3D; color: #CE93D8; }
+
+/* ====== Webpack Security Analysis ====== */
+.sm-analysis-severity { font-size: 10px; padding: 1px 5px; border-radius: 2px; color: #fff; font-weight: 600; }
+.sm-severity-critical { background: #D32F2F; }
+.sm-severity-high { background: #E65100; }
+.sm-severity-medium { background: #F9A825; color: #333; }
+.sm-severity-low { background: #1565C0; }
+.sm-severity-info { background: #757575; }
+
+.sm-analysis-item {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.sm-analysis-item:hover { background: #F5F7FA; }
+.sm-analysis-match {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 10px;
+  color: #E65100;
+  background: #FFF3E0;
+  padding: 1px 4px;
+  border-radius: 2px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+.sm-analysis-file {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 10px;
+  color: #999;
+}
+.sm-analysis-progress-text {
+  font-size: 11px;
+  color: #888;
+  padding: 4px 0;
+}
+.sm-analysis-summary {
+  font-size: 11px;
+  padding: 6px 8px;
+  background: #F8F9FA;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  color: #555;
+}
+[data-theme='dark'] .sm-analysis-item { border-color: var(--border-color); }
+[data-theme='dark'] .sm-analysis-item:hover { background: var(--bg-tertiary); }
+[data-theme='dark'] .sm-analysis-match { background: #3a2e1a; color: #FFB74D; }
+[data-theme='dark'] .sm-analysis-file { color: var(--text-secondary); }
+[data-theme='dark'] .sm-analysis-progress-text { color: var(--text-secondary); }
+[data-theme='dark'] .sm-analysis-summary { background: var(--bg-tertiary); color: var(--text-secondary); }
+
+/* ====== Webpack Scan Button Animation ====== */
+#sourcemap-scan-btn.scanning {
+  position: relative;
+  padding-left: 24px;
+}
+#sourcemap-scan-btn.scanning::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border: 2px solid #fff;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: sm-spin 0.6s linear infinite;
+}
+@keyframes sm-spin { to { transform: rotate(360deg); } }
+
+/* ====== Webpack Empty State ====== */
+.sm-empty {
+  text-align: center;
+  padding: 30px 10px;
+  color: #999;
+}
+.sm-empty-icon { font-size: 28px; margin-bottom: 8px; }
+.sm-empty-hint { font-size: 11px; color: #bbb; margin-top: 4px; }
+
+/* ====== Webpack Breadcrumb ====== */
+.sm-breadcrumb {
+  font-size: 11px;
+  color: #999;
+  padding: 4px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sm-breadcrumb-source {
+  background: #E6F0FA;
+  color: #1565C0;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-size: 10px;
+}
+[data-theme='dark'] .sm-breadcrumb { color: var(--text-secondary); }
+[data-theme='dark'] .sm-breadcrumb-source { background: #1E3A5F; color: #90CAF9; }
+
 /* ====== Webpack Module Meta (deps count, source map badge) ====== */
 .sourcemap-item-meta {
   flex-shrink: 0;

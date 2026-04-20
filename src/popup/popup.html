@@ -875,12 +875,23 @@
         <div class="card-title">Webpack 模块映射</div>
         <div class="panel-actions">
           <button class="btn btn-primary" id="sourcemap-scan-btn">扫描[v2]</button>
+          <button class="btn btn-sm btn-outline" id="sourcemap-analyze-btn">安全分析</button>
           <button class="btn btn-sm btn-outline" id="sourcemap-copy-all-btn">复制路径</button>
           <button class="btn btn-sm btn-outline" id="sourcemap-copy-tree-btn">目录树</button>
           <button class="btn btn-sm btn-outline" id="sourcemap-load-sources-btn">加载到Sources</button>
           <button class="btn btn-sm btn-outline" id="sourcemap-download-all-btn">下载全部</button>
         </div>
         <div class="sourcemap-status" id="sourcemap-status"></div>
+        <div class="sm-progress" id="sm-progress" style="display:none">
+          <div class="sm-progress-bar" id="sm-progress-bar"></div>
+        </div>
+        <div class="sm-phases" id="sm-phases" style="display:none">
+          <span class="sm-phase" data-phase="1">①运行时</span>
+          <span class="sm-phase-divider">→</span>
+          <span class="sm-phase" data-phase="2">②SourceMap</span>
+          <span class="sm-phase-divider">→</span>
+          <span class="sm-phase" data-phase="3">③JS解析</span>
+        </div>
 
         <!-- 搜索过滤 -->
         <input type="text" class="input sourcemap-search-input" id="sourcemap-search-input" placeholder="搜索模块路径..." />
@@ -888,6 +899,16 @@
         <!-- 扫描结果列表 -->
         <div id="sourcemap-results" class="sourcemap-results">
           <div class="empty-state">点击「扫描当前页面」提取 Webpack 模块映射</div>
+        </div>
+
+        <!-- 安全分析结果 -->
+        <div class="content-card card-spacing hidden" id="sm-analysis-card">
+          <div class="sourcemap-detail-header">
+            <div class="card-title card-title-flat">安全分析结果</div>
+            <button class="btn btn-sm btn-outline" id="sm-analysis-close">关闭</button>
+          </div>
+          <div id="sm-analysis-progress"></div>
+          <div id="sm-analysis-results"></div>
         </div>
 
         <!-- 文件详情（点击模块后显示） -->

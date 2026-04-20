@@ -6206,15 +6206,15 @@
   let sourcemapSourceCache = {};
   let sourcemapMapCache = {};
 
-  async function smBatchFetch(urls, concurrency) {
-    concurrency = concurrency || 5;
+  async function smBatchFetch(urls, tailOnly) {
+    var concurrency = tailOnly ? 10 : 5;
     var results = [];
     for (var i = 0; i < urls.length; i += concurrency) {
       var batch = urls.slice(i, i + concurrency);
       var batchResults = await Promise.all(
         batch.map(function (url) {
           return chrome.runtime
-            .sendMessage({ type: 'FETCH_URL', url: url })
+            .sendMessage({ type: 'FETCH_URL', url: url, tailOnly: tailOnly })
             .then(function (r) {
               return r && !r.error ? r.data : null;
             })
@@ -6236,6 +6236,107 @@
     }
   }
 
+  function smUpdateProgress(percent, activePhase) {
+    var bar = utils.get('sm-progress-bar');
+    var phases = document.querySelectorAll('#sm-phases .sm-phase');
+    if (bar) bar.style.width = percent + '%';
+    phases.forEach(function (el) {
+      var p = parseInt(el.dataset.phase);
+      el.classList.remove('active', 'done');
+      if (p < activePhase) el.classList.add('done');
+      else if (p === activePhase) el.classList.add('active');
+    });
+  }
+
+  function smExtractChunkManifest(jsContent) {
+    // Extract chunk ID → hash mapping from webpack runtime manifest
+    // Common patterns in webpack 4/5:
+    //   __webpack_require__.u = function(e) { return "js/"+e+"."+{123:"abc",456:"def"}[e]+".js"; }
+    //   "static/js/" + chunkId + "." + contentHash + ".js"
+    // Also look for: __webpack_require__.u = function(t){ return t+"."+{...}[t]+".js" }
+    var chunkMap = {};
+    var urlPrefix = '';
+
+    // Pattern 1: {123:"abc456", 456:"def789"} inside __webpack_require__.u
+    var uFuncMatch = jsContent.match(
+      /__webpack_require__\s*\.\s*u\s*=\s*function\s*\(\s*(\w+)\s*\)\s*\{[\s\S]*?return\s+(?:([\s\S]*?)\+?\s*\1\s*\+?\s*([\s\S]*?))\s*;?\s*\}/
+    );
+    if (uFuncMatch) {
+      var funcBody = uFuncMatch[0];
+      // Extract the hash map: {123:"abc", 456:"def"}
+      var mapMatch = funcBody.match(/\{[^}]*\}/g);
+      if (mapMatch) {
+        mapMatch.forEach(function (m) {
+          try {
+            var obj = JSON.parse(m.replace(/(\w+)\s*:/g, '"$1":'));
+            Object.keys(obj).forEach(function (k) {
+              chunkMap[k] = obj[k];
+            });
+          } catch (e) {
+            // try eval-safe extraction
+            var pairs = m.match(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g);
+            if (pairs) {
+              pairs.forEach(function (p) {
+                var kv = p.match(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/);
+                if (kv) chunkMap[kv[1]] = kv[2];
+              });
+            }
+          }
+        });
+      }
+      // Extract URL prefix pattern: "static/js/" or "js/" etc.
+      var prefixMatch = funcBody.match(/["']([^"']*\/)["']/);
+      if (prefixMatch) urlPrefix = prefixMatch[1];
+    }
+
+    // Pattern 2: jsonpScriptSrc or chunkSrc with full URL mapping
+    // e.g.: (window["webpackChunkapp"] = window["webpackChunkapp"] || []).push([[123], ...])
+    var chunkIdPattern = /\.push\(\s*\[\s*\[([^\]]*)\]\s*,/g;
+    var idMatch;
+    while ((idMatch = chunkIdPattern.exec(jsContent)) !== null) {
+      var ids = idMatch[1].split(',');
+      ids.forEach(function (id) {
+        var trimmed = id.replace(/['"\s]/g, '');
+        if (trimmed) chunkMap[trimmed] = chunkMap[trimmed] || '';
+      });
+    }
+
+    return { chunkMap: chunkMap, urlPrefix: urlPrefix };
+  }
+
+  function smBuildChunkUrls(chunkManifest, scriptUrl) {
+    // Build full chunk URLs from manifest + known script URL pattern
+    var urls = [];
+    if (!scriptUrl || Object.keys(chunkManifest).length === 0) return urls;
+
+    // Derive base URL from a known script URL
+    // e.g., https://example.com/static/js/app.abc123.js → https://example.com/static/js/
+    var baseUrl = scriptUrl.substring(0, scriptUrl.lastIndexOf('/') + 1);
+
+    // Also try to detect the URL pattern from script filenames
+    // e.g., app.abc123.js, chunk-vendors.def456.js → pattern is name.hash.js
+    var urlPrefix = chunkManifest.urlPrefix || '';
+
+    Object.keys(chunkManifest).forEach(function (chunkId) {
+      var hash = chunkManifest[chunkId];
+      if (!hash) return;
+      // Try common patterns: prefix + chunkId + "." + hash + ".js"
+      // Also try without prefix if not found
+      var candidates = [];
+      if (urlPrefix) {
+        candidates.push(baseUrl + urlPrefix + chunkId + '.' + hash + '.js');
+        candidates.push(baseUrl + chunkId + '.' + hash + '.js');
+      } else {
+        candidates.push(baseUrl + chunkId + '.' + hash + '.js');
+        candidates.push(baseUrl + 'js/' + chunkId + '.' + hash + '.js');
+        candidates.push(baseUrl + 'static/js/' + chunkId + '.' + hash + '.js');
+      }
+      urls.push({ chunkId: chunkId, candidates: candidates });
+    });
+
+    return urls;
+  }
+
   async function scanWebpackModules() {
     var statusEl = utils.get('sourcemap-status');
     var scanBtn = utils.get('sourcemap-scan-btn');
@@ -6248,8 +6349,20 @@
     if (scanBtn) {
       scanBtn.disabled = true;
       scanBtn.textContent = '扫描中...';
+      scanBtn.classList.add('scanning');
     }
     resultsEl.innerHTML = '';
+
+    // Show progress bar and phase indicator
+    var progressEl = utils.get('sm-progress');
+    var phasesEl = utils.get('sm-phases');
+    if (progressEl) {
+      progressEl.style.display = '';
+    }
+    if (phasesEl) {
+      phasesEl.style.display = '';
+    }
+    smUpdateProgress(0, 1);
 
     try {
       var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -6259,6 +6372,7 @@
         if (scanBtn) {
           scanBtn.disabled = false;
           scanBtn.textContent = '扫描[v2]';
+          scanBtn.classList.remove('scanning');
         }
         return;
       }
@@ -6266,9 +6380,11 @@
       var allModules = [];
       var sourceMapUrls = [];
       var scriptUrls = [];
+      var chunkManifest = null;
 
       // Phase 1: MAIN world — access webpack runtime
       statusEl.textContent = 'Phase 1: 检测 Webpack 运行时...';
+      smUpdateProgress(10, 1);
       try {
         var wpResults = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
@@ -6333,13 +6449,93 @@
               }
             }
 
-            return { modules: modules, hasWebpack: hasWebpack };
+            // Extract webpack chunk URL template and chunk info
+            var chunkInfo = null;
+            try {
+              var wpRequire =
+                typeof __webpack_require__ !== 'undefined' ? __webpack_require__ : null;
+              if (wpRequire && typeof wpRequire.u === 'function') {
+                chunkInfo = {
+                  uFunc: wpRequire.u.toString(),
+                  uKeys: Object.keys(wpRequire).filter(function (k) {
+                    return typeof wpRequire[k] === 'function' || typeof wpRequire[k] === 'object';
+                  }),
+                };
+                // Try to get installed chunks
+                if (wpRequire.o) {
+                  chunkInfo.installedChunks = {};
+                  try {
+                    chunkInfo.installedChunks = JSON.parse(JSON.stringify(wpRequire.o));
+                  } catch (e) {
+                    for (var oc in wpRequire.o) {
+                      if (wpRequire.o.hasOwnProperty(oc))
+                        chunkInfo.installedChunks[oc] = wpRequire.o[oc];
+                    }
+                  }
+                }
+              }
+              // Also try via webpackChunk arrays
+              if (!chunkInfo) {
+                for (var wck in window) {
+                  if (wck.indexOf('webpackChunk') === 0) {
+                    // Try to find the require function from push arguments
+                    var wc = window[wck];
+                    for (var wi = 0; wi < wc.length; wi++) {
+                      if (
+                        wc[wi] &&
+                        Array.isArray(wc[wi]) &&
+                        wc[wi].length >= 3 &&
+                        typeof wc[wi][2] === 'function'
+                      ) {
+                        var fn = wc[wi][2];
+                        // The function receives require, __webpack_require__, etc.
+                        // Try to get __webpack_require__ from the push call
+                        break;
+                      }
+                    }
+                    break;
+                  }
+                }
+              }
+            } catch (e) {}
+
+            return { modules: modules, hasWebpack: hasWebpack, chunkInfo: chunkInfo };
           },
         });
         if (wpResults && wpResults[0] && wpResults[0].result) {
           var wpData = wpResults[0].result;
           if (wpData.modules && wpData.modules.length > 0) {
             allModules = allModules.concat(wpData.modules);
+          }
+          // Parse chunk manifest from __webpack_require__.u
+          if (wpData.chunkInfo && wpData.chunkInfo.uFunc) {
+            var uFuncStr = wpData.chunkInfo.uFunc;
+            // Extract hash map: {123:"abc", 456:"def"} or {123:"abc",456:"def"}
+            var hashMaps = uFuncStr.match(/\{[^}]{10,}\}/g);
+            if (hashMaps) {
+              var chunkHashMap = {};
+              hashMaps.forEach(function (hm) {
+                // Try to parse the object - keys are chunk IDs, values are hashes
+                var pairs = hm.match(/"?(\w+)"?\s*:\s*"([^"]+)"/g);
+                if (pairs) {
+                  pairs.forEach(function (p) {
+                    var kv = p.match(/"?(\w+)"?\s*:\s*"([^"]+)"/);
+                    if (kv && kv[2].length >= 4 && kv[2].length <= 20) {
+                      chunkHashMap[kv[1]] = kv[2];
+                    }
+                  });
+                }
+              });
+              if (Object.keys(chunkHashMap).length > 0) {
+                // Extract URL prefix from the function body
+                var urlPrefixMatch = uFuncStr.match(/["']([^"']*\/)[^"']*["']/);
+                var urlPrefix = urlPrefixMatch ? urlPrefixMatch[1] : '';
+                // Extract file extension pattern
+                var extMatch = uFuncStr.match(/\.js["']/);
+                // Store for Phase 2.5
+                chunkManifest = { hashMap: chunkHashMap, urlPrefix: urlPrefix };
+              }
+            }
           }
         }
       } catch (e) {
@@ -6348,6 +6544,7 @@
 
       // Phase 2: ISOLATED world — collect script URLs + extract source map URLs
       statusEl.textContent = 'Phase 2: 收集脚本和 Source Map...';
+      smUpdateProgress(30, 2);
       try {
         var domResults = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
@@ -6361,12 +6558,42 @@
               var text = s.textContent || '';
               if (text.length > 10 && text.length < 500000) inlineScripts.push(text);
             });
-            return { extUrls: extUrls, inlineScripts: inlineScripts };
+            // Collect all loaded JS resources from Performance API (catches dynamic scripts)
+            var perfUrls = [];
+            try {
+              performance.getEntriesByType('resource').forEach(function (e) {
+                if (e.name && /\.js(\?|$)/.test(e.name)) {
+                  perfUrls.push(e.name);
+                }
+              });
+            } catch (ex) {}
+            // Collect preload/modulepreload link hints
+            var preloadUrls = [];
+            document
+              .querySelectorAll('link[rel="preload"][as="script"], link[rel="modulepreload"]')
+              .forEach(function (l) {
+                if (l.href) preloadUrls.push(l.href);
+              });
+            return {
+              extUrls: extUrls,
+              inlineScripts: inlineScripts,
+              perfUrls: perfUrls,
+              preloadUrls: preloadUrls,
+            };
           },
         });
         if (domResults && domResults[0] && domResults[0].result) {
           var domData = domResults[0].result;
           scriptUrls = domData.extUrls || [];
+
+          // Merge performance API URLs (dynamically loaded scripts)
+          (domData.perfUrls || []).forEach(function (u) {
+            if (scriptUrls.indexOf(u) === -1) scriptUrls.push(u);
+          });
+          // Merge preload hints
+          (domData.preloadUrls || []).forEach(function (u) {
+            if (scriptUrls.indexOf(u) === -1) scriptUrls.push(u);
+          });
 
           // Extract source map URLs from inline scripts
           var mapRegex = /[/#][@]\s*sourceMappingURL\s*=\s*(\S+)/gi;
@@ -6409,6 +6636,7 @@
       // Fetch and parse source map files
       if (sourceMapUrls.length > 0) {
         statusEl.textContent = 'Phase 2: 解析 ' + sourceMapUrls.length + ' 个 Source Map 文件...';
+        smUpdateProgress(50, 2);
         var mapContents = await smBatchFetch(sourceMapUrls.slice(0, 20));
         for (var mi = 0; mi < mapContents.length; mi++) {
           if (!mapContents[mi]) continue;
@@ -6449,9 +6677,148 @@
         }
       }
 
+      // Phase 2.5: Discover unloaded chunks via manifest + fetch their source maps
+      var discoveredChunkUrls = [];
+
+      // Build chunk URLs from MAIN world manifest (most reliable)
+      if (chunkManifest && Object.keys(chunkManifest.hashMap).length > 0 && scriptUrls.length > 0) {
+        var refScriptUrl = scriptUrls[0];
+        var baseUrl = refScriptUrl.substring(0, refScriptUrl.lastIndexOf('/') + 1);
+        var prefix = chunkManifest.urlPrefix || '';
+
+        Object.keys(chunkManifest.hashMap).forEach(function (chunkId) {
+          var hash = chunkManifest.hashMap[chunkId];
+          // Generate candidates with different prefix patterns
+          var candidates = [
+            baseUrl + prefix + chunkId + '.' + hash + '.js',
+            baseUrl + chunkId + '.' + hash + '.js',
+            baseUrl + 'static/js/' + chunkId + '.' + hash + '.js',
+            baseUrl + 'js/' + chunkId + '.' + hash + '.js',
+            baseUrl + 'assets/' + chunkId + '.' + hash + '.js',
+          ];
+          discoveredChunkUrls.push({ chunkId: chunkId, candidates: candidates });
+        });
+      }
+
+      // Fallback: parse main bundle JS content for manifest (if MAIN world didn't get it)
+      if (discoveredChunkUrls.length === 0 && scriptUrls.length > 0) {
+        var mainScriptContents = await smBatchFetch(scriptUrls.slice(0, 3));
+        for (var mc = 0; mc < mainScriptContents.length; mc++) {
+          if (!mainScriptContents[mc]) continue;
+          var manifest = smExtractChunkManifest(mainScriptContents[mc]);
+          if (Object.keys(manifest.chunkMap).length > 0) {
+            var builtUrls = smBuildChunkUrls(manifest, scriptUrls[mc]);
+            builtUrls.forEach(function (cu) {
+              discoveredChunkUrls.push(cu);
+            });
+          }
+        }
+      }
+
+      if (discoveredChunkUrls.length > 0) {
+        statusEl.textContent =
+          'Phase 2.5: Manifest 发现 ' + discoveredChunkUrls.length + ' 个 Chunk，探测中...';
+        // Deduplicate candidates
+        var seenChunkUrls = {};
+        var chunkFetchUrls = [];
+        discoveredChunkUrls.forEach(function (cu) {
+          cu.candidates.forEach(function (url) {
+            // Skip chunks already in scriptUrls
+            var alreadyKnown = false;
+            for (var sk = 0; sk < scriptUrls.length; sk++) {
+              if (
+                scriptUrls[sk].indexOf(
+                  cu.chunkId + '.' + cu.candidates[0].split('.').slice(-2)[0]
+                ) !== -1
+              ) {
+                alreadyKnown = true;
+                break;
+              }
+            }
+            if (!seenChunkUrls[url] && !alreadyKnown) {
+              seenChunkUrls[url] = true;
+              chunkFetchUrls.push(url);
+            }
+          });
+        });
+
+        // Try fetching .map for every known script URL too
+        scriptUrls.forEach(function (sUrl) {
+          var sBase = sUrl.substring(0, sUrl.lastIndexOf('/') + 1);
+          var sName = sUrl.substring(sUrl.lastIndexOf('/') + 1);
+          var guessMap = smResolveUrl(sName + '.map', sBase);
+          if (sourceMapUrls.indexOf(guessMap) === -1) sourceMapUrls.push(guessMap);
+        });
+
+        // Tail-fetch chunks to find sourceMappingURL
+        var chunkSamples = await smBatchFetch(chunkFetchUrls.slice(0, 50), true);
+        var newSourceMapUrls = [];
+        for (var ci = 0; ci < chunkSamples.length; ci++) {
+          if (!chunkSamples[ci]) continue;
+          var chunkContent = chunkSamples[ci];
+          // Check for sourceMappingURL in tail
+          var chunkMapMatch = chunkContent.match(/[/#][@]\s*sourceMappingURL\s*=\s*(\S+)/);
+          if (chunkMapMatch && chunkMapMatch[1].indexOf('data:') !== 0) {
+            var cmUrl = smResolveUrl(chunkMapMatch[1], chunkFetchUrls[ci]);
+            if (sourceMapUrls.indexOf(cmUrl) === -1) newSourceMapUrls.push(cmUrl);
+          }
+          // Also guess .map alongside
+          var chunkMapGuess = chunkFetchUrls[ci] + '.map';
+          if (sourceMapUrls.indexOf(chunkMapGuess) === -1) newSourceMapUrls.push(chunkMapGuess);
+
+          // Add confirmed chunk to scriptUrls
+          if (scriptUrls.indexOf(chunkFetchUrls[ci]) === -1) scriptUrls.push(chunkFetchUrls[ci]);
+        }
+
+        // Fetch new source maps
+        var allNewMaps = newSourceMapUrls.slice(0, 50);
+        if (allNewMaps.length > 0) {
+          statusEl.textContent = 'Phase 2.5: 解析 ' + allNewMaps.length + ' 个新 Source Map...';
+          var newMapContents = await smBatchFetch(allNewMaps);
+          for (var nmi = 0; nmi < newMapContents.length; nmi++) {
+            if (!newMapContents[nmi]) continue;
+            var nmUrl = allNewMaps[nmi];
+            if (sourcemapMapCache[nmUrl]) continue;
+            try {
+              var nmJson = JSON.parse(newMapContents[nmi]);
+              sourcemapMapCache[nmUrl] = nmJson;
+              var nmSources = nmJson.sources || [];
+              var nmContent = nmJson.sourcesContent || [];
+              for (var nsIdx = 0; nsIdx < nmSources.length; nsIdx++) {
+                var nsPath = nmSources[nsIdx];
+                if (nsPath.indexOf('webpack://') === 0) nsPath = nsPath.replace('webpack://', '');
+                var nsExists = false;
+                for (var nse = 0; nse < allModules.length; nse++) {
+                  if (allModules[nse].path === nsPath) {
+                    nsExists = true;
+                    break;
+                  }
+                }
+                if (!nsExists) {
+                  var nsResolved = nmContent[nsIdx] !== undefined && nmContent[nsIdx] !== null;
+                  var nsMod = {
+                    id: 'sm2-' + nsIdx,
+                    path: nsPath,
+                    deps: [],
+                    source: 'sourcemap',
+                    resolved: nsResolved,
+                    sourceUrl: nmUrl,
+                  };
+                  if (nsResolved) sourcemapSourceCache[nsPath] = nmContent[nsIdx];
+                  allModules.push(nsMod);
+                }
+              }
+            } catch (e) {
+              // skip invalid source map
+            }
+          }
+        }
+      }
+
       // Phase 3: Fallback — parse JS files for webpack paths
       if (allModules.length === 0 && scriptUrls.length > 0) {
         statusEl.textContent = 'Phase 3: 解析 JS 文件中的模块路径...';
+        smUpdateProgress(70, 3);
         var jsContents = await smBatchFetch(scriptUrls.slice(0, 10));
         for (var ji = 0; ji < jsContents.length; ji++) {
           if (!jsContents[ji]) continue;
@@ -6492,12 +6859,37 @@
         }
       }
 
-      // Deduplicate by path
+      // Add script URLs as chunk entries (actual loaded JS files)
+      var seenScriptUrls = {};
+      for (var si2 = 0; si2 < scriptUrls.length; si2++) {
+        var scriptPath = scriptUrls[si2];
+        if (seenScriptUrls[scriptPath]) continue;
+        seenScriptUrls[scriptPath] = true;
+        // Check if this path already exists from other phases
+        var scriptPathExists = false;
+        for (var sp = 0; sp < allModules.length; sp++) {
+          if (allModules[sp].path === scriptPath) {
+            scriptPathExists = true;
+            break;
+          }
+        }
+        if (!scriptPathExists) {
+          allModules.push({
+            id: 'script-' + si2,
+            path: scriptPath,
+            deps: [],
+            source: 'chunk',
+          });
+        }
+      }
+
+      // Deduplicate by path, skip runtime modules with numeric-only paths
       var seenPaths = {};
       var deduped = [];
       for (var ui = 0; ui < allModules.length; ui++) {
         var m = allModules[ui];
         if (!m.path) continue;
+        if (m.source === 'runtime' && /^\d+$/.test(m.path)) continue;
         if (seenPaths[m.path]) continue;
         seenPaths[m.path] = true;
         deduped.push(m);
@@ -6505,6 +6897,7 @@
 
       sourcemapModules = deduped.slice(0, 2000);
       statusEl.textContent = '找到 ' + sourcemapModules.length + ' 个模块';
+      smUpdateProgress(100, 3);
       renderSourcemapModules();
     } catch (err) {
       statusEl.textContent = '扫描失败: ' + (err.message || '未知错误');
@@ -6512,7 +6905,15 @@
       if (scanBtn) {
         scanBtn.disabled = false;
         scanBtn.textContent = '扫描[v2]';
+        scanBtn.classList.remove('scanning');
       }
+      // Hide progress bar after a brief delay
+      setTimeout(function () {
+        var progressEl = utils.get('sm-progress');
+        var phasesEl = utils.get('sm-phases');
+        if (progressEl) progressEl.style.display = 'none';
+        if (phasesEl) phasesEl.style.display = 'none';
+      }, 800);
     }
   }
 
@@ -6540,12 +6941,55 @@
       g.push({ module: filtered[i], index: sourcemapModules.indexOf(filtered[i]) });
     }
 
-    var html =
-      '<div class="sourcemap-stats-bar">共 ' +
-      sourcemapModules.length +
-      ' 个模块' +
-      (filtered.length !== sourcemapModules.length ? '，显示 ' + filtered.length : '') +
-      '</div>';
+    // Enhanced stats bar
+    var allGroups = { runtime: [], sourcemap: [], chunk: [] };
+    for (var ai = 0; ai < sourcemapModules.length; ai++) {
+      var ag = allGroups[sourcemapModules[ai].source] || allGroups.chunk;
+      ag.push(sourcemapModules[ai]);
+    }
+    var stats = {
+      total: sourcemapModules.length,
+      runtime: allGroups.runtime.length,
+      sourcemap: allGroups.sourcemap.length,
+      chunk: allGroups.chunk.length,
+      resolved: sourcemapModules.filter(function (m) {
+        return m.resolved;
+      }).length,
+    };
+    var html = '<div class="sm-stats-bar">';
+    html += '<span class="sm-stat-item sm-stat-total">共 ' + stats.total + ' 个模块</span>';
+    if (stats.runtime > 0)
+      html += '<span class="sm-stat-item sm-stat-rt">运行时 ' + stats.runtime + '</span>';
+    if (stats.sourcemap > 0)
+      html += '<span class="sm-stat-item sm-stat-sm">SourceMap ' + stats.sourcemap + '</span>';
+    if (stats.chunk > 0)
+      html += '<span class="sm-stat-item sm-stat-ch">JS解析 ' + stats.chunk + '</span>';
+    if (stats.resolved > 0)
+      html += '<span class="sm-stat-item sm-stat-src">可查看源码 ' + stats.resolved + '</span>';
+    if (filtered.length !== sourcemapModules.length) {
+      html += '<span class="sm-stat-item">显示 ' + filtered.length + '</span>';
+    }
+    html += '</div>';
+
+    // Extension badge helper
+    var extColors = {
+      '.vue': '#42B883',
+      '.js': '#F7DF1E',
+      '.ts': '#3178C6',
+      '.tsx': '#3178C6',
+      '.jsx': '#61DAFB',
+      '.css': '#264DE4',
+      '.scss': '#CF649A',
+      '.less': '#1D365D',
+      '.json': '#5B5EA6',
+      '.html': '#E34F26',
+      '.svg': '#FFB13B',
+      '.png': '#FFB13B',
+      '.jpg': '#FFB13B',
+      '.gif': '#FFB13B',
+      '.woff': '#888',
+      '.woff2': '#888',
+    };
 
     var groupLabels = { runtime: 'Webpack 运行时', sourcemap: 'Source Map', chunk: 'JS 文件解析' };
     var groupClasses = {
@@ -6566,6 +7010,19 @@
         ')</div>';
       items.forEach(function (item) {
         var m = item.module;
+        // Extension badge
+        var extMatch = m.path.match(/\.[a-zA-Z0-9]+$/);
+        var extBadge = '';
+        if (extMatch) {
+          var ext = extMatch[0].toLowerCase();
+          var extColor = extColors[ext] || '#999';
+          extBadge =
+            '<span class="sm-ext-badge" style="background:' +
+            extColor +
+            '">' +
+            ext.replace('.', '') +
+            '</span>';
+        }
         var badges =
           '<span class="sourcemap-item-source">' +
           (m.source === 'runtime' ? 'RT' : m.source === 'sourcemap' ? 'SM' : 'CH') +
@@ -6581,6 +7038,7 @@
           utils.escapeHtml(m.path) +
           '">' +
           utils.escapeHtml(m.path) +
+          extBadge +
           '</span>';
         html +=
           '<span class="sourcemap-item-meta">' + badges + ' ' + utils.escapeHtml(meta) + '</span>';
@@ -6621,6 +7079,18 @@
     resultsEl.classList.add('hidden');
     detailCard.classList.remove('hidden');
     titleEl.textContent = mod.path;
+
+    // Breadcrumb
+    var sourceLabels = { runtime: 'Webpack 运行时', sourcemap: 'Source Map', chunk: 'JS 文件解析' };
+    var existingBc = detailCard.querySelector('.sm-breadcrumb');
+    if (existingBc) existingBc.remove();
+    var bcHtml = '<div class="sm-breadcrumb">';
+    bcHtml +=
+      '<span class="sm-breadcrumb-source">' + (sourceLabels[mod.source] || mod.source) + '</span>';
+    bcHtml += '<span>›</span>';
+    bcHtml += '<span>' + utils.escapeHtml(mod.path) + '</span>';
+    bcHtml += '</div>';
+    titleEl.insertAdjacentHTML('afterend', bcHtml);
 
     // Render deps
     var depsHtml = '';
@@ -6705,6 +7175,166 @@
     var resultsEl = utils.get('sourcemap-results');
     if (detailCard) detailCard.classList.add('hidden');
     if (resultsEl) resultsEl.classList.remove('hidden');
+  }
+
+  async function analyzeSourcemaps() {
+    var analysisCard = utils.get('sm-analysis-card');
+    var progressEl = utils.get('sm-analysis-progress');
+    var resultsEl = utils.get('sm-analysis-results');
+    if (!analysisCard || !progressEl || !resultsEl) return;
+
+    var resolvedModules = sourcemapModules.filter(function (m) {
+      return sourcemapSourceCache[m.path] && m.source !== 'chunk';
+    });
+    if (resolvedModules.length === 0) {
+      utils.showToast('没有可分析的源码模块（需 Source Map 提供源码）', 'warning');
+      return;
+    }
+
+    analysisCard.classList.remove('hidden');
+    resultsEl.innerHTML = '';
+    progressEl.innerHTML =
+      '<div class="sm-analysis-progress-text">正在分析 ' +
+      resolvedModules.length +
+      ' 个源码模块（Source Map）...</div>';
+
+    var securityRules = [
+      {
+        name: 'API 密钥泄露',
+        pattern: /(?:api[_-]?key|apikey|secret[_-]?key)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
+        severity: 'high',
+      },
+      {
+        name: '硬编码密码',
+        pattern: /(?:password|passwd|pwd)\s*[:=]\s*['"]([^'"]{4,})['"]/gi,
+        severity: 'high',
+      },
+      {
+        name: 'JWT Secret',
+        pattern: /(?:jwt[_-]?secret|token[_-]?secret)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
+        severity: 'high',
+      },
+      {
+        name: '数据库连接串',
+        pattern: /(?:mongodb|mysql|postgres|redis):\/\/[^\s'"]+/gi,
+        severity: 'critical',
+      },
+      {
+        name: '内部IP地址',
+        pattern:
+          /(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})/g,
+        severity: 'medium',
+      },
+      { name: '调试代码', pattern: /console\.(?:log|debug|info)\s*\(/g, severity: 'low' },
+      { name: 'TODO/FIXME', pattern: /(?:TODO|FIXME|HACK|XXX)\s*[:\(]/gi, severity: 'info' },
+      { name: 'eval() 使用', pattern: /eval\s*\(/g, severity: 'medium' },
+      { name: 'innerHTML 赋值', pattern: /innerHTML\s*=/g, severity: 'medium' },
+      {
+        name: 'localStorage/cookie',
+        pattern: /(?:localStorage|sessionStorage|document\.cookie)/g,
+        severity: 'low',
+      },
+    ];
+
+    var allFindings = [];
+
+    for (var mi = 0; mi < resolvedModules.length; mi++) {
+      var mod = resolvedModules[mi];
+      var source = sourcemapSourceCache[mod.path];
+      if (!source) continue;
+
+      for (var ri = 0; ri < securityRules.length; ri++) {
+        var rule = securityRules[ri];
+        var regex = new RegExp(rule.pattern.source, rule.pattern.flags);
+        var match;
+        var matchCount = 0;
+        while ((match = regex.exec(source)) !== null) {
+          matchCount++;
+          if (matchCount > 20) break;
+          allFindings.push({
+            severity: rule.severity,
+            name: rule.name,
+            match: (match[1] || match[0]).substring(0, 60),
+            file: mod.path,
+            moduleIndex: sourcemapModules.indexOf(mod),
+          });
+        }
+      }
+
+      if (mi % 10 === 0) {
+        progressEl.innerHTML =
+          '<div class="sm-analysis-progress-text">已分析 ' +
+          (mi + 1) +
+          '/' +
+          resolvedModules.length +
+          ' 个模块...</div>';
+        await new Promise(function (r) {
+          setTimeout(r, 0);
+        });
+      }
+    }
+
+    progressEl.innerHTML = '';
+
+    var severityOrder = ['critical', 'high', 'medium', 'low', 'info'];
+    allFindings.sort(function (a, b) {
+      return severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity);
+    });
+
+    var severityLabels = {
+      critical: '严重',
+      high: '高危',
+      medium: '中危',
+      low: '低危',
+      info: '信息',
+    };
+    var counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    allFindings.forEach(function (f) {
+      counts[f.severity]++;
+    });
+
+    var summaryHtml = '<div class="sm-analysis-summary">共发现 ' + allFindings.length + ' 个问题：';
+    severityOrder.forEach(function (s) {
+      if (counts[s] > 0) {
+        summaryHtml +=
+          ' <span class="sm-analysis-severity sm-severity-' +
+          s +
+          '">' +
+          severityLabels[s] +
+          ' ' +
+          counts[s] +
+          '</span>';
+      }
+    });
+    summaryHtml += '</div>';
+    resultsEl.innerHTML = summaryHtml;
+
+    var itemsHtml = '';
+    var displayFindings = allFindings.slice(0, 200);
+    for (var fi = 0; fi < displayFindings.length; fi++) {
+      var f = displayFindings[fi];
+      itemsHtml += '<div class="sm-analysis-item" data-idx="' + f.moduleIndex + '">';
+      itemsHtml +=
+        '<span class="sm-analysis-severity sm-severity-' +
+        f.severity +
+        '">' +
+        severityLabels[f.severity] +
+        '</span> ';
+      itemsHtml += utils.escapeHtml(f.name) + ' ';
+      itemsHtml += '<span class="sm-analysis-match">' + utils.escapeHtml(f.match) + '</span> ';
+      itemsHtml += '<span class="sm-analysis-file">' + utils.escapeHtml(f.file) + '</span>';
+      itemsHtml += '</div>';
+    }
+    resultsEl.innerHTML += itemsHtml;
+
+    // Bind click to jump to module detail
+    resultsEl.querySelectorAll('.sm-analysis-item').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var idx = parseInt(this.dataset.idx);
+        analysisCard.classList.add('hidden');
+        if (!isNaN(idx)) showSourcemapModuleDetail(idx);
+      });
+    });
   }
 
   function copyAllSourcemapPaths() {
@@ -7573,6 +8203,14 @@
         }, 200);
       });
     }
+    var smAnalyzeBtn = utils.get('sourcemap-analyze-btn');
+    if (smAnalyzeBtn) smAnalyzeBtn.addEventListener('click', analyzeSourcemaps);
+    var smAnalysisClose = utils.get('sm-analysis-close');
+    if (smAnalysisClose)
+      smAnalysisClose.addEventListener('click', function () {
+        var card = utils.get('sm-analysis-card');
+        if (card) card.classList.add('hidden');
+      });
 
     // Status bar clock
     const statusTime = utils.get('status-time');
