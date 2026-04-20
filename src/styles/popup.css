@@ -2232,6 +2232,28 @@ body {
 [data-theme='dark'] .jssearch-results::-webkit-scrollbar-thumb,
 [data-theme='dark'] .compare-results::-webkit-scrollbar-thumb { background: #3A3A5E; }
 
+/* ====== Crypto Panel ====== */
+.crypto-algo-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+.crypto-algo-btn {
+  padding: 5px 14px; border: 1px solid #E0E0E0; background: #fff; border-radius: 6px;
+  font-size: 12px; font-weight: 500; color: #666; cursor: pointer; transition: all 0.2s ease; font-family: inherit;
+}
+.crypto-algo-btn:hover { color: #4A90E2; border-color: #4A90E2; }
+.crypto-algo-btn.active { background: #4A90E2; color: #fff; border-color: #4A90E2; }
+.crypto-algo-panel { display: none; }
+.crypto-algo-panel.active { display: block; }
+.crypto-mode-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
+.crypto-mode-row .select-filter { min-width: 80px; }
+.crypto-key-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.crypto-check-label { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #666; cursor: pointer; white-space: nowrap; }
+.crypto-check-label input { margin: 0; }
+.crypto-action-row { display: flex; gap: 6px; margin-bottom: 8px; margin-top: 8px; }
+
+[data-theme='dark'] .crypto-algo-btn { background: var(--bg-secondary); color: var(--text-secondary); border-color: var(--border-color); }
+[data-theme='dark'] .crypto-algo-btn:hover { color: var(--accent); border-color: var(--accent); }
+[data-theme='dark'] .crypto-algo-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+[data-theme='dark'] .crypto-check-label { color: var(--text-secondary); }
+
 /* ====== Payload Panel ====== */
 .payload-tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
 .payload-tab {

@@ -34,7 +34,9 @@
           <button class="sub-tab-btn" data-type="url">URL</button>
           <button class="sub-tab-btn" data-type="html">HTML</button>
           <button class="sub-tab-btn" data-type="hex">Hex</button>
+          <button class="sub-tab-btn" data-type="crypto">加密解密</button>
         </div>
+        <div id="enc-classic-section">
         <div class="form-group">
           <label>输入</label>
           <textarea class="textarea" id="encoding-input" placeholder="输入要编码或解码的文本"></textarea>
@@ -50,6 +52,151 @@
         </div>
         <div class="result-actions">
           <button class="btn btn-sm btn-outline" id="copy-encoding-btn">复制结果</button>
+        </div>
+        </div>
+
+        <!-- 加密解密区域 -->
+        <div id="crypto-section" class="hidden">
+          <div class="crypto-algo-tabs">
+            <button class="crypto-algo-btn active" data-algo="aes">AES</button>
+            <button class="crypto-algo-btn" data-algo="des">DES</button>
+            <button class="crypto-algo-btn" data-algo="rc4">RC4</button>
+            <button class="crypto-algo-btn" data-algo="sm2">SM2</button>
+            <button class="crypto-algo-btn" data-algo="sm4">SM4</button>
+            <button class="crypto-algo-btn" data-algo="bcrypt">Bcrypt</button>
+            <button class="crypto-algo-btn" data-algo="rsa">RSA</button>
+          </div>
+
+          <!-- AES -->
+          <div id="algo-aes" class="crypto-algo-panel active">
+            <div class="crypto-mode-row">
+              <select id="aes-mode" class="select-filter">
+                <option value="CBC" selected>CBC</option>
+                <option value="ECB">ECB</option>
+                <option value="CTR">CTR</option>
+                <option value="OFB">OFB</option>
+                <option value="CFB">CFB</option>
+              </select>
+              <select id="aes-keysize" class="select-filter">
+                <option value="128" selected>128位</option>
+                <option value="192">192位</option>
+                <option value="256">256位</option>
+              </select>
+              <select id="aes-padding" class="select-filter">
+                <option value="Pkcs7" selected>Pkcs7</option>
+                <option value="ZeroPadding">ZeroPadding</option>
+                <option value="NoPadding">NoPadding</option>
+              </select>
+            </div>
+            <div class="crypto-key-row">
+              <div class="form-group"><label>密钥</label><input type="text" id="aes-key" class="input" placeholder="16/24/32 字符"></div>
+              <div class="form-group" id="aes-iv-group"><label>IV</label><input type="text" id="aes-iv" class="input" placeholder="16 字符"></div>
+            </div>
+          </div>
+
+          <!-- DES -->
+          <div id="algo-des" class="crypto-algo-panel">
+            <div class="crypto-mode-row">
+              <select id="des-mode" class="select-filter">
+                <option value="CBC" selected>CBC</option>
+                <option value="ECB">ECB</option>
+                <option value="CTR">CTR</option>
+                <option value="OFB">OFB</option>
+                <option value="CFB">CFB</option>
+              </select>
+              <select id="des-padding" class="select-filter">
+                <option value="Pkcs7" selected>Pkcs7</option>
+                <option value="ZeroPadding">ZeroPadding</option>
+                <option value="NoPadding">NoPadding</option>
+              </select>
+            </div>
+            <div class="crypto-key-row">
+              <div class="form-group"><label>密钥 (8字符)</label><input type="text" id="des-key" class="input" placeholder="8 字符"></div>
+              <div class="form-group" id="des-iv-group"><label>IV (8字符)</label><input type="text" id="des-iv" class="input" placeholder="8 字符"></div>
+            </div>
+          </div>
+
+          <!-- RC4 -->
+          <div id="algo-rc4" class="crypto-algo-panel">
+            <div class="crypto-key-row">
+              <div class="form-group"><label>密钥</label><input type="text" id="rc4-key" class="input" placeholder="任意密钥"></div>
+            </div>
+          </div>
+
+          <!-- SM2 -->
+          <div id="algo-sm2" class="crypto-algo-panel">
+            <div class="crypto-mode-row">
+              <select id="sm2-cipher" class="select-filter">
+                <option value="1" selected>C1C3C2</option>
+                <option value="0">C1C2C3</option>
+              </select>
+            </div>
+            <div class="crypto-key-row">
+              <div class="form-group"><label>公钥</label><input type="text" id="sm2-pubkey" class="input" placeholder="04 开头 130 位十六进制"></div>
+              <div class="form-group"><label>私钥</label><input type="text" id="sm2-prikey" class="input" placeholder="64 位十六进制"></div>
+            </div>
+            <div class="form-actions"><button class="btn btn-sm btn-secondary" id="sm2-genkey-btn">生成密钥对</button></div>
+          </div>
+
+          <!-- SM4 -->
+          <div id="algo-sm4" class="crypto-algo-panel">
+            <div class="crypto-mode-row">
+              <select id="sm4-mode" class="select-filter">
+                <option value="ecb" selected>ECB</option>
+                <option value="cbc">CBC</option>
+              </select>
+              <label class="crypto-check-label"><input type="checkbox" id="sm4-padding" checked> PKCS5 填充</label>
+            </div>
+            <div class="crypto-key-row">
+              <div class="form-group"><label>密钥 (16字符)</label><input type="text" id="sm4-key" class="input" placeholder="16 字符"></div>
+              <div class="form-group" id="sm4-iv-group" class="hidden"><label>IV (16字符)</label><input type="text" id="sm4-iv" class="input" placeholder="16 字符"></div>
+            </div>
+          </div>
+
+          <!-- Bcrypt -->
+          <div id="algo-bcrypt" class="crypto-algo-panel">
+            <div class="crypto-mode-row">
+              <label class="crypto-check-label">Rounds:</label>
+              <select id="bcrypt-rounds" class="select-filter">
+                <option value="4">4</option><option value="6">6</option><option value="8">8</option>
+                <option value="10" selected>10</option><option value="12">12</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- RSA -->
+          <div id="algo-rsa" class="crypto-algo-panel">
+            <div class="crypto-mode-row">
+              <select id="rsa-keysize" class="select-filter">
+                <option value="1024">1024</option>
+                <option value="2048" selected>2048</option>
+                <option value="4096">4096</option>
+              </select>
+            </div>
+            <div class="crypto-key-row">
+              <div class="form-group"><label>公钥</label><textarea class="textarea" id="rsa-pubkey" rows="2" placeholder="点击生成密钥对" readonly></textarea></div>
+              <div class="form-group"><label>私钥</label><textarea class="textarea" id="rsa-prikey" rows="2" placeholder="点击生成密钥对" readonly></textarea></div>
+            </div>
+            <div class="form-actions"><button class="btn btn-sm btn-secondary" id="rsa-genkey-btn">生成密钥对</button></div>
+          </div>
+
+          <div class="crypto-action-row">
+            <button class="btn btn-primary" id="crypto-enc-btn">加密</button>
+            <button class="btn btn-secondary" id="crypto-dec-btn">解密</button>
+            <button class="btn btn-outline" id="crypto-verify-btn" class="hidden">验证</button>
+            <button class="btn btn-outline" id="crypto-clear-btn">清空</button>
+          </div>
+          <div class="form-group card-spacing">
+            <label>输入</label>
+            <textarea class="textarea" id="crypto-input" placeholder="输入明文或密文"></textarea>
+          </div>
+          <div class="form-group card-spacing">
+            <label>输出</label>
+            <textarea class="textarea" id="crypto-output" readonly placeholder="结果"></textarea>
+          </div>
+          <div class="result-actions">
+            <button class="btn btn-sm btn-outline" id="copy-crypto-btn">复制结果</button>
+          </div>
         </div>
       </div>
     </div>
@@ -742,6 +889,11 @@
     </div>
   </div>
 </div>
+<script src="lib/jsrsasign.min.js"></script>
+<script src="lib/crypto-js.min.js"></script>
+<script src="lib/sm2.js"></script>
+<script src="lib/sm4.js"></script>
+<script src="lib/bcrypt.min.js"></script>
 <script src="lib/exifr.full.js"></script>
 <script src="inline-optimized.js"></script>
 </body>
