@@ -5587,23 +5587,32 @@
     }
 
     try {
+      // Inject CSS via extension API (bypasses page CSP)
+      await chrome.scripting.insertCSS({
+        target: { tabId: tab.id },
+        css: [
+          '*, *::before, *::after {',
+          '  -webkit-user-select: auto !important;',
+          '  user-select: auto !important;',
+          '  -webkit-user-drag: auto !important;',
+          '}',
+          '.__vk-hidden { display: none !important; }',
+        ].join('\n'),
+      });
+
       var results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: 'MAIN',
         func: function () {
           var log = {};
 
-          // 1. Remove user-select: none from all elements
+          // 1. Count elements with user-select: none (now overridden by injected CSS)
           var allEls = document.querySelectorAll('*');
           var userSelectCount = 0;
           for (var i = 0; i < allEls.length; i++) {
-            var el = allEls[i];
-            var style = window.getComputedStyle(el);
+            var style = window.getComputedStyle(allEls[i]);
             var us = style.getPropertyValue('user-select') || style.webkitUserSelect;
             if (us === 'none' || us === '-webkit-none') {
-              el.style.setProperty('user-select', 'auto', 'important');
-              el.style.setProperty('-webkit-user-select', 'auto', 'important');
-              el.style.webkitUserSelect = 'auto';
               userSelectCount++;
             }
           }
@@ -5666,7 +5675,7 @@
           };
           log.preventOverride = true;
 
-          // 5. Remove pointer-events: none overlays
+          // 5. Count pointer-events: none overlays (CSS injected separately handles this)
           var pointerCount = 0;
           for (var k = 0; k < allEls.length; k++) {
             var s = window.getComputedStyle(allEls[k]);
@@ -5680,19 +5689,17 @@
                 isTransparent &&
                 (tag === 'div' || tag === 'span' || tag === 'a' || tag === 'img')
               ) {
-                allEls[k].style.setProperty('pointer-events', 'auto', 'important');
-                allEls[k].style.display = 'none';
+                allEls[k].classList.add('__vk-hidden');
                 pointerCount++;
               }
             }
           }
           log.pointerOverlays = pointerCount;
 
-          // 6. Remove -webkit-user-drag: none
+          // 6. Count -webkit-user-drag: none (now overridden by injected CSS)
           var dragCount = 0;
           for (var m = 0; m < allEls.length; m++) {
             if (allEls[m].style.webkitUserDrag === 'none') {
-              allEls[m].style.webkitUserDrag = 'auto';
               dragCount++;
             }
           }
@@ -6357,10 +6364,10 @@
     var progressEl = utils.get('sm-progress');
     var phasesEl = utils.get('sm-phases');
     if (progressEl) {
-      progressEl.style.display = '';
+      progressEl.classList.remove('hidden');
     }
     if (phasesEl) {
-      phasesEl.style.display = '';
+      phasesEl.classList.remove('hidden');
     }
     smUpdateProgress(0, 1);
 
@@ -6449,57 +6456,119 @@
               }
             }
 
-            // Extract webpack chunk URL template and chunk info
+            // Extract webpack chunk URL info
             var chunkInfo = null;
             try {
               var wpRequire =
                 typeof __webpack_require__ !== 'undefined' ? __webpack_require__ : null;
               if (wpRequire && typeof wpRequire.u === 'function') {
-                chunkInfo = {
-                  uFunc: wpRequire.u.toString(),
-                  uKeys: Object.keys(wpRequire).filter(function (k) {
-                    return typeof wpRequire[k] === 'function' || typeof wpRequire[k] === 'object';
-                  }),
-                };
-                // Try to get installed chunks
-                if (wpRequire.o) {
-                  chunkInfo.installedChunks = {};
-                  try {
-                    chunkInfo.installedChunks = JSON.parse(JSON.stringify(wpRequire.o));
-                  } catch (e) {
-                    for (var oc in wpRequire.o) {
-                      if (wpRequire.o.hasOwnProperty(oc))
-                        chunkInfo.installedChunks[oc] = wpRequire.o[oc];
+                // Extract all chunk IDs from the .u function body (the hash map keys)
+                var uBody = wpRequire.u.toString();
+                var allChunkIds = [];
+                // Find all objects with numeric keys mapping to hash strings: {123:"abc",456:"def"}
+                var mapObjs = uBody.match(/\{[^}]{5,}\}/g);
+                if (mapObjs) {
+                  mapObjs.forEach(function (obj) {
+                    var idPairs = obj.match(/(\d+)\s*:\s*"/g);
+                    if (idPairs) {
+                      idPairs.forEach(function (p) {
+                        var id = p.match(/(\d+)/);
+                        if (id && allChunkIds.indexOf(id[1]) === -1) allChunkIds.push(id[1]);
+                      });
+                    }
+                  });
+                }
+
+                // Also collect chunk IDs from webpackChunk push entries
+                for (var wck2 in window) {
+                  if (wck2.indexOf('webpackChunk') === 0 && Array.isArray(window[wck2])) {
+                    var wcArr = window[wck2];
+                    for (var wci = 0; wci < wcArr.length; wci++) {
+                      if (wcArr[wci] && Array.isArray(wcArr[wci]) && Array.isArray(wcArr[wci][0])) {
+                        wcArr[wci][0].forEach(function (cid) {
+                          var cidStr = String(cid);
+                          if (allChunkIds.indexOf(cidStr) === -1) allChunkIds.push(cidStr);
+                        });
+                      }
                     }
                   }
                 }
-              }
-              // Also try via webpackChunk arrays
-              if (!chunkInfo) {
-                for (var wck in window) {
-                  if (wck.indexOf('webpackChunk') === 0) {
-                    // Try to find the require function from push arguments
-                    var wc = window[wck];
-                    for (var wi = 0; wi < wc.length; wi++) {
-                      if (
-                        wc[wi] &&
-                        Array.isArray(wc[wi]) &&
-                        wc[wi].length >= 3 &&
-                        typeof wc[wi][2] === 'function'
-                      ) {
-                        var fn = wc[wi][2];
-                        // The function receives require, __webpack_require__, etc.
-                        // Try to get __webpack_require__ from the push call
-                        break;
-                      }
-                    }
-                    break;
-                  }
+
+                // Call .u() directly for each chunk ID to get the filename
+                var chunkFilenames = {};
+                allChunkIds.forEach(function (id) {
+                  try {
+                    var filename = wpRequire.u(id);
+                    if (filename && filename.length > 0) chunkFilenames[id] = filename;
+                  } catch (e) {}
+                });
+
+                if (Object.keys(chunkFilenames).length > 0) {
+                  chunkInfo = { chunkFilenames: chunkFilenames };
                 }
               }
             } catch (e) {}
 
-            return { modules: modules, hasWebpack: hasWebpack, chunkInfo: chunkInfo };
+            // Install network hooks to capture dynamically loaded scripts
+            try {
+              if (!window.__vulnkitScriptObserver) {
+                window.__vulnkitScriptObserver = [];
+                window.__vulnkitHookActive = true;
+
+                // 1. MutationObserver: catch script nodes added to DOM
+                new MutationObserver(function (mutations) {
+                  mutations.forEach(function (m) {
+                    m.addedNodes.forEach(function (node) {
+                      if (
+                        node.tagName === 'SCRIPT' &&
+                        node.src &&
+                        node.src.indexOf('data:') !== 0
+                      ) {
+                        window.__vulnkitScriptObserver.push(node.src);
+                      }
+                    });
+                  });
+                }).observe(document.documentElement, { childList: true, subtree: true });
+
+                // 2. Hook fetch: catch JS resource requests
+                var _origFetch = window.fetch.bind(window);
+                window.fetch = function (input) {
+                  try {
+                    var url = typeof input === 'string' ? input : input && input.url ? input.url : '';
+                    if (url && /\.js(\?|$)/.test(url) && window.__vulnkitScriptObserver.indexOf(url) === -1) {
+                      window.__vulnkitScriptObserver.push(url);
+                    }
+                  } catch (e) {}
+                  return _origFetch.apply(this, arguments);
+                };
+
+                // 3. Hook XMLHttpRequest.open: catch JS XHR requests
+                var _origXhrOpen = XMLHttpRequest.prototype.open;
+                XMLHttpRequest.prototype.open = function (method, url) {
+                  try {
+                    if (url && typeof url === 'string' && /\.js(\?|$)/.test(url) && window.__vulnkitScriptObserver.indexOf(url) === -1) {
+                      window.__vulnkitScriptObserver.push(url);
+                    }
+                  } catch (e) {}
+                  return _origXhrOpen.apply(this, arguments);
+                };
+              }
+            } catch (e) {}
+
+            // Read any already-collected script URLs
+            var monitoredScripts = [];
+            try {
+              if (window.__vulnkitScriptObserver) {
+                monitoredScripts = window.__vulkitScriptObserver.slice();
+              }
+            } catch (e) {}
+
+            return {
+              modules: modules,
+              hasWebpack: hasWebpack,
+              chunkInfo: chunkInfo,
+              monitoredScripts: monitoredScripts,
+            };
           },
         });
         if (wpResults && wpResults[0] && wpResults[0].result) {
@@ -6507,35 +6576,15 @@
           if (wpData.modules && wpData.modules.length > 0) {
             allModules = allModules.concat(wpData.modules);
           }
-          // Parse chunk manifest from __webpack_require__.u
-          if (wpData.chunkInfo && wpData.chunkInfo.uFunc) {
-            var uFuncStr = wpData.chunkInfo.uFunc;
-            // Extract hash map: {123:"abc", 456:"def"} or {123:"abc",456:"def"}
-            var hashMaps = uFuncStr.match(/\{[^}]{10,}\}/g);
-            if (hashMaps) {
-              var chunkHashMap = {};
-              hashMaps.forEach(function (hm) {
-                // Try to parse the object - keys are chunk IDs, values are hashes
-                var pairs = hm.match(/"?(\w+)"?\s*:\s*"([^"]+)"/g);
-                if (pairs) {
-                  pairs.forEach(function (p) {
-                    var kv = p.match(/"?(\w+)"?\s*:\s*"([^"]+)"/);
-                    if (kv && kv[2].length >= 4 && kv[2].length <= 20) {
-                      chunkHashMap[kv[1]] = kv[2];
-                    }
-                  });
-                }
-              });
-              if (Object.keys(chunkHashMap).length > 0) {
-                // Extract URL prefix from the function body
-                var urlPrefixMatch = uFuncStr.match(/["']([^"']*\/)[^"']*["']/);
-                var urlPrefix = urlPrefixMatch ? urlPrefixMatch[1] : '';
-                // Extract file extension pattern
-                var extMatch = uFuncStr.match(/\.js["']/);
-                // Store for Phase 2.5
-                chunkManifest = { hashMap: chunkHashMap, urlPrefix: urlPrefix };
-              }
-            }
+          // Use directly-called .u() results
+          if (wpData.chunkInfo && wpData.chunkInfo.chunkFilenames) {
+            chunkManifest = wpData.chunkInfo.chunkFilenames;
+          }
+          // Merge DOM-monitor captured scripts
+          if (wpData.monitoredScripts && wpData.monitoredScripts.length > 0) {
+            wpData.monitoredScripts.forEach(function (url) {
+              if (scriptUrls.indexOf(url) === -1) scriptUrls.push(url);
+            });
           }
         }
       } catch (e) {
@@ -6681,36 +6730,198 @@
       var discoveredChunkUrls = [];
 
       // Build chunk URLs from MAIN world manifest (most reliable)
-      if (chunkManifest && Object.keys(chunkManifest.hashMap).length > 0 && scriptUrls.length > 0) {
+      if (chunkManifest && scriptUrls.length > 0) {
         var refScriptUrl = scriptUrls[0];
         var baseUrl = refScriptUrl.substring(0, refScriptUrl.lastIndexOf('/') + 1);
-        var prefix = chunkManifest.urlPrefix || '';
-
-        Object.keys(chunkManifest.hashMap).forEach(function (chunkId) {
-          var hash = chunkManifest.hashMap[chunkId];
-          // Generate candidates with different prefix patterns
-          var candidates = [
-            baseUrl + prefix + chunkId + '.' + hash + '.js',
-            baseUrl + chunkId + '.' + hash + '.js',
-            baseUrl + 'static/js/' + chunkId + '.' + hash + '.js',
-            baseUrl + 'js/' + chunkId + '.' + hash + '.js',
-            baseUrl + 'assets/' + chunkId + '.' + hash + '.js',
-          ];
-          discoveredChunkUrls.push({ chunkId: chunkId, candidates: candidates });
+        Object.keys(chunkManifest).forEach(function (chunkId) {
+          var filename = chunkManifest[chunkId];
+          if (!filename) return;
+          var fullUrl = smResolveUrl(filename, baseUrl);
+          discoveredChunkUrls.push({ chunkId: chunkId, url: fullUrl });
         });
       }
 
-      // Fallback: parse main bundle JS content for manifest (if MAIN world didn't get it)
+      // Fallback: deep-parse bundle JS for chunk manifest patterns
       if (discoveredChunkUrls.length === 0 && scriptUrls.length > 0) {
-        var mainScriptContents = await smBatchFetch(scriptUrls.slice(0, 3));
-        for (var mc = 0; mc < mainScriptContents.length; mc++) {
-          if (!mainScriptContents[mc]) continue;
-          var manifest = smExtractChunkManifest(mainScriptContents[mc]);
-          if (Object.keys(manifest.chunkMap).length > 0) {
-            var builtUrls = smBuildChunkUrls(manifest, scriptUrls[mc]);
-            builtUrls.forEach(function (cu) {
-              discoveredChunkUrls.push(cu);
-            });
+        statusEl.textContent = 'Phase 2.5: 深度解析 Bundle 源码发现 Chunk...';
+        smUpdateProgress(40, 2);
+
+        var runtimeUrl = null;
+        for (var rb = 0; rb < scriptUrls.length; rb++) {
+          if (/runtime/i.test(scriptUrls[rb]) && /\.js(\?|$)/.test(scriptUrls[rb])) {
+            runtimeUrl = scriptUrls[rb];
+            break;
+          }
+        }
+        if (!runtimeUrl) {
+          for (var mb = 0; mb < scriptUrls.length; mb++) {
+            if (/main|app|index/i.test(scriptUrls[mb]) && /\.js(\?|$)/.test(scriptUrls[mb])) {
+              runtimeUrl = scriptUrls[mb];
+              break;
+            }
+          }
+        }
+        if (!runtimeUrl) {
+          for (var fb = 0; fb < scriptUrls.length; fb++) {
+            if (/bundle\//.test(scriptUrls[fb]) || /static\/js/.test(scriptUrls[fb])) {
+              runtimeUrl = scriptUrls[fb];
+              break;
+            }
+          }
+        }
+
+        if (runtimeUrl) {
+          var runtimeContent = await smBatchFetch([runtimeUrl]);
+          if (runtimeContent[0]) {
+            var rc = runtimeContent[0];
+            var rcBase = runtimeUrl.substring(0, runtimeUrl.lastIndexOf('/') + 1);
+
+            // Strategy 1: Extract __webpack_require__.u function body
+            var uFuncMatch = rc.match(
+              /(__webpack_require__\s*\.\s*u\s*=\s*function\s*\([^)]*\)\s*\{[^}]*return[^}]*\})/
+            );
+            if (!uFuncMatch) {
+              uFuncMatch = rc.match(
+                /(\w+)\s*=\s*function\((\w+)\)\s*\{[^}]{10,200}?return[^}]*?\{[^}]{5,}\}[^}]*?\2[^}]*?\}/
+              );
+            }
+            if (uFuncMatch) {
+              try {
+                var mappingObj = uFuncMatch[1].match(/\{[^{}]+\}/g);
+                if (mappingObj) {
+                  var chunkIdToHash = {};
+                  mappingObj.forEach(function (obj) {
+                    var pairs = obj.match(/(\d+)\s*:\s*"([a-f0-9]{4,})"/g);
+                    if (pairs) {
+                      pairs.forEach(function (p) {
+                        var kv = p.match(/(\d+)\s*:\s*"([a-f0-9]{4,})"/);
+                        if (kv) chunkIdToHash[kv[1]] = kv[2];
+                      });
+                    }
+                  });
+                  var returnMatch = uFuncMatch[1].match(/return\s+["']([^"']*\/)["']/);
+                  var urlPrefix = returnMatch ? returnMatch[1] : '';
+                  var ppMatch1 = rc.match(/\.p\s*=\s*"([^"]*\/)"/);
+                  if (!ppMatch1) ppMatch1 = rc.match(/__webpack_require__\.p\s*=\s*"([^"]+)"/);
+                  if (!ppMatch1) ppMatch1 = rc.match(/__webpack_public_path__\s*=\s*"([^"]+)"/);
+                  var finalBase = ppMatch1
+                    ? smResolveUrl(ppMatch1[1], tab.url)
+                    : urlPrefix
+                      ? smResolveUrl(urlPrefix, rcBase)
+                      : rcBase;
+                  Object.keys(chunkIdToHash).forEach(function (cid) {
+                    var hash = chunkIdToHash[cid];
+                    var chunkUrl = finalBase + cid + '.' + hash + '.js';
+                    if (scriptUrls.indexOf(chunkUrl) === -1) {
+                      var dup = discoveredChunkUrls.some(function (cu) {
+                        return cu.url === chunkUrl;
+                      });
+                      if (!dup) discoveredChunkUrls.push({ chunkId: cid, url: chunkUrl });
+                    }
+                  });
+                }
+              } catch (e) {}
+            }
+
+            // Strategy 2: Broad hash map scan for obfuscated code
+            if (discoveredChunkUrls.length === 0) {
+              var hashMaps = rc.match(/\{[^\{\}]{10,}?"?\d+"?\s*:\s*"[a-f0-9]{4,}"[^\{\}]*?\}/g);
+              if (hashMaps) {
+                var tempChunkMap = {};
+                hashMaps.forEach(function (hm) {
+                  var pairs = hm.match(/"?(\d+)"?\s*:\s*"([a-f0-9]{4,})"/g);
+                  if (pairs) {
+                    pairs.forEach(function (pair) {
+                      var kv = pair.match(/"?(\d+)"?\s*:\s*"([a-f0-9]{4,})"/);
+                      if (kv) tempChunkMap[kv[1]] = kv[2];
+                    });
+                  }
+                });
+                if (Object.keys(tempChunkMap).length > 2) {
+                  var ppMatch2 = rc.match(/\.p\s*=\s*"([^"]*\/)"/);
+                  if (!ppMatch2) ppMatch2 = rc.match(/__webpack_require__\.p\s*=\s*"([^"]+)"/);
+                  var base2 = ppMatch2 ? smResolveUrl(ppMatch2[1], tab.url) : rcBase;
+                  Object.keys(tempChunkMap).forEach(function (cid) {
+                    var hash = tempChunkMap[cid];
+                    var chunkUrl = base2 + cid + '.' + hash + '.js';
+                    if (scriptUrls.indexOf(chunkUrl) === -1) {
+                      var dup = discoveredChunkUrls.some(function (cu) {
+                        return cu.url === chunkUrl;
+                      });
+                      if (!dup) discoveredChunkUrls.push({ chunkId: cid, url: chunkUrl });
+                    }
+                  });
+                }
+              }
+            }
+
+            // Strategy 3: Find explicit chunk filename references in source
+            var chunkNameRefs = rc.match(/["']([\w.-]+\.[a-f0-9]{6,}\.js)["']/g);
+            if (chunkNameRefs) {
+              chunkNameRefs.forEach(function (ref) {
+                var nameMatch = ref.match(/["']([\w.-]+\.[a-f0-9]{6,}\.js)["']/);
+                if (nameMatch) {
+                  var fullRef = rcBase + nameMatch[1];
+                  if (scriptUrls.indexOf(fullRef) === -1) {
+                    var dup = discoveredChunkUrls.some(function (cu) {
+                      return cu.url === fullRef;
+                    });
+                    if (!dup) discoveredChunkUrls.push({ chunkId: 'ref', url: fullRef });
+                  }
+                }
+              });
+            }
+
+            // Strategy 4: Parse vendor/main bundle for dynamic import() and .e() references
+            if (discoveredChunkUrls.length === 0) {
+              var otherBundles = scriptUrls.filter(function (u) {
+                return (
+                  u !== runtimeUrl && (/(vendor|main|app|index)/i.test(u) || /bundle\//.test(u))
+                );
+              });
+              if (otherBundles.length > 0) {
+                var bundleContents = await smBatchFetch(otherBundles.slice(0, 3));
+                for (var bi = 0; bi < bundleContents.length; bi++) {
+                  if (!bundleContents[bi]) continue;
+                  // Dynamic imports: import("./chunk-xxx.hash.js")
+                  var dynamicImports = bundleContents[bi].match(
+                    /["']\.\/([\w.-]+\.[a-f0-9]{6,}\.js)["']/g
+                  );
+                  if (dynamicImports) {
+                    dynamicImports.forEach(function (imp) {
+                      var nameMatch = imp.match(/["']\.\/([\w.-]+\.[a-f0-9]{6,}\.js)["']/);
+                      if (nameMatch) {
+                        var bundleBase = otherBundles[bi].substring(
+                          0,
+                          otherBundles[bi].lastIndexOf('/') + 1
+                        );
+                        var fullImp = bundleBase + nameMatch[1];
+                        if (scriptUrls.indexOf(fullImp) === -1) {
+                          var dup = discoveredChunkUrls.some(function (cu) {
+                            return cu.url === fullImp;
+                          });
+                          if (!dup) discoveredChunkUrls.push({ chunkId: 'import', url: fullImp });
+                        }
+                      }
+                    });
+                  }
+                  // .e(chunkId) references
+                  var chunkERefs = bundleContents[bi].match(/\.e\s*\(\s*(\d+)\s*\)/g);
+                  if (chunkERefs) {
+                    chunkERefs.forEach(function (ref) {
+                      var idMatch = ref.match(/\.e\s*\(\s*(\d+)\s*\)/);
+                      if (idMatch) {
+                        var eid = idMatch[1];
+                        var dup = discoveredChunkUrls.some(function (cu) {
+                          return cu.chunkId === eid;
+                        });
+                        if (!dup) discoveredChunkUrls.push({ chunkId: eid, url: null });
+                      }
+                    });
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -6718,28 +6929,18 @@
       if (discoveredChunkUrls.length > 0) {
         statusEl.textContent =
           'Phase 2.5: Manifest 发现 ' + discoveredChunkUrls.length + ' 个 Chunk，探测中...';
-        // Deduplicate candidates
+        // Deduplicate and filter out already-known URLs
         var seenChunkUrls = {};
         var chunkFetchUrls = [];
         discoveredChunkUrls.forEach(function (cu) {
-          cu.candidates.forEach(function (url) {
-            // Skip chunks already in scriptUrls
-            var alreadyKnown = false;
-            for (var sk = 0; sk < scriptUrls.length; sk++) {
-              if (
-                scriptUrls[sk].indexOf(
-                  cu.chunkId + '.' + cu.candidates[0].split('.').slice(-2)[0]
-                ) !== -1
-              ) {
-                alreadyKnown = true;
-                break;
-              }
-            }
-            if (!seenChunkUrls[url] && !alreadyKnown) {
-              seenChunkUrls[url] = true;
-              chunkFetchUrls.push(url);
-            }
-          });
+          var url = cu.url;
+          if (!url) return;
+          // Skip if already in scriptUrls
+          if (scriptUrls.indexOf(url) !== -1) return;
+          // Skip if already seen
+          if (seenChunkUrls[url]) return;
+          seenChunkUrls[url] = true;
+          chunkFetchUrls.push(url);
         });
 
         // Try fetching .map for every known script URL too
@@ -6899,6 +7100,24 @@
       statusEl.textContent = '找到 ' + sourcemapModules.length + ' 个模块';
       smUpdateProgress(100, 3);
       renderSourcemapModules();
+
+      // Check if network hooks are active and show hint
+      try {
+        var hookResults = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: function () { return !!window.__vulnkitHookActive; },
+        });
+        if (hookResults && hookResults[0] && hookResults[0].result) {
+          var hookHint = document.createElement('div');
+          hookHint.className = 'sm-hook-hint';
+          hookHint.textContent = 'JS Hook 已激活 — 浏览其他页面可自动捕获新 Chunk，再次扫描即可合并';
+          var statusArea = document.getElementById('sourcemap-status');
+          if (statusArea && statusArea.nextSibling) {
+            statusArea.parentNode.insertBefore(hookHint, statusArea.nextSibling);
+          }
+        }
+      } catch (e) {}
     } catch (err) {
       statusEl.textContent = '扫描失败: ' + (err.message || '未知错误');
     } finally {
@@ -6911,8 +7130,8 @@
       setTimeout(function () {
         var progressEl = utils.get('sm-progress');
         var phasesEl = utils.get('sm-phases');
-        if (progressEl) progressEl.style.display = 'none';
-        if (phasesEl) phasesEl.style.display = 'none';
+        if (progressEl) progressEl.classList.add('hidden');
+        if (phasesEl) phasesEl.classList.add('hidden');
       }, 800);
     }
   }
@@ -7015,13 +7234,8 @@
         var extBadge = '';
         if (extMatch) {
           var ext = extMatch[0].toLowerCase();
-          var extColor = extColors[ext] || '#999';
-          extBadge =
-            '<span class="sm-ext-badge" style="background:' +
-            extColor +
-            '">' +
-            ext.replace('.', '') +
-            '</span>';
+          var extName = ext.replace('.', '');
+          extBadge = '<span class="sm-ext-badge" data-ext="' + extName + '">' + extName + '</span>';
         }
         var badges =
           '<span class="sourcemap-item-source">' +

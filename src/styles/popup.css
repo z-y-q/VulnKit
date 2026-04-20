@@ -2573,6 +2573,21 @@ body {
 [data-theme='dark'] .sm-phase-divider { color: #555; }
 
 /* ====== Webpack Ext Badge ====== */
+.sm-hook-hint {
+  padding: 6px 10px;
+  margin: 6px 0;
+  font-size: 11px;
+  color: #4A90E2;
+  background: #EBF5FF;
+  border-radius: 4px;
+  border-left: 3px solid #4A90E2;
+  line-height: 1.4;
+}
+[data-theme="dark"] .sm-hook-hint {
+  color: #66B2FF;
+  background: #1A2A3A;
+  border-left-color: #66B2FF;
+}
 .sm-ext-badge {
   display: inline-block;
   font-size: 9px;
@@ -2583,7 +2598,24 @@ body {
   font-weight: 600;
   line-height: 14px;
   vertical-align: middle;
+  background: #999;
 }
+.sm-ext-badge[data-ext="vue"] { background: #42B883; }
+.sm-ext-badge[data-ext="js"] { background: #F7DF1E; color: #333; }
+.sm-ext-badge[data-ext="ts"] { background: #3178C6; }
+.sm-ext-badge[data-ext="tsx"] { background: #3178C6; }
+.sm-ext-badge[data-ext="jsx"] { background: #61DAFB; color: #333; }
+.sm-ext-badge[data-ext="css"] { background: #264DE4; }
+.sm-ext-badge[data-ext="scss"] { background: #CF649A; }
+.sm-ext-badge[data-ext="less"] { background: #1D365D; }
+.sm-ext-badge[data-ext="json"] { background: #5B5EA6; }
+.sm-ext-badge[data-ext="html"] { background: #E34F26; }
+.sm-ext-badge[data-ext="svg"] { background: #FFB13B; color: #333; }
+.sm-ext-badge[data-ext="png"] { background: #FFB13B; color: #333; }
+.sm-ext-badge[data-ext="jpg"] { background: #FFB13B; color: #333; }
+.sm-ext-badge[data-ext="gif"] { background: #FFB13B; color: #333; }
+.sm-ext-badge[data-ext="woff"] { background: #888; }
+.sm-ext-badge[data-ext="woff2"] { background: #888; }
 
 /* ====== Webpack Enhanced Stats ====== */
 .sm-stats-bar {
