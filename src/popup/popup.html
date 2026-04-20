@@ -182,6 +182,22 @@
     <div id="panel-multiurl" class="panel">
       <div class="content-card">
         <div class="card-title">URL 多开</div>
+
+        <!-- 保存标签页 -->
+        <div class="tabsave-section">
+          <div class="tabsave-header">保存标签页</div>
+          <div class="tabsave-desc">一键获取当前所有浏览器标签页的 URL</div>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="tabsave-grab-btn">获取所有标签页</button>
+            <button class="btn btn-sm btn-secondary" id="tabsave-copy-btn" disabled>复制URL</button>
+            <button class="btn btn-sm btn-outline" id="tabsave-export-btn" disabled>导出 .txt</button>
+          </div>
+          <div class="tabsave-status" id="tabsave-status"></div>
+        </div>
+
+        <div class="multiurl-divider"></div>
+
+        <!-- URL多开 -->
         <div class="form-group">
           <label>输入URL（每行一个）</label>
           <textarea class="textarea" id="multiurl-input" placeholder="https://example.com&#10;https://example.org&#10;每行一个URL"></textarea>

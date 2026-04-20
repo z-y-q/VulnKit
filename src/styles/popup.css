@@ -355,6 +355,38 @@ body {
   margin-bottom: 8px;
 }
 
+/* Tab save section */
+.tabsave-section {
+  margin-bottom: 4px;
+}
+.tabsave-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 2px;
+}
+.tabsave-desc {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 8px;
+}
+.tabsave-status {
+  font-size: 12px;
+  color: #2563eb;
+  margin-top: 6px;
+  min-height: 16px;
+}
+.multiurl-divider {
+  height: 1px;
+  background: #e0e0e0;
+  margin: 12px 0;
+}
+
+[data-theme='dark'] .tabsave-header { color: var(--text-primary); }
+[data-theme='dark'] .tabsave-desc { color: var(--text-secondary); }
+[data-theme='dark'] .tabsave-status { color: var(--accent); }
+[data-theme='dark'] .multiurl-divider { background: var(--border-color); }
+
 /* ====== Info Gather Panel ====== */
 .gather-sub-tabs {
   display: flex;
