@@ -711,6 +711,125 @@ body {
   overflow-y: auto;
 }
 
+/* Shodan Host Info */
+.shodan-host-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid #E0E0E0;
+}
+.shodan-host-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1A1A2E;
+}
+.shodan-host-ip {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+  font-family: monospace;
+}
+.shodan-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-bottom: 1px solid #E0E0E0;
+}
+.shodan-info-item {
+  padding: 6px 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.shodan-info-label {
+  display: block;
+  font-size: 10px;
+  color: #999;
+  text-transform: uppercase;
+}
+.shodan-info-value {
+  display: block;
+  font-size: 12px;
+  color: #333;
+  margin-top: 1px;
+  word-break: break-all;
+}
+.shodan-section-title {
+  padding: 8px 12px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1A1A2E;
+}
+.shodan-ports {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 0 12px 8px;
+}
+.shodan-port-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+.shodan-port-num {
+  font-family: monospace;
+  font-weight: 600;
+  color: #66B2FF;
+  min-width: 40px;
+}
+.shodan-port-service {
+  color: #555;
+}
+.shodan-vulns {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 0 12px 8px;
+}
+.shodan-vuln-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 11px;
+  align-items: center;
+}
+.shodan-vuln-cve {
+  font-family: monospace;
+  font-weight: 600;
+  min-width: 120px;
+}
+.shodan-vuln-critical .shodan-vuln-cve { color: #FF4757; }
+.shodan-vuln-high .shodan-vuln-cve { color: #FF6348; }
+.shodan-vuln-medium .shodan-vuln-cve { color: #FFA502; }
+.shodan-vuln-low .shodan-vuln-cve { color: #2ED573; }
+.shodan-vuln-info .shodan-vuln-cve { color: #70A1FF; }
+.shodan-vuln-summary {
+  color: #666;
+  flex: 1;
+  min-width: 100px;
+}
+.shodan-vuln-cvss {
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+.shodan-vuln-critical .shodan-vuln-cvss { background: #FF4757; color: #fff; }
+.shodan-vuln-high .shodan-vuln-cvss { background: #FF6348; color: #fff; }
+.shodan-vuln-medium .shodan-vuln-cvss { background: #FFA502; color: #fff; }
+.shodan-vuln-low .shodan-vuln-cvss { background: #2ED573; color: #fff; }
+.shodan-vuln-info .shodan-vuln-cvss { background: #70A1FF; color: #fff; }
+
+[data-theme='dark'] .shodan-host-title { color: #E0E0E0; }
+[data-theme='dark'] .shodan-host-ip { color: #888; }
+[data-theme='dark'] .shodan-info-item { border-bottom-color: #2A2A3E; }
+[data-theme='dark'] .shodan-info-label { color: #777; }
+[data-theme='dark'] .shodan-info-value { color: #CCC; }
+[data-theme='dark'] .shodan-section-title { color: #E0E0E0; }
+[data-theme='dark'] .shodan-port-item { color: #AAA; }
+[data-theme='dark'] .shodan-host-header { border-bottom-color: #2A2A3E; }
+[data-theme='dark'] .shodan-info-grid { border-bottom-color: #2A2A3E; }
+[data-theme='dark'] .shodan-vuln-item { border-bottom-color: #2A2A3E; }
+[data-theme='dark'] .shodan-vuln-summary { color: #999; }
+
 .asset-table {
   width: 100%;
   border-collapse: collapse;

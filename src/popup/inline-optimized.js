@@ -736,6 +736,28 @@
   }
 
   // ====== Asset Mapping ======
+  function bgFetch(url) {
+    return new Promise(function (resolve) {
+      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url }, function (resp) {
+        if (chrome.runtime.lastError) {
+          resolve({ success: false, error: chrome.runtime.lastError.message });
+          return;
+        }
+        if (resp && resp.error) {
+          resolve({ success: false, error: resp.error });
+        } else if (resp && resp.data) {
+          try {
+            resolve({ success: true, data: JSON.parse(resp.data) });
+          } catch (e) {
+            resolve({ success: true, data: resp.data });
+          }
+        } else {
+          resolve({ success: false, error: '未知响应' });
+        }
+      });
+    });
+  }
+
   async function getApiKey(source) {
     return new Promise(resolve => {
       chrome.storage.local.get(['pentest_keys'], result => {
@@ -850,7 +872,7 @@
     const url =
       'https://api.zoomeye.org/host/search?query=' +
       encodeURIComponent('hostname:' + query) +
-      '&page=1';
+      '&page=1&size=100';
 
     chrome.runtime.sendMessage(
       { type: 'FETCH_URL_AUTH', url, key, header: 'API-KEY' },
@@ -883,7 +905,12 @@
       return;
     }
     setAssetStatus('正在查询 Shodan...');
-    const url = 'https://api.shodan.io/shodan/host/' + query + '?key=' + encodeURIComponent(key);
+    var searchQuery = /^[\d.]+$/.test(query) ? query : 'hostname:' + query;
+    const url =
+      'https://api.shodan.io/shodan/host/search?key=' +
+      encodeURIComponent(key) +
+      '&query=' +
+      encodeURIComponent(searchQuery);
 
     chrome.runtime.sendMessage({ type: 'FETCH_URL', url }, response => {
       if (response?.error) {
@@ -896,11 +923,11 @@
           setAssetStatus('API 错误: ' + json.error);
           return;
         }
-        const results = (json.data || []).map(d => ({
-          host: json.ip_str || query,
-          port: d.port || '-',
-          protocol: d._shodan?.module || '-',
-          title: d.http?.title || '-',
+        const results = (json.matches || []).map(m => ({
+          host: m.ip_str || '-',
+          port: m.port || '-',
+          protocol: m._shodan?.module || '-',
+          title: m.http?.title || '-',
         }));
         setAssetStatus('Shodan: 查询完成');
         renderAssetResults(results);
@@ -908,6 +935,244 @@
         setAssetStatus('解析结果失败');
       }
     });
+  }
+
+  function shodanHostLookup() {
+    var input = utils.get('shodan-host-input').value.trim();
+    var container = utils.get('shodan-host-info');
+    if (!container) return;
+
+    if (!input) {
+      getCurrentDomain().then(function (domain) {
+        if (!domain) {
+          utils.showToast('请输入 IP 或域名', 'warning');
+          return;
+        }
+        utils.get('shodan-host-input').value = domain;
+        doShodanLookup(domain, container);
+      });
+      return;
+    }
+    doShodanLookup(input, container);
+  }
+
+  function doShodanLookup(input, container) {
+    container.innerHTML =
+      '<div style="text-align:center;padding:8px;color:#66B2FF;">正在查询...</div>';
+    var resolvedIp = null;
+    var isIp = /^[\d.]+$/.test(input);
+
+    function step1() {
+      if (isIp) {
+        resolvedIp = input;
+        step2();
+        return;
+      }
+      bgFetch('https://geonet.shodan.io/api/dns/' + encodeURIComponent(input))
+        .then(function (result) {
+          if (result.success && result.data && result.data.answers) {
+            resolvedIp = result.data.answers[0].value;
+          }
+        })
+        .catch(function () {})
+        .finally(function () {
+          step2();
+        });
+    }
+
+    function step2() {
+      var targetIp = resolvedIp || input;
+      bgFetch('https://internetdb.shodan.io/' + encodeURIComponent(targetIp))
+        .then(function (result) {
+          if (!result.success || !result.data || result.data.error) {
+            container.innerHTML =
+              '<div style="color:#ff6b6b;padding:8px;">未找到该主机的信息</div>';
+            return;
+          }
+          step3(result.data, targetIp);
+        })
+        .catch(function (err) {
+          container.innerHTML =
+            '<div style="color:#ff6b6b;padding:8px;">查询失败: ' + (err.message || err) + '</div>';
+        });
+    }
+
+    function step3(idbData, targetIp) {
+      getApiKey('shodan').then(function (shodanKey) {
+        if (!shodanKey || !resolvedIp) {
+          renderShodanHostInfo(container, idbData, null, input, targetIp);
+          return;
+        }
+        bgFetch(
+          'https://api.shodan.io/shodan/host/' +
+            encodeURIComponent(resolvedIp) +
+            '?key=' +
+            encodeURIComponent(shodanKey)
+        )
+          .then(function (result) {
+            renderShodanHostInfo(
+              container,
+              idbData,
+              result.success ? result.data : null,
+              input,
+              targetIp
+            );
+          })
+          .catch(function () {
+            renderShodanHostInfo(container, idbData, null, input, targetIp);
+          });
+      });
+    }
+
+    step1();
+  }
+
+  function renderShodanHostInfo(container, idbData, shodanData, queryInput, resolvedIp) {
+    // Merge data: InternetDB for ports/vulns, Shodan API for ISP/org/OS
+    var ip =
+      (idbData && idbData.ip) || (shodanData && shodanData.ip_str) || resolvedIp || queryInput;
+    var hostnames = (idbData && idbData.hostnames) || (shodanData && shodanData.hostnames) || [];
+    var location = idbData && idbData.location ? idbData.location : null;
+    var country = location
+      ? location.country_name || location.country || '-'
+      : (shodanData && shodanData.country_name) || '-';
+    var city = location ? location.city || '-' : (shodanData && shodanData.city) || '-';
+    var lat = location ? location.latitude : shodanData && shodanData.latitude;
+    var lon = location ? location.longitude : shodanData && shodanData.longitude;
+    var ports = (idbData && idbData.ports) || (shodanData && shodanData.ports) || [];
+    var vulns = idbData ? idbData.vulns || {} : (shodanData && shodanData.vulns) || {};
+    var cpes = (idbData && idbData.cpes) || [];
+    var tags = (idbData && idbData.tags) || [];
+    var lastUpdate =
+      idbData && idbData.last_report_at
+        ? idbData.last_report_at.replace('T', ' ').substring(0, 19)
+        : (shodanData && shodanData.last_update) || '-';
+    var isp = shodanData && shodanData.isp ? shodanData.isp : null;
+    var org = shodanData && shodanData.org ? shodanData.org : null;
+    var os = shodanData && shodanData.os ? shodanData.os : null;
+    var serviceData = shodanData && shodanData.data ? shodanData.data : [];
+
+    var h = '';
+    // Header
+    h += '<div class="shodan-host-header">';
+    h += '<div class="shodan-host-title">' + (hostnames[0] || queryInput) + '</div>';
+    h += '<div class="shodan-host-ip">' + ip + '</div>';
+    if (tags.length > 0) {
+      h += '<div style="margin-top:4px;">';
+      tags.forEach(function (tag) {
+        h +=
+          '<span style="display:inline-block;font-size:10px;background:#E8F4FD;color:#1976D2;padding:1px 6px;border-radius:3px;margin-right:4px;">' +
+          tag +
+          '</span>';
+      });
+      h += '</div>';
+    }
+    h += '</div>';
+
+    // Info grid
+    h += '<div class="shodan-info-grid">';
+    var infoItems = [];
+    if (isp) infoItems.push({ label: 'ISP', value: isp });
+    if (org) infoItems.push({ label: '组织', value: org });
+    infoItems.push({ label: '国家/地区', value: country });
+    infoItems.push({ label: '城市', value: city });
+    if (lat != null && lon != null) infoItems.push({ label: '经纬度', value: lat + ', ' + lon });
+    if (os) infoItems.push({ label: '操作系统', value: os });
+    infoItems.push({ label: '最后更新', value: lastUpdate });
+    infoItems.forEach(function (item) {
+      h +=
+        '<div class="shodan-info-item"><span class="shodan-info-label">' +
+        item.label +
+        '</span><span class="shodan-info-value">' +
+        item.value +
+        '</span></div>';
+    });
+    h += '</div>';
+
+    // Ports
+    if (ports.length > 0) {
+      h += '<div class="shodan-section-title">开放端口 (' + ports.length + ')</div>';
+      h += '<div class="shodan-ports">';
+      ports.forEach(function (port) {
+        var portInfo = serviceData.find(function (d) {
+          return d.port === port;
+        });
+        var product = portInfo
+          ? portInfo.product || (portInfo._shodan && portInfo._shodan.module) || ''
+          : '';
+        var version = portInfo && portInfo.version ? ' ' + portInfo.version : '';
+        var portLabel = product ? product + version : '';
+        h +=
+          '<div class="shodan-port-item"><span class="shodan-port-num">' +
+          port +
+          '</span><span class="shodan-port-service">' +
+          portLabel +
+          '</span></div>';
+      });
+      h += '</div>';
+    }
+
+    // CPEs
+    if (cpes.length > 0) {
+      h += '<div class="shodan-section-title">CPE 识别 (' + cpes.length + ')</div>';
+      h += '<div class="shodan-ports">';
+      cpes.slice(0, 15).forEach(function (cpe) {
+        var short = cpe.replace('cpe:2.3:a:', '').replace(/:/g, ' ');
+        h +=
+          '<div class="shodan-port-item"><span class="shodan-port-service" style="font-family:monospace;font-size:11px;">' +
+          short +
+          '</span></div>';
+      });
+      if (cpes.length > 15)
+        h +=
+          '<div style="color:#888;font-size:11px;padding:4px 0;">...还有 ' +
+          (cpes.length - 15) +
+          ' 个</div>';
+      h += '</div>';
+    }
+
+    // Vulnerabilities
+    var vulnKeys = Object.keys(vulns);
+    if (vulnKeys.length > 0) {
+      h += '<div class="shodan-section-title">已知漏洞 (' + vulnKeys.length + ')</div>';
+      h += '<div class="shodan-vulns">';
+      vulnKeys.slice(0, 30).forEach(function (cve) {
+        var v = vulns[cve];
+        var severity;
+        if (v && typeof v === 'object' && v.cvss) {
+          severity =
+            v.cvss >= 9 ? 'critical' : v.cvss >= 7 ? 'high' : v.cvss >= 4 ? 'medium' : 'low';
+        } else {
+          severity = 'info';
+        }
+        var cvssStr =
+          v && typeof v === 'object' && v.cvss
+            ? '<span class="shodan-vuln-cvss">CVSS: ' + v.cvss + '</span>'
+            : '';
+        h += '<div class="shodan-vuln-item shodan-vuln-' + severity + '">';
+        h += '<span class="shodan-vuln-cve">' + cve + '</span>';
+        h += cvssStr;
+        h += '</div>';
+      });
+      if (vulnKeys.length > 30)
+        h +=
+          '<div style="color:#888;font-size:11px;padding:4px 0;">...还有 ' +
+          (vulnKeys.length - 30) +
+          ' 个</div>';
+      h += '</div>';
+    }
+
+    if (ports.length === 0 && vulnKeys.length === 0) {
+      h += '<div style="color:#888;padding:8px;">该 IP 暂无开放端口或漏洞信息</div>';
+    }
+
+    // Source footer
+    h +=
+      '<div style="text-align:center;padding:6px;font-size:10px;color:#aaa;">数据来源: Shodan InternetDB' +
+      (shodanData ? ' + Shodan API' : '') +
+      '</div>';
+
+    container.innerHTML = h;
   }
 
   async function handleAssetScan() {
@@ -8221,6 +8486,9 @@
 
     const scanBtn = utils.get('asset-scan-btn');
     if (scanBtn) scanBtn.addEventListener('click', handleAssetScan);
+
+    const shodanHostBtn = utils.get('shodan-host-btn');
+    if (shodanHostBtn) shodanHostBtn.addEventListener('click', shodanHostLookup);
 
     const saveKeysBtn = utils.get('save-keys-btn');
     if (saveKeysBtn) saveKeysBtn.addEventListener('click', saveApiKeys);

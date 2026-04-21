@@ -159,12 +159,18 @@ async function fetchUrl(url, tailOnly) {
     if (tailOnly) {
       opts.headers = { Range: 'bytes=-500' };
     }
+    var controller = new AbortController();
+    var timer = setTimeout(function () {
+      controller.abort();
+    }, 10000);
+    opts.signal = controller.signal;
     const resp = await fetch(url, opts);
+    clearTimeout(timer);
     if (!resp.ok && resp.status !== 206) throw new Error('HTTP ' + resp.status);
     const data = await resp.text();
     return { success: true, data };
   } catch (e) {
-    return { success: false, error: e.message };
+    return { success: false, error: e.message || '请求超时' };
   }
 }
 
