@@ -789,6 +789,10 @@
     utils.get('asset-status').textContent = text;
   }
 
+  function getAssetSize() {
+    return parseInt(utils.get('asset-size').value, 10) || 10;
+  }
+
   function renderAssetResults(data) {
     const container = utils.get('asset-results');
     if (!data || data.length === 0) {
@@ -835,10 +839,19 @@
       encodeURIComponent(keys.key) +
       '&qbase64=' +
       qbase64 +
-      '&fields=host,port,protocol,title&size=100';
+      '&fields=host,port,protocol,title&size=' +
+      getAssetSize();
 
     chrome.runtime.sendMessage({ type: 'FETCH_URL', url }, response => {
-      if (response?.error) {
+      if (chrome.runtime.lastError) {
+        setAssetStatus('查询失败: ' + chrome.runtime.lastError.message);
+        return;
+      }
+      if (!response) {
+        setAssetStatus('查询失败: 无响应');
+        return;
+      }
+      if (response.error) {
         setAssetStatus('查询失败: ' + response.error);
         return;
       }
@@ -854,7 +867,7 @@
           protocol: r[2],
           title: r[3],
         }));
-        setAssetStatus('FOFA: 查询完成');
+        setAssetStatus('FOFA: 查询完成 (共 ' + (json.size || results.length) + ' 条)');
         renderAssetResults(results);
       } catch {
         setAssetStatus('解析结果失败');
@@ -869,27 +882,49 @@
       return;
     }
     setAssetStatus('正在查询 ZoomEye...');
+    var baseDomain = query.replace(/^www\./, '');
+    var zoomQuery = 'hostname:' + baseDomain + ' OR site:' + baseDomain;
     const url =
       'https://api.zoomeye.org/host/search?query=' +
-      encodeURIComponent('hostname:' + query) +
-      '&page=1&size=100';
+      encodeURIComponent(zoomQuery) +
+      '&page=1&size=' +
+      getAssetSize();
 
     chrome.runtime.sendMessage(
       { type: 'FETCH_URL_AUTH', url, key, header: 'API-KEY' },
       response => {
-        if (response?.error) {
+        if (chrome.runtime.lastError) {
+          setAssetStatus('查询失败: ' + chrome.runtime.lastError.message);
+          return;
+        }
+        if (!response) {
+          setAssetStatus('查询失败: 无响应');
+          return;
+        }
+        if (response.error) {
           setAssetStatus('查询失败: ' + response.error);
           return;
         }
         try {
           const json = JSON.parse(response.data);
-          const results = (json.matches || []).map(r => ({
+          if (json.error) {
+            setAssetStatus('API 错误: ' + (json.message || json.error));
+            return;
+          }
+          const list = json.matches || json.data || [];
+          const total = json.total || list.length;
+          if (list.length === 0) {
+            setAssetStatus('ZoomEye: 未找到资产 (total=0)');
+            renderAssetResults([]);
+            return;
+          }
+          const results = list.map(r => ({
             host: r.ip || '-',
             port: r.portinfo?.port || '-',
-            protocol: r.portinfo?.type || '-',
-            title: r.webinfo?.title || '-',
+            protocol: r.portinfo?.service || r.portinfo?.type || '-',
+            title: r.webinfo?.title || r.portinfo?.product || '-',
           }));
-          setAssetStatus('ZoomEye: 查询完成');
+          setAssetStatus('ZoomEye: 查询完成 (共 ' + total + ' 条)');
           renderAssetResults(results);
         } catch {
           setAssetStatus('解析结果失败');
@@ -910,10 +945,20 @@
       'https://api.shodan.io/shodan/host/search?key=' +
       encodeURIComponent(key) +
       '&query=' +
-      encodeURIComponent(searchQuery);
+      encodeURIComponent(searchQuery) +
+      '&count=' +
+      getAssetSize();
 
     chrome.runtime.sendMessage({ type: 'FETCH_URL', url }, response => {
-      if (response?.error) {
+      if (chrome.runtime.lastError) {
+        setAssetStatus('查询失败: ' + chrome.runtime.lastError.message);
+        return;
+      }
+      if (!response) {
+        setAssetStatus('查询失败: 无响应');
+        return;
+      }
+      if (response.error) {
         setAssetStatus('查询失败: ' + response.error);
         return;
       }
@@ -929,7 +974,7 @@
           protocol: m._shodan?.module || '-',
           title: m.http?.title || '-',
         }));
-        setAssetStatus('Shodan: 查询完成');
+        setAssetStatus('Shodan: 查询完成 (共 ' + (json.total || results.length) + ' 条)');
         renderAssetResults(results);
       } catch {
         setAssetStatus('解析结果失败');

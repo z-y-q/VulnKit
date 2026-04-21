@@ -166,7 +166,12 @@ async function fetchUrl(url, tailOnly) {
     opts.signal = controller.signal;
     const resp = await fetch(url, opts);
     clearTimeout(timer);
-    if (!resp.ok && resp.status !== 206) throw new Error('HTTP ' + resp.status);
+    if (!resp.ok && resp.status !== 206) {
+      var body = await resp.text().catch(function () {
+        return '';
+      });
+      throw new Error('HTTP ' + resp.status + (body ? ': ' + body.slice(0, 200) : ''));
+    }
     const data = await resp.text();
     return { success: true, data };
   } catch (e) {
@@ -176,14 +181,25 @@ async function fetchUrl(url, tailOnly) {
 
 async function fetchUrlAuth(url, key, header) {
   try {
+    var controller = new AbortController();
+    var timer = setTimeout(function () {
+      controller.abort();
+    }, 15000);
     const resp = await fetch(url, {
       headers: { [header]: key },
+      signal: controller.signal,
     });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    clearTimeout(timer);
+    if (!resp.ok) {
+      var body = await resp.text().catch(function () {
+        return '';
+      });
+      throw new Error('HTTP ' + resp.status + (body ? ': ' + body.slice(0, 200) : ''));
+    }
     const data = await resp.text();
     return { success: true, data };
   } catch (e) {
-    return { success: false, error: e.message };
+    return { success: false, error: e.message || '请求超时' };
   }
 }
 
