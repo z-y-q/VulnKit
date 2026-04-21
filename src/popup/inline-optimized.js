@@ -8909,20 +8909,39 @@
 
   // ====== Init ======
   function initApp() {
-    // Tab scroll arrows
-    var tabNav = utils.get('tab-nav');
+    // Tab pagination (2 rows x 4 cols = 8 per page)
+    var tabBtns = Array.from(document.querySelectorAll('.tab-btn'));
+    var tabsPerPage = 8;
+    var totalTabs = tabBtns.length;
+    var totalPages = Math.ceil(totalTabs / tabsPerPage);
+    var currentPage = 0;
+
+    function showTabPage(page) {
+      currentPage = page;
+      tabBtns.forEach((btn, i) => {
+        if (i >= page * tabsPerPage && i < (page + 1) * tabsPerPage) {
+          btn.classList.remove('hidden-tab');
+        } else {
+          btn.classList.add('hidden-tab');
+        }
+      });
+      if (scrollLeftBtn) scrollLeftBtn.disabled = page === 0;
+      if (scrollRightBtn) scrollRightBtn.disabled = page >= totalPages - 1;
+    }
+
     var scrollLeftBtn = utils.get('tab-scroll-left');
     var scrollRightBtn = utils.get('tab-scroll-right');
-    if (tabNav && scrollLeftBtn) {
+    if (scrollLeftBtn) {
       scrollLeftBtn.addEventListener('click', function () {
-        tabNav.scrollBy({ left: -200, behavior: 'instant' });
+        if (currentPage > 0) showTabPage(currentPage - 1);
       });
     }
-    if (tabNav && scrollRightBtn) {
+    if (scrollRightBtn) {
       scrollRightBtn.addEventListener('click', function () {
-        tabNav.scrollBy({ left: 200, behavior: 'instant' });
+        if (currentPage < totalPages - 1) showTabPage(currentPage + 1);
       });
     }
+    showTabPage(0);
 
     // Main panel tabs
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -8934,7 +8953,6 @@
         const target = document.getElementById('panel-' + panel);
         if (target) target.classList.add('active');
         utils.get('status-text').textContent = btn.textContent;
-        btn.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'center' });
       });
     });
 

@@ -38,76 +38,74 @@ body {
   margin-bottom: 10px;
 }
 
-/* Main Tab Navigation */
+/* Main Tab Navigation - Two Row Grid */
 .tab-nav-wrapper {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   border-bottom: 2px solid #E0E0E0;
   position: relative;
+  padding: 0 0 2px;
 }
-.tab-scroll-btn {
+.tab-page-btn {
   flex-shrink: 0;
-  width: 24px;
-  border: none;
-  background: transparent;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #E0E0E0;
+  background: #f5f5f5;
   color: #999;
-  font-size: 10px;
+  font-size: 12px;
   cursor: pointer;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.2s;
+  transition: all 0.2s;
 }
-.tab-scroll-btn:hover { color: #4A90E2; }
-.tab-scroll-btn:active { color: #333; }
-.tab-scroll-left { border-right: 1px solid #E0E0E0; }
-.tab-scroll-right { border-left: 1px solid #E0E0E0; }
+.tab-page-btn:hover { color: #4A90E2; border-color: #4A90E2; background: #E6F0FA; }
+.tab-page-btn:active { color: #333; }
+#tab-scroll-left { margin-right: 6px; }
+#tab-scroll-right { margin-left: 6px; }
+.tab-page-btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
 
-.tab-nav {
+.tab-grid {
   flex: 1;
-  display: flex;
-  gap: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  scroll-behavior: instant;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 3px;
 }
-.tab-nav::-webkit-scrollbar { display: none; }
 
 .tab-btn {
-  flex-shrink: 0;
-  padding: 7px 8px;
-  border: none;
-  background: transparent;
+  padding: 6px 4px;
+  border: 1px solid transparent;
+  background: #f8f8f8;
   font-size: 12px;
   font-weight: 500;
   color: #666;
   cursor: pointer;
-  border-radius: 0;
+  border-radius: 6px;
   transition: all 0.15s ease;
-  position: relative;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
 }
 
 .tab-btn:hover {
   color: #4A90E2;
   background: #E6F0FA;
+  border-color: #c4ddef;
 }
 
 .tab-btn.active {
-  color: #4A90E2;
+  color: #fff;
   font-weight: 600;
-  background: #E6F0FA;
+  background: #4A90E2;
+  border-color: #4A90E2;
 }
 
-.tab-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #4A90E2;
+.tab-btn.hidden-tab {
+  display: none;
 }
 
 /* Main Content */
