@@ -6521,28 +6521,78 @@
   let sourcemapSearchTerm = '';
   let sourcemapCurrentModule = null;
   let sourcemapSourceCache = {};
+  let sourcemapTabId = null;
   let sourcemapMapCache = {};
 
-  async function smBatchFetch(urls, tailOnly) {
+  async function smBatchFetch(urls, tailOnly, tabId) {
     var concurrency = tailOnly ? 10 : 5;
     var results = [];
     for (var i = 0; i < urls.length; i += concurrency) {
       var batch = urls.slice(i, i + concurrency);
-      var batchResults = await Promise.all(
-        batch.map(function (url) {
-          return chrome.runtime
-            .sendMessage({ type: 'FETCH_URL', url: url, tailOnly: tailOnly })
-            .then(function (r) {
-              return r && !r.error ? r.data : null;
-            })
-            .catch(function () {
-              return null;
-            });
-        })
-      );
+      var batchResults;
+      if (tabId) {
+        batchResults = await smBatchFetchInPage(batch, tailOnly, tabId);
+      } else {
+        batchResults = await Promise.all(
+          batch.map(function (url) {
+            return chrome.runtime
+              .sendMessage({ type: 'FETCH_URL', url: url, tailOnly: tailOnly })
+              .then(function (r) {
+                return r && !r.error ? r.data : null;
+              })
+              .catch(function () {
+                return null;
+              });
+          })
+        );
+      }
       results = results.concat(batchResults);
     }
     return results;
+  }
+
+  async function smBatchFetchInPage(urls, tailOnly, tabId) {
+    try {
+      var fetchResults = await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        world: 'ISOLATED',
+        func: function (fetchParams) {
+          var promises = fetchParams.map(function (p) {
+            return fetch(p.url, p.tailOnly ? { headers: { Range: 'bytes=-500' } } : {})
+              .then(function (r) {
+                if (!r.ok) return null;
+                return p.tailOnly ? r.text() : r.text();
+              })
+              .catch(function () {
+                return null;
+              });
+          });
+          return Promise.all(promises);
+        },
+        args: [
+          urls.map(function (u) {
+            return { url: u, tailOnly: !!tailOnly };
+          }),
+        ],
+      });
+      if (fetchResults && fetchResults[0] && fetchResults[0].result) {
+        return fetchResults[0].result;
+      }
+    } catch (e) {
+      // In-page fetch failed, fall back to background
+    }
+    return Promise.all(
+      urls.map(function (url) {
+        return chrome.runtime
+          .sendMessage({ type: 'FETCH_URL', url: url, tailOnly: tailOnly })
+          .then(function (r) {
+            return r && !r.error ? r.data : null;
+          })
+          .catch(function () {
+            return null;
+          });
+      })
+    );
   }
 
   function smResolveUrl(relative, base) {
@@ -6663,6 +6713,7 @@
     sourcemapModules = [];
     sourcemapSourceCache = {};
     sourcemapMapCache = {};
+    sourcemapTabId = null;
     if (scanBtn) {
       scanBtn.disabled = true;
       scanBtn.textContent = '扫描中...';
@@ -6691,9 +6742,11 @@
           scanBtn.textContent = '扫描[v2]';
           scanBtn.classList.remove('scanning');
         }
+        sourcemapTabId = null;
         return;
       }
 
+      sourcemapTabId = tab.id;
       var allModules = [];
       var sourceMapUrls = [];
       var scriptUrls = [];
@@ -7279,7 +7332,7 @@
       if (scriptUrls.length > 0 && sourceMapUrls.length < 5) {
         statusEl.textContent =
           'Phase 2: 解析脚本 Source Map URL (' + scriptUrls.length + ' 个文件)...';
-        var scriptContents = await smBatchFetch(scriptUrls.slice(0, 15));
+        var scriptContents = await smBatchFetch(scriptUrls.slice(0, 15), false, tab.id);
         for (var si = 0; si < scriptContents.length; si++) {
           if (!scriptContents[si]) continue;
           var content = scriptContents[si];
@@ -7300,7 +7353,7 @@
       if (sourceMapUrls.length > 0) {
         statusEl.textContent = 'Phase 2: 解析 ' + sourceMapUrls.length + ' 个 Source Map 文件...';
         smUpdateProgress(50, 2);
-        var mapContents = await smBatchFetch(sourceMapUrls.slice(0, 20));
+        var mapContents = await smBatchFetch(sourceMapUrls.slice(0, 20), false, tab.id);
         for (var mi = 0; mi < mapContents.length; mi++) {
           if (!mapContents[mi]) continue;
           try {
@@ -7404,7 +7457,7 @@
         }
 
         if (runtimeUrl) {
-          var runtimeContent = await smBatchFetch([runtimeUrl]);
+          var runtimeContent = await smBatchFetch([runtimeUrl], false, tab.id);
           if (runtimeContent[0]) {
             var rc = runtimeContent[0];
             var rcBase = runtimeUrl.substring(0, runtimeUrl.lastIndexOf('/') + 1);
@@ -7442,9 +7495,15 @@
                     : urlPrefix
                       ? smResolveUrl(urlPrefix, rcBase)
                       : rcBase;
+                  var hasPublicPath = !!ppMatch1;
                   Object.keys(chunkIdToHash).forEach(function (cid) {
                     var hash = chunkIdToHash[cid];
-                    var chunkUrl = finalBase + cid + '.' + hash + '.js';
+                    var chunkUrl =
+                      (hasPublicPath ? finalBase + urlPrefix : finalBase) +
+                      cid +
+                      '.' +
+                      hash +
+                      '.js';
                     if (scriptUrls.indexOf(chunkUrl) === -1) {
                       var dup = discoveredChunkUrls.some(function (cu) {
                         return cu.url === chunkUrl;
@@ -7473,10 +7532,18 @@
                 if (Object.keys(tempChunkMap).length > 2) {
                   var ppMatch2 = rc.match(/\.p\s*=\s*"([^"]*\/)"/);
                   if (!ppMatch2) ppMatch2 = rc.match(/__webpack_require__\.p\s*=\s*"([^"]+)"/);
-                  var base2 = ppMatch2 ? smResolveUrl(ppMatch2[1], tab.url) : rcBase;
+                  var prefixMatch2 = rc.match(/return\s+["']([^"']*\/)["']/);
+                  var urlPrefix2 = prefixMatch2 ? prefixMatch2[1] : '';
+                  var hasPublicPath2 = !!ppMatch2;
+                  var base2 = ppMatch2
+                    ? smResolveUrl(ppMatch2[1], tab.url)
+                    : urlPrefix2
+                      ? smResolveUrl(urlPrefix2, rcBase)
+                      : rcBase;
                   Object.keys(tempChunkMap).forEach(function (cid) {
                     var hash = tempChunkMap[cid];
-                    var chunkUrl = base2 + cid + '.' + hash + '.js';
+                    var chunkUrl =
+                      (hasPublicPath2 ? base2 + urlPrefix2 : base2) + cid + '.' + hash + '.js';
                     if (scriptUrls.indexOf(chunkUrl) === -1) {
                       var dup = discoveredChunkUrls.some(function (cu) {
                         return cu.url === chunkUrl;
@@ -7513,7 +7580,7 @@
                 );
               });
               if (otherBundles.length > 0) {
-                var bundleContents = await smBatchFetch(otherBundles.slice(0, 3));
+                var bundleContents = await smBatchFetch(otherBundles.slice(0, 3), false, tab.id);
                 for (var bi = 0; bi < bundleContents.length; bi++) {
                   if (!bundleContents[bi]) continue;
                   // Dynamic imports: import("./chunk-xxx.hash.js")
@@ -7591,7 +7658,7 @@
         });
 
         // Tail-fetch chunks (up to 50) to find sourceMappingURL
-        var chunkSamples = await smBatchFetch(chunkFetchUrls.slice(0, 50), true);
+        var chunkSamples = await smBatchFetch(chunkFetchUrls.slice(0, 50), true, tab.id);
         var newSourceMapUrls = [];
         for (var ci = 0; ci < chunkSamples.length; ci++) {
           if (!chunkSamples[ci]) continue;
@@ -7609,7 +7676,7 @@
         var allNewMaps = newSourceMapUrls.slice(0, 50);
         if (allNewMaps.length > 0) {
           statusEl.textContent = 'Phase 2.5: 解析 ' + allNewMaps.length + ' 个新 Source Map...';
-          var newMapContents = await smBatchFetch(allNewMaps);
+          var newMapContents = await smBatchFetch(allNewMaps, false, tab.id);
           for (var nmi = 0; nmi < newMapContents.length; nmi++) {
             if (!newMapContents[nmi]) continue;
             var nmUrl = allNewMaps[nmi];
@@ -7654,7 +7721,7 @@
       if (allModules.length === 0 && scriptUrls.length > 0) {
         statusEl.textContent = 'Phase 3: 解析 JS 文件中的模块路径...';
         smUpdateProgress(70, 3);
-        var jsContents = await smBatchFetch(scriptUrls.slice(0, 10));
+        var jsContents = await smBatchFetch(scriptUrls.slice(0, 10), false, tab.id);
         for (var ji = 0; ji < jsContents.length; ji++) {
           if (!jsContents[ji]) continue;
           var jsText = jsContents[ji];
@@ -8058,7 +8125,7 @@
       var chunkUrls = chunkToFetch.map(function (m) {
         return m.path.split('?')[0];
       });
-      var contents = await smBatchFetch(chunkUrls.slice(0, 50));
+      var contents = await smBatchFetch(chunkUrls.slice(0, 50), false, sourcemapTabId);
       for (var ci = 0; ci < contents.length; ci++) {
         if (contents[ci]) {
           sourcemapSourceCache[chunkToFetch[ci].path] = contents[ci];
