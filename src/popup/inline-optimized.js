@@ -6388,6 +6388,7 @@
       var sourceMapUrls = [];
       var scriptUrls = [];
       var chunkManifest = null;
+      var wpPublicPath = '';
 
       // Phase 1: MAIN world — access webpack runtime
       statusEl.textContent = 'Phase 1: 检测 Webpack 运行时...';
@@ -6399,6 +6400,70 @@
           func: function () {
             var modules = [];
             var hasWebpack = false;
+            var capturedWpRequire = null;
+
+            // Strategy 0: Intercept webpackChunk* to capture webpack require
+            // Works even when __webpack_require__ is NOT on window (webpack 5 default)
+            // Two sub-strategies:
+            //   A) Hook push for future pushes (pages still loading)
+            //   B) Fake-push to extract require from webpack's already-installed handler
+            try {
+              // Helper: hook an existing webpackChunk* array to capture require
+              function hookWebpackPush(chunkArr) {
+                if (!chunkArr || !Array.isArray(chunkArr)) return;
+                if (chunkArr._vulnkitHooked) return;
+                chunkArr._vulnkitHooked = true;
+                var origPush = chunkArr.push.bind(chunkArr);
+                chunkArr.push = function () {
+                  var args = Array.prototype.slice.call(arguments);
+                  if (args.length >= 2 && typeof args[1] === 'function') {
+                    capturedWpRequire = args[1];
+                  } else if (
+                    args.length >= 1 &&
+                    Array.isArray(args[0]) &&
+                    args[0].length >= 3 &&
+                    typeof args[0][2] === 'function'
+                  ) {
+                    capturedWpRequire = args[0][2];
+                  }
+                  return origPush.apply(this, args);
+                };
+              }
+
+              // Strategy 0B: Fake-push on already-loaded webpackChunk* arrays
+              // In webpack 5, the runtime replaces array.push with its jsonpCallback.
+              // The jsonpCallback calls the 3rd tuple element with the require function:
+              //   chunkArray.push([[chunkIds], modules, function(require) { ... }])
+              // We push a fake entry with a large unused chunkId and a capture callback.
+              for (var _wck in window) {
+                if (_wck.indexOf('webpackChunk') !== 0) continue;
+                if (!Array.isArray(window[_wck])) continue;
+                var _arr = window[_wck];
+                var _pushStr = _arr.push.toString();
+                // If push is NOT native, webpack has replaced it — we can exploit it
+                if (_pushStr.indexOf('[native code]') !== -1) {
+                  // Still native — hook for future pushes
+                  hookWebpackPush(_arr);
+                  continue;
+                }
+                hasWebpack = true;
+                // Fake push with a chunkId that definitely isn't installed (999999)
+                // webpack's jsonpCallback will call our 3rd-element function with require
+                try {
+                  _arr.push([
+                    [999999],
+                    {},
+                    function (wpRequire) {
+                      capturedWpRequire = wpRequire;
+                    },
+                  ]);
+                } catch (_fpErr) {
+                  // Some webpack configs may reject unknown chunkIds; fallback to hook
+                  hookWebpackPush(_arr);
+                }
+                if (capturedWpRequire) break;
+              }
+            } catch (e) {}
 
             // Webpack 4: __webpack_require__.c (module cache)
             if (typeof __webpack_require__ !== 'undefined' && __webpack_require__.c) {
@@ -6459,13 +6524,17 @@
             // Extract webpack chunk URL info
             var chunkInfo = null;
             try {
-              var wpRequire =
-                typeof __webpack_require__ !== 'undefined' ? __webpack_require__ : null;
+              // Try captured require first (works for obfuscated webpack 5),
+              // then fall back to global __webpack_require__ (webpack 4 / non-obfuscated)
+              var wpRequire = capturedWpRequire;
+              if (!wpRequire && typeof __webpack_require__ !== 'undefined') {
+                wpRequire = __webpack_require__;
+              }
               if (wpRequire && typeof wpRequire.u === 'function') {
-                // Extract all chunk IDs from the .u function body (the hash map keys)
                 var uBody = wpRequire.u.toString();
                 var allChunkIds = [];
-                // Find all objects with numeric keys mapping to hash strings: {123:"abc",456:"def"}
+
+                // Pattern A: plain numeric keys — {123:"abc", 456:"def"}
                 var mapObjs = uBody.match(/\{[^}]{5,}\}/g);
                 if (mapObjs) {
                   mapObjs.forEach(function (obj) {
@@ -6477,6 +6546,25 @@
                       });
                     }
                   });
+                }
+
+                // Pattern B: hex keys from obfuscated code — {0xcf:..., 0xd7:..., ...}
+                // Obfuscators encode the hash map keys as hex literals
+                if (allChunkIds.length === 0) {
+                  var hexPairs = uBody.match(/0x([0-9a-f]+)\s*:/g);
+                  if (hexPairs) {
+                    var seenHex = {};
+                    hexPairs.forEach(function (hp) {
+                      var hv = hp.match(/0x([0-9a-f]+)/);
+                      if (hv) {
+                        var dec = parseInt(hv[1], 16);
+                        if (dec > 0 && !seenHex[dec]) {
+                          seenHex[dec] = true;
+                          allChunkIds.push(String(dec));
+                        }
+                      }
+                    });
+                  }
                 }
 
                 // Also collect chunk IDs from webpackChunk push entries
@@ -6494,8 +6582,9 @@
                   }
                 }
 
-                // Call .u() directly for each chunk ID to get the filename
+                // Try calling .u() for numeric IDs, try range-based probing for obfuscated builds
                 var chunkFilenames = {};
+                // First: direct call for known IDs
                 allChunkIds.forEach(function (id) {
                   try {
                     var filename = wpRequire.u(id);
@@ -6503,11 +6592,202 @@
                   } catch (e) {}
                 });
 
+                // If direct calls yielded nothing (hash values are encoded strings),
+                // probe .u() with a range of IDs to find valid chunk filenames
+                // Valid chunk IDs are typically 100–10000 in most webpack builds
+                if (Object.keys(chunkFilenames).length === 0 && allChunkIds.length > 0) {
+                  var maxProbe = 0;
+                  allChunkIds.forEach(function (id) {
+                    var n = parseInt(id, 10);
+                    if (n > maxProbe) maxProbe = n;
+                  });
+                  // Probe from 1 to max known ID + buffer
+                  var probeLimit = Math.min(maxProbe + 200, 100000);
+                  for (var pid = 1; pid <= probeLimit; pid++) {
+                    try {
+                      var pfn = wpRequire.u(pid);
+                      if (pfn && typeof pfn === 'string' && pfn.length > 3) {
+                        // Filter out filenames that just echo the ID back (fallback path)
+                        if (pfn.indexOf(String(pid) + '.') === -1) {
+                          chunkFilenames[String(pid)] = pfn;
+                        } else if (pfn !== String(pid) + '.js') {
+                          chunkFilenames[String(pid)] = pfn;
+                        }
+                      }
+                    } catch (e) {}
+                  }
+                }
+
                 if (Object.keys(chunkFilenames).length > 0) {
                   chunkInfo = { chunkFilenames: chunkFilenames };
                 }
               }
             } catch (e) {}
+
+            // Strategy 0C: Decode obfuscated .u() via globally-accessible string decoder
+            // Obfuscators (javascript-obfuscator) define decoder functions at top-level scope.
+            // The .u() body uses a local alias: var _local=globalDecoder; return _local(prefixIdx)+{map1}[id]+"."+{map2}[id]+_local(suffixIdx)
+            // We extract the local var name, find its global decoder, call it, and build chunk URLs.
+            if (!chunkInfo && hasWebpack) {
+              (function () {
+                try {
+                  var _scripts = document.querySelectorAll('script[src]');
+                  var _bundleUrls = [];
+                  _scripts.forEach(function (s) {
+                    var _src = s.getAttribute('src') || '';
+                    if (_src && /\.js(\?|$)/.test(_src) && _src.indexOf('node_modules') === -1)
+                      _bundleUrls.push(_src);
+                  });
+                  var _rtUrl = null;
+                  for (var _bi = 0; _bi < _bundleUrls.length; _bi++) {
+                    if (/main|app|index|runtime/i.test(_bundleUrls[_bi])) {
+                      _rtUrl = _bundleUrls[_bi];
+                      break;
+                    }
+                  }
+                  if (!_rtUrl) {
+                    for (var _bi2 = 0; _bi2 < _bundleUrls.length; _bi2++) {
+                      if (/bundle\/|static\/js/.test(_bundleUrls[_bi2])) {
+                        _rtUrl = _bundleUrls[_bi2];
+                        break;
+                      }
+                    }
+                  }
+                  if (!_rtUrl) return;
+
+                  var _xhr = new XMLHttpRequest();
+                  _xhr.open('GET', _rtUrl, false);
+                  _xhr.send();
+                  var _bundleSrc = _xhr.responseText;
+
+                  var _uOpenMatch = _bundleSrc.match(
+                    /(\w+)\['u'\]\s*=\s*function\s*\(\s*(\w+)\s*\)\s*\{/
+                  );
+                  if (!_uOpenMatch)
+                    _uOpenMatch = _bundleSrc.match(
+                      /(\w+)\.u\s*=\s*function\s*\(\s*(\w+)\s*\)\s*\{/
+                    );
+                  if (!_uOpenMatch) return;
+
+                  var _uStart = _uOpenMatch.index + _uOpenMatch[0].length;
+                  var _bc = 1,
+                    _uEnd = _uStart;
+                  while (_uEnd < _bundleSrc.length && _bc > 0) {
+                    if (_bundleSrc[_uEnd] === '{') _bc++;
+                    else if (_bundleSrc[_uEnd] === '}') _bc--;
+                    _uEnd++;
+                  }
+                  var _uBody = _bundleSrc.substring(_uStart, _uEnd - 1);
+
+                  var _ldMatch = _uBody.match(/var\s+(\w+)\s*=\s*(a\d+_0x\w+)\s*;/);
+                  var _localVar = _ldMatch ? _ldMatch[1] : null;
+                  var _globalDecName = _ldMatch ? _ldMatch[2] : null;
+                  if (
+                    !_localVar &&
+                    window[_uOpenMatch[1]] &&
+                    typeof window[_uOpenMatch[1]] === 'function'
+                  ) {
+                    _localVar = _uOpenMatch[1];
+                    _globalDecName = _uOpenMatch[1];
+                  }
+                  if (!_localVar) return;
+
+                  var _dec = window[_globalDecName] || window[_localVar];
+                  if (!_dec || typeof _dec !== 'function') return;
+
+                  var _maps = [],
+                    _mRegex = /\{([^{}]+)\}/g,
+                    _mCnt = 0,
+                    _mMatch;
+                  while ((_mMatch = _mRegex.exec(_uBody)) !== null && _mCnt < 2) {
+                    var _hk = _mMatch[1].match(/0x[0-9a-f]+\s*:/g);
+                    if (_hk && _hk.length >= 3) {
+                      _maps.push(_mMatch[1]);
+                      _mCnt++;
+                    }
+                  }
+                  var _outside = _uBody.replace(/\{[^{}]+\}/g, '/*M*/');
+                  var _oRegex = new RegExp(_localVar + '\\\((0x[0-9a-f]+)\\)', 'g');
+                  var _oIdxs = [],
+                    _oM;
+                  while ((_oM = _oRegex.exec(_outside)) !== null) {
+                    _oIdxs.push(parseInt(_oM[1], 16));
+                  }
+                  var _prefix = '',
+                    _suffix = '';
+                  try {
+                    if (_oIdxs.length >= 1) _prefix = _dec(_oIdxs[0]) || '';
+                  } catch (e) {}
+                  try {
+                    if (_oIdxs.length >= 2) _suffix = _dec(_oIdxs[_oIdxs.length - 1]) || '';
+                  } catch (e) {}
+
+                  var _decodedChunks = {};
+                  var _pr = /0x([0-9a-f]+)\s*:\s*\w+\((0x[0-9a-f]+)\)/;
+                  if (_maps.length >= 2) {
+                    var _mapR = new RegExp(
+                      '0x([0-9a-f]+)\\s*:\\s*' + _localVar + '\\\((0x[0-9a-f]+)\\)',
+                      'g'
+                    );
+                    var _map2 = {},
+                      _m2;
+                    while ((_m2 = _mapR.exec(_maps[1])) !== null) {
+                      var _pm = _m2[0].match(_pr);
+                      if (_pm) {
+                        try {
+                          _map2[parseInt(_pm[1], 16)] = _dec(parseInt(_pm[2], 16));
+                        } catch (e) {}
+                      }
+                    }
+                    _mapR.lastIndex = 0;
+                    var _m1;
+                    while ((_m1 = _mapR.exec(_maps[0])) !== null) {
+                      var _pm = _m1[0].match(_pr);
+                      if (_pm) {
+                        var _cid = parseInt(_pm[1], 16);
+                        try {
+                          var _name = _dec(parseInt(_pm[2], 16)),
+                            _ext = _map2[_cid] || '';
+                          if (_name && _ext)
+                            _decodedChunks[String(_cid)] = _prefix + _name + '.' + _ext + _suffix;
+                        } catch (e) {}
+                      }
+                    }
+                  }
+                  if (Object.keys(_decodedChunks).length === 0 && _maps.length >= 1) {
+                    var _smR = new RegExp(
+                      '0x([0-9a-f]+)\\s*:\\s*' + _localVar + '\\\((0x[0-9a-f]+)\\)',
+                      'g'
+                    );
+                    var _sm;
+                    while ((_sm = _smR.exec(_maps[0])) !== null) {
+                      var _pm = _sm[0].match(_pr);
+                      if (_pm) {
+                        var _cid = parseInt(_pm[1], 16);
+                        try {
+                          var _hash = _dec(parseInt(_pm[2], 16));
+                          if (_hash)
+                            _decodedChunks[String(_cid)] = _prefix + _cid + '.' + _hash + _suffix;
+                        } catch (e) {}
+                      }
+                    }
+                  }
+                  if (Object.keys(_decodedChunks).length > 0) {
+                    // Extract webpack public path from same object that has .u()
+                    var _wpPp = '';
+                    var _ppMatch = _bundleSrc.match(
+                      new RegExp(_uOpenMatch[1] + '\\[\'p\'\\]\\s*=\\s*"([^"]*)"')
+                    );
+                    if (!_ppMatch)
+                      _ppMatch = _bundleSrc.match(
+                        new RegExp(_uOpenMatch[1] + '\\.p\\s*=\\s*"([^"]*)"')
+                      );
+                    if (_ppMatch) _wpPp = _ppMatch[1];
+                    chunkInfo = { chunkFilenames: _decodedChunks, publicPath: _wpPp };
+                  }
+                } catch (e) {}
+              })();
+            }
 
             // Install network hooks to capture dynamically loaded scripts
             try {
@@ -6534,8 +6814,13 @@
                 var _origFetch = window.fetch.bind(window);
                 window.fetch = function (input) {
                   try {
-                    var url = typeof input === 'string' ? input : input && input.url ? input.url : '';
-                    if (url && /\.js(\?|$)/.test(url) && window.__vulnkitScriptObserver.indexOf(url) === -1) {
+                    var url =
+                      typeof input === 'string' ? input : input && input.url ? input.url : '';
+                    if (
+                      url &&
+                      /\.js(\?|$)/.test(url) &&
+                      window.__vulnkitScriptObserver.indexOf(url) === -1
+                    ) {
                       window.__vulnkitScriptObserver.push(url);
                     }
                   } catch (e) {}
@@ -6546,7 +6831,12 @@
                 var _origXhrOpen = XMLHttpRequest.prototype.open;
                 XMLHttpRequest.prototype.open = function (method, url) {
                   try {
-                    if (url && typeof url === 'string' && /\.js(\?|$)/.test(url) && window.__vulnkitScriptObserver.indexOf(url) === -1) {
+                    if (
+                      url &&
+                      typeof url === 'string' &&
+                      /\.js(\?|$)/.test(url) &&
+                      window.__vulnkitScriptObserver.indexOf(url) === -1
+                    ) {
                       window.__vulnkitScriptObserver.push(url);
                     }
                   } catch (e) {}
@@ -6563,11 +6853,20 @@
               }
             } catch (e) {}
 
+            var wpPublicPath = '';
+            try {
+              var _wpR =
+                capturedWpRequire ||
+                (typeof __webpack_require__ !== 'undefined' ? __webpack_require__ : null);
+              if (_wpR && _wpR.p) wpPublicPath = _wpR.p;
+            } catch (e) {}
+
             return {
               modules: modules,
               hasWebpack: hasWebpack,
               chunkInfo: chunkInfo,
               monitoredScripts: monitoredScripts,
+              wpPublicPath: wpPublicPath,
             };
           },
         });
@@ -6579,7 +6878,12 @@
           // Use directly-called .u() results
           if (wpData.chunkInfo && wpData.chunkInfo.chunkFilenames) {
             chunkManifest = wpData.chunkInfo.chunkFilenames;
+            // Prefer public path from Strategy 0C (extracted from bundle source),
+            // fall back to __webpack_require__.p from runtime
+            wpPublicPath = wpData.chunkInfo.publicPath || wpData.wpPublicPath || '';
           }
+          // Store webpack public path for chunk URL resolution
+          if (!wpPublicPath) wpPublicPath = wpData.wpPublicPath || '';
           // Merge DOM-monitor captured scripts
           if (wpData.monitoredScripts && wpData.monitoredScripts.length > 0) {
             wpData.monitoredScripts.forEach(function (url) {
@@ -6731,8 +7035,27 @@
 
       // Build chunk URLs from MAIN world manifest (most reliable)
       if (chunkManifest && scriptUrls.length > 0) {
-        var refScriptUrl = scriptUrls[0];
-        var baseUrl = refScriptUrl.substring(0, refScriptUrl.lastIndexOf('/') + 1);
+        // Infer correct base URL by cross-referencing decoded chunks with known scriptUrls.
+        // Example: decoded "bundle/home.js" matches DOM "/bundle/home.js" → base = origin root "/"
+        var inferredBase = null;
+        for (var si = 0; si < scriptUrls.length && !inferredBase; si++) {
+          var sUrlClean = scriptUrls[si].split('?')[0];
+          var sBare = sUrlClean.substring(sUrlClean.lastIndexOf('/') + 1);
+          for (var cid in chunkManifest) {
+            if (inferredBase) break;
+            var cFname = chunkManifest[cid];
+            if (!cFname) continue;
+            var cBare = cFname.substring(cFname.lastIndexOf('/') + 1);
+            if (cBare === sBare) {
+              inferredBase = sUrlClean.substring(0, sUrlClean.length - cFname.length);
+            }
+          }
+        }
+        var baseUrl = inferredBase
+          ? inferredBase
+          : wpPublicPath
+            ? smResolveUrl(wpPublicPath, tab.url)
+            : tab.url.substring(0, tab.url.lastIndexOf('/') + 1);
         Object.keys(chunkManifest).forEach(function (chunkId) {
           var filename = chunkManifest[chunkId];
           if (!filename) return;
@@ -6951,24 +7274,25 @@
           if (sourceMapUrls.indexOf(guessMap) === -1) sourceMapUrls.push(guessMap);
         });
 
-        // Tail-fetch chunks to find sourceMappingURL
+        // Add ALL discovered chunk URLs to scriptUrls (not just fetch-confirmed ones)
+        // The URLs were computed from webpack .u() decoding — they are valid regardless of fetch success
+        chunkFetchUrls.forEach(function (cUrl) {
+          if (scriptUrls.indexOf(cUrl) === -1) scriptUrls.push(cUrl);
+        });
+
+        // Tail-fetch chunks (up to 50) to find sourceMappingURL
         var chunkSamples = await smBatchFetch(chunkFetchUrls.slice(0, 50), true);
         var newSourceMapUrls = [];
         for (var ci = 0; ci < chunkSamples.length; ci++) {
           if (!chunkSamples[ci]) continue;
           var chunkContent = chunkSamples[ci];
-          // Check for sourceMappingURL in tail
           var chunkMapMatch = chunkContent.match(/[/#][@]\s*sourceMappingURL\s*=\s*(\S+)/);
           if (chunkMapMatch && chunkMapMatch[1].indexOf('data:') !== 0) {
             var cmUrl = smResolveUrl(chunkMapMatch[1], chunkFetchUrls[ci]);
             if (sourceMapUrls.indexOf(cmUrl) === -1) newSourceMapUrls.push(cmUrl);
           }
-          // Also guess .map alongside
           var chunkMapGuess = chunkFetchUrls[ci] + '.map';
           if (sourceMapUrls.indexOf(chunkMapGuess) === -1) newSourceMapUrls.push(chunkMapGuess);
-
-          // Add confirmed chunk to scriptUrls
-          if (scriptUrls.indexOf(chunkFetchUrls[ci]) === -1) scriptUrls.push(chunkFetchUrls[ci]);
         }
 
         // Fetch new source maps
@@ -7084,15 +7408,17 @@
         }
       }
 
-      // Deduplicate by path, skip runtime modules with numeric-only paths
+      // Deduplicate by path (strip query params — anti-crawl params cause fake duplicates)
+      // Always filter out runtime modules with numeric-only paths.
       var seenPaths = {};
       var deduped = [];
       for (var ui = 0; ui < allModules.length; ui++) {
         var m = allModules[ui];
         if (!m.path) continue;
         if (m.source === 'runtime' && /^\d+$/.test(m.path)) continue;
-        if (seenPaths[m.path]) continue;
-        seenPaths[m.path] = true;
+        var baseKey = m.path.split('?')[0];
+        if (seenPaths[baseKey]) continue;
+        seenPaths[baseKey] = true;
         deduped.push(m);
       }
 
@@ -7106,12 +7432,15 @@
         var hookResults = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
           world: 'MAIN',
-          func: function () { return !!window.__vulnkitHookActive; },
+          func: function () {
+            return !!window.__vulnkitHookActive;
+          },
         });
         if (hookResults && hookResults[0] && hookResults[0].result) {
           var hookHint = document.createElement('div');
           hookHint.className = 'sm-hook-hint';
-          hookHint.textContent = 'JS Hook 已激活 — 浏览其他页面可自动捕获新 Chunk，再次扫描即可合并';
+          hookHint.textContent =
+            'JS Hook 已激活 — 浏览其他页面可自动捕获新 Chunk，再次扫描即可合并';
           var statusArea = document.getElementById('sourcemap-status');
           if (statusArea && statusArea.nextSibling) {
             statusArea.parentNode.insertBefore(hookHint, statusArea.nextSibling);
@@ -7229,10 +7558,10 @@
         ')</div>';
       items.forEach(function (item) {
         var m = item.module;
-        // Extension badge
+        // Extension badge — skip for full URLs (extension already visible in URL)
         var extMatch = m.path.match(/\.[a-zA-Z0-9]+$/);
         var extBadge = '';
-        if (extMatch) {
+        if (extMatch && m.path.indexOf('://') === -1) {
           var ext = extMatch[0].toLowerCase();
           var extName = ext.replace('.', '');
           extBadge = '<span class="sm-ext-badge" data-ext="' + extName + '">' + extName + '</span>';
