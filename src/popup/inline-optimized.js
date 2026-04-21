@@ -7933,19 +7933,55 @@
   }
 
   async function loadSourcesToDevTools() {
-    var mapUrls = [];
+    var jsUrls = [];
     sourcemapModules.forEach(function (m) {
-      if (m.sourceUrl && mapUrls.indexOf(m.sourceUrl) === -1) mapUrls.push(m.sourceUrl);
+      if (m.source === 'chunk' && m.path && m.path.indexOf('://') !== -1) {
+        var url = m.path.split('?')[0];
+        if (jsUrls.indexOf(url) === -1) jsUrls.push(url);
+      }
     });
-    if (mapUrls.length === 0) {
-      utils.showToast('未找到 Source Map URL', 'warning');
+    if (jsUrls.length === 0) {
+      utils.showToast('未找到可加载的 JS 文件', 'warning');
       return;
     }
-    utils.copyText(mapUrls.join('\n'));
-    if (mapUrls.length > 0) {
-      chrome.tabs.create({ url: mapUrls[0], active: false });
+    try {
+      var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      var tab = tabs[0];
+      if (!tab || !tab.id) {
+        utils.showToast('无法获取当前标签页', 'warning');
+        return;
+      }
+      var results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        world: 'MAIN',
+        func: function (urls) {
+          var existing = new Set();
+          document.querySelectorAll('script[src]').forEach(function (s) {
+            existing.add(s.src.split('?')[0]);
+          });
+          var injected = 0;
+          urls.forEach(function (url) {
+            if (existing.has(url)) return;
+            var script = document.createElement('script');
+            script.src = url;
+            script.async = true;
+            document.head.appendChild(script);
+            injected++;
+          });
+          return injected;
+        },
+        args: [jsUrls],
+      });
+      var count = results && results[0] && results[0].result ? results[0].result : 0;
+      if (count === 0) {
+        utils.showToast('所有 JS 文件已在页面中加载', 'info');
+      } else {
+        utils.showToast(count + ' 个 JS 文件已注入页面，刷新 DevTools Sources 查看', 'success');
+      }
+    } catch (e) {
+      utils.copyText(jsUrls.join('\n'));
+      utils.showToast('注入失败，URL 已复制到剪贴板', 'warning');
     }
-    utils.showToast(mapUrls.length + ' 个 Source Map URL 已复制', 'success');
   }
 
   async function downloadAllSourcemapSources() {
