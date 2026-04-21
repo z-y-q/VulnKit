@@ -7726,11 +7726,43 @@
     var resultsEl = utils.get('sm-analysis-results');
     if (!analysisCard || !progressEl || !resultsEl) return;
 
+    // Collect modules with available source code (sourcemap cache) + chunk JS URLs to fetch
     var resolvedModules = sourcemapModules.filter(function (m) {
       return sourcemapSourceCache[m.path] && m.source !== 'chunk';
     });
+    var chunkToFetch = sourcemapModules.filter(function (m) {
+      return (
+        m.source === 'chunk' &&
+        m.path &&
+        m.path.indexOf('://') !== -1 &&
+        !sourcemapSourceCache[m.path]
+      );
+    });
+
+    // Fetch chunk JS content for analysis
+    if (chunkToFetch.length > 0) {
+      progressEl.innerHTML =
+        '<div class="sm-analysis-progress-text">正在获取 ' +
+        chunkToFetch.length +
+        ' 个 JS 文件源码...</div>';
+      var chunkUrls = chunkToFetch.map(function (m) {
+        return m.path.split('?')[0];
+      });
+      var contents = await smBatchFetch(chunkUrls.slice(0, 50));
+      for (var ci = 0; ci < contents.length; ci++) {
+        if (contents[ci]) {
+          sourcemapSourceCache[chunkToFetch[ci].path] = contents[ci];
+          chunkToFetch[ci].resolved = true;
+          resolvedModules.push(chunkToFetch[ci]);
+        }
+      }
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+    }
+
     if (resolvedModules.length === 0) {
-      utils.showToast('没有可分析的源码模块（需 Source Map 提供源码）', 'warning');
+      utils.showToast('没有可分析的源码模块', 'warning');
       return;
     }
 
