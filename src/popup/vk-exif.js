@@ -129,9 +129,7 @@ window.VulnKitExif = (function () {
 
       let html = '';
       EXIF_SECTIONS.forEach(section => {
-        const hasData = section.fields.some(
-          f => exif[f.key] !== undefined && exif[f.key] !== null
-        );
+        const hasData = section.fields.some(f => exif[f.key] !== undefined && exif[f.key] !== null);
         if (!hasData) return;
 
         html += '<div class="exif-section">';
@@ -140,16 +138,12 @@ window.VulnKitExif = (function () {
         section.fields.forEach(field => {
           if (exif[field.key] === undefined || exif[field.key] === null) return;
 
-          if (
-            field.format === 'gps' &&
-            (field.key === 'latitude' || field.key === 'longitude')
-          ) {
+          if (field.format === 'gps' && (field.key === 'latitude' || field.key === 'longitude')) {
             const lat = exif.latitude;
             const lon = exif.longitude;
             const latStr = formatGpsDms(lat) + ' (' + lat.toFixed(6) + ')';
             const lonStr =
-              formatGpsDms(lon).replace('N', 'E').replace('S', 'W') +
-              ' (' + lon.toFixed(6) + ')';
+              formatGpsDms(lon).replace('N', 'E').replace('S', 'W') + ' (' + lon.toFixed(6) + ')';
             if (field.key === 'latitude') {
               html +=
                 '<div class="exif-row"><span class="exif-label">纬度</span><span class="exif-value" title="' +
@@ -187,8 +181,7 @@ window.VulnKitExif = (function () {
           exif.longitude !== undefined &&
           section.title === 'GPS 信息'
         ) {
-          const mapUrl =
-            'https://www.google.com/maps?q=' + exif.latitude + ',' + exif.longitude;
+          const mapUrl = 'https://www.google.com/maps?q=' + exif.latitude + ',' + exif.longitude;
           html +=
             '<div class="exif-gps-row"><a class="exif-gps-link" href="' +
             mapUrl +
@@ -274,7 +267,8 @@ window.VulnKitExif = (function () {
         sectionsEl.innerHTML = '';
         return;
       }
-      const bytes = Uint8Array.from(atob(response.data), c => c.charCodeAt(0));
+      const b64 = response.data.replace(/^data:[^;]+;base64,/, '');
+      const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
       const mime = url.match(/\.(jpe?g|png|webp|tiff?|heic)/i)
         ? 'image/' + RegExp.$1.toLowerCase().replace('jpg', 'jpeg')
         : 'image/jpeg';
@@ -370,7 +364,11 @@ window.VulnKitExif = (function () {
     fetchExifFromUrl,
     scanPageImages,
     checkExifPending,
-    get lastExifData() { return lastExifData; },
-    set lastExifData(v) { lastExifData = v; },
+    get lastExifData() {
+      return lastExifData;
+    },
+    set lastExifData(v) {
+      lastExifData = v;
+    },
   };
 })();
