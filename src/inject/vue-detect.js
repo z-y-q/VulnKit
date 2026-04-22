@@ -1,6 +1,6 @@
 // VulnKit - Vue Detect (Stealth Injection)
 // This script is injected via <script> tag by content script, then removed.
-;(function () {
+(function () {
   'use strict';
 
   var info = {
@@ -57,18 +57,33 @@
     return paths;
   }
 
+  function addFlatRoutes(tree, flatRoutes) {
+    var existingPaths = collectTreePaths(tree, '');
+    flatRoutes.forEach(function (r) {
+      if (r.path && !existingPaths[r.path]) {
+        tree.push(normalizeRoute(r));
+      }
+    });
+  }
+
   function getVue3Routes(router) {
     if (!router) return [];
     var treeRoutes = safeSerialize(router.options && router.options.routes) || [];
     var tree = buildRouteTree(treeRoutes);
     if (typeof router.getRoutes === 'function') {
-      var flatRoutes = router.getRoutes();
-      var existingPaths = collectTreePaths(tree, '');
-      flatRoutes.forEach(function (r) {
-        if (r.path && !existingPaths[r.path]) {
-          tree.push(normalizeRoute(r));
-        }
-      });
+      addFlatRoutes(tree, router.getRoutes());
+    }
+    // Vue Router 4 fallback: history.matched
+    if (tree.length === 0 && router.history && router.history.current) {
+      try {
+        var matched = router.history.current.matched || [];
+        addFlatRoutes(
+          tree,
+          matched.map(function (r) {
+            return r.record || r;
+          })
+        );
+      } catch (e) {}
     }
     return tree;
   }
@@ -104,14 +119,30 @@
     var opts = router.options;
     var treeRoutes = opts ? safeSerialize(opts.routes) || [] : [];
     var tree = buildRouteTree(treeRoutes);
+    // Vue Router 3.x
     if (typeof router.getRoutes === 'function') {
-      var flatRoutes = router.getRoutes();
-      var existingPaths = collectTreePaths(tree, '');
-      flatRoutes.forEach(function (r) {
-        if (r.path && !existingPaths[r.path]) {
-          tree.push(normalizeRoute(r));
+      addFlatRoutes(tree, router.getRoutes());
+    }
+    // Vue Router 2.x fallback: matcher.getRoutes()
+    if (tree.length === 0 && router.matcher && typeof router.matcher.getRoutes === 'function') {
+      try {
+        var matcherRoutes = router.matcher.getRoutes();
+        if (Array.isArray(matcherRoutes)) {
+          addFlatRoutes(tree, matcherRoutes);
         }
-      });
+      } catch (e) {}
+    }
+    // Vue Router 2.x fallback: history.current.matched
+    if (tree.length === 0 && router.history && router.history.current) {
+      try {
+        var matched = router.history.current.matched || [];
+        addFlatRoutes(
+          tree,
+          matched.map(function (r) {
+            return r.record || r;
+          })
+        );
+      } catch (e) {}
     }
     return tree;
   }
@@ -134,14 +165,7 @@
   }
 
   // Strategy 1: check common mount points
-  var mountSelectors = [
-    '#app',
-    '[data-v-app]',
-    '[id^="app"]',
-    '#root',
-    '#application',
-    '#main',
-  ];
+  var mountSelectors = ['#app', '[data-v-app]', '[id^="app"]', '#root', '#application', '#main'];
   for (var si = 0; si < mountSelectors.length; si++) {
     var el = document.querySelector(mountSelectors[si]);
     if (el && el.__vue_app__) {
