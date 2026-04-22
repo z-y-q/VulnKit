@@ -397,6 +397,111 @@ window.VulnKitVue = (function () {
     }
   }
 
+  async function disableRouteAuth() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        world: 'MAIN',
+        func: () => {
+          var authKeys = [
+            'auth',
+            'requireAuth',
+            'requiresAuth',
+            'login',
+            'needLogin',
+            'requiresLogin',
+          ];
+          var changed = 0;
+
+          function clearAuthMeta(routes, depth) {
+            if (!routes || !Array.isArray(routes) || depth > 20) return;
+            for (var i = 0; i < routes.length; i++) {
+              var route = routes[i];
+              if (route.meta && typeof route.meta === 'object') {
+                for (var j = 0; j < authKeys.length; j++) {
+                  if (authKeys[j] in route.meta && route.meta[authKeys[j]]) {
+                    route.meta[authKeys[j]] = false;
+                    changed++;
+                  }
+                }
+              }
+              if (route.children) clearAuthMeta(route.children, depth + 1);
+            }
+          }
+
+          // Vue 3
+          var appEl =
+            document.querySelector('#app') ||
+            document.querySelector('[data-v-app]') ||
+            document.querySelector('[id^="app"]') ||
+            document.querySelector('#root') ||
+            document.querySelector('#application') ||
+            document.querySelector('#main');
+          if (appEl && appEl.__vue_app__) {
+            var router = appEl.__vue_app__.config.globalProperties.$router;
+            if (router) {
+              if (router.options && router.options.routes) clearAuthMeta(router.options.routes, 0);
+              var flatRoutes;
+              try {
+                flatRoutes = router.getRoutes();
+              } catch (e) {}
+              if (flatRoutes) {
+                for (var k = 0; k < flatRoutes.length; k++) {
+                  if (flatRoutes[k].meta && typeof flatRoutes[k].meta === 'object') {
+                    for (var m = 0; m < authKeys.length; m++) {
+                      if (authKeys[m] in flatRoutes[k].meta && flatRoutes[k].meta[authKeys[m]]) {
+                        flatRoutes[k].meta[authKeys[m]] = false;
+                        changed++;
+                      }
+                    }
+                  }
+                }
+              }
+              return { version: 'vue3', changed: changed };
+            }
+          }
+
+          // Vue 2
+          var allEls = document.querySelectorAll('*');
+          for (var n = 0; n < allEls.length; n++) {
+            if (allEls[n].__vue__) {
+              var vm = allEls[n].__vue__.$root || allEls[n].__vue__;
+              if (vm.$router && vm.$router.options && vm.$router.options.routes) {
+                clearAuthMeta(vm.$router.options.routes, 0);
+                return { version: 'vue2', changed: changed };
+              }
+            }
+          }
+
+          return null;
+        },
+      });
+
+      const result = results?.[0]?.result;
+      if (!result) {
+        utils.showToast('未找到 Vue Router', 'warning');
+        return;
+      }
+      if (result.changed > 0) {
+        utils.showToast(
+          '已修改 ' +
+            result.changed +
+            ' 条路由 auth (Vue ' +
+            (result.version === 'vue3' ? '3' : '2') +
+            ')',
+          'success'
+        );
+      } else {
+        utils.showToast('未发现需要修改的 auth 字段', 'warning');
+      }
+    } catch (e) {
+      utils.showToast('修改失败: ' + e.message, 'error');
+    }
+  }
+
   // ====== Vue Sub-tab Switching ======
 
   function switchVueSubTab(tab) {
@@ -2356,11 +2461,11 @@ window.VulnKitVue = (function () {
     }
   }
 
-
   return {
     detectVue,
     exportVueRoutes,
     bypassVueGuards,
+    disableRouteAuth,
     switchVueSubTab,
     startPermInterception,
     stopPermInterception,
@@ -2382,15 +2487,35 @@ window.VulnKitVue = (function () {
     renderPermList,
     startPermAutoRefresh,
     stopPermAutoRefresh,
-    get lastVueResult() { return lastVueResult; },
-    set lastVueResult(v) { lastVueResult = v; },
-    get permInterceptActive() { return permInterceptActive; },
-    set permInterceptActive(v) { permInterceptActive = v; },
-    get permCapturedData() { return permCapturedData; },
-    set permCapturedData(v) { permCapturedData = v; },
-    get permSelectedIndex() { return permSelectedIndex; },
-    set permSelectedIndex(v) { permSelectedIndex = v; },
-    get permViewMode() { return permViewMode; },
-    set permViewMode(v) { permViewMode = v; },
+    get lastVueResult() {
+      return lastVueResult;
+    },
+    set lastVueResult(v) {
+      lastVueResult = v;
+    },
+    get permInterceptActive() {
+      return permInterceptActive;
+    },
+    set permInterceptActive(v) {
+      permInterceptActive = v;
+    },
+    get permCapturedData() {
+      return permCapturedData;
+    },
+    set permCapturedData(v) {
+      permCapturedData = v;
+    },
+    get permSelectedIndex() {
+      return permSelectedIndex;
+    },
+    set permSelectedIndex(v) {
+      permSelectedIndex = v;
+    },
+    get permViewMode() {
+      return permViewMode;
+    },
+    set permViewMode(v) {
+      permViewMode = v;
+    },
   };
 })();

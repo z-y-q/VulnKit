@@ -161,6 +161,7 @@
     detectVue,
     exportVueRoutes,
     bypassVueGuards,
+    disableRouteAuth,
     switchVueSubTab,
     startPermInterception,
     stopPermInterception,
@@ -940,6 +941,8 @@
     if (vueExportBtn) vueExportBtn.addEventListener('click', exportVueRoutes);
     const vueBypassBtn = utils.get('vue-bypass-guards-btn');
     if (vueBypassBtn) vueBypassBtn.addEventListener('click', bypassVueGuards);
+    const vueDisableAuthBtn = utils.get('vue-disable-auth-btn');
+    if (vueDisableAuthBtn) vueDisableAuthBtn.addEventListener('click', disableRouteAuth);
     const vueCopyBtn = utils.get('vue-copy-btn');
     if (vueCopyBtn) {
       vueCopyBtn.addEventListener('click', () => {
