@@ -60,7 +60,14 @@ window.VulnKitVue = (function () {
         target: { tabId: tab.id },
         world: 'MAIN',
         func: () => {
-          const info = { detected: false, version: '', router: false, store: false, routes: [] };
+          const info = {
+            detected: false,
+            version: '',
+            router: false,
+            store: false,
+            routes: [],
+            pageOrigin: location.origin,
+          };
 
           function safeSerialize(obj) {
             try {
@@ -123,6 +130,32 @@ window.VulnKitVue = (function () {
             return tree;
           }
 
+          function getRouterInfo(router) {
+            if (!router) return {};
+            var base = '/';
+            var mode = 'history';
+            try {
+              base = router.options && router.options.base ? router.options.base : base;
+            } catch (e) {}
+            try {
+              if (router.mode === 'hash' || router.mode === 'abstract') mode = router.mode;
+              else if (
+                router.options &&
+                router.options.history &&
+                typeof router.options.history.pushState === 'function'
+              )
+                mode = 'history';
+              else if (typeof HTMLAnchorElement !== 'undefined') {
+                try {
+                  var testA = document.createElement('a');
+                  testA.href = '/#/test';
+                  if (testA.hash) mode = 'hash';
+                } catch (e) {}
+              }
+            } catch (e) {}
+            return { base: base, mode: mode };
+          }
+
           function getVue2Routes(router) {
             if (!router) return [];
             var opts = router.options;
@@ -156,6 +189,7 @@ window.VulnKitVue = (function () {
             if (router) {
               info.router = true;
               info.routes = getVue3Routes(router);
+              info.routerInfo = getRouterInfo(router);
             }
             const store = app.config.globalProperties.$pinia || app.config.globalProperties.$store;
             if (store) info.store = true;
@@ -173,6 +207,7 @@ window.VulnKitVue = (function () {
               if (router) {
                 info.router = true;
                 info.routes = getVue3Routes(router);
+                info.routerInfo = getRouterInfo(router);
               }
               const store =
                 app.config.globalProperties.$pinia || app.config.globalProperties.$store;
@@ -187,6 +222,7 @@ window.VulnKitVue = (function () {
               if (router) {
                 info.router = true;
                 info.routes = getVue2Routes(router);
+                info.routerInfo = getRouterInfo(router);
               }
               if (vm.$store) info.store = true;
               return info;
@@ -211,6 +247,11 @@ window.VulnKitVue = (function () {
 
       statusEl.textContent = '检测到 Vue ' + data.version;
 
+      var ri = data.routerInfo || {};
+      lastRouterBase = ri.base || '/';
+      lastRouterMode = ri.mode || 'history';
+      lastPageOrigin = data.pageOrigin || '';
+
       let html = '';
       html +=
         '<div class="vue-info-row"><span class="vue-info-label">版本</span><span class="vue-info-value"><span class="vue-badge vue-badge-ok">Vue ' +
@@ -218,7 +259,15 @@ window.VulnKitVue = (function () {
         '</span></span></div>';
       html +=
         '<div class="vue-info-row"><span class="vue-info-label">Vue Router</span><span class="vue-info-value">' +
-        (data.router ? '<span class="vue-badge vue-badge-ok">已检测</span>' : '未检测到') +
+        (data.router
+          ? '<span class="vue-badge vue-badge-ok">已检测 (' +
+            utils.escapeHtml(ri.mode || '?') +
+            ' 模式)</span>'
+          : '未检测到') +
+        '</span></div>';
+      html +=
+        '<div class="vue-info-row"><span class="vue-info-label">Base Path</span><span class="vue-info-value">' +
+        utils.escapeHtml(ri.base || '/') +
         '</span></div>';
       html +=
         '<div class="vue-info-row"><span class="vue-info-label">状态管理</span><span class="vue-info-value">' +
@@ -226,11 +275,13 @@ window.VulnKitVue = (function () {
         '</span></div>';
 
       if (data.router && data.routes.length > 0) {
+        html += '<div class="card-spacing"><div class="vue-route-toolbar">';
+        html += '<span class="vue-route-count">路由列表 (' + data.routes.length + ')</span>';
         html +=
-          '<div class="card-spacing"><div class="card-title">路由列表 (' +
-          data.routes.length +
-          ')</div></div>';
-        html += renderRouteTree(data.routes, 0);
+          '<button class="btn btn-xs btn-outline vue-copy-hist-btn">复制 History URL</button>';
+        html += '<button class="btn btn-xs btn-outline vue-copy-hash-btn">复制 Hash URL</button>';
+        html += '</div></div>';
+        html += renderRouteTree(data.routes, 0, ri.base || '/', ri.mode || 'history');
       }
 
       resultsEl.innerHTML = html;
@@ -241,27 +292,81 @@ window.VulnKitVue = (function () {
     }
   }
 
-  function renderRouteTree(routes, depth) {
+  var lastRouterBase = '/';
+  var lastRouterMode = 'history';
+
+  var lastPageOrigin = '';
+
+  function buildRouteUrl(path, base, mode) {
+    var origin = lastPageOrigin || 'https://example.com';
+    var basePath = base || '/';
+    if (basePath.charAt(basePath.length - 1) !== '/') basePath += '/';
+    var fullPath = basePath + (path || '/').replace(/^\//, '');
+    if (mode === 'hash') {
+      return origin + basePath + '#' + (path || '/');
+    }
+    return origin + fullPath;
+  }
+
+  function collectAllPaths(routes, prefix, base, mode) {
+    var result = [];
+    if (!routes || !Array.isArray(routes)) return result;
+    routes.forEach(function (r) {
+      var p = r.path || '/';
+      if (p.charAt(0) !== '/' && prefix && prefix !== '/') {
+        p = prefix + '/' + p;
+      }
+      if (p.indexOf(':') === -1 && p.indexOf('*') === -1) {
+        var url = buildRouteUrl(p, base, mode);
+        result.push({ path: p, url: url, name: r.name || '' });
+      }
+      if (r.children && r.children.length > 0) {
+        var childPaths = collectAllPaths(r.children, p === '/' ? '/' : p, base, mode);
+        result = result.concat(childPaths);
+      }
+    });
+    return result;
+  }
+
+  function renderRouteTree(routes, depth, base, mode) {
     let html = '';
     if (!routes || !Array.isArray(routes) || depth > 10) return html;
+    base = base || '/';
+    mode = mode || 'history';
     routes.forEach(route => {
+      var routePath = route.path || '/';
+      var histUrl = buildRouteUrl(routePath, base, 'history');
+      var hashUrl = buildRouteUrl(routePath, base, 'hash');
+
       html += '<div class="vue-route-item vue-depth-' + depth + '">';
-      html += '<span class="vue-route-path">' + utils.escapeHtml(route.path || '/') + '</span>';
+      html += '<span class="vue-route-path">' + utils.escapeHtml(routePath) + '</span>';
       if (route.name)
         html += '<span class="vue-route-name">' + utils.escapeHtml(route.name) + '</span>';
       if (route.meta) {
         try {
-          html +=
-            '<span class="vue-route-meta">meta: ' +
-            utils.escapeHtml(JSON.stringify(route.meta).substring(0, 60)) +
-            '</span>';
+          var metaStr = JSON.stringify(route.meta).substring(0, 60);
+          html += '<span class="vue-route-meta">meta: ' + utils.escapeHtml(metaStr) + '</span>';
         } catch (e) {
           html += '<span class="vue-route-meta">meta: [无法序列化]</span>';
         }
       }
+      html += '<span class="vue-route-urls">';
+      html +=
+        '<button class="vue-route-open-btn" data-url="' +
+        utils.escapeHtml(histUrl) +
+        '" title="' +
+        utils.escapeHtml(histUrl) +
+        '">H</button>';
+      html +=
+        '<button class="vue-route-open-btn" data-url="' +
+        utils.escapeHtml(hashUrl) +
+        '" title="' +
+        utils.escapeHtml(hashUrl) +
+        '">#</button>';
+      html += '</span>';
       html += '</div>';
       if (route.children && route.children.length > 0) {
-        html += renderRouteTree(route.children, depth + 1);
+        html += renderRouteTree(route.children, depth + 1, base, mode);
       }
     });
     return html;
@@ -2466,6 +2571,7 @@ window.VulnKitVue = (function () {
     exportVueRoutes,
     bypassVueGuards,
     disableRouteAuth,
+    collectAllPaths,
     switchVueSubTab,
     startPermInterception,
     stopPermInterception,

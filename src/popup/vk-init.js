@@ -162,6 +162,7 @@
     exportVueRoutes,
     bypassVueGuards,
     disableRouteAuth,
+    collectAllPaths: collectAllPathsFromVue,
     switchVueSubTab,
     startPermInterception,
     stopPermInterception,
@@ -954,6 +955,43 @@
         utils.showToast('已复制', 'success');
       });
     }
+
+    // Route URL open buttons (event delegation)
+    document.getElementById('vue-results').addEventListener('click', e => {
+      if (e.target.classList.contains('vue-route-open-btn')) {
+        chrome.tabs.create({ url: e.target.dataset.url });
+      }
+    });
+    // Batch copy History/Hash URLs
+    document.getElementById('vue-results').addEventListener('click', e => {
+      if (
+        e.target.classList.contains('vue-copy-hist-btn') ||
+        e.target.classList.contains('vue-copy-hash-btn')
+      ) {
+        if (!lastVueResult) {
+          utils.showToast('请先检测 Vue', 'warning');
+          return;
+        }
+        try {
+          var data = JSON.parse(lastVueResult);
+          if (!data.routes || !data.routes.length) {
+            utils.showToast('无路由数据', 'warning');
+            return;
+          }
+          var mode = e.target.classList.contains('vue-copy-hist-btn') ? 'history' : 'hash';
+          var base = (data.routerInfo && data.routerInfo.base) || '/';
+          var paths = collectAllPathsFromVue(data.routes, '', base, mode);
+          if (paths.length === 0) {
+            utils.showToast('无静态路由路径', 'warning');
+            return;
+          }
+          utils.copyText(paths.map(p => p.url).join('\n'));
+          utils.showToast('已复制 ' + paths.length + ' 条 ' + mode + ' URL', 'success');
+        } catch (err) {
+          utils.showToast('复制失败', 'error');
+        }
+      }
+    });
 
     // Vue sub-tabs
     document.querySelectorAll('.vue-stab').forEach(btn => {
