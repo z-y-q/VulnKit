@@ -41,23 +41,10 @@ window.VulnKitVue = (function () {
     }
   }
 
-  async function detectVue() {
-    const statusEl = utils.get('vue-status');
-    const resultsEl = utils.get('vue-results');
-    if (!statusEl || !resultsEl) return;
-
-    statusEl.textContent = '检测中...';
-    resultsEl.innerHTML = '';
-
+  async function detectOnce(tabId) {
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) {
-        statusEl.textContent = '无法获取当前标签页';
-        return;
-      }
-
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
+        target: { tabId: tabId },
         world: 'MAIN',
         func: () => {
           const info = {
@@ -173,60 +160,69 @@ window.VulnKitVue = (function () {
             return tree;
           }
 
-          // Vue 3
-          const appEl =
-            document.querySelector('#app') ||
-            document.querySelector('[data-v-app]') ||
-            document.querySelector('[id^="app"]') ||
-            document.querySelector('#root') ||
-            document.querySelector('#application') ||
-            document.querySelector('#main');
-          if (appEl && appEl.__vue_app__) {
-            const app = appEl.__vue_app__;
+          function fillInfo(app, isVue3) {
             info.detected = true;
-            info.version = app.version || '3.x';
-            const router = app.config.globalProperties.$router;
+            info.version = isVue3 ? app.version || '3.x' : app.constructor.version || '2.x';
+            var router = isVue3 ? app.config.globalProperties.$router : app.$router;
             if (router) {
               info.router = true;
-              info.routes = getVue3Routes(router);
+              info.routes = isVue3 ? getVue3Routes(router) : getVue2Routes(router);
               info.routerInfo = getRouterInfo(router);
             }
-            const store = app.config.globalProperties.$pinia || app.config.globalProperties.$store;
-            if (store) info.store = true;
-            return info;
+            if (isVue3) {
+              var store = app.config.globalProperties.$pinia || app.config.globalProperties.$store;
+              if (store) info.store = true;
+            } else {
+              if (app.$store) info.store = true;
+            }
           }
 
-          // Broader fallback: single-pass scan for Vue 3 and Vue 2
-          const allEls = document.querySelectorAll('*');
-          for (const el of allEls) {
-            if (el.__vue_app__) {
-              const app = el.__vue_app__;
-              info.detected = true;
-              info.version = app.version || '3.x';
-              const router = app.config.globalProperties.$router;
-              if (router) {
-                info.router = true;
-                info.routes = getVue3Routes(router);
-                info.routerInfo = getRouterInfo(router);
-              }
-              const store =
-                app.config.globalProperties.$pinia || app.config.globalProperties.$store;
-              if (store) info.store = true;
+          // Strategy 1: check common mount points
+          var mountSelectors = [
+            '#app',
+            '[data-v-app]',
+            '[id^="app"]',
+            '#root',
+            '#application',
+            '#main',
+          ];
+          for (var si = 0; si < mountSelectors.length; si++) {
+            var el = document.querySelector(mountSelectors[si]);
+            if (el && el.__vue_app__) {
+              fillInfo(el.__vue_app__, true);
               return info;
             }
-            if (el.__vue__) {
-              const vm = el.__vue__.$root || el.__vue__;
-              info.detected = true;
-              info.version = vm.constructor.version || '2.x';
-              const router = vm.$router;
-              if (router) {
-                info.router = true;
-                info.routes = getVue2Routes(router);
-                info.routerInfo = getRouterInfo(router);
-              }
-              if (vm.$store) info.store = true;
+          }
+
+          // Strategy 2: BFS scan (max 1000 nodes)
+          var bfsRoots = document.body ? [document.body] : [document.documentElement];
+          var visited = new Set();
+          var queue = bfsRoots.slice();
+          var bfsCount = 0;
+          while (queue.length > 0 && bfsCount < 1000) {
+            var current = queue.shift();
+            if (!current || visited.has(current)) continue;
+            visited.add(current);
+            bfsCount++;
+            if (current.__vue_app__) {
+              fillInfo(current.__vue_app__, true);
               return info;
             }
+            if (current.__vue__) {
+              var vm = current.__vue__.$root || current.__vue__;
+              fillInfo(vm, false);
+              return info;
+            }
+            var children = current.children;
+            for (var ci = 0; ci < children.length; ci++) {
+              queue.push(children[ci]);
+            }
+          }
+
+          // Strategy 3: global Vue check
+          if (typeof window.Vue !== 'undefined' && window.Vue.version) {
+            info.detected = true;
+            info.version = window.Vue.version;
           }
 
           return info;
@@ -234,12 +230,46 @@ window.VulnKitVue = (function () {
       });
 
       const data = results?.[0]?.result;
-      if (!data) {
-        statusEl.textContent = '检测失败';
+      if (!data || !data.detected) return data;
+
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  async function detectWithRetry(tabId) {
+    var delays = [0, 300, 600];
+    for (var i = 0; i < delays.length; i++) {
+      if (i > 0) await sleep(delays[i]);
+      var result = await detectOnce(tabId);
+      if (result && result.detected) return result;
+    }
+    return null;
+  }
+
+  async function detectVue() {
+    const statusEl = utils.get('vue-status');
+    const resultsEl = utils.get('vue-results');
+    if (!statusEl || !resultsEl) return;
+
+    statusEl.textContent = '检测中...';
+    resultsEl.innerHTML = '';
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) {
+        statusEl.textContent = '无法获取当前标签页';
         return;
       }
 
-      if (!data.detected) {
+      const data = await detectWithRetry(tab.id);
+
+      if (!data) {
         statusEl.textContent = '未检测到 Vue';
         resultsEl.innerHTML = '<div class="empty-state">当前页面未使用 Vue 框架</div>';
         return;
