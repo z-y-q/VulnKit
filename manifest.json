@@ -26,6 +26,19 @@
   "background": {
     "service_worker": "src/background/background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/vk-content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/inject/vue-detect.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "action": {
     "default_popup": "src/popup/popup.html",
     "default_title": "VulnKit - 漏洞工具包"
