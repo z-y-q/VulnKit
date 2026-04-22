@@ -1,19 +1,29 @@
-// VulnKit - Info Gather
+// VulnKit - Info Gather (HaE Rules Engine)
 window.VulnKitGather = (function () {
   'use strict';
 
-  let gatherData = { api: [], domain: [], sensitive: [], ip: [] };
-  let currentGatherTab = 'api';
+  var DOM_GROUP = 'DOM Analysis';
+  var STORAGE_KEY = 'gatherData';
+  var URL_KEY = 'gatherDataUrl';
+  var TABS_KEY = 'gatherDataTabs';
+
+  var gatherData = {};
+  var currentGatherTab = DOM_GROUP;
+  var loadedRules = [];
 
   function getUtils() {
     return window.VulnKitUtils || null;
   }
 
+  function getHaeRules() {
+    return window.VulnKitHaeRules || null;
+  }
+
   function renderGatherTab() {
-    const utils = getUtils();
-    const list = gatherData[currentGatherTab] || [];
-    const container = utils.get('gather-results');
-    const statusEl = utils.get('gather-status');
+    var utils = getUtils();
+    var list = gatherData[currentGatherTab] || [];
+    var container = utils.get('gather-results');
+    var statusEl = utils.get('gather-status');
 
     if (list.length === 0) {
       container.innerHTML = '<div class="empty-state">点击「收集当前页面」开始</div>';
@@ -22,31 +32,22 @@ window.VulnKitGather = (function () {
     }
 
     statusEl.textContent = '共 ' + list.length + ' 条';
-    let html = '';
-    list.forEach(item => {
+    var html = '';
+    list.forEach(function (item) {
       html += '<div class="gather-item">';
-      html +=
-        '<span class="gather-item-type type-' +
-        (item.type || 'other') +
-        '">' +
-        item.type +
-        '</span>';
-      html +=
-        '<span class="gather-item-value" title="' +
-        utils.escapeHtml(item.value) +
-        '">' +
-        utils.escapeHtml(item.value) +
-        '</span>';
-      html +=
-        '<button class="gather-item-copy" data-copy="' +
-        utils.escapeHtml(item.value) +
-        '">复制</button>';
+      html += '<span class="gather-item-type type-' + (item.color || item.type || 'gray') + '">';
+      html += utils.escapeHtml(item.name || item.type || '');
+      html += '</span>';
+      html += '<span class="gather-item-value" title="' + utils.escapeHtml(item.value) + '">';
+      html += utils.escapeHtml(item.value);
+      html += '</span>';
+      html += '<button class="gather-item-copy" data-copy="' + utils.escapeHtml(item.value) + '">复制</button>';
       html += '</div>';
     });
     container.innerHTML = html;
 
-    container.querySelectorAll('.gather-item-copy').forEach(btn => {
-      btn.addEventListener('click', () => {
+    container.querySelectorAll('.gather-item-copy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
         utils.copyText(btn.dataset.copy);
         utils.showToast('已复制', 'success');
       });
@@ -55,226 +56,232 @@ window.VulnKitGather = (function () {
 
   function switchGatherTab(tab) {
     currentGatherTab = tab;
-    document
-      .querySelectorAll('.gather-tab')
-      .forEach(b => b.classList.toggle('active', b.dataset.gather === tab));
+    document.querySelectorAll('.gather-tab').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.gather === tab);
+    });
     renderGatherTab();
   }
 
+  function renderSubTabs() {
+    var container = document.getElementById('gather-sub-tabs');
+    if (!container) return;
+
+    var groups = [DOM_GROUP].concat(getHaeRules().getGroups(loadedRules));
+    var html = '';
+    groups.forEach(function (group, i) {
+      var active = i === 0 ? ' active' : '';
+      var label = group === DOM_GROUP ? 'DOM分析' : group;
+      html += '<button class="gather-tab' + active + '" data-gather="' + group + '">' + label + '</button>';
+    });
+    container.innerHTML = html;
+
+    container.querySelectorAll('.gather-tab').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        switchGatherTab(btn.dataset.gather);
+      });
+    });
+
+    currentGatherTab = DOM_GROUP;
+  }
+
+  function init() {
+    var haeRules = getHaeRules();
+    if (!haeRules) return;
+
+    haeRules.loadRules(function (rules) {
+      loadedRules = rules;
+      renderSubTabs();
+    });
+  }
+
   async function gatherInfo() {
-    const utils = getUtils();
-    const statusEl = utils.get('gather-status');
+    var utils = getUtils();
+    var statusEl = utils.get('gather-status');
     statusEl.textContent = '正在收集...';
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.url) {
+      var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      var tab = tabs[0];
+      if (!tab || !tab.url) {
         statusEl.textContent = '无法获取当前页面';
         return;
       }
 
-      const results = await chrome.scripting.executeScript({
+      var rulesForInjection = loadedRules.filter(function (g) {
+        return g.rules && g.rules.some(function (r) { return r.loaded; });
+      });
+
+      var results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: () => {
-          const pageUrl = location.href;
-          const pageHtml = document.documentElement.outerHTML;
-          const collected = { api: [], domain: [], sensitive: [], ip: [] };
-          const seen = { api: new Set(), domain: new Set(), sensitive: new Set(), ip: new Set() };
+        func: function (haeRules, domGroup) {
+          var pageUrl = location.href;
+          var pageHtml = document.documentElement.outerHTML;
+          var collected = {};
 
-          function add(cat, type, value) {
-            if (!value || seen[cat].has(value)) return;
-            seen[cat].add(value);
-            collected[cat].push({ type, value });
+          var seenAll = {};
+          function add(group, name, value, color) {
+            if (!value) return;
+            var key = group + '::' + value;
+            if (seenAll[key]) return;
+            seenAll[key] = true;
+            if (!collected[group]) collected[group] = [];
+            collected[group].push({ name: name || group, value: value, color: color || 'gray' });
           }
 
-          // 1. API endpoints
-          document.querySelectorAll('form').forEach(form => {
-            const action = form.getAttribute('action') || '';
-            const method = (form.method || 'GET').toUpperCase();
+          // DOM Analysis
+          var domSeen = {};
+          function addDom(type, value) {
+            if (!value || domSeen[type + '::' + value]) return;
+            domSeen[type + '::' + value] = true;
+            add(domGroup, type, value, type);
+          }
+
+          document.querySelectorAll('form').forEach(function (form) {
+            var action = form.getAttribute('action') || '';
+            var method = (form.method || 'GET').toUpperCase();
             if (action) {
-              const fullUrl = new URL(action, pageUrl).href;
-              add('api', method.toLowerCase(), fullUrl);
+              try {
+                addDom('form', new URL(action, pageUrl).href + ' [' + method + ']');
+              } catch (e) {}
             }
           });
 
-          // Script src as potential API base
-          document.querySelectorAll('script[src]').forEach(s => {
-            const src = s.src;
-            if (src) {
-              const m = src.match(/^(https?:\/\/[^/]+)/i);
-              if (m) add('api', 'src', m[1]);
-            }
+          document.querySelectorAll('script[src]').forEach(function (s) {
+            if (s.src) addDom('script', s.src);
           });
 
-          // Extract API paths from inline scripts
-          document.querySelectorAll('script:not([src])').forEach(s => {
-            const text = s.textContent || '';
-            const apiMatches = text.match(/["'](\/api\/[^"']+)["']/g) || [];
-            apiMatches.forEach(m => add('api', 'api', m.replace(/["']/g, '')));
-            const pathMatches = text.match(/["'](\/[a-zA-Z0-9_/{}-]+)["']/g) || [];
-            pathMatches.forEach(m => {
-              const p = m.replace(/["']/g, '');
-              if (p.length > 2 && /\/(v\d|api|rest|graphql|json|ws|socket)/i.test(p)) {
-                add('api', 'api', p);
-              }
-            });
-            const fetchMatches = text.match(/fetch\s*\(\s*["']([^"']+)["']/gi) || [];
-            fetchMatches.forEach(m =>
-              add('api', 'get', m.replace(/^fetch\s*\(\s*["']/i, '').replace(/["']\s*\)$/i, ''))
-            );
-            const ajaxMatches =
-              text.match(/\$?\.(?:get|post|put|delete|ajax|fetch)\s*\(\s*["']([^"']+)["']/gi) || [];
-            ajaxMatches.forEach(m => {
-              const url = m.replace(/^.*\(\s*["']/, '').replace(/["']/, '');
-              if (url) {
-                const method = /\.(post|put|delete)/i.test(m)
-                  ? m.match(/\.(post|put|delete)/i)[1]
-                  : 'get';
-                add('api', method.toLowerCase(), url);
-              }
-            });
-            const wsMatches = text.match(/wss?:\/\/[^"'\s]+/g) || [];
-            wsMatches.forEach(u => add('api', 'ws', u));
+          document.querySelectorAll('link[href]').forEach(function (l) {
+            if (l.href && /\.(json|xml|yaml)$/i.test(l.href)) addDom('data', l.href);
           });
 
-          // Link[href] endpoints
-          document.querySelectorAll('link[href]').forEach(l => {
-            const href = l.href;
-            if (href && /\.(json|xml|yaml)$/i.test(href)) add('api', 'api', href);
-          });
-
-          // 2. Domains
-          document.querySelectorAll('[href]').forEach(el => {
+          document.querySelectorAll('[href]').forEach(function (el) {
             try {
-              const url = new URL(el.href, pageUrl);
-              if (url.hostname !== location.hostname) add('domain', 'link', url.hostname);
-            } catch {}
+              var url = new URL(el.href, pageUrl);
+              if (url.hostname !== location.hostname) addDom('domain', url.hostname);
+            } catch (e) {}
           });
-          document.querySelectorAll('[src]').forEach(el => {
+
+          document.querySelectorAll('[src]').forEach(function (el) {
             try {
-              const url = new URL(el.src, pageUrl);
-              if (url.hostname !== location.hostname) add('domain', 'src', url.hostname);
-            } catch {}
+              var url = new URL(el.src, pageUrl);
+              if (url.hostname !== location.hostname) addDom('domain', url.hostname);
+            } catch (e) {}
           });
-          document.querySelectorAll('iframe[src],frame[src]').forEach(el => {
+
+          document.querySelectorAll('iframe[src],frame[src]').forEach(function (el) {
             try {
-              const url = new URL(el.src, pageUrl);
-              add('domain', 'frame', url.hostname);
-            } catch {}
+              var url = new URL(el.src, pageUrl);
+              addDom('frame', url.hostname);
+            } catch (e) {}
           });
 
-          // 3. Sensitive info
-          // Meta generator
-          document.querySelectorAll('meta[name="generator"]').forEach(m => {
-            if (m.content) add('sensitive', 'meta', 'Generator: ' + m.content);
+          document.querySelectorAll('meta[name="generator"]').forEach(function (m) {
+            if (m.content) addDom('meta', m.content);
           });
-
-          // Emails
-          const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-          const emails = pageHtml.match(emailRegex) || [];
-          emails.forEach(e => add('sensitive', 'email', e));
-
-          // API keys/tokens in meta or inline scripts
-          const tokenPatterns = [
-            /(?:api[_-]?key|apikey|token|secret|access[_-]?key|auth[_-]?token|bearer)\s*[:=]\s*["']([^"']{8,})["']/gi,
-            /(?:sk|pk|rk)[_-][a-zA-Z0-9]{20,}/g,
-            /(?:AIza|ya29)[a-zA-Z0-9_-]{30,}/g,
-            /ghp_[a-zA-Z0-9]{30,}/g,
-            /glpat-[a-zA-Z0-9_-]{20,}/g,
-            /xox[bpras]-[a-zA-Z0-9-]{10,}/g,
-          ];
-          tokenPatterns.forEach(pattern => {
-            const matches = pageHtml.match(pattern) || [];
-            matches.forEach(m => {
-              const val =
-                m.includes('=') || m.includes(':')
-                  ? m
-                      .split(/[:=]/)
-                      .pop()
-                      .trim()
-                      .replace(/^["']|["']$/g, '')
-                  : m;
-              add('sensitive', 'token', val);
-            });
-          });
-
-          // Comments with sensitive info
-          const commentRegex = /<!--([\s\S]*?)-->/g;
-          let commentMatch;
-          while ((commentMatch = commentRegex.exec(pageHtml)) !== null) {
-            const comment = commentMatch[1].trim();
-            if (comment.length > 5 && comment.length < 200) {
-              if (/todo|fixme|hack|bug|password|key|secret|temp/i.test(comment)) {
-                add('sensitive', 'comment', comment);
-              }
-            }
-          }
 
           // Cookies
-          document.cookie.split(';').forEach(c => {
-            const name = c.split('=')[0].trim();
-            if (name) add('sensitive', 'cookie', name);
-          });
-
-          // localStorage keys
           try {
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i);
+            document.cookie.split(';').forEach(function (c) {
+              var name = c.split('=')[0].trim();
+              if (name) addDom('cookie', name);
+            });
+          } catch (e) {}
+
+          // localStorage
+          try {
+            for (var i = 0; i < localStorage.length; i++) {
+              var key = localStorage.key(i);
               if (/token|key|secret|session|auth|user|admin/i.test(key)) {
-                add('sensitive', 'storage', 'localStorage: ' + key);
+                addDom('storage', key);
               }
             }
-          } catch {}
+          } catch (e) {}
 
-          // 4. IP addresses
-          const ipRegex = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
-          const ips = pageHtml.match(ipRegex) || [];
-          ips.forEach(ip => {
-            const parts = ip.split('.').map(Number);
-            if (parts[0] !== 0 && parts[0] !== 127 && parts.every(p => p >= 0 && p <= 255)) {
-              add('ip', 'ip', ip);
-            }
-          });
-
-          // Internal/private IPs
-          ips.forEach(ip => {
-            const p = ip.split('.').map(Number);
-            if (
-              p[0] === 10 ||
-              (p[0] === 172 && p[1] >= 16 && p[1] <= 31) ||
-              (p[0] === 192 && p[1] === 168)
-            ) {
-              add('ip', 'ip', ip);
-            }
-          });
-
-          // Cloud/hosting domains hint
-          const domainStr = collected.domain.map(d => d.value).join(' ');
-          const cloudHints = [
-            { pattern: /aws\.amazon/i, label: 'AWS' },
-            { pattern: /azure\.microsoft/i, label: 'Azure' },
-            { pattern: /googleapis\.com/i, label: 'GCP' },
-            { pattern: /aliyuncs\.com/i, label: 'Aliyun' },
-            { pattern: /tencentcloud/i, label: 'Tencent' },
-            { pattern: /cloudflare/i, label: 'Cloudflare' },
-            { pattern: /fastly/i, label: 'Fastly' },
-            { pattern: /cdn\.|c\.cloudfront\.net/i, label: 'CDN' },
+          // Cloud hints
+          var cloudPatterns = [
+            { p: /aws\.amazon/i, l: 'AWS' },
+            { p: /azure\.microsoft/i, l: 'Azure' },
+            { p: /googleapis\.com/i, l: 'GCP' },
+            { p: /aliyuncs\.com/i, l: 'Aliyun' },
+            { p: /tencentcloud/i, l: 'Tencent' },
+            { p: /cloudflare/i, l: 'Cloudflare' },
+            { p: /fastly/i, l: 'Fastly' },
+            { p: /cdn\.|c\.cloudfront\.net/i, l: 'CDN' }
           ];
-          cloudHints.forEach(h => {
-            if (h.pattern.test(pageHtml + domainStr)) add('ip', 'cloud', h.label);
+          cloudPatterns.forEach(function (c) {
+            if (c.p.test(pageHtml)) addDom('cloud', c.l);
+          });
+
+          // HaE rules matching
+          var pageScopes = ['response body', 'response', 'any'];
+          haeRules.forEach(function (group) {
+            var groupResults = [];
+            (group.rules || []).forEach(function (rule) {
+              if (!rule.loaded || !rule.f_regex) return;
+              if (pageScopes.indexOf(rule.scope) === -1) return;
+
+              try {
+                var flags = rule.sensitive ? 'g' : 'gi';
+                var regex = new RegExp(rule.f_regex, flags);
+                var match;
+                var ruleSeen = {};
+
+                while ((match = regex.exec(pageHtml)) !== null) {
+                  var captures = [];
+                  for (var ci = 1; ci < match.length; ci++) captures.push(match[ci] || '');
+
+                  var value = (rule.format || '{0}');
+                  for (var fi = 0; fi < captures.length; fi++) {
+                    while (value.indexOf('{' + fi + '}') !== -1) {
+                      value = value.replace('{' + fi + '}', captures[fi] || '');
+                    }
+                  }
+                  if (!value || value.trim() === '') continue;
+
+                  if (rule.s_regex && rule.s_regex.trim() !== '') {
+                    try {
+                      var sFlags = rule.sensitive ? '' : 'i';
+                      if (!new RegExp(rule.s_regex, sFlags).test(match[0])) continue;
+                    } catch (e) {}
+                  }
+
+                  var rKey = rule.name + '::' + value;
+                  if (ruleSeen[rKey]) continue;
+                  ruleSeen[rKey] = true;
+
+                  groupResults.push({
+                    name: rule.name,
+                    value: value,
+                    color: rule.color || 'gray'
+                  });
+                }
+              } catch (e) {}
+            });
+
+            if (groupResults.length > 0) {
+              collected[group.group] = groupResults;
+            }
           });
 
           return collected;
         },
+        args: [rulesForInjection, DOM_GROUP]
       });
 
-      if (results?.[0]?.result) {
+      if (results && results[0] && results[0].result) {
         gatherData = results[0].result;
         renderGatherTab();
-        const total = Object.values(gatherData).reduce((s, a) => s + a.length, 0);
+
+        var total = Object.values(gatherData).reduce(function (s, a) { return s + a.length; }, 0);
         statusEl.textContent = '收集完成，共 ' + total + ' 条';
         utils.showToast('收集完成', 'success');
-        chrome.storage.local.set({ gatherData: gatherData, gatherDataUrl: tab.url });
+
+        var groups = [DOM_GROUP].concat(getHaeRules().getGroups(loadedRules));
+        chrome.storage.local.set({
+          gatherData: gatherData,
+          gatherDataUrl: tab.url,
+          gatherDataTabs: groups
+        });
       } else {
         statusEl.textContent = '收集失败';
       }
@@ -284,13 +291,50 @@ window.VulnKitGather = (function () {
     }
   }
 
+  function restoreData(url) {
+    chrome.storage.local.get([STORAGE_KEY, URL_KEY, TABS_KEY], function (result) {
+      if (result[STORAGE_KEY] && result[URL_KEY] === url) {
+        gatherData = result[STORAGE_KEY];
+        if (result[TABS_KEY]) {
+          loadedRules = loadedRules.length > 0 ? loadedRules : (getHaeRules() ? getHaeRules().getDefaultRules() : []);
+          var allGroups = [DOM_GROUP].concat(getHaeRules().getGroups(loadedRules));
+          renderSubTabs();
+        }
+        var firstGroup = Object.keys(gatherData)[0] || DOM_GROUP;
+        currentGatherTab = firstGroup;
+        renderGatherTab();
+
+        var utils = getUtils();
+        var statusEl = utils.get('gather-status');
+        var total = Object.values(gatherData).reduce(function (s, a) { return s + a.length; }, 0);
+        statusEl.textContent = '已恢复，共 ' + total + ' 条';
+      }
+    });
+  }
+
+  function getActiveRules() {
+    return loadedRules;
+  }
+
+  function updateRules(rules) {
+    loadedRules = rules;
+    getHaeRules().saveRules(rules);
+    renderSubTabs();
+  }
+
   return {
-    renderGatherTab,
-    switchGatherTab,
-    gatherInfo,
+    init: init,
+    renderGatherTab: renderGatherTab,
+    switchGatherTab: switchGatherTab,
+    renderSubTabs: renderSubTabs,
+    gatherInfo: gatherInfo,
+    restoreData: restoreData,
+    getActiveRules: getActiveRules,
+    updateRules: updateRules,
     get gatherData() { return gatherData; },
     set gatherData(v) { gatherData = v; },
     get currentGatherTab() { return currentGatherTab; },
     set currentGatherTab(v) { currentGatherTab = v; },
+    DOM_GROUP: DOM_GROUP
   };
 })();

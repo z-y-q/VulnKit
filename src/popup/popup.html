@@ -246,12 +246,10 @@
         <div class="gather-actions">
           <button class="btn btn-primary" id="gather-btn">收集当前页面</button>
           <button class="btn btn-sm btn-outline" id="gather-copy-btn">复制当前分类</button>
+          <button class="btn btn-sm btn-outline" id="gather-rules-btn">规则管理</button>
         </div>
-        <div class="gather-sub-tabs">
-          <button class="gather-tab active" data-gather="api">接口信息</button>
-          <button class="gather-tab" data-gather="domain">域名信息</button>
-          <button class="gather-tab" data-gather="sensitive">敏感信息</button>
-          <button class="gather-tab" data-gather="ip">IP信息</button>
+        <div class="gather-sub-tabs" id="gather-sub-tabs">
+          <!-- 由 JS 动态生成 -->
         </div>
         <div class="gather-status" id="gather-status"></div>
         <div class="gather-results" id="gather-results">
@@ -259,6 +257,25 @@
         </div>
       </div>
     </div>
+
+    <!-- HaE 规则管理弹窗 -->
+    <div id="rules-modal" class="modal" style="display:none">
+      <div class="modal-overlay"></div>
+      <div class="modal-content rules-modal-content">
+        <div class="modal-header">
+          <span>HaE 规则管理</span>
+          <button class="modal-close" id="rules-modal-close">&times;</button>
+        </div>
+        <div class="rules-toolbar">
+          <button class="btn btn-sm btn-primary" id="rules-import-btn">导入规则</button>
+          <button class="btn btn-sm btn-outline" id="rules-reset-btn">恢复默认</button>
+        </div>
+        <div class="rules-list" id="rules-list">
+          <!-- 由 JS 动态生成 -->
+        </div>
+      </div>
+    </div>
+    <input type="file" id="rules-file-input" accept=".yml,.yaml,.json" style="display:none">
 
     <!-- 资产测绘面板 -->
     <div id="panel-asset" class="panel">
@@ -1042,6 +1059,7 @@
 <script src="vk-crypto.js"></script>
 <script src="vk-favicon.js"></script>
 <!-- Features -->
+<script src="vk-hae-rules.js"></script>
 <script src="vk-gather.js"></script>
 <script src="vk-asset.js"></script>
 <script src="vk-links.js"></script>

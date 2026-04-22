@@ -80,34 +80,10 @@
 
   // ====== Info Gather (loaded from vk-gather.js) ======
   const gather = window.VulnKitGather;
-  let gatherData;
-  let currentGatherTab;
-  Object.defineProperties(
-    {},
-    {
-      gatherData: {
-        get() {
-          return gather;
-        },
-        set(v) {
-          gatherData = v;
-        },
-        enumerable: true,
-      },
-      currentGatherTab: {
-        get() {
-          return currentGatherTab;
-        },
-        set(v) {
-          currentGatherTab = v;
-        },
-        enumerable: true,
-      },
-    }
-  );
+  const haeRules = window.VulnKitHaeRules;
   const renderGatherTab = gather.renderGatherTab.bind(gather);
-  const switchGatherTab = gather.switchGatherTab.bind(gather);
   const gatherInfo = gather.gatherInfo.bind(gather);
+  gather.init();
 
   // ====== Link Extract (loaded from vk-links.js) ======
   const { extractLinks, getFilteredLinks, renderLinks } = window.VulnKitLinks;
@@ -554,15 +530,14 @@
     loadApiKeys();
 
     // Info gather
-    document.querySelectorAll('.gather-tab').forEach(btn => {
-      btn.addEventListener('click', () => switchGatherTab(btn.dataset.gather));
-    });
     const gatherBtn = utils.get('gather-btn');
     if (gatherBtn) gatherBtn.addEventListener('click', gatherInfo);
     const gatherCopyBtn = utils.get('gather-copy-btn');
     if (gatherCopyBtn) {
       gatherCopyBtn.addEventListener('click', () => {
-        const list = gatherData[currentGatherTab] || [];
+        const data = gather.gatherData;
+        const tab = gather.currentGatherTab;
+        const list = data[tab] || [];
         if (list.length === 0) {
           utils.showToast('没有可复制的内容', 'warning');
           return;
@@ -571,6 +546,113 @@
         utils.copyText(text);
         utils.showToast('已复制 ' + list.length + ' 条', 'success');
       });
+    }
+
+    // Rules management
+    const rulesBtn = utils.get('gather-rules-btn');
+    const rulesModal = document.getElementById('rules-modal');
+    const rulesModalClose = document.getElementById('rules-modal-close');
+    const rulesImportBtn = utils.get('rules-import-btn');
+    const rulesResetBtn = utils.get('rules-reset-btn');
+    const rulesFileInput = document.getElementById('rules-file-input');
+
+    function renderRulesList() {
+      const container = document.getElementById('rules-list');
+      if (!container || !haeRules) return;
+      const rules = gather.getActiveRules();
+      let html = '';
+      rules.forEach(group => {
+        html += '<div class="rules-group">';
+        html += '<div class="rules-group-header">' + utils.escapeHtml(group.group) + '</div>';
+        (group.rules || []).forEach(rule => {
+          const checked = rule.loaded ? ' checked' : '';
+          const scopeLabel = isPageScope(rule.scope)
+            ? ''
+            : ' <span class="rules-scope-na">[不适用]</span>';
+          html += '<label class="rules-item">';
+          html +=
+            '<input type="checkbox"' +
+            checked +
+            ' data-group="' +
+            utils.escapeHtml(group.group) +
+            '" data-rule="' +
+            utils.escapeHtml(rule.name) +
+            '">';
+          html +=
+            '<span class="rules-item-name type-' +
+            (rule.color || 'gray') +
+            '">' +
+            utils.escapeHtml(rule.name) +
+            '</span>';
+          html +=
+            '<span class="rules-item-scope">' +
+            utils.escapeHtml(rule.scope) +
+            scopeLabel +
+            '</span>';
+          html += '</label>';
+        });
+        html += '</div>';
+      });
+      container.innerHTML = html;
+
+      container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const updated = haeRules.toggleRule(rules, cb.dataset.group, cb.dataset.rule);
+          gather.updateRules(updated);
+        });
+      });
+    }
+
+    if (rulesBtn && rulesModal) {
+      rulesBtn.addEventListener('click', () => {
+        renderRulesList();
+        rulesModal.style.display = 'flex';
+      });
+    }
+    if (rulesModalClose && rulesModal) {
+      rulesModalClose.addEventListener('click', () => {
+        rulesModal.style.display = 'none';
+      });
+      rulesModal.querySelector('.modal-overlay').addEventListener('click', () => {
+        rulesModal.style.display = 'none';
+      });
+    }
+    if (rulesImportBtn && rulesFileInput && haeRules) {
+      rulesImportBtn.addEventListener('click', () => {
+        rulesFileInput.click();
+      });
+      rulesFileInput.addEventListener('change', () => {
+        const file = rulesFileInput.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const imported = haeRules.importRules(reader.result);
+          if (imported && imported.length > 0) {
+            gather.updateRules(imported);
+            renderRulesList();
+            utils.showToast(
+              '已导入 ' + imported.reduce((s, g) => s + (g.rules || []).length, 0) + ' 条规则',
+              'success'
+            );
+          } else {
+            utils.showToast('规则文件解析失败', 'error');
+          }
+        };
+        reader.readAsText(file);
+        rulesFileInput.value = '';
+      });
+    }
+    if (rulesResetBtn && haeRules) {
+      rulesResetBtn.addEventListener('click', () => {
+        const defaults = haeRules.getDefaultRules();
+        gather.updateRules(defaults);
+        renderRulesList();
+        utils.showToast('已恢复默认规则', 'success');
+      });
+    }
+
+    function isPageScope(scope) {
+      return ['response body', 'response', 'any'].indexOf(scope) !== -1;
     }
 
     // Link extract
@@ -1033,15 +1115,7 @@
     // Restore gather data for current tab
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
       const currentUrl = tabs[0]?.url || '';
-      chrome.storage.local.get(['gatherData', 'gatherDataUrl'], result => {
-        if (result.gatherData && result.gatherDataUrl === currentUrl) {
-          gatherData = result.gatherData;
-          renderGatherTab();
-          const total = Object.values(gatherData).reduce((s, a) => s + a.length, 0);
-          const statusEl = utils.get('gather-status');
-          if (statusEl) statusEl.textContent = '已恢复，共 ' + total + ' 条';
-        }
-      });
+      gather.restoreData(currentUrl);
       chrome.storage.local.get(['allLinks', 'allLinksUrl'], result => {
         if (result.allLinks && result.allLinksUrl === currentUrl) {
           allLinks = result.allLinks;
@@ -1208,5 +1282,4 @@
   } else {
     initApp();
   }
-
 })();

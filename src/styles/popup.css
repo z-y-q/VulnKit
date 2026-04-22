@@ -485,8 +485,15 @@ body {
 .type-email { background: #a855f7; }
 .type-token { background: #ef4444; }
 .type-other { background: #6b7280; }
-
-.gather-item-value {
+.type-red { background: #ef4444; }
+.type-orange { background: #f97316; }
+.type-yellow { background: #eab308; }
+.type-green { background: #10b981; }
+.type-cyan { background: #06b6d4; }
+.type-blue { background: #3b82f6; }
+.type-pink { background: #ec4899; }
+.type-magenta { background: #d946ef; }
+.type-gray { background: #6b7280; }
   flex: 1;
   color: #333;
   overflow: hidden;
@@ -3117,3 +3124,64 @@ body {
   color: #CE93D8;
 }
 [data-theme='dark'] .sourcemap-dep-tag-reverse:hover { background: #3D2B4D; }
+
+/* ====== HaE Rules Modal ====== */
+.rules-modal-content {
+  max-height: 520px;
+  display: flex;
+  flex-direction: column;
+}
+.rules-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+.rules-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  max-height: 400px;
+}
+.rules-group {
+  margin-bottom: 12px;
+}
+.rules-group-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 4px;
+}
+.rules-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 11px;
+}
+.rules-item input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+.rules-item-name {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 10px;
+  min-width: 80px;
+  text-align: center;
+}
+.rules-item-scope {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+.rules-scope-na {
+  color: #ef4444;
+  font-size: 9px;
+}
