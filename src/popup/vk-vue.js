@@ -1558,7 +1558,7 @@ window.VulnKitVue = (function () {
         msg += ' + ' + overrideResult.storagePatchCount + '个本地缓存';
       }
       msg += '）→ 请在页面上点击菜单或刷新页面，检查是否出现新菜单项';
-      utils.showToast(msg, 'success', 5000);
+      utils.showToast(msg, 'success');
     } catch (e) {
       utils.showToast('应用失败: ' + e.message, 'error');
     }

@@ -260,29 +260,29 @@ window.VulnKitJsCtrl = (function () {
       var scannedCount = 0;
       var maxScan = 10;
       var antiDebugPatterns = [
-        { regex: /\bdebugger\b/g, type: 'debugger语句', desc: '外部 JS 中包含 debugger 语句' },
+        { regex: /\bdebugger\b/, type: 'debugger语句', desc: '外部 JS 中包含 debugger 语句' },
         {
-          regex: /outerWidth\s*-\s*innerWidth\s*>\s*\d+/g,
+          regex: /outerWidth\s*-\s*innerWidth\s*>\s*\d+/,
           type: 'DevTools检测',
           desc: '外部 JS 通过窗口尺寸差检测 DevTools',
         },
         {
-          regex: /Firebug|firebug|chrome\.devtools/g,
+          regex: /Firebug|firebug|chrome\.devtools/i,
           type: 'DevTools检测',
           desc: '外部 JS 包含 Firebug/DevTools 探测',
         },
         {
-          regex: /new\s+Image.*onerror.*devtools/gi,
+          regex: /new\s+Image.*onerror.*devtools/i,
           type: 'DevTools检测',
           desc: '外部 JS 通过 Image.onerror 检测 DevTools',
         },
         {
-          regex: /setInterval\s*\(\s*function\s*\([^)]*\)\s*\{[^}]*debugger/g,
+          regex: /setInterval\s*\(\s*function\s*\([^)]*\)\s*\{[^}]*debugger/,
           type: 'debugger循环',
           desc: '外部 JS 包含 setInterval + debugger 循环',
         },
         {
-          regex: /constructor\s*=\s*function/g,
+          regex: /constructor\s*=\s*function/,
           type: 'Function劫持',
           desc: '外部 JS 包含 constructor 重写代码',
         },
@@ -367,6 +367,16 @@ window.VulnKitJsCtrl = (function () {
         target: { tabId: tab.id },
         world: 'MAIN',
         func: function () {
+          // Save native references before any overrides
+          var nativeConsoleLog = (function () {
+            var iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.head.appendChild(iframe);
+            var log = iframe.contentWindow.console.log;
+            document.head.removeChild(iframe);
+            return log;
+          })();
+
           // Override Function constructor to strip debugger
           var OriginalFunction = Function.prototype.constructor;
           Function.prototype.constructor = function () {
@@ -398,13 +408,14 @@ window.VulnKitJsCtrl = (function () {
             if (typeof fn === 'function') {
               var fnStr = fn.toString();
               if (fnStr.includes('debugger')) {
-                return function () {
-                  try {
-                    fn();
-                  } catch (e) {
-                    /* ignore debugger */
-                  }
-                };
+                try {
+                  var cleaned = fnStr.replace(/debugger/g, '');
+                  return new Function(
+                    cleaned.replace(/^function\s*\w*\s*\([^)]*\)\s*\{/, '').replace(/\}$/, '')
+                  );
+                } catch (e) {
+                  return function () {};
+                }
               }
             }
             return fn;
@@ -422,14 +433,7 @@ window.VulnKitJsCtrl = (function () {
 
           // Restore console if overridden
           if (!console.log.restore) {
-            var log = console.log;
-            console.log = function () {
-              var args = Array.prototype.slice.call(arguments);
-              var stack = new Error().stack;
-              var callerLine = stack ? stack.split('\n')[2] || '' : '';
-              if (callerLine.includes('debugger')) return;
-              return log.apply(console, args);
-            };
+            console.log = nativeConsoleLog;
             console.log.restore = true;
           }
 

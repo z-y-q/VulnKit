@@ -98,7 +98,13 @@ async function removeUaRule() {
 
 async function addHeaderRules(tabId, url, headers) {
   const requestHeaders = [];
-  const urlFilter = '*';
+  var urlFilter;
+  try {
+    var parsed = new URL(url);
+    urlFilter = parsed.hostname + '/*';
+  } catch {
+    urlFilter = '*';
+  }
 
   if (headers.xff) {
     requestHeaders.push({ header: 'X-Forwarded-For', operation: 'set', value: headers.xff });
@@ -222,15 +228,64 @@ async function fetchImage(url) {
   try {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const blob = await resp.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve({ success: true, data: reader.result });
-      reader.onerror = () => reject(new Error('Failed to read image'));
-      reader.readAsDataURL(blob);
-    });
+    const buf = await resp.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    var binary = '';
+    for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    var b64 = btoa(binary);
+    var mime = resp.headers.get('content-type') || 'image/jpeg';
+    return { success: true, data: 'data:' + mime + ';base64,' + b64 };
   } catch (e) {
     return { success: false, error: e.message };
+  }
+}
+
+var zoomEyeTokenCache = { token: null, expiresAt: 0 };
+
+async function fetchZoomEyeAuth(url, apiKey) {
+  try {
+    var now = Date.now();
+    if (zoomEyeTokenCache.token && zoomEyeTokenCache.expiresAt > now) {
+      var resp = await fetch(url, {
+        headers: { Authorization: 'JWT ' + zoomEyeTokenCache.token },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!resp.ok) {
+        var body = await resp.text().catch(function () {
+          return '';
+        });
+        if (resp.status === 401) zoomEyeTokenCache = { token: null, expiresAt: 0 };
+        throw new Error('HTTP ' + resp.status + (body ? ': ' + body.slice(0, 200) : ''));
+      }
+      var data = await resp.text();
+      return { success: true, data: data };
+    }
+
+    var loginResp = await fetch('https://api.zoomeye.org/user/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: apiKey }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!loginResp.ok) throw new Error('ZoomEye login failed: HTTP ' + loginResp.status);
+    var loginData = await loginResp.json();
+    if (!loginData.access_token) throw new Error('ZoomEye login failed: no access_token');
+    zoomEyeTokenCache = { token: loginData.access_token, expiresAt: now + 3600000 };
+
+    var apiResp = await fetch(url, {
+      headers: { Authorization: 'JWT ' + loginData.access_token },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!apiResp.ok) {
+      var apiBody = await apiResp.text().catch(function () {
+        return '';
+      });
+      throw new Error('HTTP ' + apiResp.status + (apiBody ? ': ' + apiBody.slice(0, 200) : ''));
+    }
+    var apiData = await apiResp.text();
+    return { success: true, data: apiData };
+  } catch (e) {
+    return { success: false, error: e.message || '请求超时' };
   }
 }
 
@@ -300,6 +355,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'FETCH_URL_AUTH':
       if (!isAllowedUrl(message.url)) {
         sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
+      } else if (message.provider === 'zoomeye') {
+        fetchZoomEyeAuth(message.url, message.key).then(result => {
+          sendResponse(result.success ? { data: result.data } : { error: result.error });
+        });
       } else {
         fetchUrlAuth(message.url, message.key, message.header).then(result => {
           sendResponse(result.success ? { data: result.data } : { error: result.error });

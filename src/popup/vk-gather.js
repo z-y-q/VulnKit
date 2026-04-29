@@ -131,8 +131,10 @@ window.VulnKitGather = (function () {
         func: function (haeRules, domGroup) {
           var pageUrl = location.href;
           var rawHtml = document.documentElement.outerHTML;
-          var pageHtml = rawHtml.length > 500000 ? rawHtml.substring(0, 500000) : rawHtml;
+          var truncated = rawHtml.length > 500000;
+          var pageHtml = truncated ? rawHtml.substring(0, 500000) : rawHtml;
           var collected = {};
+          collected._meta = { truncated: truncated, totalSize: rawHtml.length };
 
           var seenAll = {};
           function add(group, name, value, color) {
@@ -229,7 +231,7 @@ window.VulnKitGather = (function () {
           });
 
           // HaE rules matching
-          var pageScopes = ['response body', 'response', 'any'];
+          var pageScopes = ['response body', 'response', 'request', 'header', 'any'];
           haeRules.forEach(function (group) {
             var groupResults = [];
             (group.rules || []).forEach(function (rule) {
@@ -286,13 +288,22 @@ window.VulnKitGather = (function () {
 
       if (results && results[0] && results[0].result) {
         gatherData = results[0].result;
+        var meta = gatherData._meta;
+        delete gatherData._meta;
         renderGatherTab();
 
         var total = Object.values(gatherData).reduce(function (s, a) {
-          return s + a.length;
+          return s + (Array.isArray(a) ? a.length : 0);
         }, 0);
-        statusEl.textContent = '收集完成，共 ' + total + ' 条';
-        utils.showToast('收集完成', 'success');
+        var statusText = '收集完成，共 ' + total + ' 条';
+        if (meta && meta.truncated) {
+          statusText += '（HTML 已截断至 500KB/' + (meta.totalSize / 1024).toFixed(0) + 'KB）';
+        }
+        statusEl.textContent = statusText;
+        utils.showToast(
+          meta && meta.truncated ? '收集完成（页面过大，部分内容被截断）' : '收集完成',
+          meta && meta.truncated ? 'warning' : 'success'
+        );
 
         var groups = [DOM_GROUP].concat(getHaeRules() ? getHaeRules().getGroups(loadedRules) : []);
         chrome.storage.local.set({

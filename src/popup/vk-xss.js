@@ -118,9 +118,14 @@ window.VulnKitXss = (function () {
         func: () => {
           if (window.__XSS_INTERCEPT__) return 'already_injected';
           window.__XSS_INTERCEPT__ = [];
-          const origOpen = XMLHttpRequest.prototype.open;
-          const origSend = XMLHttpRequest.prototype.send;
-          const origFetch = window.fetch;
+          window.__XSS_ORIGINAL__ = {
+            xhrOpen: XMLHttpRequest.prototype.open,
+            xhrSend: XMLHttpRequest.prototype.send,
+            fetch: window.fetch,
+          };
+          const origOpen = window.__XSS_ORIGINAL__.xhrOpen;
+          const origSend = window.__XSS_ORIGINAL__.xhrSend;
+          const origFetch = window.__XSS_ORIGINAL__.fetch;
 
           XMLHttpRequest.prototype.open = function (method, url) {
             this.__xss_method = method;
@@ -133,7 +138,7 @@ window.VulnKitXss = (function () {
                 const u = new URL(this.__xss_url, location.href);
                 u.searchParams.forEach((_, k) => {
                   window.__XSS_INTERCEPT__.push({
-                    url: u.pathname + u.search,
+                    url: u.origin + u.pathname + u.search,
                     param: k,
                     method: this.__xss_method || 'GET',
                   });
@@ -148,7 +153,7 @@ window.VulnKitXss = (function () {
                   try {
                     const u = new URL(fallbackUrl, location.href);
                     window.__XSS_INTERCEPT__.push({
-                      url: u.pathname,
+                      url: u.origin + u.pathname,
                       param: k,
                       method: this.__xss_method || 'POST',
                     });
@@ -170,7 +175,7 @@ window.VulnKitXss = (function () {
               const u = new URL(url, location.href);
               u.searchParams.forEach((_, k) => {
                 window.__XSS_INTERCEPT__.push({
-                  url: u.pathname + u.search,
+                  url: u.origin + u.pathname + u.search,
                   param: k,
                   method: (init?.method || 'GET').toUpperCase(),
                 });
@@ -183,7 +188,7 @@ window.VulnKitXss = (function () {
                   try {
                     const u = new URL(url, location.href);
                     window.__XSS_INTERCEPT__.push({
-                      url: u.pathname,
+                      url: u.origin + u.pathname,
                       param: k,
                       method: (init?.method || 'POST').toUpperCase(),
                     });
@@ -240,6 +245,30 @@ window.VulnKitXss = (function () {
     utils.get('xssscan-start-intercept-btn').disabled = false;
     utils.get('xssscan-stop-intercept-btn').disabled = true;
     updateXssInterceptStatus();
+
+    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+      if (!tabs[0]?.id) return;
+      chrome.scripting
+        .executeScript({
+          target: { tabId: tabs[0].id },
+          world: 'MAIN',
+          func: () => {
+            if (!window.__XSS_ORIGINAL__) return;
+            if (window.__XSS_ORIGINAL__.xhrOpen) {
+              XMLHttpRequest.prototype.open = window.__XSS_ORIGINAL__.xhrOpen;
+            }
+            if (window.__XSS_ORIGINAL__.xhrSend) {
+              XMLHttpRequest.prototype.send = window.__XSS_ORIGINAL__.xhrSend;
+            }
+            if (window.__XSS_ORIGINAL__.fetch) {
+              window.fetch = window.__XSS_ORIGINAL__.fetch;
+            }
+            delete window.__XSS_INTERCEPT__;
+            delete window.__XSS_ORIGINAL__;
+          },
+        })
+        .catch(() => {});
+    });
   }
 
   function updateXssInterceptStatus() {
@@ -347,10 +376,14 @@ window.VulnKitXss = (function () {
 
   function buildXssTestUrl(point, payload) {
     try {
-      const url = new URL(point.url, 'about:blank');
+      const url = new URL(point.url);
       if (point.method === 'GET') {
         url.searchParams.set(point.param, payload);
         return url.href;
+      }
+      if (point.method === 'POST') {
+        url.searchParams.set(point.param, payload);
+        return { url: url.href, method: 'POST', param: point.param, payload: payload };
       }
       return url.href;
     } catch {
@@ -411,13 +444,30 @@ window.VulnKitXss = (function () {
     const payload = encodePayload(rawPayload, encoding);
     let opened = 0;
     for (const point of selected) {
-      const url = buildXssTestUrl(point, payload);
-      if (url) {
-        chrome.tabs.create({ url, active: false });
+      const result = buildXssTestUrl(point, payload);
+      if (!result) continue;
+      if (typeof result === 'object') {
+        const data = new URLSearchParams();
+        data.set(result.param, result.payload);
+        const formHtml =
+          '<form method="POST" action="' +
+          result.url.replace(/"/g, '&quot;') +
+          '">' +
+          '<input type="hidden" name="' +
+          result.param.replace(/"/g, '&quot;') +
+          '" value="' +
+          result.payload.replace(/"/g, '&quot;').replace(/</g, '&lt;') +
+          '">' +
+          '</form><script>document.forms[0].submit()<\/script>';
+        const blobUrl = URL.createObjectURL(new Blob([formHtml], { type: 'text/html' }));
+        chrome.tabs.create({ url: blobUrl, active: false });
+        opened++;
+      } else {
+        chrome.tabs.create({ url: result, active: false });
         opened++;
       }
     }
-    utils.showToast('已打开 ' + opened + ' 个测试页面', 'success');
+    utils.showToast('已打开 ' + opened + ' 个测试页面（POST 注入通过自动提交表单实现）', 'success');
   }
 
   function handleCopyXssUrls() {
@@ -430,13 +480,22 @@ window.VulnKitXss = (function () {
     const rawPayload = getSelectedPayload();
     const encoding = (utils.get('xssscan-encoding') || {}).value || 'none';
     const payload = encodePayload(rawPayload, encoding);
-    const urls = selected.map(p => buildXssTestUrl(p, payload)).filter(Boolean);
-    if (urls.length === 0) {
+    const lines = selected
+      .map(p => {
+        const result = buildXssTestUrl(p, payload);
+        if (!result) return null;
+        if (typeof result === 'object') {
+          return '[POST] ' + result.url + '\n  参数: ' + result.param + '=' + result.payload;
+        }
+        return result;
+      })
+      .filter(Boolean);
+    if (lines.length === 0) {
       utils.showToast('无法生成测试URL', 'warning');
       return;
     }
-    utils.copyText(urls.join('\n'));
-    utils.showToast('已复制 ' + urls.length + ' 个URL', 'success');
+    utils.copyText(lines.join('\n'));
+    utils.showToast('已复制 ' + lines.length + ' 个URL', 'success');
   }
 
   function initXssScanPayloadSelect() {

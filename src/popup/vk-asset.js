@@ -160,7 +160,7 @@ window.VulnKitAsset = (function () {
     }
     setAssetStatus('正在查询 ZoomEye...');
     var baseDomain = query.replace(/^www\./, '');
-    var zoomQuery = 'hostname:' + baseDomain + ' OR site:' + baseDomain;
+    var zoomQuery = 'hostname:' + baseDomain;
     const url =
       'https://api.zoomeye.org/host/search?query=' +
       encodeURIComponent(zoomQuery) +
@@ -168,7 +168,7 @@ window.VulnKitAsset = (function () {
       getAssetSize();
 
     chrome.runtime.sendMessage(
-      { type: 'FETCH_URL_AUTH', url, key, header: 'API-KEY' },
+      { type: 'FETCH_URL_AUTH', url, key, provider: 'zoomeye' },
       response => {
         if (chrome.runtime.lastError) {
           setAssetStatus('查询失败: ' + chrome.runtime.lastError.message);
@@ -218,7 +218,9 @@ window.VulnKitAsset = (function () {
       return;
     }
     setAssetStatus('正在查询 Shodan...');
-    var searchQuery = /^[\d.]+$/.test(query) ? query : 'hostname:' + query;
+    var searchQuery = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(query)
+      ? query
+      : 'hostname:' + query;
     const url =
       'https://api.shodan.io/shodan/host/search?key=' +
       encodeURIComponent(key) +
@@ -282,7 +284,7 @@ window.VulnKitAsset = (function () {
     container.innerHTML =
       '<div style="text-align:center;padding:8px;color:#66B2FF;">正在查询...</div>';
     var resolvedIp = null;
-    var isIp = /^[\d.]+$/.test(input);
+    var isIp = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(input);
 
     function step1() {
       if (isIp) {
@@ -303,7 +305,14 @@ window.VulnKitAsset = (function () {
     }
 
     function step2() {
-      var targetIp = resolvedIp || input;
+      var targetIp = resolvedIp;
+      if (!targetIp || !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(targetIp)) {
+        container.innerHTML =
+          '<div style="color:#ff6b6b;padding:8px;">无法解析域名 ' +
+          utils.escapeHtml(input) +
+          ' 为 IP 地址，请直接输入 IP</div>';
+        return;
+      }
       bgFetch('https://internetdb.shodan.io/' + encodeURIComponent(targetIp))
         .then(function (result) {
           if (!result.success || !result.data || result.data.error) {
