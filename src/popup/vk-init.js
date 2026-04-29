@@ -14,6 +14,11 @@
   const clearEncodingFields = encoding.clearEncodingFields;
   const switchEncodingTab = encoding.switchEncodingTab;
 
+  // ====== JWT (loaded from vk-jwt.js) ======
+  const jwt = window.VulnKitJwt;
+  const decodeJwt = jwt.decodeJwt;
+  const clearJwt = jwt.clearJwt;
+
   // ====== Crypto (AES/DES/RC4/SM2/SM4/Bcrypt) ======
 
   // ====== Crypto (loaded from vk-crypto.js) ======
@@ -24,6 +29,8 @@
     doCryptoEncrypt,
     doCryptoDecrypt,
     doCryptoVerify,
+    computeHash,
+    toggleHashHmac,
     rsaGenerateKeyPair,
   } = crypto;
 
@@ -424,6 +431,20 @@
       if (el) el.addEventListener('click', handler);
     });
 
+    // JWT buttons
+    var jwtDecodeBtn = utils.get('jwt-decode-btn');
+    if (jwtDecodeBtn)
+      jwtDecodeBtn.addEventListener('click', function () {
+        var input = (utils.get('jwt-input') || {}).value;
+        if (!input) {
+          utils.showToast('请输入 JWT Token', 'warning');
+          return;
+        }
+        decodeJwt(input);
+      });
+    var jwtClearBtn = utils.get('jwt-clear-btn');
+    if (jwtClearBtn) jwtClearBtn.addEventListener('click', clearJwt);
+
     // Crypto algo tabs
     document.querySelectorAll('.crypto-algo-btn').forEach(function (btn) {
       if (btn.dataset.algo)
@@ -439,6 +460,8 @@
     if (cryptoDecBtn) cryptoDecBtn.addEventListener('click', doCryptoDecrypt);
     var cryptoVerifyBtn = utils.get('crypto-verify-btn');
     if (cryptoVerifyBtn) cryptoVerifyBtn.addEventListener('click', doCryptoVerify);
+    var hashHmacCheck = utils.get('hash-hmac');
+    if (hashHmacCheck) hashHmacCheck.addEventListener('change', toggleHashHmac);
     var cryptoClearBtn = utils.get('crypto-clear-btn');
     if (cryptoClearBtn)
       cryptoClearBtn.addEventListener('click', function () {

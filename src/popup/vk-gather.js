@@ -69,7 +69,9 @@ window.VulnKitGather = (function () {
     var container = document.getElementById('gather-sub-tabs');
     if (!container) return;
 
-    var groups = [DOM_GROUP].concat(getHaeRules() ? getHaeRules().getGroups(loadedRules) : []);
+    var groups = [DOM_GROUP];
+    if (gatherData['JS API'] && gatherData['JS API'].length > 0) groups.push('JS API');
+    groups = groups.concat(getHaeRules() ? getHaeRules().getGroups(loadedRules) : []);
     var html = '';
     groups.forEach(function (group, i) {
       var active = i === 0 ? ' active' : '';
@@ -102,6 +104,112 @@ window.VulnKitGather = (function () {
       loadedRules = rules;
       renderSubTabs();
     });
+  }
+
+  var API_PATTERNS = [
+    {
+      regex:
+        /(?:fetch|axios|\.get|\.post|\.put|\.delete|\.patch|\.request)\s*\(\s*["']([^"']+)["']/gi,
+      label: 'fetch',
+    },
+    {
+      regex: /(?:url|endpoint|api|baseUrl|baseURL|apiUrl|apiURL)["']?\s*[:=]\s*["']([^"']+)["']/gi,
+      label: 'config',
+    },
+    { regex: /["']\/api\/[a-zA-Z0-9_\-./{}:?&=]*["']/gi, label: 'api-path' },
+    { regex: /["']\/v\d+(?:\/[a-zA-Z0-9_\-./{}:?&=]*)*["']/gi, label: 'versioned' },
+    { regex: /path:\s*["']([^"']+)["']/gi, label: 'route-path' },
+    { regex: /@(?:Get|Post|Put|Delete|Patch|Route)\s*\(\s*["']([^"']+)["']/gi, label: 'decorator' },
+    {
+      regex: /["']((?:\/[a-zA-Z0-9_-]+){2,}(?:\/[a-zA-Z0-9_-{}:?&=]*)*)["']/g,
+      label: 'path',
+    },
+  ];
+
+  function isValidApiPath(path) {
+    if (!path || path.length < 3 || path.length > 200) return false;
+    if (
+      /^(https?:)?\/\/([^/]+\.)?google|facebook|github\.com|jquery|analytics|doubleclick|googletagmanager|fontawesome|bootstrapcdn|unpkg\.com|cdn\./i.test(
+        path
+      )
+    )
+      return false;
+    if (/^\.\//.test(path) && !/api|route|endpoint|action/i.test(path)) return false;
+    if (/^(\/\/)/.test(path) && /\.js(\?|$)/i.test(path)) return false;
+    if (/\.(js|css|png|jpg|jpeg|gif|svg|woff|ttf|eot|ico)(\?|$)/i.test(path)) return false;
+    return true;
+  }
+
+  function fetchJsFile(url) {
+    return new Promise(function (resolve) {
+      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url, tailOnly: false }, function (resp) {
+        if (resp && resp.data) resolve(resp.data);
+        else resolve(null);
+      });
+    });
+  }
+
+  async function extractApiFromJsFiles(scriptSrcs, pageUrl) {
+    var seen = {};
+    var endpoints = [];
+    var pageOrigin = '';
+    try {
+      pageOrigin = new URL(pageUrl).origin;
+    } catch {}
+
+    var filesToFetch = scriptSrcs.filter(function (src) {
+      try {
+        var u = new URL(src, pageUrl);
+        return u.origin === pageOrigin;
+      } catch {
+        return false;
+      }
+    });
+    filesToFetch = filesToFetch.slice(0, 15);
+
+    var fetchPromises = filesToFetch.map(function (src) {
+      return fetchJsFile(src);
+    });
+    var jsContents = await Promise.all(fetchPromises);
+
+    jsContents.forEach(function (content, idx) {
+      if (!content) return;
+      if (content.length > 500000) content = content.substring(0, 500000);
+
+      API_PATTERNS.forEach(function (pattern) {
+        var regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+        var match;
+        while ((match = regex.exec(content)) !== null) {
+          var path = match[1];
+          if (!path || !isValidApiPath(path)) continue;
+
+          var cleanPath = path;
+          if (cleanPath.startsWith('//')) {
+            try {
+              cleanPath = new URL('https:' + cleanPath).pathname;
+            } catch {}
+          } else if (cleanPath.startsWith('http')) {
+            try {
+              cleanPath = new URL(cleanPath).pathname;
+            } catch {}
+          }
+
+          if (!cleanPath || cleanPath.length < 2) continue;
+
+          var key = cleanPath.toLowerCase();
+          if (seen[key]) continue;
+          seen[key] = true;
+
+          endpoints.push({
+            name: pattern.label,
+            value: cleanPath,
+            color: 'api',
+          });
+        }
+      });
+    });
+
+    return endpoints;
   }
 
   async function gatherInfo() {
@@ -148,6 +256,7 @@ window.VulnKitGather = (function () {
 
           // DOM Analysis
           var domSeen = {};
+          var scriptSrcs = [];
           function addDom(type, value) {
             if (!value || domSeen[type + '::' + value]) return;
             domSeen[type + '::' + value] = true;
@@ -165,7 +274,10 @@ window.VulnKitGather = (function () {
           });
 
           document.querySelectorAll('script[src]').forEach(function (s) {
-            if (s.src) addDom('script', s.src);
+            if (s.src) {
+              addDom('script', s.src);
+              if (/^https?:\/\//i.test(s.src)) scriptSrcs.push(s.src);
+            }
           });
 
           document.querySelectorAll('link[href]').forEach(function (l) {
@@ -281,6 +393,7 @@ window.VulnKitGather = (function () {
             }
           });
 
+          collected._scriptSrcs = scriptSrcs;
           return collected;
         },
         args: [rulesForInjection, DOM_GROUP],
@@ -290,6 +403,19 @@ window.VulnKitGather = (function () {
         gatherData = results[0].result;
         var meta = gatherData._meta;
         delete gatherData._meta;
+        var scriptSrcs = gatherData._scriptSrcs || [];
+        delete gatherData._scriptSrcs;
+
+        // Fetch external JS files and extract API endpoints
+        if (scriptSrcs.length > 0) {
+          statusEl.textContent = '正在分析 JS 文件（' + scriptSrcs.length + ' 个）...';
+          var apiEndpoints = await extractApiFromJsFiles(scriptSrcs, tab.url);
+          if (apiEndpoints.length > 0) {
+            gatherData['JS API'] = apiEndpoints;
+          }
+        }
+
+        renderSubTabs();
         renderGatherTab();
 
         var total = Object.values(gatherData).reduce(function (s, a) {
@@ -305,7 +431,10 @@ window.VulnKitGather = (function () {
           meta && meta.truncated ? 'warning' : 'success'
         );
 
-        var groups = [DOM_GROUP].concat(getHaeRules() ? getHaeRules().getGroups(loadedRules) : []);
+        var groups = [DOM_GROUP].concat(
+          gatherData['JS API'] ? ['JS API'] : [],
+          getHaeRules() ? getHaeRules().getGroups(loadedRules) : []
+        );
         chrome.storage.local.set({
           gatherData: gatherData,
           gatherDataUrl: tab.url,

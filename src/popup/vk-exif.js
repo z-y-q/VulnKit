@@ -301,6 +301,7 @@ window.VulnKitExif = (function () {
           const imgs = [];
           document.querySelectorAll('img[src]').forEach(img => {
             if (img.src && img.naturalWidth > 50 && img.naturalHeight > 50) {
+              if (/^(blob:|data:)/i.test(img.src)) return;
               imgs.push({
                 src: img.src,
                 alt: img.alt || '',
@@ -311,7 +312,9 @@ window.VulnKitExif = (function () {
           });
           document.querySelectorAll('[style*="background"]').forEach(el => {
             const m = el.style.backgroundImage.match(/url\(["']?(.*?)["']?\)/);
-            if (m && m[1]) imgs.push({ src: m[1], alt: '', w: 0, h: 0 });
+            if (m && m[1] && !/^(blob:|data:)/i.test(m[1])) {
+              imgs.push({ src: m[1], alt: '', w: 0, h: 0 });
+            }
           });
           const unique = [...new Map(imgs.map(i => [i.src, i])).values()];
           return unique.slice(0, 50);

@@ -40,6 +40,10 @@ window.VulnKitCrypto = (function () {
       if (encBtn) encBtn.textContent = '生成哈希';
       if (decBtn) decBtn.classList.add('hidden');
       if (verifyBtn) verifyBtn.classList.remove('hidden');
+    } else if (algo === 'hash') {
+      if (encBtn) encBtn.textContent = '计算哈希';
+      if (decBtn) decBtn.classList.add('hidden');
+      if (verifyBtn) verifyBtn.classList.add('hidden');
     } else {
       if (encBtn) encBtn.textContent = '加密';
       if (decBtn) decBtn.classList.remove('hidden');
@@ -87,6 +91,9 @@ window.VulnKitCrypto = (function () {
           break;
         case 'bcrypt':
           result = bcryptHash(input);
+          break;
+        case 'hash':
+          result = computeHash(input);
           break;
         case 'rsa':
           rsaEncrypt(input)
@@ -338,6 +345,34 @@ window.VulnKitCrypto = (function () {
     });
   }
 
+  function computeHash(input) {
+    var algo = (utils.get('hash-algo') || {}).value || 'sha256';
+    var useHex = (utils.get('hash-hex') || {}).checked !== false;
+    var useHmac = (utils.get('hash-hmac') || {}).checked;
+    var hmacKey = (utils.get('hash-hmac-key') || {}).value || '';
+    if (useHmac && !hmacKey) throw new Error('请输入 HMAC 密钥');
+    var algoName = algo.toUpperCase().replace('-', '');
+    if (algoName === 'SHA384') algoName = 'SHA384';
+    if (useHmac) {
+      var keyWA = CryptoJS.enc.Utf8.parse(hmacKey);
+      var hash = CryptoJS.HmacSHA256(input, keyWA);
+      if (algo === 'md5') hash = CryptoJS.HmacMD5(input, keyWA);
+      else if (algo === 'sha1') hash = CryptoJS.HmacSHA1(input, keyWA);
+      else if (algo === 'sha256') hash = CryptoJS.HmacSHA256(input, keyWA);
+      else if (algo === 'sha512') hash = CryptoJS.HmacSHA512(input, keyWA);
+      else if (algo === 'sha384') hash = CryptoJS.HmacSHA384(input, keyWA);
+      return useHex ? hash.toString(CryptoJS.enc.Hex) : CryptoJS.enc.Base64.stringify(hash);
+    }
+    var result = CryptoJS[algoName](input);
+    return useHex ? result.toString(CryptoJS.enc.Hex) : CryptoJS.enc.Base64.stringify(result);
+  }
+
+  function toggleHashHmac() {
+    var useHmac = (utils.get('hash-hmac') || {}).checked;
+    var row = utils.get('hash-hmac-key-row');
+    if (row) row.classList.toggle('hidden', !useHmac);
+  }
+
   function bcryptHash(input) {
     var rounds = parseInt((utils.get('bcrypt-rounds') || {}).value) || 10;
     var salt = dcodeIO.bcrypt.genSaltSync(rounds);
@@ -463,6 +498,8 @@ window.VulnKitCrypto = (function () {
     doCryptoEncrypt,
     doCryptoDecrypt,
     doCryptoVerify,
+    computeHash,
+    toggleHashHmac,
     rsaGenerateKeyPair,
     get currentCryptoAlgo() {
       return currentCryptoAlgo;

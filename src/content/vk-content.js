@@ -54,7 +54,41 @@
       injectAndDetect().then(function (result) {
         sendResponse(result);
       });
-      return true; // async sendResponse
+      return true;
+    }
+    if (message.type === 'CONTEXT_EXTRACT_LINKS') {
+      var pageUrl = location.href;
+      var pageDomain = location.hostname;
+      var links = [];
+      var seen = {};
+      function addLink(href, text, tag) {
+        if (!href || href === '#' || href.startsWith('javascript:') || seen[href]) return;
+        seen[href] = true;
+        var domain = '';
+        try {
+          domain = new URL(href, pageUrl).hostname;
+        } catch (e) {}
+        links.push({ href: href, text: text || '', tag: tag, domain: domain });
+      }
+      document.querySelectorAll('a[href]').forEach(function (el) {
+        addLink(
+          el.href,
+          (el.textContent || '').trim().substring(0, 60) || el.getAttribute('title') || '',
+          'a'
+        );
+      });
+      document.querySelectorAll('script[src]').forEach(function (el) {
+        addLink(el.src, '', 'script');
+      });
+      document.querySelectorAll('link[href]').forEach(function (el) {
+        addLink(el.href, el.rel || '', 'link');
+      });
+      document.querySelectorAll('iframe[src],frame[src]').forEach(function (el) {
+        addLink(el.src, '', 'iframe');
+      });
+      chrome.storage.local.set({ contextExtractedLinks: links, contextExtractedUrl: pageUrl });
+      sendResponse({ count: links.length });
+      return true;
     }
   });
 })();

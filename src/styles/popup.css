@@ -494,6 +494,7 @@ body {
 .type-pink { background: #ec4899; }
 .type-magenta { background: #d946ef; }
 .type-gray { background: #6b7280; }
+.type-api { background: #f59e0b; }
 
 .gather-item-value {
   flex: 1;
@@ -2429,6 +2430,22 @@ body {
 [data-theme='dark'] .perm-captured-list::-webkit-scrollbar-thumb,
 [data-theme='dark'] .jssearch-results::-webkit-scrollbar-thumb,
 [data-theme='dark'] .compare-results::-webkit-scrollbar-thumb { background: #3A3A5E; }
+
+/* ====== JWT Panel ====== */
+.jwt-block { margin-bottom: 10px; border: 1px solid #E0E0E0; border-radius: 8px; overflow: hidden; }
+.jwt-block-header { padding: 6px 10px; font-size: 12px; font-weight: 600; background: #F5F7FA; display: flex; align-items: center; gap: 6px; }
+.jwt-color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.jwt-pre { margin: 0; padding: 8px 10px; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; background: #FAFBFC; }
+.jwt-sig { font-family: monospace; word-break: break-all; }
+.jwt-claims { margin-top: 8px; }
+.jwt-claim { display: flex; justify-content: space-between; padding: 4px 10px; font-size: 11px; border-bottom: 1px solid #f0f0f0; }
+.jwt-claim-valid { color: #27ae60; }
+.jwt-claim-expired { color: #e74c3c; }
+
+[data-theme='dark'] .jwt-block { border-color: var(--border-color); }
+[data-theme='dark'] .jwt-block-header { background: var(--bg-secondary); color: var(--text-primary); }
+[data-theme='dark'] .jwt-pre { background: var(--bg-secondary); color: var(--text-primary); }
+[data-theme='dark'] .jwt-claim { border-color: var(--border-color); color: var(--text-secondary); }
 
 /* ====== Crypto Panel ====== */
 .crypto-algo-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }

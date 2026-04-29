@@ -17,6 +17,19 @@ let spoofState = {
 chrome.storage.local.get(['pentest_spoof'], result => {
   if (result.pentest_spoof) {
     spoofState = result.pentest_spoof;
+    // Re-create DNR rules after browser restart
+    if (spoofState.ua.enabled && spoofState.ua.current) {
+      addUaRule(null, null, spoofState.ua.current).catch(() => {});
+    }
+    if (
+      spoofState.headers &&
+      (spoofState.headers.xff ||
+        spoofState.headers.referer ||
+        spoofState.headers.clientIp ||
+        (spoofState.headers.custom && spoofState.headers.custom.length > 0))
+    ) {
+      addHeaderRules(null, null, spoofState.headers).catch(() => {});
+    }
   }
 });
 

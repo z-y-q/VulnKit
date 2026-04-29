@@ -81,14 +81,20 @@ window.VulnKitFavicon = (function () {
       utils.get('favicon-url').textContent = resolvedUrl;
 
       try {
-        const resp = await fetch(resolvedUrl);
-        const buf = await resp.arrayBuffer();
-        const bytes = new Uint8Array(buf);
+        const response = await new Promise(function (resolve) {
+          chrome.runtime.sendMessage({ type: 'FETCH_IMAGE', url: resolvedUrl }, function (resp) {
+            resolve(resp);
+          });
+        });
 
-        let binary = '';
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        const b64 = btoa(binary);
-        const faviconHash = mm3hash32(b64);
+        if (!response || !response.data) {
+          utils.get('favicon-hash').textContent = '获取失败';
+          utils.showToast('图标获取失败: ' + (response?.error || '网络错误'), 'error');
+          return;
+        }
+
+        const b64Data = response.data.replace(/^data:[^;]+;base64,/, '');
+        const faviconHash = mm3hash32(b64Data);
         utils.get('favicon-hash').textContent = '-' + faviconHash;
 
         const platforms = [

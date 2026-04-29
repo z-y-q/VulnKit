@@ -160,6 +160,39 @@ window.VulnKitXss = (function () {
                   } catch {}
                 });
               } catch {}
+              try {
+                const jsonBody = JSON.parse(body);
+                if (typeof jsonBody === 'object' && jsonBody !== null) {
+                  const fallbackUrl2 = this.__xss_url || location.href;
+                  let parsedUrl2;
+                  try {
+                    parsedUrl2 = new URL(fallbackUrl2, location.href);
+                  } catch {
+                    return;
+                  }
+                  Object.keys(jsonBody).forEach(function (k) {
+                    if (
+                      typeof jsonBody[k] === 'object' &&
+                      jsonBody[k] !== null &&
+                      !Array.isArray(jsonBody[k])
+                    ) {
+                      Object.keys(jsonBody[k]).forEach(function (nk) {
+                        window.__XSS_INTERCEPT__.push({
+                          url: parsedUrl2.origin + parsedUrl2.pathname,
+                          param: k + '.' + nk,
+                          method: this.__xss_method || 'POST',
+                        });
+                      });
+                    } else {
+                      window.__XSS_INTERCEPT__.push({
+                        url: parsedUrl2.origin + parsedUrl2.pathname,
+                        param: k,
+                        method: xhrThis.__xss_method || 'POST',
+                      });
+                    }
+                  });
+                }
+              } catch {}
             }
             return origSend.apply(this, arguments);
           };
@@ -194,6 +227,39 @@ window.VulnKitXss = (function () {
                     });
                   } catch {}
                 });
+              } catch {}
+              try {
+                const jsonBody = JSON.parse(init.body);
+                if (typeof jsonBody === 'object' && jsonBody !== null) {
+                  let parsedUrl;
+                  try {
+                    parsedUrl = new URL(url, location.href);
+                  } catch {
+                    return origFetch.apply(this, arguments);
+                  }
+                  const fetchMethod = (init?.method || 'POST').toUpperCase();
+                  Object.keys(jsonBody).forEach(function (k) {
+                    if (
+                      typeof jsonBody[k] === 'object' &&
+                      jsonBody[k] !== null &&
+                      !Array.isArray(jsonBody[k])
+                    ) {
+                      Object.keys(jsonBody[k]).forEach(function (nk) {
+                        window.__XSS_INTERCEPT__.push({
+                          url: parsedUrl.origin + parsedUrl.pathname,
+                          param: k + '.' + nk,
+                          method: fetchMethod,
+                        });
+                      });
+                    } else {
+                      window.__XSS_INTERCEPT__.push({
+                        url: parsedUrl.origin + parsedUrl.pathname,
+                        param: k,
+                        method: fetchMethod,
+                      });
+                    }
+                  });
+                }
               } catch {}
             }
             return origFetch.apply(this, arguments);

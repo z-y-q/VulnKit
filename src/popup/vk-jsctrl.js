@@ -668,6 +668,7 @@ window.VulnKitJsCtrl = (function () {
       }
 
       uncopyActive = true;
+      if (btn) btn.disabled = false;
       updateUncopyIndicator('on', '复制限制已解除');
       utils.showToast('复制限制已解除', 'success');
     } catch (e) {
