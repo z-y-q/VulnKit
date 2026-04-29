@@ -38,9 +38,9 @@ window.VulnKitEncoding = (function () {
         return d.innerHTML;
       },
       decode(t) {
-        const d = document.createElement('div');
+        const d = document.createElement('textarea');
         d.innerHTML = t;
-        return d.textContent || '';
+        return d.value || '';
       },
     },
     hex: {

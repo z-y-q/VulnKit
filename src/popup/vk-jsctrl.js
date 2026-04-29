@@ -28,10 +28,12 @@ window.VulnKitJsCtrl = (function () {
 
   function switchJsCtrlTab(tab) {
     currentJsCtrlTab = tab;
-    document
-      .querySelectorAll('.jsctrl-tab')
-      .forEach(function (b) { return b.classList.toggle('active', b.dataset.ctrl === tab); });
-    document.querySelectorAll('.jsctrl-panel').forEach(function (p) { return p.classList.remove('active'); });
+    document.querySelectorAll('.jsctrl-tab').forEach(function (b) {
+      return b.classList.toggle('active', b.dataset.ctrl === tab);
+    });
+    document.querySelectorAll('.jsctrl-panel').forEach(function (p) {
+      return p.classList.remove('active');
+    });
     var target = document.getElementById('jsctrl-' + tab);
     if (target) target.classList.add('active');
   }
@@ -107,7 +109,10 @@ window.VulnKitJsCtrl = (function () {
         utils.showToast('已禁用 JavaScript，请刷新页面', 'success');
       } else {
         updateJsToggleStatus();
-        utils.showToast('禁用失败: ' + (response && response.error ? response.error : '未知错误'), 'error');
+        utils.showToast(
+          '禁用失败: ' + (response && response.error ? response.error : '未知错误'),
+          'error'
+        );
       }
     } catch (e) {
       updateJsToggleStatus();
@@ -149,7 +154,10 @@ window.VulnKitJsCtrl = (function () {
         utils.showToast('已启用 JavaScript，请刷新页面', 'success');
       } else {
         updateJsToggleStatus();
-        utils.showToast('启用失败: ' + (response && response.error ? response.error : '未知错误'), 'error');
+        utils.showToast(
+          '启用失败: ' + (response && response.error ? response.error : '未知错误'),
+          'error'
+        );
       }
     } catch (e) {
       updateJsToggleStatus();
@@ -241,7 +249,10 @@ window.VulnKitJsCtrl = (function () {
         },
       });
 
-      var inline = (inlineResults && inlineResults[0] && inlineResults[0].result) || { detections: [], externalUrls: [] };
+      var inline = (inlineResults && inlineResults[0] && inlineResults[0].result) || {
+        detections: [],
+        externalUrls: [],
+      };
       var detections = inline.detections || [];
 
       // Phase 2: scan external JS files via background fetch
@@ -573,16 +584,6 @@ window.VulnKitJsCtrl = (function () {
           });
           log.captureListeners = blockEvents.length;
 
-          // 4. Override preventDefault on document level events
-          var origPreventDefault = Event.prototype.preventDefault;
-          var blockTypes = {};
-          blockEvents.forEach(function (t) {
-            blockTypes[t] = true;
-          });
-          Event.prototype.preventDefault = function () {
-            if (this.type && blockTypes[this.type]) return;
-            origPreventDefault.call(this);
-          };
           log.preventOverride = true;
 
           // 5. Count pointer-events: none overlays (CSS injected separately handles this)
@@ -685,7 +686,11 @@ window.VulnKitJsCtrl = (function () {
     removeCopyRestrictions: removeCopyRestrictions,
     updateUncopyIndicator: updateUncopyIndicator,
     // State accessors
-    get jsBlocked() { return jsBlocked; },
-    set jsBlocked(v) { jsBlocked = v; },
+    get jsBlocked() {
+      return jsBlocked;
+    },
+    set jsBlocked(v) {
+      jsBlocked = v;
+    },
   };
 })();

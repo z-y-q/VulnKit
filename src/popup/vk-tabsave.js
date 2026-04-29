@@ -16,9 +16,6 @@ window.VulnKitTabSave = (function () {
   // ====== Tab Save ======
   var savedTabUrls = [];
 
-  // ====== Tab Save ======
-  var savedTabUrls = [];
-
   async function grabAllTabs() {
     var grabBtn = utils.get('tabsave-grab-btn');
     var copyBtn = utils.get('tabsave-copy-btn');

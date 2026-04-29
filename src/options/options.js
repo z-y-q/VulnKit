@@ -81,9 +81,12 @@ function importSettings() {
 
 function clearData() {
   if (confirm('确定要清除所有数据吗？此操作不可恢复。')) {
-    chrome.storage.local.clear(() => {
-      showStatus('所有数据已清除', 'success');
-    });
+    chrome.storage.local.remove(
+      ['pentestSettings', 'pentest_history', 'pentest_spoof', 'pentest_keys'],
+      () => {
+        showStatus('所有数据已清除', 'success');
+      }
+    );
   }
 }
 

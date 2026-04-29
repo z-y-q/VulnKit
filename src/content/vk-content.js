@@ -1,5 +1,5 @@
 // VulnKit - Content Script Bridge
-;(function () {
+(function () {
   'use strict';
 
   if (window.__VK_CONTENT_BRIDGE__) return;
@@ -7,16 +7,20 @@
 
   var extId = chrome.runtime.id;
   var pendingResolve = null;
+  var detecting = false;
 
   window.addEventListener('message', function (e) {
     if (e.data && e.data.__vk_detect && pendingResolve) {
       var result = e.data.result;
       pendingResolve(result);
       pendingResolve = null;
+      detecting = false;
     }
   });
 
   function injectAndDetect() {
+    if (detecting) return Promise.resolve(null);
+    detecting = true;
     return new Promise(function (resolve) {
       pendingResolve = resolve;
 
@@ -29,6 +33,7 @@
           if (pendingResolve) {
             pendingResolve(null);
             pendingResolve = null;
+            detecting = false;
           }
         }, 3000);
       };
@@ -37,6 +42,7 @@
         if (pendingResolve) {
           pendingResolve(null);
           pendingResolve = null;
+          detecting = false;
         }
       };
       (document.head || document.documentElement).appendChild(script);

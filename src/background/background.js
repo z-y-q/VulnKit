@@ -152,6 +152,21 @@ async function removeAllHeaderRules() {
   });
 }
 
+// ====== URL validation (SSRF prevention) ======
+function isAllowedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') return false;
+    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|127\.)/.test(hostname)) return false;
+    if (hostname.endsWith('.local') || hostname.endsWith('.internal')) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ====== Fetch helpers ======
 async function fetchUrl(url, tailOnly) {
   try {
@@ -273,21 +288,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'FETCH_URL':
-      fetchUrl(message.url, message.tailOnly).then(result => {
-        sendResponse(result.success ? { data: result.data } : { error: result.error });
-      });
+      if (!isAllowedUrl(message.url)) {
+        sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
+      } else {
+        fetchUrl(message.url, message.tailOnly).then(result => {
+          sendResponse(result.success ? { data: result.data } : { error: result.error });
+        });
+      }
       return true;
 
     case 'FETCH_URL_AUTH':
-      fetchUrlAuth(message.url, message.key, message.header).then(result => {
-        sendResponse(result.success ? { data: result.data } : { error: result.error });
-      });
+      if (!isAllowedUrl(message.url)) {
+        sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
+      } else {
+        fetchUrlAuth(message.url, message.key, message.header).then(result => {
+          sendResponse(result.success ? { data: result.data } : { error: result.error });
+        });
+      }
       return true;
 
     case 'FETCH_IMAGE':
-      fetchImage(message.url).then(result => {
-        sendResponse(result.success ? { data: result.data } : { error: result.error });
-      });
+      if (!isAllowedUrl(message.url)) {
+        sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
+      } else {
+        fetchImage(message.url).then(result => {
+          sendResponse(result.success ? { data: result.data } : { error: result.error });
+        });
+      }
       return true;
 
     default:

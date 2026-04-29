@@ -21,6 +21,7 @@ window.VulnKitVue = (function () {
   let permSelectedIndex = -1;
   let permViewMode = 'list';
   let permRefreshTimer = null;
+  let permCapturedLength = -1;
   let lastCompareHiddenRoutes = [];
   let lastJsMatchContexts = [];
   let jsSearchFoundPaths = [];
@@ -31,7 +32,7 @@ window.VulnKitVue = (function () {
       if (permInterceptActive && permViewMode === 'list') {
         refreshPermCaptured();
       }
-    }, 2000);
+    }, 5000);
   }
 
   function stopPermAutoRefresh() {
@@ -982,10 +983,18 @@ window.VulnKitVue = (function () {
         target: { tabId: tab.id },
         world: 'MAIN',
         func: function () {
-          return window.__PERM_INTERCEPTOR__ ? window.__PERM_INTERCEPTOR__.getCaptured() : [];
+          return window.__PERM_INTERCEPTOR__
+            ? {
+                items: window.__PERM_INTERCEPTOR__.getCaptured(),
+                length: window.__PERM_INTERCEPTOR__.getCaptured().length,
+              }
+            : { items: [], length: 0 };
         },
       });
-      permCapturedData = (results && results[0] && results[0].result) || [];
+      var result = (results && results[0] && results[0].result) || { items: [], length: 0 };
+      if (result.length === permCapturedLength) return;
+      permCapturedLength = result.length;
+      permCapturedData = result.items || [];
       renderPermList();
     } catch (e) {
       utils.showToast('获取捕获数据失败', 'error');

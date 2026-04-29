@@ -41,7 +41,10 @@ window.VulnKitGather = (function () {
       html += '<span class="gather-item-value" title="' + utils.escapeHtml(item.value) + '">';
       html += utils.escapeHtml(item.value);
       html += '</span>';
-      html += '<button class="gather-item-copy" data-copy="' + utils.escapeHtml(item.value) + '">复制</button>';
+      html +=
+        '<button class="gather-item-copy" data-copy="' +
+        utils.escapeHtml(item.value) +
+        '">复制</button>';
       html += '</div>';
     });
     container.innerHTML = html;
@@ -71,7 +74,14 @@ window.VulnKitGather = (function () {
     groups.forEach(function (group, i) {
       var active = i === 0 ? ' active' : '';
       var label = group === DOM_GROUP ? 'DOM分析' : group;
-      html += '<button class="gather-tab' + active + '" data-gather="' + group + '">' + label + '</button>';
+      html +=
+        '<button class="gather-tab' +
+        active +
+        '" data-gather="' +
+        group +
+        '">' +
+        label +
+        '</button>';
     });
     container.innerHTML = html;
 
@@ -108,14 +118,20 @@ window.VulnKitGather = (function () {
       }
 
       var rulesForInjection = loadedRules.filter(function (g) {
-        return g.rules && g.rules.some(function (r) { return r.loaded; });
+        return (
+          g.rules &&
+          g.rules.some(function (r) {
+            return r.loaded;
+          })
+        );
       });
 
       var results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: function (haeRules, domGroup) {
           var pageUrl = location.href;
-          var pageHtml = document.documentElement.outerHTML;
+          var rawHtml = document.documentElement.outerHTML;
+          var pageHtml = rawHtml.length > 500000 ? rawHtml.substring(0, 500000) : rawHtml;
           var collected = {};
 
           var seenAll = {};
@@ -206,7 +222,7 @@ window.VulnKitGather = (function () {
             { p: /tencentcloud/i, l: 'Tencent' },
             { p: /cloudflare/i, l: 'Cloudflare' },
             { p: /fastly/i, l: 'Fastly' },
-            { p: /cdn\.|c\.cloudfront\.net/i, l: 'CDN' }
+            { p: /cdn\.|c\.cloudfront\.net/i, l: 'CDN' },
           ];
           cloudPatterns.forEach(function (c) {
             if (c.p.test(pageHtml)) addDom('cloud', c.l);
@@ -230,7 +246,7 @@ window.VulnKitGather = (function () {
                   var captures = [];
                   for (var ci = 1; ci < match.length; ci++) captures.push(match[ci] || '');
 
-                  var value = (rule.format || '{0}');
+                  var value = rule.format || '{0}';
                   for (var fi = 0; fi < captures.length; fi++) {
                     while (value.indexOf('{' + fi + '}') !== -1) {
                       value = value.replace('{' + fi + '}', captures[fi] || '');
@@ -252,7 +268,7 @@ window.VulnKitGather = (function () {
                   groupResults.push({
                     name: rule.name,
                     value: value,
-                    color: rule.color || 'gray'
+                    color: rule.color || 'gray',
                   });
                 }
               } catch (e) {}
@@ -265,14 +281,16 @@ window.VulnKitGather = (function () {
 
           return collected;
         },
-        args: [rulesForInjection, DOM_GROUP]
+        args: [rulesForInjection, DOM_GROUP],
       });
 
       if (results && results[0] && results[0].result) {
         gatherData = results[0].result;
         renderGatherTab();
 
-        var total = Object.values(gatherData).reduce(function (s, a) { return s + a.length; }, 0);
+        var total = Object.values(gatherData).reduce(function (s, a) {
+          return s + a.length;
+        }, 0);
         statusEl.textContent = '收集完成，共 ' + total + ' 条';
         utils.showToast('收集完成', 'success');
 
@@ -280,7 +298,7 @@ window.VulnKitGather = (function () {
         chrome.storage.local.set({
           gatherData: gatherData,
           gatherDataUrl: tab.url,
-          gatherDataTabs: groups
+          gatherDataTabs: groups,
         });
       } else {
         statusEl.textContent = '收集失败';
@@ -296,7 +314,12 @@ window.VulnKitGather = (function () {
       if (result[STORAGE_KEY] && result[URL_KEY] === url) {
         gatherData = result[STORAGE_KEY];
         if (result[TABS_KEY]) {
-          loadedRules = loadedRules.length > 0 ? loadedRules : (getHaeRules() ? getHaeRules().getDefaultRules() : []);
+          loadedRules =
+            loadedRules.length > 0
+              ? loadedRules
+              : getHaeRules()
+                ? getHaeRules().getDefaultRules()
+                : [];
           var allGroups = [DOM_GROUP].concat(getHaeRules().getGroups(loadedRules));
           renderSubTabs();
         }
@@ -306,7 +329,9 @@ window.VulnKitGather = (function () {
 
         var utils = getUtils();
         var statusEl = utils.get('gather-status');
-        var total = Object.values(gatherData).reduce(function (s, a) { return s + a.length; }, 0);
+        var total = Object.values(gatherData).reduce(function (s, a) {
+          return s + a.length;
+        }, 0);
         statusEl.textContent = '已恢复，共 ' + total + ' 条';
       }
     });
@@ -331,10 +356,18 @@ window.VulnKitGather = (function () {
     restoreData: restoreData,
     getActiveRules: getActiveRules,
     updateRules: updateRules,
-    get gatherData() { return gatherData; },
-    set gatherData(v) { gatherData = v; },
-    get currentGatherTab() { return currentGatherTab; },
-    set currentGatherTab(v) { currentGatherTab = v; },
-    DOM_GROUP: DOM_GROUP
+    get gatherData() {
+      return gatherData;
+    },
+    set gatherData(v) {
+      gatherData = v;
+    },
+    get currentGatherTab() {
+      return currentGatherTab;
+    },
+    set currentGatherTab(v) {
+      currentGatherTab = v;
+    },
+    DOM_GROUP: DOM_GROUP,
   };
 })();

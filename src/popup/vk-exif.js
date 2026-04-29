@@ -100,6 +100,9 @@ window.VulnKitExif = (function () {
     sectionsEl.innerHTML = '<div class="empty-state">正在解析...</div>';
 
     const objectUrl = URL.createObjectURL(file);
+    previewImg.onload = function () {
+      URL.revokeObjectURL(objectUrl);
+    };
     previewImg.src = objectUrl;
     fileNameEl.textContent = file.name;
     fileSizeEl.textContent = (file.size / 1024).toFixed(1) + ' KB';
@@ -269,8 +272,9 @@ window.VulnKitExif = (function () {
       }
       const b64 = response.data.replace(/^data:[^;]+;base64,/, '');
       const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-      const mime = url.match(/\.(jpe?g|png|webp|tiff?|heic)/i)
-        ? 'image/' + RegExp.$1.toLowerCase().replace('jpg', 'jpeg')
+      const mimeMatch = url.match(/\.(jpe?g|png|webp|tiff?|heic)/i);
+      const mime = mimeMatch
+        ? 'image/' + mimeMatch[1].toLowerCase().replace('jpg', 'jpeg')
         : 'image/jpeg';
       const blob = new Blob([bytes], { type: mime });
       const file = new File([blob], fileNameEl.textContent, { type: mime });

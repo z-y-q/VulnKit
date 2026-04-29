@@ -58,7 +58,7 @@ window.VulnKitHistory = (function () {
         url += '&filter=original:.*\\.' + encodeURIComponent(t) + '($|\\?.*)';
       });
     }
-    url += '&limit=100000';
+    url += '&limit=10000';
     return url;
   }
 
@@ -132,8 +132,7 @@ window.VulnKitHistory = (function () {
         .filter(Boolean)
         .sort();
       if (timestamps.length > 0) {
-        const fmt = ts =>
-          ts.substring(0, 4) + '-' + ts.substring(4, 6) + '-' + ts.substring(6, 8);
+        const fmt = ts => ts.substring(0, 4) + '-' + ts.substring(4, 6) + '-' + ts.substring(6, 8);
         utils.get('history-first').textContent = fmt(timestamps[0]);
         utils.get('history-last').textContent = fmt(timestamps[timestamps.length - 1]);
         utils.get('history-summary').classList.remove('hidden');
@@ -167,8 +166,7 @@ window.VulnKitHistory = (function () {
       else if (status === '404') statusClass = 'status-404';
 
       html += '<div class="timeline-item">';
-      if (hasTs)
-        html += '<span class="timeline-date">' + utils.escapeHtml(dateStr) + '</span>';
+      if (hasTs) html += '<span class="timeline-date">' + utils.escapeHtml(dateStr) + '</span>';
       if (status)
         html +=
           '<span class="timeline-status ' +
@@ -177,8 +175,7 @@ window.VulnKitHistory = (function () {
           utils.escapeHtml(status) +
           '</span>';
       if (mime)
-        html +=
-          '<span class="timeline-status status-other">' + utils.escapeHtml(mime) + '</span>';
+        html += '<span class="timeline-status status-other">' + utils.escapeHtml(mime) + '</span>';
       html +=
         '<span class="timeline-url" data-wayback="' +
         utils.escapeHtml(waybackUrl) +
@@ -261,7 +258,11 @@ window.VulnKitHistory = (function () {
     extractDomain,
     queryHistory,
     renderHistoryResults,
-    get lastHistoryResults() { return lastHistoryResults; },
-    set lastHistoryResults(v) { lastHistoryResults = v; },
+    get lastHistoryResults() {
+      return lastHistoryResults;
+    },
+    set lastHistoryResults(v) {
+      lastHistoryResults = v;
+    },
   };
 })();

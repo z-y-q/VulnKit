@@ -15,8 +15,6 @@ window.VulnKitCrypto = (function () {
 
   // ====== Crypto (AES/DES/RC4/SM2/SM4/Bcrypt) ======
   var currentCryptoAlgo = 'aes';
-
-  // ====== Crypto (AES/DES/RC4/SM2/SM4/Bcrypt) ======
   function padOrTruncate(key, len) {
     if (!key) return key;
     key = key.toString();
@@ -436,7 +434,14 @@ window.VulnKitCrypto = (function () {
   }
 
   function ab2pem(buffer, label) {
-    var b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+    var bytes = new Uint8Array(buffer);
+    var binary = '';
+    var chunkSize = 8192;
+    for (var i = 0; i < bytes.length; i += chunkSize) {
+      var chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, chunk);
+    }
+    var b64 = btoa(binary);
     var lines = b64.match(/.{1,64}/g) || [];
     return '-----BEGIN ' + label + '-----\n' + lines.join('\n') + '\n-----END ' + label + '-----';
   }
@@ -459,7 +464,11 @@ window.VulnKitCrypto = (function () {
     doCryptoDecrypt,
     doCryptoVerify,
     rsaGenerateKeyPair,
-    get currentCryptoAlgo() { return currentCryptoAlgo; },
-    set currentCryptoAlgo(v) { currentCryptoAlgo = v; },
+    get currentCryptoAlgo() {
+      return currentCryptoAlgo;
+    },
+    set currentCryptoAlgo(v) {
+      currentCryptoAlgo = v;
+    },
   };
 })();

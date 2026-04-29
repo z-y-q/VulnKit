@@ -133,7 +133,13 @@ window.VulnKitSpoof = (function () {
         '<div class="ua-item' + (isSelected ? ' ua-selected' : '') + '" data-idx="' + idx + '">';
       html += '<span class="ua-item-label">' + preset.label + '</span>';
       html +=
-        '<span class="ua-item-value" title="' + preset.value.replace(/"/g, '&quot;') + '">';
+        '<span class="ua-item-value" title="' +
+        preset.value
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;') +
+        '">';
       html += preset.value.length > 80 ? preset.value.substring(0, 80) + '...' : preset.value;
       html += '</span></div>';
     });
@@ -436,8 +442,7 @@ window.VulnKitSpoof = (function () {
     let html = '<div class="cookie-editor">';
     html += '<div class="card-title">导入 Cookie 字符串</div>';
     html += '<div class="form-group">';
-    html +=
-      '<label>Cookie 字符串（name=value; name2=value2 格式）</label>';
+    html += '<label>Cookie 字符串（name=value; name2=value2 格式）</label>';
     html +=
       '<textarea class="textarea cookie-import-textarea" rows="4" placeholder="session_id=abc123; token=eyJhbG...; user=admin"></textarea>';
     html += '</div>';
@@ -521,7 +526,14 @@ window.VulnKitSpoof = (function () {
     let referer = refererEl.value.trim();
 
     if (refererPreset === 'none') referer = '';
-    else if (refererPreset === 'same') referer = 'same';
+    else if (refererPreset === 'same') {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        referer = tab && tab.url ? new URL(tab.url).origin + new URL(tab.url).pathname : '';
+      } catch {
+        referer = '';
+      }
+    }
     const clientIp = clientIpEl.value.trim();
 
     const customHeaders = [];
@@ -623,7 +635,11 @@ window.VulnKitSpoof = (function () {
     applyHeaders,
     addCustomHeaderRow,
     resetHeaders,
-    get currentSpoofTab() { return currentSpoofTab; },
-    set currentSpoofTab(v) { currentSpoofTab = v; },
+    get currentSpoofTab() {
+      return currentSpoofTab;
+    },
+    set currentSpoofTab(v) {
+      currentSpoofTab = v;
+    },
   };
 })();

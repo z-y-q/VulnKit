@@ -317,7 +317,12 @@ window.VulnKitAsset = (function () {
         })
         .catch(function (err) {
           container.innerHTML =
-            '<div style="color:#ff6b6b;padding:8px;">查询失败: ' + (err.message || err) + '</div>';
+            '<div style="color:#ff6b6b;padding:8px;">查询失败: ' +
+            String(err.message || err)
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;') +
+            '</div>';
         });
     }
 
@@ -352,6 +357,15 @@ window.VulnKitAsset = (function () {
   }
 
   function renderShodanHostInfo(container, idbData, shodanData, queryInput, resolvedIp) {
+    var utils = getUtils();
+    var esc =
+      utils && utils.escapeHtml
+        ? function (s) {
+            return utils.escapeHtml(String(s == null ? '' : s));
+          }
+        : function (s) {
+            return String(s == null ? '' : s);
+          };
     var ip =
       (idbData && idbData.ip) || (shodanData && shodanData.ip_str) || resolvedIp || queryInput;
     var hostnames = (idbData && idbData.hostnames) || (shodanData && shodanData.hostnames) || [];
@@ -377,14 +391,14 @@ window.VulnKitAsset = (function () {
 
     var h = '';
     h += '<div class="shodan-host-header">';
-    h += '<div class="shodan-host-title">' + (hostnames[0] || queryInput) + '</div>';
-    h += '<div class="shodan-host-ip">' + ip + '</div>';
+    h += '<div class="shodan-host-title">' + esc(hostnames[0] || queryInput) + '</div>';
+    h += '<div class="shodan-host-ip">' + esc(ip) + '</div>';
     if (tags.length > 0) {
       h += '<div style="margin-top:4px;">';
       tags.forEach(function (tag) {
         h +=
           '<span style="display:inline-block;font-size:10px;background:#E8F4FD;color:#1976D2;padding:1px 6px;border-radius:3px;margin-right:4px;">' +
-          tag +
+          esc(tag) +
           '</span>';
       });
       h += '</div>';
@@ -405,7 +419,7 @@ window.VulnKitAsset = (function () {
         '<div class="shodan-info-item"><span class="shodan-info-label">' +
         item.label +
         '</span><span class="shodan-info-value">' +
-        item.value +
+        esc(item.value) +
         '</span></div>';
     });
     h += '</div>';
@@ -424,9 +438,9 @@ window.VulnKitAsset = (function () {
         var portLabel = product ? product + version : '';
         h +=
           '<div class="shodan-port-item"><span class="shodan-port-num">' +
-          port +
+          esc(port) +
           '</span><span class="shodan-port-service">' +
-          portLabel +
+          esc(portLabel) +
           '</span></div>';
       });
       h += '</div>';
@@ -439,7 +453,7 @@ window.VulnKitAsset = (function () {
         var short = cpe.replace('cpe:2.3:a:', '').replace(/:/g, ' ');
         h +=
           '<div class="shodan-port-item"><span class="shodan-port-service" style="font-family:monospace;font-size:11px;">' +
-          short +
+          esc(short) +
           '</span></div>';
       });
       if (cpes.length > 15)
@@ -468,7 +482,7 @@ window.VulnKitAsset = (function () {
             ? '<span class="shodan-vuln-cvss">CVSS: ' + v.cvss + '</span>'
             : '';
         h += '<div class="shodan-vuln-item shodan-vuln-' + severity + '">';
-        h += '<span class="shodan-vuln-cve">' + cve + '</span>';
+        h += '<span class="shodan-vuln-cve">' + esc(cve) + '</span>';
         h += cvssStr;
         h += '</div>';
       });
