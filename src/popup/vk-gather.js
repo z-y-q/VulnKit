@@ -69,7 +69,7 @@ window.VulnKitGather = (function () {
     var container = document.getElementById('gather-sub-tabs');
     if (!container) return;
 
-    var groups = [DOM_GROUP].concat(getHaeRules().getGroups(loadedRules));
+    var groups = [DOM_GROUP].concat(getHaeRules() ? getHaeRules().getGroups(loadedRules) : []);
     var html = '';
     groups.forEach(function (group, i) {
       var active = i === 0 ? ' active' : '';
@@ -294,7 +294,7 @@ window.VulnKitGather = (function () {
         statusEl.textContent = '收集完成，共 ' + total + ' 条';
         utils.showToast('收集完成', 'success');
 
-        var groups = [DOM_GROUP].concat(getHaeRules().getGroups(loadedRules));
+        var groups = [DOM_GROUP].concat(getHaeRules() ? getHaeRules().getGroups(loadedRules) : []);
         chrome.storage.local.set({
           gatherData: gatherData,
           gatherDataUrl: tab.url,
@@ -320,7 +320,9 @@ window.VulnKitGather = (function () {
               : getHaeRules()
                 ? getHaeRules().getDefaultRules()
                 : [];
-          var allGroups = [DOM_GROUP].concat(getHaeRules().getGroups(loadedRules));
+          var allGroups = [DOM_GROUP].concat(
+            getHaeRules() ? getHaeRules().getGroups(loadedRules) : []
+          );
           renderSubTabs();
         }
         var firstGroup = Object.keys(gatherData)[0] || DOM_GROUP;
@@ -343,7 +345,7 @@ window.VulnKitGather = (function () {
 
   function updateRules(rules) {
     loadedRules = rules;
-    getHaeRules().saveRules(rules);
+    if (getHaeRules()) getHaeRules().saveRules(rules);
     renderSubTabs();
   }
 

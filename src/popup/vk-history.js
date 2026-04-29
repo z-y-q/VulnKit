@@ -3,6 +3,7 @@ window.VulnKitHistory = (function () {
   'use strict';
 
   let lastHistoryResults = [];
+  let allHistoryResults = [];
 
   function getUtils() {
     return window.VulnKitUtils || null;
@@ -109,9 +110,10 @@ window.VulnKitHistory = (function () {
     });
   }
 
-  function renderHistoryResults(items) {
+  function renderHistoryResults(items, isFilter) {
     const utils = getUtils();
     lastHistoryResults = items;
+    if (!isFilter) allHistoryResults = items;
     const container = utils.get('history-timeline');
     const statusEl = utils.get('history-status');
     const fields = utils.get('history-fields').value;
@@ -220,6 +222,7 @@ window.VulnKitHistory = (function () {
     showHistoryQuickLinks(domain);
     utils.get('history-status').textContent = '正在查询...';
     utils.get('history-timeline').innerHTML = '';
+    utils.get('history-summary').classList.add('hidden');
 
     const cdxUrl = buildCdxUrl(domain);
     chrome.runtime.sendMessage({ type: 'FETCH_URL', url: cdxUrl }, response => {
@@ -263,6 +266,12 @@ window.VulnKitHistory = (function () {
     },
     set lastHistoryResults(v) {
       lastHistoryResults = v;
+    },
+    get allHistoryResults() {
+      return allHistoryResults;
+    },
+    set allHistoryResults(v) {
+      allHistoryResults = v;
     },
   };
 })();

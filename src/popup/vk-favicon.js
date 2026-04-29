@@ -99,7 +99,12 @@ window.VulnKitFavicon = (function () {
           },
           {
             name: 'FOFA',
-            url: 'https://fofa.info/result?qbase64=' + btoa('icon_hash="-' + faviconHash + '"'),
+            url:
+              'https://fofa.info/result?qbase64=' +
+              btoa('icon_hash="-' + faviconHash + '"')
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, ''),
             color: '#10b981',
           },
           {

@@ -449,11 +449,12 @@ window.VulnKitXss = (function () {
       opt.textContent = p.name;
       select.appendChild(opt);
     });
-    if (typeof XSS_DATA !== 'undefined') {
-      Object.keys(XSS_DATA).forEach(cat => {
+    var xssData = window.VulnKitPayload ? window.VulnKitPayload.XSS_DATA : null;
+    if (xssData) {
+      Object.keys(xssData).forEach(cat => {
         const group = document.createElement('optgroup');
         group.label = cat;
-        XSS_DATA[cat].forEach(payload => {
+        xssData[cat].forEach(payload => {
           const opt = document.createElement('option');
           opt.value = payload;
           opt.textContent = payload.length > 50 ? payload.substring(0, 47) + '...' : payload;
@@ -473,9 +474,17 @@ window.VulnKitXss = (function () {
     handleBatchOpenXss,
     handleCopyXssUrls,
     initXssScanPayloadSelect,
-    get xssPoints() { return xssPoints; },
-    set xssPoints(v) { xssPoints = v; },
-    get xssFilterType() { return xssFilterType; },
-    set xssFilterType(v) { xssFilterType = v; },
+    get xssPoints() {
+      return xssPoints;
+    },
+    set xssPoints(v) {
+      xssPoints = v;
+    },
+    get xssFilterType() {
+      return xssFilterType;
+    },
+    set xssFilterType(v) {
+      xssFilterType = v;
+    },
   };
 })();

@@ -172,7 +172,7 @@ window.VulnKitExif = (function () {
           html += '<span class="exif-label">' + field.label + '</span>';
           html +=
             '<span class="exif-value" title="' +
-            String(exif[field.key]) +
+            utils.escapeHtml(String(exif[field.key])) +
             '">' +
             formatted +
             '</span>';

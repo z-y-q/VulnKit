@@ -223,9 +223,7 @@ window.VulnKitAsset = (function () {
       'https://api.shodan.io/shodan/host/search?key=' +
       encodeURIComponent(key) +
       '&query=' +
-      encodeURIComponent(searchQuery) +
-      '&count=' +
-      getAssetSize();
+      encodeURIComponent(searchQuery);
 
     chrome.runtime.sendMessage({ type: 'FETCH_URL', url }, response => {
       if (chrome.runtime.lastError) {
@@ -246,7 +244,7 @@ window.VulnKitAsset = (function () {
           setAssetStatus('API 错误: ' + json.error);
           return;
         }
-        const results = (json.matches || []).map(m => ({
+        const results = (json.matches || []).slice(0, getAssetSize()).map(m => ({
           host: m.ip_str || '-',
           port: m.port || '-',
           protocol: m._shodan?.module || '-',

@@ -127,6 +127,13 @@
       },
       configurable: true,
     },
+    allHistoryResults: {
+      get: () => window.VulnKitHistory.allHistoryResults,
+      set: v => {
+        window.VulnKitHistory.allHistoryResults = v;
+      },
+      configurable: true,
+    },
   });
 
   // ====== Request Spoofing (loaded from vk-spoof.js) ======
@@ -783,11 +790,11 @@
     const historyTypeFilter = utils.get('history-type-filter');
     if (historyTypeFilter) {
       historyTypeFilter.addEventListener('input', () => {
-        if (lastHistoryResults.length === 0) return;
-        const filtered = filterByType(lastHistoryResults, historyTypeFilter.value);
-        renderHistoryResults(filtered);
+        if (allHistoryResults.length === 0) return;
+        const filtered = filterByType(allHistoryResults, historyTypeFilter.value);
+        renderHistoryResults(filtered, true);
         utils.get('history-status').textContent =
-          '筛选: ' + filtered.length + ' / ' + lastHistoryResults.length + ' 条';
+          '筛选: ' + filtered.length + ' / ' + allHistoryResults.length + ' 条';
       });
     }
 
