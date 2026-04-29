@@ -294,9 +294,13 @@ window.VulnKitJsCtrl = (function () {
       for (var u = 0; u < externalUrls.length && scannedCount < maxScan; u++) {
         try {
           var fetchResult = await new Promise(function (resolve) {
+            var timer = setTimeout(function () {
+              resolve(null);
+            }, 12000);
             chrome.runtime.sendMessage(
               { type: 'FETCH_URL', url: externalUrls[u] },
               function (resp) {
+                clearTimeout(timer);
                 resolve(resp);
               }
             );

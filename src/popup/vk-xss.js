@@ -170,6 +170,7 @@ window.VulnKitXss = (function () {
                   } catch {
                     return;
                   }
+                  var xssSelf = this;
                   Object.keys(jsonBody).forEach(function (k) {
                     if (
                       typeof jsonBody[k] === 'object' &&
@@ -180,14 +181,14 @@ window.VulnKitXss = (function () {
                         window.__XSS_INTERCEPT__.push({
                           url: parsedUrl2.origin + parsedUrl2.pathname,
                           param: k + '.' + nk,
-                          method: this.__xss_method || 'POST',
+                          method: xssSelf.__xss_method || 'POST',
                         });
                       });
                     } else {
                       window.__XSS_INTERCEPT__.push({
                         url: parsedUrl2.origin + parsedUrl2.pathname,
                         param: k,
-                        method: xhrThis.__xss_method || 'POST',
+                        method: xssSelf.__xss_method || 'POST',
                       });
                     }
                   });
@@ -342,10 +343,18 @@ window.VulnKitXss = (function () {
     const el = utils.get('xssscan-status');
     if (!el) return;
     if (xssInterceptActive) {
-      el.textContent = '拦截监听中... 剩余 ' + xssInterceptCountdown + 's（请操作页面触发请求）';
+      el.textContent =
+        '拦截监听中... 剩余 ' +
+        xssInterceptCountdown +
+        's — 已捕获 ' +
+        xssPoints.length +
+        ' 个参数点';
       el.style.color = '#e67e22';
     } else {
-      el.textContent = '点击「采集参数」开始扫描当前页面';
+      el.textContent =
+        xssPoints.length > 0
+          ? '监听结束，共 ' + xssPoints.length + ' 个参数点'
+          : '点击「采集参数」开始扫描当前页面';
       el.style.color = '';
     }
   }

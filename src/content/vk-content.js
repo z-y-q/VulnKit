@@ -11,6 +11,7 @@
 
   window.addEventListener('message', function (e) {
     if (e.data && e.data.__vk_detect && pendingResolve) {
+      if (e.origin !== location.origin) return;
       var result = e.data.result;
       pendingResolve(result);
       pendingResolve = null;

@@ -13,6 +13,10 @@ let spoofState = {
   headers: { xff: '', referer: '', clientIp: '', custom: [] },
 };
 
+function persistSpoofState() {
+  chrome.storage.local.set({ pentest_spoof: spoofState }).catch(() => {});
+}
+
 // Restore spoof state from storage on startup
 chrome.storage.local.get(['pentest_spoof'], result => {
   if (result.pentest_spoof) {
@@ -239,7 +243,12 @@ async function fetchUrlAuth(url, key, header) {
 
 async function fetchImage(url) {
   try {
-    const resp = await fetch(url);
+    const controller = new AbortController();
+    var timer = setTimeout(function () {
+      controller.abort();
+    }, 15000);
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const buf = await resp.arrayBuffer();
     const bytes = new Uint8Array(buf);
@@ -322,6 +331,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'SPOOF_UA':
       if (message.url && message.userAgent) {
         spoofState.ua = { enabled: true, current: message.userAgent };
+        persistSpoofState();
         addUaRule(message.tabId, message.url, message.userAgent)
           .then(() => sendResponse({ success: true }))
           .catch(e => sendResponse({ success: false, error: e.message }));
@@ -332,6 +342,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'RESET_SPOOF_UA':
       spoofState.ua = { enabled: false, current: '' };
+      persistSpoofState();
       removeUaRule()
         .then(() => sendResponse({ success: true }))
         .catch(e => sendResponse({ success: false, error: e.message }));
@@ -340,6 +351,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'SPOOF_HEADERS':
       if (message.headers) {
         spoofState.headers = message.headers;
+        persistSpoofState();
         addHeaderRules(message.tabId, message.url, message.headers)
           .then(() => sendResponse({ success: true }))
           .catch(e => sendResponse({ success: false, error: e.message }));
@@ -350,6 +362,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'RESET_SPOOF_HEADERS':
       spoofState.headers = { xff: '', referer: '', clientIp: '', custom: [] };
+      persistSpoofState();
       removeAllHeaderRules()
         .then(() => sendResponse({ success: true }))
         .catch(e => sendResponse({ success: false, error: e.message }));

@@ -295,6 +295,7 @@
         <div class="gather-actions">
           <button class="btn btn-primary" id="gather-btn">收集当前页面</button>
           <button class="btn btn-sm btn-outline" id="gather-copy-btn">复制当前分类</button>
+          <button class="btn btn-sm btn-outline" id="gather-export-btn">导出</button>
           <button class="btn btn-sm btn-outline" id="gather-rules-btn">规则管理</button>
         </div>
         <div class="gather-sub-tabs" id="gather-sub-tabs">
@@ -334,6 +335,10 @@
           <input type="text" id="asset-query" class="input" placeholder="留空使用当前页面域名" />
           <button class="btn btn-primary" id="asset-scan-btn">扫描</button>
         </div>
+        <div class="asset-query-options">
+          <button id="asset-custom-toggle" class="toggle-btn">自定义语法</button>
+          <span id="asset-query-hint" class="asset-query-hint"></span>
+        </div>
         <div class="asset-source-tabs">
           <button class="source-btn active" data-source="fofa">FOFA</button>
           <button class="source-btn" data-source="zoomeye">ZoomEye</button>
@@ -349,6 +354,9 @@
           </div>
         </div>
         <div class="asset-status" id="asset-status"></div>
+        <div class="asset-actions-row" id="asset-actions-row" style="display:none">
+          <button id="asset-export-btn" class="btn btn-sm btn-outline">导出结果</button>
+        </div>
         <div class="asset-results" id="asset-results"></div>
 
         <div class="card-spacing">
@@ -396,6 +404,7 @@
         <div class="link-actions">
           <button class="btn btn-primary" id="links-extract-btn">提取链接</button>
           <button class="btn btn-sm btn-outline" id="links-copy-btn">复制筛选结果</button>
+          <button class="btn btn-sm btn-outline" id="links-export-btn">导出</button>
           <button class="btn btn-sm btn-secondary" id="links-send-multiurl-btn">发送到URL多开</button>
         </div>
         <div class="link-filter-row">
@@ -503,6 +512,7 @@
         <div class="history-actions-row">
           <button id="history-copy-result-btn" class="btn btn-sm btn-outline">复制全部</button>
           <button id="history-copy-filtered-btn" class="btn btn-sm btn-primary">复制筛选结果</button>
+          <button id="history-export-btn" class="btn btn-sm btn-outline">导出</button>
           <button id="history-send-links-btn" class="btn btn-sm btn-secondary">发送到URL多开</button>
         </div>
         <div class="history-status" id="history-status"></div>
@@ -612,6 +622,7 @@
             <button class="btn btn-primary" id="cookie-refresh-btn">刷新 Cookie</button>
             <button class="btn btn-sm btn-secondary" id="cookie-add-btn">添加 Cookie</button>
             <button class="btn btn-sm btn-outline" id="cookie-import-btn">导入</button>
+            <button class="btn btn-sm btn-outline" id="cookie-export-btn">导出</button>
             <button class="btn btn-sm btn-outline" id="cookie-clear-btn">清除全部</button>
           </div>
           <div class="cookie-domain-info" id="cookie-domain-info"></div>
@@ -1013,6 +1024,7 @@
             <button class="btn btn-sm btn-outline" id="xssscan-selectall-btn">全选</button>
             <button class="btn btn-sm btn-primary" id="xssscan-batchopen-btn">批量打开</button>
             <button class="btn btn-sm btn-outline" id="xssscan-copyall-btn">复制所有URL</button>
+            <button class="btn btn-sm btn-outline" id="xssscan-export-btn">导出</button>
           </div>
         </div>
       </div>
@@ -1124,6 +1136,8 @@
 <script src="vk-sourcemap.js"></script>
 <script src="vk-vue.js"></script>
 <script src="vk-jsctrl.js"></script>
+<!-- Utilities -->
+<script src="vk-export.js"></script>
 <!-- Init (must load last) -->
 <script src="vk-init.js"></script>
 </body>

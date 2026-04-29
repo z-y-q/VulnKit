@@ -12,6 +12,32 @@ window.VulnKitSpoof = (function () {
     return window.VulnKitUtils || null;
   }
 
+  function confirmAction(message, onConfirm) {
+    var overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML =
+      '<div class="confirm-dialog">' +
+      '<div class="confirm-msg">' +
+      message +
+      '</div>' +
+      '<div class="confirm-actions">' +
+      '<button class="btn btn-sm btn-primary confirm-yes">确定</button>' +
+      '<button class="btn btn-sm btn-outline confirm-no">取消</button>' +
+      '</div></div>';
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.confirm-yes').addEventListener('click', function () {
+      overlay.remove();
+      onConfirm();
+    });
+    overlay.querySelector('.confirm-no').addEventListener('click', function () {
+      overlay.remove();
+    });
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) overlay.remove();
+    });
+  }
+
   const UA_PRESETS = {
     mobile: [
       {
@@ -419,19 +445,22 @@ window.VulnKitSpoof = (function () {
     }
   }
 
-  async function deleteCookie(cookieName) {
-    const utils = getUtils();
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.url) return;
-    const url = new URL(tab.url);
-
-    try {
-      await chrome.cookies.remove({ url: url.origin, name: cookieName });
-      utils.showToast('Cookie 已删除', 'success');
-      loadCookies();
-    } catch (e) {
-      utils.showToast('删除失败: ' + e.message, 'error');
-    }
+  function deleteCookie(cookieName) {
+    var utils = getUtils();
+    confirmAction('确定删除 Cookie「' + cookieName + '」？', function () {
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        if (!tabs[0]?.url) return;
+        var url = new URL(tabs[0].url);
+        chrome.cookies.remove({ url: url.origin, name: cookieName }, function () {
+          if (chrome.runtime.lastError) {
+            utils.showToast('删除失败: ' + chrome.runtime.lastError.message, 'error');
+            return;
+          }
+          utils.showToast('Cookie 已删除', 'success');
+          loadCookies();
+        });
+      });
+    });
   }
 
   function showCookieImportDialog() {
@@ -496,21 +525,23 @@ window.VulnKitSpoof = (function () {
     loadCookies();
   }
 
-  async function clearAllCookies() {
-    const utils = getUtils();
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.url) return;
-    const url = new URL(tab.url);
-    const domain = url.hostname;
-
-    const cookies = await chrome.cookies.getAll({ domain: domain });
-    let count = 0;
-    for (const cookie of cookies) {
-      await chrome.cookies.remove({ url: url.origin, name: cookie.name });
-      count++;
-    }
-    utils.showToast('已清除 ' + count + ' 个 Cookie', 'success');
-    loadCookies();
+  function clearAllCookies() {
+    var utils = getUtils();
+    confirmAction('确定清除当前域名所有 Cookie？此操作不可撤销。', function () {
+      chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
+        if (!tabs[0]?.url) return;
+        var url = new URL(tabs[0].url);
+        var domain = url.hostname;
+        var cookies = await chrome.cookies.getAll({ domain: domain });
+        var count = 0;
+        for (var i = 0; i < cookies.length; i++) {
+          await chrome.cookies.remove({ url: url.origin, name: cookies[i].name });
+          count++;
+        }
+        utils.showToast('已清除 ' + count + ' 个 Cookie', 'success');
+        loadCookies();
+      });
+    });
   }
 
   async function applyHeaders() {
@@ -620,6 +651,128 @@ window.VulnKitSpoof = (function () {
     }
   }
 
+  async function exportCookies() {
+    const utils = getUtils();
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.url) {
+      utils.showToast('无法获取当前页面', 'error');
+      return;
+    }
+    const url = new URL(tab.url);
+    const domain = url.hostname;
+    const cookies = await chrome.cookies.getAll({ domain: domain });
+
+    if (cookies.length === 0) {
+      utils.showToast('当前域名无 Cookie', 'warning');
+      return;
+    }
+
+    var exportData = cookies.map(function (c) {
+      return {
+        name: c.name,
+        value: c.value,
+        domain: c.domain,
+        path: c.path,
+        httpOnly: c.httpOnly || false,
+        secure: c.secure || false,
+        sameSite: c.sameSite || 'unspecified',
+        expirationDate: c.expirationDate || null,
+      };
+    });
+
+    var json = JSON.stringify(exportData, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = domain.replace(/\./g, '_') + '_cookies.json';
+    link.click();
+    URL.revokeObjectURL(link.href);
+    utils.showToast('已导出 ' + exportData.length + ' 个 Cookie', 'success');
+  }
+
+  function showCookieFileImportDialog() {
+    const utils = getUtils();
+    const listEl = utils.get('cookie-list');
+    if (!listEl) return;
+
+    let html = '<div class="cookie-editor">';
+    html += '<div class="card-title">从文件导入 Cookie</div>';
+    html += '<div class="form-group">';
+    html += '<label>选择 JSON 文件（由导出功能生成）</label>';
+    html += '<input type="file" id="cookie-file-input" accept=".json" style="margin:4px 0">';
+    html += '</div>';
+    html += '<div class="form-group">';
+    html += '<label>或粘贴 JSON 数组</label>';
+    html +=
+      '<textarea class="textarea cookie-json-import-textarea" rows="4" placeholder=\'[{"name":"token","value":"xxx","domain":".example.com",...}\'></textarea>';
+    html += '</div>';
+    html += '<div class="form-actions">';
+    html += '<button class="btn btn-primary" id="cookie-file-import-do">导入</button>';
+    html += '<button class="btn btn-outline cookie-cancel-btn">取消</button>';
+    html += '</div></div>';
+    listEl.innerHTML = html;
+
+    listEl.querySelector('.cookie-cancel-btn').addEventListener('click', () => loadCookies());
+    listEl.querySelector('#cookie-file-import-do').addEventListener('click', () => {
+      var fileInput = document.getElementById('cookie-file-input');
+      var textarea = document.querySelector('.cookie-json-import-textarea');
+      if (fileInput && fileInput.files && fileInput.files.length > 0) {
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          importCookieJson(e.target.result);
+        };
+        reader.readAsText(fileInput.files[0]);
+      } else if (textarea && textarea.value.trim()) {
+        importCookieJson(textarea.value.trim());
+      } else {
+        utils.showToast('请选择文件或粘贴 JSON', 'warning');
+      }
+    });
+  }
+
+  async function importCookieJson(jsonStr) {
+    const utils = getUtils();
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.url) return;
+    const url = new URL(tab.url);
+
+    var cookies;
+    try {
+      cookies = JSON.parse(jsonStr);
+      if (!Array.isArray(cookies)) {
+        utils.showToast('JSON 格式错误：需要数组', 'error');
+        return;
+      }
+    } catch (e) {
+      utils.showToast('JSON 解析失败: ' + e.message, 'error');
+      return;
+    }
+
+    var count = 0;
+    for (var i = 0; i < cookies.length; i++) {
+      var c = cookies[i];
+      if (!c.name) continue;
+      try {
+        await chrome.cookies.set({
+          url: url.origin + (c.path || '/'),
+          name: c.name,
+          value: c.value || '',
+          domain: c.domain || url.hostname,
+          path: c.path || '/',
+          secure: c.secure !== false,
+          httpOnly: !!c.httpOnly,
+          sameSite: c.sameSite || 'unspecified',
+          expirationDate: c.expirationDate && c.expirationDate > 0 ? c.expirationDate : undefined,
+        });
+        count++;
+      } catch (e) {
+        /* skip invalid */
+      }
+    }
+    utils.showToast('已导入 ' + count + '/' + cookies.length + ' 个 Cookie', 'success');
+    loadCookies();
+  }
+
   return {
     UA_PRESETS,
     spoofState,
@@ -631,6 +784,8 @@ window.VulnKitSpoof = (function () {
     loadCookies,
     showCookieAddEditor,
     showCookieImportDialog,
+    showCookieFileImportDialog,
+    exportCookies,
     clearAllCookies,
     applyHeaders,
     addCustomHeaderRow,

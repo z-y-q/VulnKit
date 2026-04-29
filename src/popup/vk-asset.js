@@ -3,6 +3,8 @@ window.VulnKitAsset = (function () {
   'use strict';
 
   let currentAssetSource = 'fofa';
+  let lastAssetResults = [];
+  let customQueryMode = false;
 
   async function getCurrentDomain() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -70,6 +72,9 @@ window.VulnKitAsset = (function () {
   function renderAssetResults(data) {
     const utils = getUtils();
     const container = utils.get('asset-results');
+    var actionsRow = document.getElementById('asset-actions-row');
+    lastAssetResults = data || [];
+    if (actionsRow) actionsRow.style.display = lastAssetResults.length > 0 ? 'flex' : 'none';
     if (!data || data.length === 0) {
       container.innerHTML = '<div class="empty-state">未找到结果</div>';
       return;
@@ -107,7 +112,8 @@ window.VulnKitAsset = (function () {
       return;
     }
     setAssetStatus('正在查询 FOFA...');
-    const qbase64 = btoa(unescape(encodeURIComponent('domain="' + query + '"')));
+    const fofaQuery = customQueryMode ? query : 'domain="' + query + '"';
+    const qbase64 = btoa(unescape(encodeURIComponent(fofaQuery)));
     const url =
       'https://fofa.info/api/v1/search/all?email=' +
       encodeURIComponent(keys.email) +
@@ -159,8 +165,7 @@ window.VulnKitAsset = (function () {
       return;
     }
     setAssetStatus('正在查询 ZoomEye...');
-    var baseDomain = query.replace(/^www\./, '');
-    var zoomQuery = 'hostname:' + baseDomain;
+    var zoomQuery = customQueryMode ? query : 'hostname:' + query.replace(/^www\./, '');
     const url =
       'https://api.zoomeye.org/host/search?query=' +
       encodeURIComponent(zoomQuery) +
@@ -218,9 +223,11 @@ window.VulnKitAsset = (function () {
       return;
     }
     setAssetStatus('正在查询 Shodan...');
-    var searchQuery = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(query)
+    var searchQuery = customQueryMode
       ? query
-      : 'hostname:' + query;
+      : /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(query)
+        ? query
+        : 'hostname:' + query;
     const url =
       'https://api.shodan.io/shodan/host/search?key=' +
       encodeURIComponent(key) +
@@ -547,6 +554,22 @@ window.VulnKitAsset = (function () {
     setAssetStatus('');
   }
 
+  function toggleCustomQueryMode(enabled) {
+    customQueryMode = enabled;
+    const utils = getUtils();
+    const queryInput = utils.get('asset-query');
+    const hint = document.getElementById('asset-query-hint');
+    if (enabled) {
+      queryInput.placeholder = '输入自定义查询语法，如 domain="x.com" && title="login"';
+      if (hint) hint.textContent = '自定义模式：直接输入引擎查询语法';
+    } else {
+      queryInput.placeholder = '留空使用当前页面域名';
+      if (hint) hint.textContent = '';
+    }
+    var toggle = document.getElementById('asset-custom-toggle');
+    if (toggle) toggle.classList.toggle('active', enabled);
+  }
+
   function saveApiKeys() {
     const utils = getUtils();
     const keys = {
@@ -585,12 +608,16 @@ window.VulnKitAsset = (function () {
   return {
     handleAssetScan,
     switchAssetSource,
+    toggleCustomQueryMode,
     shodanHostLookup,
     saveApiKeys,
     loadApiKeys,
     clearApiKeys,
     get currentAssetSource() {
       return currentAssetSource;
+    },
+    get lastAssetResults() {
+      return lastAssetResults;
     },
     set currentAssetSource(v) {
       currentAssetSource = v;

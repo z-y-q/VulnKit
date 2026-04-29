@@ -142,7 +142,11 @@ window.VulnKitGather = (function () {
 
   function fetchJsFile(url) {
     return new Promise(function (resolve) {
+      var timer = setTimeout(function () {
+        resolve(null);
+      }, 12000);
       chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url, tailOnly: false }, function (resp) {
+        clearTimeout(timer);
         if (resp && resp.data) resolve(resp.data);
         else resolve(null);
       });

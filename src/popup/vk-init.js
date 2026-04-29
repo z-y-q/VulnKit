@@ -53,6 +53,7 @@
   const {
     handleAssetScan,
     switchAssetSource,
+    toggleCustomQueryMode,
     shodanHostLookup,
     saveApiKeys,
     loadApiKeys,
@@ -153,6 +154,8 @@
     loadCookies,
     showCookieAddEditor,
     showCookieImportDialog,
+    showCookieFileImportDialog,
+    exportCookies,
     clearAllCookies,
     applyHeaders,
     addCustomHeaderRow,
@@ -549,6 +552,35 @@
 
     const scanBtn = utils.get('asset-scan-btn');
     if (scanBtn) scanBtn.addEventListener('click', handleAssetScan);
+    const customToggle = utils.get('asset-custom-toggle');
+    if (customToggle)
+      customToggle.addEventListener('click', () =>
+        toggleCustomQueryMode(!customToggle.classList.contains('active'))
+      );
+    const assetExportBtn = utils.get('asset-export-btn');
+    if (assetExportBtn) {
+      assetExportBtn.addEventListener('click', function () {
+        var exportLib = window.VulnKitExport;
+        var results = asset.lastAssetResults;
+        if (!results || results.length === 0) {
+          utils.showToast('没有可导出的结果', 'warning');
+          return;
+        }
+        exportLib.createDropdown(
+          assetExportBtn,
+          function () {
+            return results;
+          },
+          [
+            { key: 'host', label: 'IP/域名' },
+            { key: 'port', label: '端口' },
+            { key: 'protocol', label: '协议' },
+            { key: 'title', label: '标题' },
+          ],
+          'asset_' + asset.currentAssetSource
+        );
+      });
+    }
 
     const shodanHostBtn = utils.get('shodan-host-btn');
     if (shodanHostBtn) shodanHostBtn.addEventListener('click', shodanHostLookup);
@@ -577,6 +609,29 @@
         const text = list.map(i => i.value).join('\n');
         utils.copyText(text);
         utils.showToast('已复制 ' + list.length + ' 条', 'success');
+      });
+    }
+    const gatherExportBtn = utils.get('gather-export-btn');
+    if (gatherExportBtn) {
+      gatherExportBtn.addEventListener('click', function () {
+        var exportLib = window.VulnKitExport;
+        var tab = gather.currentGatherTab;
+        var list = gather.gatherData[tab] || [];
+        if (list.length === 0) {
+          utils.showToast('没有可导出的内容', 'warning');
+          return;
+        }
+        exportLib.createDropdown(
+          gatherExportBtn,
+          function () {
+            return list;
+          },
+          [
+            { key: 'name', label: '类型' },
+            { key: 'value', label: '值' },
+          ],
+          'gather_' + tab
+        );
       });
     }
 
@@ -702,6 +757,30 @@
         utils.showToast('已复制 ' + filtered.length + ' 个链接', 'success');
       });
     }
+    const linksExportBtn = utils.get('links-export-btn');
+    if (linksExportBtn) {
+      linksExportBtn.addEventListener('click', function () {
+        var exportLib = window.VulnKitExport;
+        var filtered = getFilteredLinks();
+        if (filtered.length === 0) {
+          utils.showToast('没有链接', 'warning');
+          return;
+        }
+        exportLib.createDropdown(
+          linksExportBtn,
+          function () {
+            return filtered;
+          },
+          [
+            { key: 'href', label: 'URL' },
+            { key: 'text', label: '文本' },
+            { key: 'tag', label: '标签类型' },
+            { key: 'domain', label: '域名' },
+          ],
+          'links'
+        );
+      });
+    }
     const linksSendBtn = utils.get('links-send-multiurl-btn');
     if (linksSendBtn) {
       linksSendBtn.addEventListener('click', () => {
@@ -807,6 +886,30 @@
         const text = lastHistoryResults.map(i => i.raw || i.url).join('\n');
         utils.copyText(text);
         utils.showToast('已复制 ' + lastHistoryResults.length + ' 条', 'success');
+      });
+    }
+    const historyExportBtn = utils.get('history-export-btn');
+    if (historyExportBtn) {
+      historyExportBtn.addEventListener('click', function () {
+        var exportLib = window.VulnKitExport;
+        var results = lastHistoryResults;
+        if (!results || results.length === 0) {
+          utils.showToast('没有可导出的结果', 'warning');
+          return;
+        }
+        exportLib.createDropdown(
+          historyExportBtn,
+          function () {
+            return results;
+          },
+          [
+            { key: 'timestamp', label: '时间戳' },
+            { key: 'url', label: 'URL' },
+            { key: 'statuscode', label: '状态码' },
+            { key: 'mimetype', label: 'MIME类型' },
+          ],
+          'history'
+        );
       });
     }
 
@@ -926,7 +1029,9 @@
     const cookieAddBtn = utils.get('cookie-add-btn');
     if (cookieAddBtn) cookieAddBtn.addEventListener('click', showCookieAddEditor);
     const cookieImportBtn = utils.get('cookie-import-btn');
-    if (cookieImportBtn) cookieImportBtn.addEventListener('click', showCookieImportDialog);
+    if (cookieImportBtn) cookieImportBtn.addEventListener('click', showCookieFileImportDialog);
+    const cookieExportBtn = utils.get('cookie-export-btn');
+    if (cookieExportBtn) cookieExportBtn.addEventListener('click', exportCookies);
     const cookieClearBtn = utils.get('cookie-clear-btn');
     if (cookieClearBtn) cookieClearBtn.addEventListener('click', clearAllCookies);
 
@@ -1294,6 +1399,30 @@
     if (xssBatchOpenBtn) xssBatchOpenBtn.addEventListener('click', handleBatchOpenXss);
     var xssCopyAllBtn = utils.get('xssscan-copyall-btn');
     if (xssCopyAllBtn) xssCopyAllBtn.addEventListener('click', handleCopyXssUrls);
+    var xssExportBtn = utils.get('xssscan-export-btn');
+    if (xssExportBtn) {
+      xssExportBtn.addEventListener('click', function () {
+        var exportLib = window.VulnKitExport;
+        var points = xss.xssPoints;
+        if (!points || points.length === 0) {
+          utils.showToast('没有可导出的注入点', 'warning');
+          return;
+        }
+        exportLib.createDropdown(
+          xssExportBtn,
+          function () {
+            return points;
+          },
+          [
+            { key: 'source', label: '来源' },
+            { key: 'url', label: 'URL' },
+            { key: 'param', label: '参数' },
+            { key: 'method', label: '方法' },
+          ],
+          'xss_points'
+        );
+      });
+    }
 
     // Webpack Module Mapping (Source Map Scan)
     var smScanBtn = utils.get('sourcemap-scan-btn');
