@@ -251,6 +251,44 @@
     },
   });
 
+  // ====== RuoYi Route (loaded from vk-ruoyi.js) ======
+  const ruoyi = window.VulnKitRuoYi;
+  const {
+    detectRuoYi,
+    installRouteHook,
+    removeRouteHook,
+    checkHookStatus,
+    analyzeJsRoutes,
+    applyExtraRoutes,
+    clearExtraRoutes,
+    setAugmentMode,
+    switchRuoYiSubTab,
+    copyRouteJson,
+    copyExtraPaths,
+    toggleSelectAll,
+  } = ruoyi;
+
+  Object.defineProperties(window, {
+    ruoyiHookActive: {
+      get() {
+        return ruoyi.ruoyiHookActive;
+      },
+      set(v) {
+        ruoyi.ruoyiHookActive = v;
+      },
+      configurable: true,
+    },
+    ruoyiTabId: {
+      get() {
+        return ruoyi.ruoyiTabId;
+      },
+      set(v) {
+        ruoyi.ruoyiTabId = v;
+      },
+      configurable: true,
+    },
+  });
+
   // ====== JS Control (loaded from vk-jsctrl.js) ======
   const jsCtrl = window.VulnKitJsCtrl;
   const {
@@ -1252,6 +1290,41 @@
     const uncopyBtn = utils.get('uncopy-btn');
     if (uncopyBtn) uncopyBtn.addEventListener('click', removeCopyRestrictions);
 
+    // RuoYi sub-tabs
+    document.querySelectorAll('.ruoyi-stab').forEach(btn => {
+      if (btn.dataset.rstab)
+        btn.addEventListener('click', () => switchRuoYiSubTab(btn.dataset.rstab));
+    });
+
+    // RuoYi detection
+    const ruoyiDetectBtn = utils.get('ruoyi-detect-btn');
+    if (ruoyiDetectBtn) ruoyiDetectBtn.addEventListener('click', detectRuoYi);
+    const ruoyiCopyJsonBtn = utils.get('ruoyi-copy-json-btn');
+    if (ruoyiCopyJsonBtn) ruoyiCopyJsonBtn.addEventListener('click', copyRouteJson);
+
+    // RuoYi route hook
+    const ruoyiHookInstallBtn = utils.get('ruoyi-hook-install-btn');
+    if (ruoyiHookInstallBtn) ruoyiHookInstallBtn.addEventListener('click', installRouteHook);
+    const ruoyiHookRemoveBtn = utils.get('ruoyi-hook-remove-btn');
+    if (ruoyiHookRemoveBtn) ruoyiHookRemoveBtn.addEventListener('click', removeRouteHook);
+    const ruoyiHookCheckBtn = utils.get('ruoyi-hook-check-btn');
+    if (ruoyiHookCheckBtn) ruoyiHookCheckBtn.addEventListener('click', checkHookStatus);
+    const ruoyiAugmentMode = utils.get('ruoyi-augment-mode');
+    if (ruoyiAugmentMode)
+      ruoyiAugmentMode.addEventListener('change', () => setAugmentMode(ruoyiAugmentMode.value));
+
+    // RuoYi JS analysis
+    const ruoyiAnalyzeBtn = utils.get('ruoyi-analyze-btn');
+    if (ruoyiAnalyzeBtn) ruoyiAnalyzeBtn.addEventListener('click', analyzeJsRoutes);
+    const ruoyiApplyBtn = utils.get('ruoyi-apply-btn');
+    if (ruoyiApplyBtn) ruoyiApplyBtn.addEventListener('click', applyExtraRoutes);
+    const ruoyiClearBtn = utils.get('ruoyi-clear-btn');
+    if (ruoyiClearBtn) ruoyiClearBtn.addEventListener('click', clearExtraRoutes);
+    const ruoyiSelectAllBtn = utils.get('ruoyi-selectall-btn');
+    if (ruoyiSelectAllBtn) ruoyiSelectAllBtn.addEventListener('click', toggleSelectAll);
+    const ruoyiCopyPathsBtn = utils.get('ruoyi-copy-paths-btn');
+    if (ruoyiCopyPathsBtn) ruoyiCopyPathsBtn.addEventListener('click', copyExtraPaths);
+
     // Restore perm intercept state
     chrome.storage.local.get(['permInterceptTabId'], result => {
       if (result.permInterceptTabId) {
@@ -1283,6 +1356,25 @@
             updateJsToggleStatus();
           } else {
             chrome.storage.local.remove('js_blocked_tabId');
+          }
+        });
+      }
+    });
+
+    // Restore RuoYi hook state
+    chrome.storage.local.get(['ruoyiHookTabId'], result => {
+      if (result.ruoyiHookTabId) {
+        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+          if (tabs[0] && tabs[0].id === result.ruoyiHookTabId) {
+            ruoyiHookActive = true;
+            ruoyiTabId = result.ruoyiHookTabId;
+            const installBtn = utils.get('ruoyi-hook-install-btn');
+            const removeBtn = utils.get('ruoyi-hook-remove-btn');
+            if (installBtn) installBtn.disabled = true;
+            if (removeBtn) removeBtn.disabled = false;
+            checkHookStatus();
+          } else {
+            chrome.storage.local.remove('ruoyiHookTabId');
           }
         });
       }

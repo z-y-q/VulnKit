@@ -31,11 +31,17 @@
       "matches": ["<all_urls>"],
       "js": ["src/content/vk-content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/inject/ruoyi-route-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/inject/vue-detect.js"],
+      "resources": ["src/inject/vue-detect.js", "src/inject/ruoyi-route-hook.js"],
       "matches": ["<all_urls>"]
     }
   ],

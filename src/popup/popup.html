@@ -21,6 +21,7 @@
         <button class="tab-btn" data-panel="exif">EXIF查看</button>
         <button class="tab-btn" data-panel="spoof">请求伪造</button>
         <button class="tab-btn" data-panel="vue">Vue分析</button>
+        <button class="tab-btn" data-panel="ruoyi">RuoYi路由</button>
         <button class="tab-btn" data-panel="jsctrl">JS控制</button>
         <button class="tab-btn" data-panel="payload">Payload</button>
         <button class="tab-btn" data-panel="xssscan">XSS扫描</button>
@@ -1087,9 +1088,71 @@
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="status-bar">
+    <!-- RuoYi 路由面板 -->
+    <div id="panel-ruoyi" class="panel">
+      <div class="content-card">
+        <div class="card-title">RuoYi 路由</div>
+        <div class="ruoyi-sub-tabs">
+          <button class="ruoyi-stab active" data-rstab="detect">框架检测</button>
+          <button class="ruoyi-stab" data-rstab="hook">路由钩子</button>
+          <button class="ruoyi-stab" data-rstab="analyze">JS分析</button>
+        </div>
+
+        <!-- 框架检测 -->
+        <div id="rstab-detect" class="ruoyi-subpanel active">
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="ruoyi-detect-btn">检测 RuoYi</button>
+            <button class="btn btn-sm btn-outline" id="ruoyi-copy-json-btn">复制路由JSON</button>
+          </div>
+          <div class="ruoyi-status" id="ruoyi-status">检测当前页面是否使用 RuoYi 框架</div>
+          <div class="ruoyi-results" id="ruoyi-results">
+            <div class="empty-state">点击「检测 RuoYi」分析当前页面</div>
+          </div>
+        </div>
+
+        <!-- 路由钩子 -->
+        <div id="rstab-hook" class="ruoyi-subpanel">
+          <div class="ruoyi-hook-desc">在页面加载前注入 fetch/XHR 钩子，自动拦截 /getRouters 响应并合并额外路由。启用后需刷新页面。</div>
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="ruoyi-hook-install-btn">安装钩子</button>
+            <button class="btn btn-sm btn-secondary" id="ruoyi-hook-remove-btn" disabled>移除钩子</button>
+            <button class="btn btn-sm btn-outline" id="ruoyi-hook-check-btn">检查状态</button>
+          </div>
+          <div class="ruoyi-augment-row">
+            <label>增强模式:</label>
+            <select id="ruoyi-augment-mode" class="select-filter">
+              <option value="auto" selected>自动注入额外路由</option>
+              <option value="manual">仅捕获不修改</option>
+              <option value="off">关闭</option>
+            </select>
+          </div>
+          <div class="ruoyi-status" id="ruoyi-hook-status">未安装</div>
+          <div class="ruoyi-captured-panel" id="ruoyi-captured-panel">
+            <div class="empty-state">安装钩子并刷新页面后，此处显示捕获的路由数据</div>
+          </div>
+        </div>
+
+        <!-- JS分析 -->
+        <div id="rstab-analyze" class="ruoyi-subpanel">
+          <div class="ruoyi-analyze-desc">扫描页面 JS 文件中的路由定义，找出未在 /getRouters 中注册的隐藏路由</div>
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="ruoyi-analyze-btn">分析JS路由</button>
+            <button class="btn btn-sm btn-secondary" id="ruoyi-apply-btn">应用选中路由</button>
+            <button class="btn btn-sm btn-outline" id="ruoyi-clear-btn">清除</button>
+          </div>
+          <div class="panel-actions">
+            <button class="btn btn-sm btn-outline" id="ruoyi-selectall-btn">全选/反选</button>
+            <button class="btn btn-sm btn-outline" id="ruoyi-copy-paths-btn">复制路径</button>
+          </div>
+          <div class="ruoyi-status" id="ruoyi-analyze-status"></div>
+          <div class="ruoyi-analyze-results" id="ruoyi-analyze-results">
+            <div class="empty-state">点击「分析JS路由」开始</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
     <span class="status-left" id="status-text">编码工具</span>
     <div class="status-right">
       <span class="status-time" id="status-time"></span>
@@ -1135,6 +1198,7 @@
 <script src="vk-xss.js"></script>
 <script src="vk-sourcemap.js"></script>
 <script src="vk-vue.js"></script>
+<script src="vk-ruoyi.js"></script>
 <script src="vk-jsctrl.js"></script>
 <!-- Utilities -->
 <script src="vk-export.js"></script>
