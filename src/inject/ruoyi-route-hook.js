@@ -485,6 +485,188 @@
     }
   };
 
+  // ====== Vue Router Injection (MaR-style dynamic route loading) ======
+
+  function findVueRouter() {
+    var router = null;
+
+    // Vue 3: check __vue_app__
+    if (window.__vue_app__) {
+      try {
+        var cfg = window.__vue_app__.config;
+        if (cfg && cfg.globalProperties && cfg.globalProperties.$router) {
+          return cfg.globalProperties.$router;
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    // Search DOM elements for Vue instances
+    var selectors = ['#app', '[data-v-app]', '.app-wrapper', '#app-main'];
+    for (var si = 0; si < selectors.length && !router; si++) {
+      var els = document.querySelectorAll(selectors[si]);
+      for (var ei = 0; ei < els.length && !router; ei++) {
+        var el = els[ei];
+        // Vue 3 app instance
+        if (el.__vue_app__) {
+          try {
+            router = el.__vue_app__.config.globalProperties.$router;
+          } catch (e) {
+            /* ignore */
+          }
+        }
+        // Vue 2 instance
+        if (!router && el.__vue__) {
+          router = el.__vue__.$router || (el.__vue__.$root && el.__vue__.$root.$router);
+        }
+      }
+    }
+
+    // Deep scan for Vue 2 instances on all elements
+    if (!router) {
+      var allEls = document.querySelectorAll('*');
+      for (var ai = 0; ai < allEls.length && !router; ai++) {
+        var ael = allEls[ai];
+        if (ael.__vue__ && ael.__vue__.$router) {
+          router = ael.__vue__.$router;
+        } else if (ael.__vue__ && ael.__vue__.$root && ael.__vue__.$root.$router) {
+          router = ael.__vue__.$root.$router;
+        }
+      }
+    }
+
+    return router;
+  }
+
+  window.__VK_RUOYI_HOOK__.findVueRouter = findVueRouter;
+
+  window.__VK_RUOYI_HOOK__.getRouterInfo = function () {
+    var router = findVueRouter();
+    if (!router) return { found: false, routes: [], currentRoutes: [] };
+    var currentRoutes = [];
+    try {
+      var rawRoutes = router.getRoutes
+        ? router.getRoutes()
+        : (router.options && router.options.routes) || [];
+      rawRoutes.forEach(function (r) {
+        if (r.path) currentRoutes.push(r.path);
+      });
+    } catch (e) {
+      /* ignore */
+    }
+    return {
+      found: true,
+      mode: router.mode || (router.options && router.options.history ? 'history' : 'hash'),
+      routeCount: currentRoutes.length,
+      currentRoutes: currentRoutes,
+    };
+  };
+
+  window.__VK_RUOYI_HOOK__.injectRoutesToVueRouter = function (routes) {
+    var result = { injected: 0, skipped: 0, errors: [], routerFound: false, routerMode: '' };
+    var router = findVueRouter();
+
+    if (!router) {
+      result.errors.push('Vue Router 实例未找到');
+      return result;
+    }
+
+    result.routerFound = true;
+    result.routerMode = router.mode || 'unknown';
+
+    // Try to find RuoYi's loadView function for component resolution
+    var loadView = null;
+    try {
+      // Check global scope or common RuoYi patterns
+      if (typeof window.loadView === 'function') loadView = window.loadView;
+      if (!loadView && typeof window.loadComponent === 'function') loadView = window.loadComponent;
+    } catch (e) {
+      /* ignore */
+    }
+
+    // Get current route paths for dedup
+    var existingPaths = {};
+    try {
+      var currentRoutes = router.getRoutes ? router.getRoutes() : [];
+      currentRoutes.forEach(function (r) {
+        if (r.path) existingPaths[r.path] = true;
+      });
+    } catch (e) {
+      /* ignore */
+    }
+
+    routes.forEach(function (route) {
+      try {
+        var path = route.path;
+        if (!path) {
+          result.skipped++;
+          return;
+        }
+        if (existingPaths[path]) {
+          result.skipped++;
+          return;
+        }
+
+        // Build a proper route object with component resolution
+        var routeObj = {
+          path: path,
+          name: route.name || path.replace(/^\/+/, '').replace(/\//g, '-'),
+          meta: route.meta || {},
+        };
+
+        // Resolve component string to actual component
+        if (route.component && typeof route.component === 'string') {
+          if (loadView) {
+            try {
+              routeObj.component = loadView(route.component);
+            } catch (e) {
+              // loadView failed — use a placeholder component
+              routeObj.component = { template: '<div>Loading: ' + path + '</div>' };
+            }
+          } else {
+            // No loadView — try webpack dynamic import pattern
+            try {
+              var viewPath = route.component;
+              if (!/^views\//i.test(viewPath) && !/^\//i.test(viewPath)) {
+                viewPath = 'views/' + viewPath;
+              }
+              routeObj.component = function () {
+                return import(
+                  /* webpackChunkName: "mar-[request]" */ '@/'.concat(viewPath, '.vue')
+                );
+              };
+            } catch (e) {
+              routeObj.component = { template: '<div>Loading: ' + path + '</div>' };
+            }
+          }
+        } else if (route.component) {
+          routeObj.component = route.component;
+        } else {
+          // No component specified — use placeholder
+          routeObj.component = { template: '<div>Route: ' + path + '</div>' };
+        }
+
+        if (typeof router.addRoute === 'function') {
+          // Vue Router 4 (Vue 3) — wrap under a parent Layout route if needed
+          router.addRoute(routeObj);
+        } else if (typeof router.addRoutes === 'function') {
+          // Vue Router 3 (Vue 2)
+          router.addRoutes([routeObj]);
+        } else {
+          result.errors.push('No addRoute/addRoutes method');
+          return;
+        }
+        result.injected++;
+        existingPaths[path] = true;
+      } catch (e) {
+        result.errors.push((route.path || '?') + ': ' + e.message);
+      }
+    });
+
+    return result;
+  };
+
   // Notify popup if hook was auto-restored from storage
   if (configEnabled) {
     setTimeout(function () {

@@ -2259,6 +2259,162 @@ body {
   color: #a5b4fc;
 }
 
+/* ====== MaR Dynamic Route Loading ====== */
+
+.mar-info-section {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.mar-info-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.mar-label {
+  color: #666;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.mar-value {
+  color: #333;
+  word-break: break-all;
+}
+
+.mar-highlight {
+  color: #e67e22;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.mar-warn {
+  color: #e74c3c;
+}
+
+.mar-stats {
+  display: flex;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 11px;
+}
+
+.mar-stat-item {
+  padding: 2px 8px;
+  background: #eef;
+  border-radius: 3px;
+  color: #555;
+}
+
+.mar-stat-hidden {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.mar-stat-dict {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.mar-routes-header {
+  font-size: 11px;
+  color: #555;
+  padding: 4px 0;
+  border-top: 1px solid #eee;
+  margin-top: 6px;
+}
+
+.mar-route-list {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.mar-route-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.mar-route-item label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.mar-route-path {
+  font-family: monospace;
+  font-size: 11px;
+  color: #333;
+}
+
+.mar-route-title {
+  font-size: 11px;
+  color: #888;
+  margin-left: 4px;
+}
+
+/* Dark theme — MaR */
+[data-theme='dark'] .mar-info-section {
+  background: var(--bg-secondary);
+}
+
+[data-theme='dark'] .mar-label {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .mar-value {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .mar-highlight {
+  color: #f0a040;
+}
+
+[data-theme='dark'] .mar-warn {
+  color: #f87171;
+}
+
+[data-theme='dark'] .mar-stat-item {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .mar-stat-hidden {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .mar-stat-dict {
+  background: #0c4a6e;
+  color: #7dd3fc;
+}
+
+[data-theme='dark'] .mar-routes-header {
+  border-top-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .mar-route-item {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .mar-route-path {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .mar-route-title {
+  color: var(--text-secondary);
+}
+
 [data-theme='dark'] .traffic-url {
   color: var(--text-primary);
 }

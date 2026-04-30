@@ -1150,6 +1150,7 @@
         <div class="ruoyi-sub-tabs">
           <button class="ruoyi-stab active" data-rstab="detect">框架检测</button>
           <button class="ruoyi-stab" data-rstab="hook">路由钩子</button>
+          <button class="ruoyi-stab" data-rstab="mar">动态路由</button>
           <button class="ruoyi-stab" data-rstab="analyze">JS分析</button>
           <button class="ruoyi-stab" data-rstab="probe">批量探测</button>
           <button class="ruoyi-stab" data-rstab="traffic">API流量</button>
@@ -1212,6 +1213,21 @@
           <div class="ruoyi-status" id="ruoyi-analyze-status"></div>
           <div class="ruoyi-analyze-results" id="ruoyi-analyze-results">
             <div class="empty-state">点击「分析JS路由」开始</div>
+          </div>
+        </div>
+
+        <!-- 动态路由 (MaR) -->
+        <div id="rstab-mar" class="ruoyi-subpanel">
+          <div class="ruoyi-analyze-desc">MaR 模式 — 扫描 JS 中的全部动态路由定义，找出权限过滤掉的隐藏路由，并注入到 Vue Router 中</div>
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="mar-scan-btn">扫描动态路由</button>
+            <button class="btn btn-sm btn-secondary" id="mar-inject-btn">注入到 Router</button>
+            <button class="btn btn-sm btn-outline" id="mar-selectall-btn">全选/反选</button>
+            <button class="btn btn-sm btn-outline" id="mar-copy-btn">复制路径</button>
+          </div>
+          <div class="ruoyi-status" id="mar-scan-status"></div>
+          <div class="ruoyi-analyze-results" id="mar-scan-results">
+            <div class="empty-state">点击「扫描动态路由」查找 JS 中定义的全部路由</div>
           </div>
         </div>
 

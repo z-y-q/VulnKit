@@ -288,6 +288,10 @@
     exportApiTraffic,
     filterApiTraffic,
     lookupCve,
+    marScanDynamicRoutes,
+    marInjectToRouter,
+    marToggleSelectAll,
+    marCopyHiddenPaths,
   } = ruoyi;
 
   Object.defineProperties(window, {
@@ -1308,6 +1312,16 @@
     if (ruoyiTrafficExportBtn) ruoyiTrafficExportBtn.addEventListener('click', exportApiTraffic);
     const ruoyiTrafficFilter = utils.get('ruoyi-traffic-filter');
     if (ruoyiTrafficFilter) ruoyiTrafficFilter.addEventListener('input', filterApiTraffic);
+
+    // MaR dynamic route loading
+    const marScanBtn = utils.get('mar-scan-btn');
+    if (marScanBtn) marScanBtn.addEventListener('click', marScanDynamicRoutes);
+    const marInjectBtn = utils.get('mar-inject-btn');
+    if (marInjectBtn) marInjectBtn.addEventListener('click', marInjectToRouter);
+    const marSelectAllBtn = utils.get('mar-selectall-btn');
+    if (marSelectAllBtn) marSelectAllBtn.addEventListener('click', marToggleSelectAll);
+    const marCopyBtn = utils.get('mar-copy-btn');
+    if (marCopyBtn) marCopyBtn.addEventListener('click', marCopyHiddenPaths);
 
     // Restore perm intercept state
     chrome.storage.local.get(['permInterceptTabId'], result => {
