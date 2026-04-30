@@ -9,6 +9,7 @@ window.VulnKitTabSave = (function () {
   ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
     utils[method] = function () {
       var u = getUtils();
+      if (!u || typeof u[method] !== 'function') return undefined;
       return u[method].apply(u, arguments);
     };
   });

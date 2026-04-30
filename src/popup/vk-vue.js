@@ -476,6 +476,193 @@ window.VulnKitVue = (function () {
     if (target) target.classList.add('active');
   }
 
+  // ====== Store Reader (injected into page to read Pinia/Vuex/localStorage) ======
+  var permStoreReaderFunc = function () {
+    if (!window.__PERM_INTERCEPTOR__) return;
+    var MENU_KEYWORDS = [
+      'menu',
+      'menulist',
+      'menuList',
+      'menuData',
+      'permission',
+      'permissions',
+      'permList',
+      'menuIds',
+      'menu_ids',
+      'menuId',
+      'isAdmin',
+      'isadmin',
+      'role',
+      'roles',
+      'getMenu',
+      'getMenus',
+      'getPermission',
+      'getUserInfo',
+      'navList',
+      'sideMenu',
+      'sidebar',
+    ];
+    function classifyStr(str, url) {
+      var urlLower = (url || '').toLowerCase();
+      if (/permission/i.test(urlLower)) return 'permission';
+      if (/role/i.test(urlLower)) return 'role';
+      if (/menu/i.test(urlLower)) return 'menu';
+      for (var i = 0; i < MENU_KEYWORDS.length; i++) {
+        if (str.indexOf(MENU_KEYWORDS[i]) !== -1) return 'menu';
+      }
+      return 'other';
+    }
+    function sanitizeForTransfer(obj, depth) {
+      if (obj === null || obj === undefined) return obj;
+      if (typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean')
+        return obj;
+      if (typeof obj === 'function') return '[function]';
+      if (obj instanceof HTMLElement) return '[HTMLElement]';
+      if (obj instanceof RegExp) return '[RegExp]';
+      if (depth > 12) return '[max-depth]';
+      if (Array.isArray(obj)) {
+        return obj.map(function (item) {
+          return sanitizeForTransfer(item, depth + 1);
+        });
+      }
+      if (typeof obj === 'object') {
+        var skipKeys = {
+          component: 1,
+          _Ctor: 1,
+          _compiled: 1,
+          _scopeId: 1,
+          staticRenderFns: 1,
+          render: 1,
+          beforeCreate: 1,
+          created: 1,
+          beforeMount: 1,
+          mounted: 1,
+          beforeUpdate: 1,
+          updated: 1,
+          beforeDestroy: 1,
+          destroyed: 1,
+          activated: 1,
+          deactivated: 1,
+          mixins: 1,
+          extends: 1,
+          directives: 1,
+          filters: 1,
+          _ssrRegister: 1,
+          __file: 1,
+          _functional: 1,
+          _inject: 1,
+          _provided: 1,
+          model: 1,
+          inheritAttrs: 1,
+          comments: 1,
+        };
+        var result = {};
+        try {
+          var keys = Object.keys(obj);
+          for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            if (skipKeys[k]) {
+              if (k === 'component') {
+                var v = obj[k];
+                result[k] =
+                  v && (v.name || v.__name || v.displayName)
+                    ? '[component: ' + (v.name || v.__name || v.displayName) + ']'
+                    : '[component]';
+              }
+              continue;
+            }
+            result[k] = sanitizeForTransfer(obj[k], depth + 1);
+          }
+        } catch (e) {
+          return '[error-reading-keys]';
+        }
+        return result;
+      }
+      return String(obj);
+    }
+    function tryAdd(data, url) {
+      if (!data || typeof data === 'string') return;
+      var cap = window.__PERM_INTERCEPTOR__.captured;
+      for (var di = 0; di < cap.length; di++) {
+        if (cap[di].url === url && cap[di].method === 'store-read') return;
+      }
+      var clean = sanitizeForTransfer(data, 0);
+      var str = JSON.stringify(clean);
+      var type = classifyStr(str, url);
+      if (type !== 'other') {
+        cap.push({
+          url: url,
+          type: type,
+          subtype: null,
+          data: clean,
+          rawText: str,
+          size: str.length,
+          timestamp: Date.now(),
+          method: 'store-read',
+        });
+      }
+    }
+    // Check Vue 3 Pinia stores
+    var appEl =
+      document.querySelector('#app') ||
+      document.querySelector('[data-v-app]') ||
+      document.querySelector('[id^="app"]') ||
+      document.querySelector('#root') ||
+      document.querySelector('#application') ||
+      document.querySelector('#main');
+    if (appEl && appEl.__vue_app__) {
+      var pinia = appEl.__vue_app__.config.globalProperties.$pinia;
+      if (pinia && pinia._s) {
+        pinia._s.forEach(function (store, id) {
+          var state = store.$state;
+          for (var key in state) {
+            if (
+              /menu|permission|nav|route|sidebar/i.test(key) &&
+              (Array.isArray(state[key]) || (typeof state[key] === 'object' && state[key] !== null))
+            ) {
+              tryAdd(state[key], 'pinia://' + id + '/' + key);
+            }
+          }
+        });
+      }
+    }
+    // Check Vue 2 Vuex store
+    var allEls = document.querySelectorAll('*');
+    for (var i = 0; i < allEls.length; i++) {
+      if (allEls[i].__vue__) {
+        var vm = allEls[i].__vue__.$root || allEls[i].__vue__;
+        if (vm.$store && vm.$store.state) {
+          for (var key in vm.$store.state) {
+            if (
+              /menu|permission|nav|route|sidebar/i.test(key) &&
+              (Array.isArray(vm.$store.state[key]) ||
+                (typeof vm.$store.state[key] === 'object' && vm.$store.state[key] !== null))
+            ) {
+              tryAdd(vm.$store.state[key], 'vuex://state/' + key);
+            }
+          }
+        }
+        break;
+      }
+    }
+    // Check localStorage for menu-like keys
+    var storagePrefixes = ['menu', 'permission', 'routes', 'nav', 'sidebar'];
+    for (var s = 0; s < localStorage.length; s++) {
+      var storageKey = localStorage.key(s);
+      if (storageKey) {
+        for (var p = 0; p < storagePrefixes.length; p++) {
+          if (storageKey.toLowerCase().indexOf(storagePrefixes[p]) !== -1) {
+            try {
+              var parsed = JSON.parse(localStorage.getItem(storageKey));
+              tryAdd(parsed, 'localStorage://' + storageKey);
+            } catch (e) {}
+            break;
+          }
+        }
+      }
+    }
+  };
+
   // ====== Permission Menu Interceptor ======
   var permInterceptorFunc = function () {
     if (window.__PERM_INTERCEPTOR__) {
@@ -756,186 +943,7 @@ window.VulnKitVue = (function () {
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
           world: 'MAIN',
-          func: function () {
-            if (!window.__PERM_INTERCEPTOR__) return;
-            var MENU_KEYWORDS = [
-              'menu',
-              'menulist',
-              'menuList',
-              'menuData',
-              'permission',
-              'permissions',
-              'permList',
-              'menuIds',
-              'isAdmin',
-              'isadmin',
-              'role',
-              'roles',
-              'navList',
-              'sideMenu',
-              'sidebar',
-            ];
-            function classifyStr(str, url) {
-              var urlLower = (url || '').toLowerCase();
-              if (/permission/i.test(urlLower)) return 'permission';
-              if (/role/i.test(urlLower)) return 'role';
-              if (/menu/i.test(urlLower)) return 'menu';
-              for (var i = 0; i < MENU_KEYWORDS.length; i++) {
-                if (str.indexOf(MENU_KEYWORDS[i]) !== -1) return 'menu';
-              }
-              return 'other';
-            }
-            function sanitizeForTransfer(obj, depth) {
-              if (obj === null || obj === undefined) return obj;
-              if (typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean')
-                return obj;
-              if (typeof obj === 'function') return '[function]';
-              if (obj instanceof HTMLElement) return '[HTMLElement]';
-              if (obj instanceof RegExp) return '[RegExp]';
-              if (depth > 12) return '[max-depth]';
-              if (Array.isArray(obj)) {
-                return obj.map(function (item) {
-                  return sanitizeForTransfer(item, depth + 1);
-                });
-              }
-              if (typeof obj === 'object') {
-                var skipKeys = {
-                  component: 1,
-                  _Ctor: 1,
-                  _compiled: 1,
-                  _scopeId: 1,
-                  staticRenderFns: 1,
-                  render: 1,
-                  beforeCreate: 1,
-                  created: 1,
-                  beforeMount: 1,
-                  mounted: 1,
-                  beforeUpdate: 1,
-                  updated: 1,
-                  beforeDestroy: 1,
-                  destroyed: 1,
-                  activated: 1,
-                  deactivated: 1,
-                  mixins: 1,
-                  extends: 1,
-                  directives: 1,
-                  filters: 1,
-                  _ssrRegister: 1,
-                  __file: 1,
-                  _functional: 1,
-                  _inject: 1,
-                  _provided: 1,
-                  model: 1,
-                  inheritAttrs: 1,
-                  comments: 1,
-                };
-                var result = {};
-                try {
-                  var keys = Object.keys(obj);
-                  for (var i = 0; i < keys.length; i++) {
-                    var k = keys[i];
-                    if (skipKeys[k]) {
-                      if (k === 'component') {
-                        var v = obj[k];
-                        result[k] =
-                          v && (v.name || v.__name || v.displayName)
-                            ? '[component: ' + (v.name || v.__name || v.displayName) + ']'
-                            : '[component]';
-                      }
-                      continue;
-                    }
-                    result[k] = sanitizeForTransfer(obj[k], depth + 1);
-                  }
-                } catch (e) {
-                  return '[error-reading-keys]';
-                }
-                return result;
-              }
-              return String(obj);
-            }
-            function tryAdd(data, url) {
-              if (!data || typeof data === 'string') return;
-              var cap = window.__PERM_INTERCEPTOR__.captured;
-              for (var di = 0; di < cap.length; di++) {
-                if (cap[di].url === url && cap[di].method === 'store-read') return;
-              }
-              var clean = sanitizeForTransfer(data, 0);
-              var str = JSON.stringify(clean);
-              var type = classifyStr(str, url);
-              if (type !== 'other') {
-                cap.push({
-                  url: url,
-                  type: type,
-                  subtype: null,
-                  data: clean,
-                  rawText: str,
-                  size: str.length,
-                  timestamp: Date.now(),
-                  method: 'store-read',
-                });
-              }
-            }
-            // Check Vue 3 Pinia stores
-            var appEl =
-              document.querySelector('#app') ||
-              document.querySelector('[data-v-app]') ||
-              document.querySelector('[id^="app"]') ||
-              document.querySelector('#root') ||
-              document.querySelector('#application') ||
-              document.querySelector('#main');
-            if (appEl && appEl.__vue_app__) {
-              var pinia = appEl.__vue_app__.config.globalProperties.$pinia;
-              if (pinia && pinia._s) {
-                pinia._s.forEach(function (store, id) {
-                  var state = store.$state;
-                  for (var key in state) {
-                    if (
-                      /menu|permission|nav|route|sidebar/i.test(key) &&
-                      (Array.isArray(state[key]) ||
-                        (typeof state[key] === 'object' && state[key] !== null))
-                    ) {
-                      tryAdd(state[key], 'pinia://' + id + '/' + key);
-                    }
-                  }
-                });
-              }
-            }
-            // Check Vue 2 Vuex store
-            var allEls = document.querySelectorAll('*');
-            for (var i = 0; i < allEls.length; i++) {
-              if (allEls[i].__vue__) {
-                var vm = allEls[i].__vue__.$root || allEls[i].__vue__;
-                if (vm.$store && vm.$store.state) {
-                  for (var key in vm.$store.state) {
-                    if (
-                      /menu|permission|nav|route|sidebar/i.test(key) &&
-                      (Array.isArray(vm.$store.state[key]) ||
-                        (typeof vm.$store.state[key] === 'object' && vm.$store.state[key] !== null))
-                    ) {
-                      tryAdd(vm.$store.state[key], 'vuex://state/' + key);
-                    }
-                  }
-                }
-                break;
-              }
-            }
-            // Check localStorage for menu-like keys
-            var storagePrefixes = ['menu', 'permission', 'routes', 'nav', 'sidebar'];
-            for (var s = 0; s < localStorage.length; s++) {
-              var storageKey = localStorage.key(s);
-              if (storageKey) {
-                for (var p = 0; p < storagePrefixes.length; p++) {
-                  if (storageKey.toLowerCase().indexOf(storagePrefixes[p]) !== -1) {
-                    try {
-                      var parsed = JSON.parse(localStorage.getItem(storageKey));
-                      tryAdd(parsed, 'localStorage://' + storageKey);
-                    } catch (e) {}
-                    break;
-                  }
-                }
-              }
-            }
-          },
+          func: permStoreReaderFunc,
         });
       } catch (e) {
         // Non-critical: store reading is best-effort
@@ -983,12 +991,9 @@ window.VulnKitVue = (function () {
         target: { tabId: tab.id },
         world: 'MAIN',
         func: function () {
-          return window.__PERM_INTERCEPTOR__
-            ? {
-                items: window.__PERM_INTERCEPTOR__.getCaptured(),
-                length: window.__PERM_INTERCEPTOR__.getCaptured().length,
-              }
-            : { items: [], length: 0 };
+          if (!window.__PERM_INTERCEPTOR__) return { items: [], length: 0 };
+          var captured = window.__PERM_INTERCEPTOR__.getCaptured();
+          return { items: captured, length: captured.length };
         },
       });
       var result = (results && results[0] && results[0].result) || { items: [], length: 0 };
@@ -1057,17 +1062,24 @@ window.VulnKitVue = (function () {
     var item = permCapturedData[idx];
     if (!item) return;
     permViewMode = 'detail';
-    utils.get('perm-captured-list').classList.add('hidden');
+    var capturedList = utils.get('perm-captured-list');
+    if (capturedList) capturedList.classList.add('hidden');
     var filterRow = utils.get('perm-filter-row');
     if (filterRow) filterRow.classList.add('hidden');
-    utils.get('perm-detail').classList.remove('hidden');
-    utils.get('perm-detail-url').textContent = item.url;
-    utils.get('perm-detail-type').textContent = item.type.toUpperCase();
+    var detailPanel = utils.get('perm-detail');
+    if (!detailPanel) return;
+    detailPanel.classList.remove('hidden');
+    var urlEl = utils.get('perm-detail-url');
+    if (urlEl) urlEl.textContent = item.url;
+    var typeEl = utils.get('perm-detail-type');
+    if (typeEl) typeEl.textContent = item.type.toUpperCase();
 
     var classification = classifyPermType(item.data);
     var classifyEl = utils.get('perm-classify');
-    classifyEl.textContent = classification.label;
-    classifyEl.className = 'perm-classify ' + classification.cssClass;
+    if (classifyEl) {
+      classifyEl.textContent = classification.label;
+      classifyEl.className = 'perm-classify ' + classification.cssClass;
+    }
 
     if (typeof showPermSuggestions === 'function') showPermSuggestions(classification);
 
@@ -1676,9 +1688,12 @@ window.VulnKitVue = (function () {
       for (var i = 0; i < matchList.length; i++) {
         var m = matchList[i];
         lastJsMatchContexts.push(m.context);
-        var kwRegex = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        var escapedKeyword = utils.escapeHtml(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         var escaped = utils.escapeHtml(m.context);
-        var highlighted = escaped.replace(new RegExp('(' + kwRegex + ')', 'gi'), '<mark>$1</mark>');
+        var highlighted = escaped.replace(
+          new RegExp('(' + escapedKeyword + ')', 'gi'),
+          '<mark>$1</mark>'
+        );
         html += '<div class="jssearch-match">';
         html +=
           '<div class="jssearch-match-source">' +
@@ -2016,7 +2031,6 @@ window.VulnKitVue = (function () {
 
   // ====== Auto-traverse routes ======
   var traverseActive = false;
-  var traversePort = null;
 
   function addTraverseLog(idx, path, status) {
     var logEl = utils.get('traverse-log');
@@ -2048,12 +2062,6 @@ window.VulnKitVue = (function () {
 
   function stopTraverse() {
     traverseActive = false;
-    if (traversePort) {
-      try {
-        traversePort.disconnect();
-      } catch (e) {}
-      traversePort = null;
-    }
     var startBtn = utils.get('traverse-start-btn');
     var stopBtn = utils.get('traverse-stop-btn');
     if (startBtn) startBtn.disabled = false;

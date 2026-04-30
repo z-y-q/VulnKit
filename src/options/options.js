@@ -1,12 +1,17 @@
+function $(id) {
+  return document.getElementById(id);
+}
+
 function saveSettings() {
+  var el;
   const settings = {
-    enableNotifications: document.getElementById('enableNotifications').checked,
-    enableContextMenu: document.getElementById('enableContextMenu').checked,
-    theme: document.getElementById('theme').value,
-    storeHistory: document.getElementById('storeHistory').checked,
-    analytics: document.getElementById('analytics').checked,
-    defaultEncoding: document.getElementById('defaultEncoding').value,
-    defaultHash: document.getElementById('defaultHash').value,
+    enableNotifications: (el = $('enableNotifications')) ? el.checked : true,
+    enableContextMenu: (el = $('enableContextMenu')) ? el.checked : true,
+    theme: (el = $('theme')) ? el.value : 'auto',
+    storeHistory: (el = $('storeHistory')) ? el.checked : true,
+    analytics: (el = $('analytics')) ? el.checked : false,
+    defaultEncoding: (el = $('defaultEncoding')) ? el.value : 'base64',
+    defaultHash: (el = $('defaultHash')) ? el.value : 'SHA256',
   };
 
   chrome.storage.local.set({ pentestSettings: settings }, () => {
@@ -17,20 +22,21 @@ function saveSettings() {
 function loadSettings() {
   chrome.storage.local.get(['pentestSettings'], result => {
     const settings = result.pentestSettings || {};
-
-    document.getElementById('enableNotifications').checked = settings.enableNotifications !== false;
-    document.getElementById('enableContextMenu').checked = settings.enableContextMenu !== false;
-    document.getElementById('theme').value = settings.theme || 'auto';
-    document.getElementById('storeHistory').checked = settings.storeHistory !== false;
-    document.getElementById('analytics').checked = settings.analytics || false;
-    document.getElementById('defaultEncoding').value = settings.defaultEncoding || 'base64';
-    document.getElementById('defaultHash').value = settings.defaultHash || 'SHA256';
+    var el;
+    if ((el = $('enableNotifications'))) el.checked = settings.enableNotifications !== false;
+    if ((el = $('enableContextMenu'))) el.checked = settings.enableContextMenu !== false;
+    if ((el = $('theme'))) el.value = settings.theme || 'auto';
+    if ((el = $('storeHistory'))) el.checked = settings.storeHistory !== false;
+    if ((el = $('analytics'))) el.checked = settings.analytics || false;
+    if ((el = $('defaultEncoding'))) el.value = settings.defaultEncoding || 'base64';
+    if ((el = $('defaultHash'))) el.value = settings.defaultHash || 'SHA256';
   });
 }
 
 function showStatus(message, type) {
   type = type || 'info';
-  const status = document.getElementById('status');
+  const status = $('status');
+  if (!status) return;
   status.textContent = message;
   status.className = 'status ' + type;
 
@@ -101,15 +107,16 @@ function resetSettings() {
 
 document.addEventListener('DOMContentLoaded', () => {
   const version = chrome.runtime.getManifest().version;
-  const versionEl = document.getElementById('version');
+  const versionEl = $('version');
   if (versionEl) versionEl.textContent = version;
 
   loadSettings();
 
-  document.getElementById('export-btn').addEventListener('click', exportSettings);
-  document.getElementById('import-btn').addEventListener('click', importSettings);
-  document.getElementById('clear-btn').addEventListener('click', clearData);
-  document.getElementById('reset-btn').addEventListener('click', resetSettings);
+  var btn;
+  if ((btn = $('export-btn'))) btn.addEventListener('click', exportSettings);
+  if ((btn = $('import-btn'))) btn.addEventListener('click', importSettings);
+  if ((btn = $('clear-btn'))) btn.addEventListener('click', clearData);
+  if ((btn = $('reset-btn'))) btn.addEventListener('click', resetSettings);
 
   document.querySelectorAll('input, select').forEach(input => {
     input.addEventListener('change', saveSettings);

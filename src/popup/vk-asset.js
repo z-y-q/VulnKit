@@ -61,17 +61,20 @@ window.VulnKitAsset = (function () {
 
   function setAssetStatus(text) {
     const utils = getUtils();
-    utils.get('asset-status').textContent = text;
+    const el = utils.get('asset-status');
+    if (el) el.textContent = text;
   }
 
   function getAssetSize() {
     const utils = getUtils();
-    return parseInt(utils.get('asset-size').value, 10) || 10;
+    const el = utils.get('asset-size');
+    return el ? parseInt(el.value, 10) || 10 : 10;
   }
 
   function renderAssetResults(data) {
     const utils = getUtils();
     const container = utils.get('asset-results');
+    if (!container) return;
     var actionsRow = document.getElementById('asset-actions-row');
     lastAssetResults = data || [];
     if (actionsRow) actionsRow.style.display = lastAssetResults.length > 0 ? 'flex' : 'none';
@@ -269,7 +272,8 @@ window.VulnKitAsset = (function () {
 
   function shodanHostLookup() {
     const utils = getUtils();
-    var input = utils.get('shodan-host-input').value.trim();
+    var inputEl = utils.get('shodan-host-input');
+    var input = inputEl ? inputEl.value.trim() : '';
     var container = utils.get('shodan-host-info');
     if (!container) return;
 
@@ -279,7 +283,7 @@ window.VulnKitAsset = (function () {
           utils.showToast('请输入 IP 或域名', 'warning');
           return;
         }
-        utils.get('shodan-host-input').value = domain;
+        if (inputEl) inputEl.value = domain;
         doShodanLookup(domain, container);
       });
       return;
@@ -493,7 +497,7 @@ window.VulnKitAsset = (function () {
         }
         var cvssStr =
           v && typeof v === 'object' && v.cvss
-            ? '<span class="shodan-vuln-cvss">CVSS: ' + v.cvss + '</span>'
+            ? '<span class="shodan-vuln-cvss">CVSS: ' + esc(v.cvss) + '</span>'
             : '';
         h += '<div class="shodan-vuln-item shodan-vuln-' + severity + '">';
         h += '<span class="shodan-vuln-cve">' + esc(cve) + '</span>';
@@ -522,7 +526,8 @@ window.VulnKitAsset = (function () {
 
   async function handleAssetScan() {
     const utils = getUtils();
-    let query = utils.get('asset-query').value.trim();
+    const queryEl = utils.get('asset-query');
+    let query = queryEl ? queryEl.value.trim() : '';
     if (!query) {
       query = await getCurrentUrl().then(url => {
         if (!url) return null;
@@ -536,7 +541,7 @@ window.VulnKitAsset = (function () {
         utils.showToast('请输入目标或打开一个网页', 'warning');
         return;
       }
-      utils.get('asset-query').value = query;
+      if (queryEl) queryEl.value = query;
     }
 
     const scanners = { fofa: scanFofa, zoomeye: scanZoomEye, shodan: scanShodan };
@@ -550,7 +555,8 @@ window.VulnKitAsset = (function () {
     document
       .querySelectorAll('.source-btn')
       .forEach(b => b.classList.toggle('active', b.dataset.source === source));
-    utils.get('asset-results').innerHTML = '';
+    const results = utils.get('asset-results');
+    if (results) results.innerHTML = '';
     setAssetStatus('');
   }
 
@@ -559,24 +565,24 @@ window.VulnKitAsset = (function () {
     const utils = getUtils();
     const queryInput = utils.get('asset-query');
     const hint = document.getElementById('asset-query-hint');
-    if (enabled) {
-      queryInput.placeholder = '输入自定义查询语法，如 domain="x.com" && title="login"';
-      if (hint) hint.textContent = '自定义模式：直接输入引擎查询语法';
-    } else {
-      queryInput.placeholder = '留空使用当前页面域名';
-      if (hint) hint.textContent = '';
+    if (queryInput) {
+      queryInput.placeholder = enabled
+        ? '输入自定义查询语法，如 domain="x.com" && title="login"'
+        : '留空使用当前页面域名';
     }
+    if (hint) hint.textContent = enabled ? '自定义模式：直接输入引擎查询语法' : '';
     var toggle = document.getElementById('asset-custom-toggle');
     if (toggle) toggle.classList.toggle('active', enabled);
   }
 
   function saveApiKeys() {
     const utils = getUtils();
+    var el = id => utils.get(id);
     const keys = {
-      fofa_email: utils.get('key-fofa-email').value.trim(),
-      fofa_key: utils.get('key-fofa-key').value.trim(),
-      zoomeye: utils.get('key-zoomeye').value.trim(),
-      shodan: utils.get('key-shodan').value.trim(),
+      fofa_email: (el('key-fofa-email') || {}).value ? el('key-fofa-email').value.trim() : '',
+      fofa_key: (el('key-fofa-key') || {}).value ? el('key-fofa-key').value.trim() : '',
+      zoomeye: (el('key-zoomeye') || {}).value ? el('key-zoomeye').value.trim() : '',
+      shodan: (el('key-shodan') || {}).value ? el('key-shodan').value.trim() : '',
     };
     chrome.storage.local.set({ pentest_keys: keys }, () => {
       utils.showToast('配置已保存', 'success');
@@ -597,10 +603,10 @@ window.VulnKitAsset = (function () {
   function clearApiKeys() {
     const utils = getUtils();
     chrome.storage.local.remove(['pentest_keys'], () => {
-      utils.get('key-fofa-email').value = '';
-      utils.get('key-fofa-key').value = '';
-      utils.get('key-zoomeye').value = '';
-      utils.get('key-shodan').value = '';
+      ['key-fofa-email', 'key-fofa-key', 'key-zoomeye', 'key-shodan'].forEach(id => {
+        var el = utils.get(id);
+        if (el) el.value = '';
+      });
       utils.showToast('配置已清除', 'success');
     });
   }

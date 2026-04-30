@@ -36,12 +36,13 @@ window.VulnKitHistory = (function () {
 
   function buildCdxUrl(domain) {
     const utils = getUtils();
-    const matchType = utils.get('history-match-type').value;
-    const outputType = utils.get('history-output-type').value;
-    const fields = utils.get('history-fields').value;
-    const from = utils.get('history-from').value;
-    const to = utils.get('history-to').value;
-    const typeFilter = utils.get('history-type-filter').value.trim();
+    const matchType = (utils.get('history-match-type') || {}).value || 'domain';
+    const outputType = (utils.get('history-output-type') || {}).value || 'json';
+    const fields =
+      (utils.get('history-fields') || {}).value || 'timestamp,original,statuscode,mimetype';
+    const from = (utils.get('history-from') || {}).value || '';
+    const to = (utils.get('history-to') || {}).value || '';
+    const typeFilter = ((utils.get('history-type-filter') || {}).value || '').trim();
 
     let url = 'https://web.archive.org/cdx/search/cdx?url=' + encodeURIComponent(domain);
     url += '&collapse=urlkey';

@@ -95,17 +95,20 @@ window.VulnKitExif = (function () {
     const fileNameEl = utils.get('exif-file-name');
     const fileSizeEl = utils.get('exif-file-size');
 
+    if (!resultEl || !emptyEl || !sectionsEl) return;
     resultEl.classList.add('hidden');
     emptyEl.classList.add('hidden');
     sectionsEl.innerHTML = '<div class="empty-state">正在解析...</div>';
 
     const objectUrl = URL.createObjectURL(file);
-    previewImg.onload = function () {
-      URL.revokeObjectURL(objectUrl);
-    };
-    previewImg.src = objectUrl;
-    fileNameEl.textContent = file.name;
-    fileSizeEl.textContent = (file.size / 1024).toFixed(1) + ' KB';
+    if (previewImg) {
+      previewImg.onload = function () {
+        URL.revokeObjectURL(objectUrl);
+      };
+      previewImg.src = objectUrl;
+    }
+    if (fileNameEl) fileNameEl.textContent = file.name;
+    if (fileSizeEl) fileSizeEl.textContent = (file.size / 1024).toFixed(1) + ' KB';
 
     try {
       const exif = await exifr.parse(file, {
@@ -233,9 +236,12 @@ window.VulnKitExif = (function () {
     document
       .querySelectorAll('.exif-mode-btn')
       .forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-    utils.get('exif-mode-local').classList.toggle('hidden', mode !== 'local');
-    utils.get('exif-mode-url').classList.toggle('hidden', mode !== 'url');
-    utils.get('exif-mode-page').classList.toggle('hidden', mode !== 'page');
+    var localEl = utils.get('exif-mode-local');
+    var urlEl = utils.get('exif-mode-url');
+    var pageEl = utils.get('exif-mode-page');
+    if (localEl) localEl.classList.toggle('hidden', mode !== 'local');
+    if (urlEl) urlEl.classList.toggle('hidden', mode !== 'url');
+    if (pageEl) pageEl.classList.toggle('hidden', mode !== 'page');
   }
 
   async function fetchExifFromUrl(url) {
@@ -247,13 +253,14 @@ window.VulnKitExif = (function () {
     const fileNameEl = utils.get('exif-file-name');
     const fileSizeEl = utils.get('exif-file-size');
 
+    if (!resultEl || !emptyEl || !sectionsEl) return;
     resultEl.classList.add('hidden');
     emptyEl.classList.add('hidden');
     sectionsEl.innerHTML = '<div class="empty-state">正在获取图片...</div>';
 
-    previewImg.src = url;
-    fileNameEl.textContent = url.split('/').pop() || url;
-    fileSizeEl.textContent = '';
+    if (previewImg) previewImg.src = url;
+    if (fileNameEl) fileNameEl.textContent = url.split('/').pop() || url;
+    if (fileSizeEl) fileSizeEl.textContent = '';
 
     chrome.runtime.sendMessage({ type: 'FETCH_IMAGE', url }, response => {
       if (!response || response.error) {

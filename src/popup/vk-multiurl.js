@@ -8,7 +8,9 @@ window.VulnKitMultiUrl = (function () {
 
   function parseUrls() {
     const utils = getUtils();
-    const text = utils.get('multiurl-input').value;
+    const el = utils.get('multiurl-input');
+    if (!el) return [];
+    const text = el.value;
     return text
       .split(/[\n\r]+/)
       .map(line => {
@@ -49,7 +51,8 @@ window.VulnKitMultiUrl = (function () {
       utils.showToast('没有重复URL', 'info');
       return;
     }
-    utils.get('multiurl-input').value = unique.join('\n');
+    const inputEl = utils.get('multiurl-input');
+    if (inputEl) inputEl.value = unique.join('\n');
     updateMultiurlInfo(unique.length);
     utils.showToast('去重完成，移除 ' + (urls.length - unique.length) + ' 个重复', 'success');
   }

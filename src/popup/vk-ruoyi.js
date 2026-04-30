@@ -9,6 +9,7 @@ window.VulnKitRuoYi = (function () {
   ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
     utils[method] = function () {
       var u = getUtils();
+      if (!u || typeof u[method] !== 'function') return undefined;
       return u[method].apply(u, arguments);
     };
   });
@@ -29,6 +30,7 @@ window.VulnKitRuoYi = (function () {
   // ====== HTML Helpers (avoid duplication) ======
 
   function buildEvidenceList(evidence) {
+    if (!Array.isArray(evidence)) return '';
     return (
       '<div class="ruoyi-evidence-list">' +
       evidence
@@ -1008,7 +1010,9 @@ window.VulnKitRuoYi = (function () {
         });
       }
       extraRoutes = [];
+      var statusEl = utils.get('ruoyi-analyze-status');
       var resultsEl = utils.get('ruoyi-analyze-results');
+      if (statusEl) statusEl.textContent = '';
       if (resultsEl) resultsEl.innerHTML = '<div class="empty-state">已清除</div>';
       utils.showToast('已清除额外路由', 'info');
     } catch (e) {
@@ -1044,7 +1048,11 @@ window.VulnKitRuoYi = (function () {
 
     try {
       var tab = await getActiveTab();
-      var baseUrl = tab && tab.url ? new URL(tab.url).origin : 'http://target';
+      if (!tab || !tab.id) {
+        utils.showToast('无法获取当前标签页', 'warning');
+        return;
+      }
+      var baseUrl = tab.url ? new URL(tab.url).origin : 'http://target';
       var paths = [];
       extractPathsFromData(capturedRouterData.data || capturedRouterData, paths);
 
@@ -1069,14 +1077,15 @@ window.VulnKitRuoYi = (function () {
       }
 
       var cmds = paths.map(function (p) {
+        var safePath = p.replace(/'/g, "'\\''");
         return (
           "curl -s '" +
           baseUrl +
-          p +
+          safePath +
           "'" +
           cookieHeader +
           " -o /dev/null -w '%{http_code} " +
-          p +
+          safePath +
           "\\n'"
         );
       });

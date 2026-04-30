@@ -24,6 +24,7 @@ window.VulnKitJwt = (function () {
     var sigEl = utils.get('jwt-signature');
     var claimsEl = utils.get('jwt-claims');
 
+    if (!resultEl || !errorEl || !headerEl || !payloadEl || !claimsEl) return;
     resultEl.classList.add('hidden');
     errorEl.classList.add('hidden');
 
@@ -63,21 +64,30 @@ window.VulnKitJwt = (function () {
       var expDate = new Date(payload.exp * 1000);
       var isExpired = payload.exp < now;
       claimsHtml +=
-        '<div class="jwt-claim ' + (isExpired ? 'jwt-claim-expired' : 'jwt-claim-valid') + '">' +
-        '<span>过期时间 (exp)</span><span>' + expDate.toLocaleString('zh-CN') +
-        (isExpired ? ' — 已过期' : ' — 有效') + '</span></div>';
+        '<div class="jwt-claim ' +
+        (isExpired ? 'jwt-claim-expired' : 'jwt-claim-valid') +
+        '">' +
+        '<span>过期时间 (exp)</span><span>' +
+        expDate.toLocaleString('zh-CN') +
+        (isExpired ? ' — 已过期' : ' — 有效') +
+        '</span></div>';
     }
     if (payload.iat) {
       claimsHtml +=
         '<div class="jwt-claim"><span>签发时间 (iat)</span><span>' +
-        new Date(payload.iat * 1000).toLocaleString('zh-CN') + '</span></div>';
+        new Date(payload.iat * 1000).toLocaleString('zh-CN') +
+        '</span></div>';
     }
     if (payload.nbf) {
       var isNbfValid = payload.nbf <= now;
       claimsHtml +=
-        '<div class="jwt-claim ' + (isNbfValid ? 'jwt-claim-valid' : 'jwt-claim-expired') + '">' +
-        '<span>生效时间 (nbf)</span><span>' + new Date(payload.nbf * 1000).toLocaleString('zh-CN') +
-        (isNbfValid ? ' — 已生效' : ' — 尚未生效') + '</span></div>';
+        '<div class="jwt-claim ' +
+        (isNbfValid ? 'jwt-claim-valid' : 'jwt-claim-expired') +
+        '">' +
+        '<span>生效时间 (nbf)</span><span>' +
+        new Date(payload.nbf * 1000).toLocaleString('zh-CN') +
+        (isNbfValid ? ' — 已生效' : ' — 尚未生效') +
+        '</span></div>';
     }
 
     claimsEl.innerHTML = claimsHtml;

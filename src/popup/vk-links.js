@@ -11,12 +11,12 @@ window.VulnKitLinks = (function () {
   async function extractLinks() {
     const utils = getUtils();
     const statusEl = utils.get('links-count');
-    statusEl.textContent = '正在提取...';
+    if (statusEl) statusEl.textContent = '正在提取...';
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.url) {
-        statusEl.textContent = '无法获取当前页面';
+        if (statusEl) statusEl.textContent = '无法获取当前页面';
         return;
       }
 
@@ -125,20 +125,23 @@ window.VulnKitLinks = (function () {
       if (results?.[0]?.result) {
         allLinks = results[0].result;
         renderLinks();
-        statusEl.textContent = '提取完成，共 ' + allLinks.length + ' 个链接';
+        if (statusEl) statusEl.textContent = '提取完成，共 ' + allLinks.length + ' 个链接';
         utils.showToast('提取完成', 'success');
         chrome.storage.local.set({ allLinks: allLinks, allLinksUrl: tab.url });
       }
     } catch (e) {
-      utils.get('links-count').textContent = '提取失败: ' + e.message;
+      var errEl = utils.get('links-count');
+      if (errEl) errEl.textContent = '提取失败: ' + e.message;
       utils.showToast('提取失败', 'error');
     }
   }
 
   function getFilteredLinks() {
     const utils = getUtils();
-    const filterText = utils.get('links-filter').value.trim().toLowerCase();
-    const filterType = utils.get('links-filter-type').value;
+    const filterEl = utils.get('links-filter');
+    const filterTypeEl = utils.get('links-filter-type');
+    const filterText = filterEl ? filterEl.value.trim().toLowerCase() : '';
+    const filterType = filterTypeEl ? filterTypeEl.value : 'all';
 
     return allLinks.filter(link => {
       if (filterType !== 'all' && link.tag !== filterType && filterType !== 'script') return false;
@@ -161,9 +164,10 @@ window.VulnKitLinks = (function () {
     const filtered = getFilteredLinks();
     const container = utils.get('links-results');
     const countEl = utils.get('links-count');
+    if (!container) return;
 
-    const existingText = countEl.textContent;
-    if (!existingText.includes('正在')) {
+    const existingText = countEl ? countEl.textContent : '';
+    if (countEl && !existingText.includes('正在')) {
       countEl.textContent = '显示 ' + filtered.length + ' / ' + allLinks.length + ' 个链接';
     }
 
@@ -211,7 +215,11 @@ window.VulnKitLinks = (function () {
     extractLinks,
     getFilteredLinks,
     renderLinks,
-    get allLinks() { return allLinks; },
-    set allLinks(v) { allLinks = v; },
+    get allLinks() {
+      return allLinks;
+    },
+    set allLinks(v) {
+      allLinks = v;
+    },
   };
 })();

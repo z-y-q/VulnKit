@@ -17,16 +17,32 @@ window.VulnKitExport = (function () {
       return JSON.stringify(items, null, 2);
     }
     if (format === 'csv') {
-      var header = fields.map(function (f) { return csvEscape(f.label); }).join(',');
+      var header = fields
+        .map(function (f) {
+          return csvEscape(f.label);
+        })
+        .join(',');
       var rows = items.map(function (item) {
-        return fields.map(function (f) { return csvEscape(item[f.key]); }).join(',');
+        return fields
+          .map(function (f) {
+            return csvEscape(item[f.key]);
+          })
+          .join(',');
       });
       return header + '\n' + rows.join('\n');
     }
     // txt - tab-separated
-    var header = fields.map(function (f) { return f.label; }).join('\t');
+    var header = fields
+      .map(function (f) {
+        return f.label;
+      })
+      .join('\t');
     var rows = items.map(function (item) {
-      return fields.map(function (f) { return item[f.key] || ''; }).join('\t');
+      return fields
+        .map(function (f) {
+          return item[f.key] || '';
+        })
+        .join('\t');
     });
     return header + '\n' + rows.join('\n');
   }
@@ -49,7 +65,8 @@ window.VulnKitExport = (function () {
     var fields = options.fields || [];
     var prefix = options.filename || 'export';
     var ext = format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'txt';
-    var mime = format === 'json' ? 'application/json' : format === 'csv' ? 'text/csv' : 'text/plain';
+    var mime =
+      format === 'json' ? 'application/json' : format === 'csv' ? 'text/csv' : 'text/plain';
     var timestamp = new Date().toISOString().slice(0, 10);
     var content = formatData(items, format, fields);
     downloadFile(content, prefix + '_' + timestamp + '.' + ext, mime);
@@ -57,9 +74,10 @@ window.VulnKitExport = (function () {
 
   function createDropdown(btnEl, itemsGetter, fields, filename) {
     if (openDropdown) {
+      var wasSame = openDropdown === btnEl._dropdown;
       openDropdown.remove();
       openDropdown = null;
-      if (openDropdown === btnEl._dropdown) return;
+      if (wasSame) return;
     }
 
     var dd = document.createElement('div');

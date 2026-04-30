@@ -4,6 +4,14 @@ window.VulnKitSourcemap = (function () {
   function getUtils() {
     return window.VulnKitUtils || null;
   }
+  var utils = {};
+  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
+    utils[method] = function () {
+      var u = getUtils();
+      if (!u || typeof u[method] !== 'function') return undefined;
+      return u[method].apply(u, arguments);
+    };
+  });
 
   // --- State ---
   let sourcemapModules = [];
@@ -12,6 +20,12 @@ window.VulnKitSourcemap = (function () {
   let sourcemapSourceCache = {};
   let sourcemapTabId = null;
   let sourcemapMapCache = {};
+
+  var SOURCE_TYPE_LABELS = {
+    runtime: 'Webpack 运行时',
+    sourcemap: 'Source Map',
+    chunk: 'JS 文件解析',
+  };
 
   async function smBatchFetch(urls, tailOnly, tabId) {
     var concurrency = tailOnly ? 10 : 5;
@@ -93,7 +107,6 @@ window.VulnKitSourcemap = (function () {
   }
 
   function smUpdateProgress(percent, activePhase) {
-    var utils = getUtils();
     var bar = utils.get('sm-progress-bar');
     var phases = document.querySelectorAll('#sm-phases .sm-phase');
     if (bar) bar.style.width = percent + '%';
@@ -105,97 +118,7 @@ window.VulnKitSourcemap = (function () {
     });
   }
 
-  function smExtractChunkManifest(jsContent) {
-    // Extract chunk ID -> hash mapping from webpack runtime manifest
-    // Common patterns in webpack 4/5:
-    //   __webpack_require__.u = function(e) { return "js/"+e+"."+{123:"abc",456:"def"}[e]+".js"; }
-    //   "static/js/" + chunkId + "." + contentHash + ".js"
-    // Also look for: __webpack_require__.u = function(t){ return t+"."+{...}[t]+".js" }
-    var chunkMap = {};
-    var urlPrefix = '';
-
-    // Pattern 1: {123:"abc456", 456:"def789"} inside __webpack_require__.u
-    var uFuncMatch = jsContent.match(
-      /__webpack_require__\s*\.\s*u\s*=\s*function\s*\(\s*(\w+)\s*\)\s*\{[\s\S]*?return\s+(?:([\s\S]*?)\+?\s*\1\s*\+?\s*([\s\S]*?))\s*;?\s*\}/
-    );
-    if (uFuncMatch) {
-      var funcBody = uFuncMatch[0];
-      // Extract the hash map: {123:"abc", 456:"def"}
-      var mapMatch = funcBody.match(/\{[^}]*\}/g);
-      if (mapMatch) {
-        mapMatch.forEach(function (m) {
-          try {
-            var obj = JSON.parse(m.replace(/(\w+)\s*:/g, '"$1":'));
-            Object.keys(obj).forEach(function (k) {
-              chunkMap[k] = obj[k];
-            });
-          } catch (e) {
-            // try eval-safe extraction
-            var pairs = m.match(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g);
-            if (pairs) {
-              pairs.forEach(function (p) {
-                var kv = p.match(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/);
-                if (kv) chunkMap[kv[1]] = kv[2];
-              });
-            }
-          }
-        });
-      }
-      // Extract URL prefix pattern: "static/js/" or "js/" etc.
-      var prefixMatch = funcBody.match(/["']([^"']*\/)["']/);
-      if (prefixMatch) urlPrefix = prefixMatch[1];
-    }
-
-    // Pattern 2: jsonpScriptSrc or chunkSrc with full URL mapping
-    // e.g.: (window["webpackChunkapp"] = window["webpackChunkapp"] || []).push([[123], ...])
-    var chunkIdPattern = /\.push\(\s*\[\s*\[([^\]]*)\]\s*,/g;
-    var idMatch;
-    while ((idMatch = chunkIdPattern.exec(jsContent)) !== null) {
-      var ids = idMatch[1].split(',');
-      ids.forEach(function (id) {
-        var trimmed = id.replace(/['"\s]/g, '');
-        if (trimmed) chunkMap[trimmed] = chunkMap[trimmed] || '';
-      });
-    }
-
-    return { chunkMap: chunkMap, urlPrefix: urlPrefix };
-  }
-
-  function smBuildChunkUrls(chunkManifest, scriptUrl) {
-    // Build full chunk URLs from manifest + known script URL pattern
-    var urls = [];
-    if (!scriptUrl || Object.keys(chunkManifest).length === 0) return urls;
-
-    // Derive base URL from a known script URL
-    // e.g., https://example.com/static/js/app.abc123.js -> https://example.com/static/js/
-    var baseUrl = scriptUrl.substring(0, scriptUrl.lastIndexOf('/') + 1);
-
-    // Also try to detect the URL pattern from script filenames
-    // e.g., app.abc123.js, chunk-vendors.def456.js -> pattern is name.hash.js
-    var urlPrefix = chunkManifest.urlPrefix || '';
-
-    Object.keys(chunkManifest).forEach(function (chunkId) {
-      var hash = chunkManifest[chunkId];
-      if (!hash) return;
-      // Try common patterns: prefix + chunkId + "." + hash + ".js"
-      // Also try without prefix if not found
-      var candidates = [];
-      if (urlPrefix) {
-        candidates.push(baseUrl + urlPrefix + chunkId + '.' + hash + '.js');
-        candidates.push(baseUrl + chunkId + '.' + hash + '.js');
-      } else {
-        candidates.push(baseUrl + chunkId + '.' + hash + '.js');
-        candidates.push(baseUrl + 'js/' + chunkId + '.' + hash + '.js');
-        candidates.push(baseUrl + 'static/js/' + chunkId + '.' + hash + '.js');
-      }
-      urls.push({ chunkId: chunkId, candidates: candidates });
-    });
-
-    return urls;
-  }
-
   async function scanWebpackModules() {
-    var utils = getUtils();
     var statusEl = utils.get('sourcemap-status');
     var scanBtn = utils.get('sourcemap-scan-btn');
     var resultsEl = utils.get('sourcemap-results');
@@ -210,7 +133,7 @@ window.VulnKitSourcemap = (function () {
       scanBtn.textContent = '扫描中...';
       scanBtn.classList.add('scanning');
     }
-    resultsEl.innerHTML = '';
+    if (resultsEl) resultsEl.innerHTML = '';
 
     // Show progress bar and phase indicator
     var progressEl = utils.get('sm-progress');
@@ -630,7 +553,7 @@ window.VulnKitSourcemap = (function () {
                     // Extract webpack public path from same object that has .u()
                     var _wpPp = '';
                     var _ppMatch = _bundleSrc.match(
-                      new RegExp(_uOpenMatch[1] + "\\['p'\\]\\s*=\\s*\"([^\"]*)\"")
+                      new RegExp(_uOpenMatch[1] + '\\[\'p\'\\]\\s*=\\s*"([^"]*)"')
                     );
                     if (!_ppMatch)
                       _ppMatch = _bundleSrc.match(
@@ -805,6 +728,7 @@ window.VulnKitSourcemap = (function () {
           // Extract source map URLs from inline scripts
           var mapRegex = /[/#][@]\s*sourceMappingURL\s*=\s*(\S+)/gi;
           (domData.inlineScripts || []).forEach(function (script) {
+            mapRegex.lastIndex = 0;
             var match;
             while ((match = mapRegex.exec(script)) !== null) {
               var url = match[1];
@@ -1325,8 +1249,8 @@ window.VulnKitSourcemap = (function () {
       }
       // Hide progress bar after a brief delay
       setTimeout(function () {
-        var progressEl = getUtils().get('sm-progress');
-        var phasesEl = getUtils().get('sm-phases');
+        var progressEl = utils.get('sm-progress');
+        var phasesEl = utils.get('sm-phases');
         if (progressEl) progressEl.classList.add('hidden');
         if (phasesEl) phasesEl.classList.add('hidden');
       }, 800);
@@ -1334,7 +1258,6 @@ window.VulnKitSourcemap = (function () {
   }
 
   function renderSourcemapModules() {
-    var utils = getUtils();
     var container = utils.get('sourcemap-results');
     if (!container) return;
 
@@ -1408,7 +1331,7 @@ window.VulnKitSourcemap = (function () {
       '.woff2': '#888',
     };
 
-    var groupLabels = { runtime: 'Webpack 运行时', sourcemap: 'Source Map', chunk: 'JS 文件解析' };
+    var groupLabels = SOURCE_TYPE_LABELS;
     var groupClasses = {
       runtime: 'sourcemap-section',
       sourcemap: 'sourcemap-section sourcemap-section-resolved',
@@ -1476,7 +1399,6 @@ window.VulnKitSourcemap = (function () {
   }
 
   async function showSourcemapModuleDetail(index) {
-    var utils = getUtils();
     var mod = sourcemapModules[index];
     if (!mod) return;
     sourcemapCurrentModule = index;
@@ -1487,14 +1409,14 @@ window.VulnKitSourcemap = (function () {
     var depsEl = utils.get('sourcemap-deps-info');
     var codeEl = utils.get('sourcemap-source-code');
 
-    if (!detailCard || !resultsEl) return;
+    if (!detailCard || !resultsEl || !titleEl || !depsEl || !codeEl) return;
 
     resultsEl.classList.add('hidden');
     detailCard.classList.remove('hidden');
     titleEl.textContent = mod.path;
 
     // Breadcrumb
-    var sourceLabels = { runtime: 'Webpack 运行时', sourcemap: 'Source Map', chunk: 'JS 文件解析' };
+    var sourceLabels = SOURCE_TYPE_LABELS;
     var existingBc = detailCard.querySelector('.sm-breadcrumb');
     if (existingBc) existingBc.remove();
     var bcHtml = '<div class="sm-breadcrumb">';
@@ -1584,7 +1506,6 @@ window.VulnKitSourcemap = (function () {
 
   function backToSourcemapList() {
     sourcemapCurrentModule = null;
-    var utils = getUtils();
     var detailCard = utils.get('sourcemap-detail-card');
     var resultsEl = utils.get('sourcemap-results');
     if (detailCard) detailCard.classList.add('hidden');
@@ -1592,7 +1513,6 @@ window.VulnKitSourcemap = (function () {
   }
 
   async function analyzeSourcemaps() {
-    var utils = getUtils();
     var analysisCard = utils.get('sm-analysis-card');
     var progressEl = utils.get('sm-analysis-progress');
     var resultsEl = utils.get('sm-analysis-results');
@@ -1785,7 +1705,6 @@ window.VulnKitSourcemap = (function () {
   }
 
   function copyAllSourcemapPaths() {
-    var utils = getUtils();
     if (sourcemapModules.length === 0) {
       utils.showToast('没有模块路径', 'warning');
       return;
@@ -1801,7 +1720,6 @@ window.VulnKitSourcemap = (function () {
   }
 
   function generateSourcemapTree() {
-    var utils = getUtils();
     if (sourcemapModules.length === 0) {
       utils.showToast('没有模块路径', 'warning');
       return;
@@ -1839,7 +1757,6 @@ window.VulnKitSourcemap = (function () {
   }
 
   async function loadSourcesToDevTools() {
-    var utils = getUtils();
     var jsUrls = [];
     sourcemapModules.forEach(function (m) {
       if (m.source === 'chunk' && m.path && m.path.indexOf('://') !== -1) {
@@ -1892,7 +1809,6 @@ window.VulnKitSourcemap = (function () {
   }
 
   async function downloadAllSourcemapSources() {
-    var utils = getUtils();
     var resolved = sourcemapModules.filter(function (m) {
       return m.resolved || sourcemapSourceCache[m.path];
     });
@@ -1924,7 +1840,6 @@ window.VulnKitSourcemap = (function () {
   }
 
   function downloadSingleModule(index) {
-    var utils = getUtils();
     var mod = sourcemapModules[index];
     if (!mod) return;
     var source = sourcemapSourceCache[mod.path] || '';
@@ -1946,7 +1861,6 @@ window.VulnKitSourcemap = (function () {
   }
 
   function copyModuleSource() {
-    var utils = getUtils();
     var codeEl = utils.get('sourcemap-source-code');
     if (codeEl && codeEl.value) {
       utils.copyText(codeEl.value);

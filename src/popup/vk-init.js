@@ -190,10 +190,6 @@
     permExpandMenuIds,
     applyPermOverride,
     searchJsKeywords,
-    extractPathsFromJsResults,
-    autoFillFromJsPaths,
-    extractKeywordsFromCapturedUrls,
-    autoSearchForZeroOpen,
     compareRoutesAndMenu,
     startTraverseRoutes,
     stopTraverse,
@@ -1188,10 +1184,12 @@
     if (permDetailBack)
       permDetailBack.addEventListener('click', () => {
         permViewMode = 'list';
-        utils.get('perm-captured-list').classList.remove('hidden');
+        const permList = utils.get('perm-captured-list');
+        if (permList) permList.classList.remove('hidden');
         const filterRow = utils.get('perm-filter-row');
         if (filterRow) filterRow.classList.remove('hidden');
-        utils.get('perm-detail').classList.add('hidden');
+        const permDetail = utils.get('perm-detail');
+        if (permDetail) permDetail.classList.add('hidden');
       });
     const permOpenAllBtn = utils.get('perm-open-all');
     if (permOpenAllBtn) permOpenAllBtn.addEventListener('click', permOpenAll);

@@ -524,14 +524,20 @@ window.VulnKitXss = (function () {
       if (typeof result === 'object') {
         const data = new URLSearchParams();
         data.set(result.param, result.payload);
+        const escAttr = s =>
+          s
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
         const formHtml =
           '<form method="POST" action="' +
-          result.url.replace(/"/g, '&quot;') +
+          escAttr(result.url) +
           '">' +
           '<input type="hidden" name="' +
-          result.param.replace(/"/g, '&quot;') +
+          escAttr(result.param) +
           '" value="' +
-          result.payload.replace(/"/g, '&quot;').replace(/</g, '&lt;') +
+          escAttr(result.payload) +
           '">' +
           '</form><script>document.forms[0].submit()<\/script>';
         const blobUrl = URL.createObjectURL(new Blob([formHtml], { type: 'text/html' }));

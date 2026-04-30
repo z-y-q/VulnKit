@@ -96,7 +96,7 @@
       hookScript.src = chrome.runtime.getURL('src/inject/ruoyi-route-hook.js');
       hookScript.onload = function () {
         hookScript.remove();
-        sendResponse({ status: 'ok', hookReady: !!window.__VK_RUOYI_HOOK__ });
+        sendResponse({ status: 'ok' });
       };
       hookScript.onerror = function () {
         hookScript.remove();

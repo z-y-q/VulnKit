@@ -24,6 +24,7 @@ window.VulnKitGather = (function () {
     var list = gatherData[currentGatherTab] || [];
     var container = utils.get('gather-results');
     var statusEl = utils.get('gather-status');
+    if (!container || !statusEl) return;
 
     if (list.length === 0) {
       container.innerHTML = '<div class="empty-state">点击「收集当前页面」开始</div>';
@@ -219,13 +220,13 @@ window.VulnKitGather = (function () {
   async function gatherInfo() {
     var utils = getUtils();
     var statusEl = utils.get('gather-status');
-    statusEl.textContent = '正在收集...';
+    if (statusEl) statusEl.textContent = '正在收集...';
 
     try {
       var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
       var tab = tabs[0];
       if (!tab || !tab.url) {
-        statusEl.textContent = '无法获取当前页面';
+        if (statusEl) statusEl.textContent = '无法获取当前页面';
         return;
       }
 
@@ -412,7 +413,8 @@ window.VulnKitGather = (function () {
 
         // Fetch external JS files and extract API endpoints
         if (scriptSrcs.length > 0) {
-          statusEl.textContent = '正在分析 JS 文件（' + scriptSrcs.length + ' 个）...';
+          if (statusEl)
+            statusEl.textContent = '正在分析 JS 文件（' + scriptSrcs.length + ' 个）...';
           var apiEndpoints = await extractApiFromJsFiles(scriptSrcs, tab.url);
           if (apiEndpoints.length > 0) {
             gatherData['JS API'] = apiEndpoints;
@@ -429,7 +431,7 @@ window.VulnKitGather = (function () {
         if (meta && meta.truncated) {
           statusText += '（HTML 已截断至 500KB/' + (meta.totalSize / 1024).toFixed(0) + 'KB）';
         }
-        statusEl.textContent = statusText;
+        if (statusEl) statusEl.textContent = statusText;
         utils.showToast(
           meta && meta.truncated ? '收集完成（页面过大，部分内容被截断）' : '收集完成',
           meta && meta.truncated ? 'warning' : 'success'
@@ -445,10 +447,10 @@ window.VulnKitGather = (function () {
           gatherDataTabs: groups,
         });
       } else {
-        statusEl.textContent = '收集失败';
+        if (statusEl) statusEl.textContent = '收集失败';
       }
     } catch (e) {
-      statusEl.textContent = '收集失败: ' + e.message;
+      if (statusEl) statusEl.textContent = '收集失败: ' + e.message;
       utils.showToast('收集失败', 'error');
     }
   }
@@ -478,7 +480,7 @@ window.VulnKitGather = (function () {
         var total = Object.values(gatherData).reduce(function (s, a) {
           return s + a.length;
         }, 0);
-        statusEl.textContent = '已恢复，共 ' + total + ' 条';
+        if (statusEl) statusEl.textContent = '已恢复，共 ' + total + ' 条';
       }
     });
   }

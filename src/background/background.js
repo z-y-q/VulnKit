@@ -386,9 +386,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse(result.success ? { data: result.data } : { error: result.error });
         });
       } else {
-        fetchUrlAuth(message.url, message.key, message.header).then(result => {
-          sendResponse(result.success ? { data: result.data } : { error: result.error });
-        });
+        sendResponse({ error: 'Unknown provider: ' + (message.provider || '(none)') });
       }
       return true;
 

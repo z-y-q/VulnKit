@@ -134,13 +134,14 @@ window.VulnKitFavicon = (function () {
         ];
 
         const linksContainer = utils.get('favicon-search-links');
+        if (!linksContainer) return;
         linksContainer.innerHTML = platforms
           .map(
             p =>
               '<a class="favicon-search-link" href="' +
-              p.url +
+              utils.escapeHtml(p.url) +
               '" target="_blank">' +
-              p.name +
+              utils.escapeHtml(p.name) +
               '</a>'
           )
           .join('');

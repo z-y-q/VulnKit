@@ -13,12 +13,19 @@ window.VulnKitSpoof = (function () {
   }
 
   function confirmAction(message, onConfirm) {
+    var utils = getUtils();
+    var safeMsg =
+      utils && utils.escapeHtml
+        ? utils.escapeHtml(message)
+        : message.replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+          });
     var overlay = document.createElement('div');
     overlay.className = 'confirm-overlay';
     overlay.innerHTML =
       '<div class="confirm-dialog">' +
       '<div class="confirm-msg">' +
-      message +
+      safeMsg +
       '</div>' +
       '<div class="confirm-actions">' +
       '<button class="btn btn-sm btn-primary confirm-yes">确定</button>' +
