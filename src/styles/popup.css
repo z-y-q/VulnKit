@@ -1292,6 +1292,11 @@ body {
   font-weight: 600;
 }
 
+.ruoyi-wf-step.done {
+  color: #27ae60;
+  font-weight: 500;
+}
+
 .ruoyi-wf-arrow {
   color: #ccc;
   font-size: 14px;
@@ -1599,6 +1604,10 @@ body {
 
 [data-theme='dark'] .ruoyi-wf-step.active {
   color: var(--accent, #4A90E2);
+}
+
+[data-theme='dark'] .ruoyi-wf-step.done {
+  color: #2ecc71;
 }
 
 [data-theme='dark'] .ruoyi-wf-arrow {

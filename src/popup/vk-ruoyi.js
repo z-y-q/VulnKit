@@ -42,6 +42,22 @@ window.VulnKitRuoYi = (function () {
     );
   }
 
+  // Steps: 1=detect, 2=hook, 3=mar, 4=probe
+  function updateWorkflowStep(step) {
+    var steps = document.querySelectorAll('.ruoyi-wf-step');
+    for (var i = 0; i < steps.length; i++) {
+      if (i < step) {
+        steps[i].classList.add('done');
+        steps[i].classList.remove('active');
+      } else if (i === step) {
+        steps[i].classList.add('active');
+        steps[i].classList.remove('done');
+      } else {
+        steps[i].classList.remove('active', 'done');
+      }
+    }
+  }
+
   function buildDetectHtml(badge, label, evidence) {
     return (
       '<div class="ruoyi-detect-info">' +
@@ -237,6 +253,7 @@ window.VulnKitRuoYi = (function () {
       };
 
       if (data.detected) {
+        updateWorkflowStep(1); // detect done → step 2 active
         var variantLabel = data.variant ? ' [' + data.variant.toUpperCase() + ']' : '';
         var html = buildDetectHtml(
           'ruoyi-badge-ok',
@@ -269,6 +286,7 @@ window.VulnKitRuoYi = (function () {
           autoCaptureRoutes(tab.id, data.cookieToken);
         }, 300);
       } else if (data.evidence.length > 0) {
+        updateWorkflowStep(0); // still on step 1 but partial match
         if (resultsEl)
           resultsEl.innerHTML = buildDetectHtml(
             'ruoyi-badge-warn',
@@ -277,11 +295,13 @@ window.VulnKitRuoYi = (function () {
           );
         if (statusEl) statusEl.textContent = '疑似 RuoYi (' + data.evidence.length + ' 个特征)';
       } else {
+        updateWorkflowStep(0);
         if (resultsEl)
           resultsEl.innerHTML = '<div class="empty-state">当前页面未检测到 RuoYi 框架特征</div>';
         if (statusEl) statusEl.textContent = '未检测到 RuoYi';
       }
     } catch (e) {
+      updateWorkflowStep(0);
       if (statusEl) statusEl.textContent = '检测出错';
       utils.showToast('检测失败: ' + e.message, 'error');
     }
@@ -544,6 +564,7 @@ window.VulnKitRuoYi = (function () {
       hookStatus = 'active';
       chrome.storage.local.set({ ruoyiHookTabId: tab.id, ruoyiHookEnabled: true });
       setHookUI(true);
+      updateWorkflowStep(2); // hook done → step 3 active
       if (statusEl) statusEl.textContent = '钩子已启用，正在刷新页面...';
       utils.showToast('钩子已启用，刷新页面以捕获 /getRouters', 'success');
       await chrome.tabs.reload(tab.id);
@@ -631,6 +652,7 @@ window.VulnKitRuoYi = (function () {
       } else if (data.captured) {
         // Data already passively captured — show it regardless of enabled state
         hookStatus = data.enabled ? 'captured' : 'passive-captured';
+        updateWorkflowStep(2); // hook done, routes captured
         setHookUI(data.enabled);
         var modeText = data.enabled ? data.augmentMode || 'auto' : '被动捕获';
         var extras =
@@ -1072,6 +1094,7 @@ window.VulnKitRuoYi = (function () {
       });
 
       if (statusEl) statusEl.textContent = '分析完成，发现 ' + extraRoutes.length + ' 条额外路由';
+      updateWorkflowStep(3); // MaR done → step 4 active
 
       if (extraRoutes.length > 0) {
         var html =
@@ -1117,6 +1140,7 @@ window.VulnKitRuoYi = (function () {
         if (resultsEl) resultsEl.innerHTML = html;
         utils.showToast('发现 ' + extraRoutes.length + ' 条额外路由', 'success');
       } else {
+        updateWorkflowStep(3); // MaR scan complete even if no extras
         if (resultsEl)
           resultsEl.innerHTML =
             '<div class="empty-state">' +
