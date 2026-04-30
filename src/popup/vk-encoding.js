@@ -137,21 +137,22 @@ window.VulnKitEncoding = (function () {
     var encSection = utils.get('enc-classic-section');
     var cryptoSection = utils.get('crypto-section');
     var jwtSection = utils.get('jwt-section');
+    var cardTitle = utils.get('card-title');
     if (type === 'crypto') {
       if (encSection) encSection.classList.add('hidden');
       if (jwtSection) jwtSection.classList.add('hidden');
       if (cryptoSection) cryptoSection.classList.remove('hidden');
-      utils.get('card-title').textContent = '加密解密';
+      if (cardTitle) cardTitle.textContent = '加密解密';
     } else if (type === 'jwt') {
       if (encSection) encSection.classList.add('hidden');
       if (cryptoSection) cryptoSection.classList.add('hidden');
       if (jwtSection) jwtSection.classList.remove('hidden');
-      utils.get('card-title').textContent = 'JWT 解码';
+      if (cardTitle) cardTitle.textContent = 'JWT 解码';
     } else {
       if (encSection) encSection.classList.remove('hidden');
       if (cryptoSection) cryptoSection.classList.add('hidden');
       if (jwtSection) jwtSection.classList.add('hidden');
-      utils.get('card-title').textContent = ENCODING_NAMES[type] + ' 编码/解码';
+      if (cardTitle) cardTitle.textContent = ENCODING_NAMES[type] + ' 编码/解码';
     }
   }
 

@@ -98,14 +98,8 @@
   gather.init();
 
   // ====== Link Extract (loaded from vk-links.js) ======
-  const {
-    extractLinks,
-    getFilteredLinks,
-    renderLinks,
-    copyFilteredUrls,
-    exportLinks,
-    sendToMultiUrl,
-  } = window.VulnKitLinks;
+  const { extractLinks, renderLinks, copyFilteredUrls, exportLinks, sendToMultiUrl } =
+    window.VulnKitLinks;
   Object.defineProperties(window, {
     allLinks: {
       get: () => window.VulnKitLinks.allLinks,

@@ -320,7 +320,7 @@ window.VulnKitAsset = (function () {
         ? query
         : 'hostname:' + query;
     const url =
-      'https://api.shodan.io/shodan/host/search?key=' +
+      'https://api.shodan.io/shodan/search?key=' +
       encodeURIComponent(key) +
       '&query=' +
       encodeURIComponent(searchQuery);

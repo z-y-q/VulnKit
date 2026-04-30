@@ -935,8 +935,10 @@ window.VulnKitVue = (function () {
       }
       permInterceptActive = true;
       chrome.storage.local.set({ permInterceptTabId: tab.id });
-      utils.get('perm-start-btn').disabled = true;
-      utils.get('perm-stop-btn').disabled = false;
+      var permStartBtn = utils.get('perm-start-btn');
+      var permStopBtn = utils.get('perm-stop-btn');
+      if (permStartBtn) permStartBtn.disabled = true;
+      if (permStopBtn) permStopBtn.disabled = false;
       if (statusEl) statusEl.textContent = '拦截中... 请操作页面触发菜单API请求，或刷新页面';
       utils.showToast('拦截已启动，请操作页面或刷新页面', 'success');
       // Try to read already-loaded data from Vue/Pinia/Vuex stores
@@ -970,8 +972,10 @@ window.VulnKitVue = (function () {
       });
       permInterceptActive = false;
       chrome.storage.local.remove('permInterceptTabId');
-      utils.get('perm-start-btn').disabled = false;
-      utils.get('perm-stop-btn').disabled = true;
+      var permStartBtn = utils.get('perm-start-btn');
+      var permStopBtn = utils.get('perm-stop-btn');
+      if (permStartBtn) permStartBtn.disabled = false;
+      if (permStopBtn) permStopBtn.disabled = true;
       var statusEl = utils.get('perm-status');
       if (statusEl) statusEl.textContent = '拦截已停止';
       utils.showToast('拦截已停止', 'info');

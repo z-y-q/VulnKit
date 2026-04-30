@@ -15,6 +15,10 @@ function saveSettings() {
   };
 
   chrome.storage.local.set({ pentestSettings: settings }, () => {
+    if (chrome.runtime.lastError) {
+      showStatus('保存失败: ' + chrome.runtime.lastError.message, 'error');
+      return;
+    }
     showStatus('设置已保存', 'success');
   });
 }
@@ -73,6 +77,10 @@ function importSettings() {
       try {
         const settings = JSON.parse(evt.target.result);
         chrome.storage.local.set({ pentestSettings: settings }, () => {
+          if (chrome.runtime.lastError) {
+            showStatus('导入失败: ' + chrome.runtime.lastError.message, 'error');
+            return;
+          }
           loadSettings();
           showStatus('设置已导入', 'success');
         });
@@ -90,6 +98,10 @@ function clearData() {
     chrome.storage.local.remove(
       ['pentestSettings', 'pentest_history', 'pentest_spoof', 'pentest_keys'],
       () => {
+        if (chrome.runtime.lastError) {
+          showStatus('清除失败: ' + chrome.runtime.lastError.message, 'error');
+          return;
+        }
         showStatus('所有数据已清除', 'success');
       }
     );
@@ -99,6 +111,10 @@ function clearData() {
 function resetSettings() {
   if (confirm('确定要重置为默认设置吗？')) {
     chrome.storage.local.remove(['pentestSettings'], () => {
+      if (chrome.runtime.lastError) {
+        showStatus('重置失败: ' + chrome.runtime.lastError.message, 'error');
+        return;
+      }
       loadSettings();
       showStatus('设置已重置', 'success');
     });

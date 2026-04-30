@@ -353,7 +353,6 @@ window.VulnKitCrypto = (function () {
     var hmacKey = (utils.get('hash-hmac-key') || {}).value || '';
     if (useHmac && !hmacKey) throw new Error('请输入 HMAC 密钥');
     var algoName = algo.toUpperCase().replace('-', '');
-    if (algoName === 'SHA384') algoName = 'SHA384';
     if (useHmac) {
       var keyWA = CryptoJS.enc.Utf8.parse(hmacKey);
       var hash = CryptoJS.HmacSHA256(input, keyWA);

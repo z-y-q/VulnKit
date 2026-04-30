@@ -3,7 +3,7 @@ window.VulnKitHaeRules = (function () {
   'use strict';
 
   var STORAGE_KEY = 'haeRules';
-  var PAGE_SCOPE = ['response body', 'response', 'any'];
+  var PAGE_SCOPE = ['response body', 'response', 'any', 'request', 'response header', 'any header'];
 
   var DEFAULT_RULES = [
     {

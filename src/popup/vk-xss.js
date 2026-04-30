@@ -535,38 +535,76 @@ window.VulnKitXss = (function () {
     const rawPayload = getSelectedPayload();
     const encoding = (utils.get('xssscan-encoding') || {}).value || 'none';
     const payload = encodePayload(rawPayload, encoding);
+    const getPoints = selected.filter(p => p.method !== 'POST');
+    const postPoints = selected.filter(p => p.method === 'POST');
     let opened = 0;
-    for (const point of selected) {
+
+    for (const point of getPoints) {
       const result = buildXssTestUrl(point, payload);
-      if (!result) continue;
-      if (typeof result === 'object') {
-        const data = new URLSearchParams();
-        data.set(result.param, result.payload);
-        const escAttr = s =>
-          s
-            .replace(/&/g, '&amp;')
-            .replace(/"/g, '&quot;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-        const formHtml =
-          '<form method="POST" action="' +
-          escAttr(result.url) +
-          '">' +
-          '<input type="hidden" name="' +
-          escAttr(result.param) +
-          '" value="' +
-          escAttr(result.payload) +
-          '">' +
-          '</form><script>document.forms[0].submit()<\/script>';
-        const blobUrl = URL.createObjectURL(new Blob([formHtml], { type: 'text/html' }));
-        chrome.tabs.create({ url: blobUrl, active: false });
-        opened++;
-      } else {
-        chrome.tabs.create({ url: result, active: false });
-        opened++;
+      if (!result || typeof result === 'object') continue;
+      chrome.tabs.create({ url: result, active: false });
+      opened++;
+    }
+
+    if (postPoints.length > 0) {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) {
+        utils.showToast('无法获取当前标签页', 'error');
+        return;
+      }
+      for (const point of postPoints) {
+        const targetUrl = point.url;
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: (url, param, pl) => {
+              const form = document.createElement('form');
+              form.method = 'POST';
+              form.action = url;
+              form.target = '_blank';
+              form.style.display = 'none';
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = param;
+              input.value = pl;
+              form.appendChild(input);
+              document.body.appendChild(form);
+              form.submit();
+              form.remove();
+            },
+            args: [targetUrl, point.param, payload],
+          });
+          opened++;
+        } catch {
+          try {
+            const escAttr = s =>
+              s
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            const formHtml =
+              '<form method="POST" action="' +
+              escAttr(targetUrl) +
+              '">' +
+              '<input type="hidden" name="' +
+              escAttr(point.param) +
+              '" value="' +
+              escAttr(payload) +
+              '">' +
+              '</form><script>document.forms[0].submit()<\/script>';
+            const blobUrl = URL.createObjectURL(new Blob([formHtml], { type: 'text/html' }));
+            chrome.tabs.create({ url: blobUrl, active: false });
+            opened++;
+          } catch {
+            /* skip this point */
+          }
+        }
       }
     }
-    utils.showToast('已打开 ' + opened + ' 个测试页面（POST 注入通过自动提交表单实现）', 'success');
+
+    const methodInfo = postPoints.length > 0 ? '（POST 通过页面内表单提交）' : '';
+    utils.showToast('已打开 ' + opened + ' 个测试页面' + methodInfo, 'success');
   }
 
   function handleCopyXssUrls() {

@@ -105,20 +105,5 @@
       (document.head || document.documentElement).appendChild(hookScript);
       return true;
     }
-    if (message.type === 'VK_RUOYI_STATUS') {
-      var statusHandler = function (e) {
-        if (e.data && e.data.__vk_ruoyi_hook_status) {
-          sendResponse(e.data);
-          window.removeEventListener('message', statusHandler);
-        }
-      };
-      window.addEventListener('message', statusHandler);
-      window.postMessage({ __vk_ruoyi_hook_query: true }, '*');
-      setTimeout(function () {
-        window.removeEventListener('message', statusHandler);
-        sendResponse({ status: 'not_installed' });
-      }, 1000);
-      return true;
-    }
   });
 })();

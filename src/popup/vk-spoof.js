@@ -228,6 +228,10 @@ window.VulnKitSpoof = (function () {
       chrome.runtime.sendMessage(
         { type: 'SPOOF_UA', tabId: tab.id, url: tab.url, userAgent: ua },
         response => {
+          if (chrome.runtime.lastError) {
+            utils.showToast('应用失败: ' + chrome.runtime.lastError.message, 'error');
+            return;
+          }
           if (response?.success) {
             updateUaStatus();
             utils.showToast('UA 已应用', 'success');
@@ -251,6 +255,10 @@ window.VulnKitSpoof = (function () {
       spoofState.ua.current = '';
 
       chrome.runtime.sendMessage({ type: 'RESET_SPOOF_UA', tabId: tab?.id }, response => {
+        if (chrome.runtime.lastError) {
+          utils.showToast('恢复失败: ' + chrome.runtime.lastError.message, 'error');
+          return;
+        }
         if (response?.success) {
           updateUaStatus();
           utils.showToast('UA 已恢复', 'success');
@@ -611,6 +619,10 @@ window.VulnKitSpoof = (function () {
       chrome.runtime.sendMessage(
         { type: 'SPOOF_HEADERS', tabId: tab.id, url: tab.url, headers: spoofState.headers },
         response => {
+          if (chrome.runtime.lastError) {
+            utils.showToast('应用失败: ' + chrome.runtime.lastError.message, 'error');
+            return;
+          }
           if (response?.success) {
             utils.showToast('Header 伪造已应用', 'success');
           } else {
@@ -666,9 +678,17 @@ window.VulnKitSpoof = (function () {
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      chrome.runtime.sendMessage({ type: 'RESET_SPOOF_HEADERS', tabId: tab?.id });
+      chrome.runtime.sendMessage({ type: 'RESET_SPOOF_HEADERS', tabId: tab?.id }, response => {
+        if (chrome.runtime.lastError || !response?.success) {
+          utils.showToast(
+            '重置失败: ' + (chrome.runtime.lastError?.message || '未知错误'),
+            'error'
+          );
+          return;
+        }
+        utils.showToast('Header 已重置', 'success');
+      });
       chrome.storage.local.set({ pentest_spoof: spoofState });
-      utils.showToast('Header 已重置', 'success');
     } catch (e) {
       utils.showToast('操作失败: ' + e.message, 'error');
     }
