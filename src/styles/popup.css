@@ -1869,6 +1869,410 @@ body {
   background: var(--bg-tertiary, #2a2a3e);
 }
 
+/* RuoYi — Route Perms */
+.ruoyi-route-perms {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: #dbeafe;
+  color: #1e40af;
+  margin-right: 4px;
+}
+
+[data-theme='dark'] .ruoyi-route-perms {
+  background: #1e3a5f;
+  color: #90caf9;
+}
+
+/* RuoYi — Batch Probe */
+.ruoyi-probe-desc,
+.ruoyi-traffic-desc {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.ruoyi-probe-opts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.ruoyi-probe-opts label {
+  white-space: nowrap;
+  color: #666;
+}
+
+.ruoyi-probe-opts .select-filter {
+  width: 70px;
+}
+
+.ruoyi-probe-opts .text-input {
+  width: 80px;
+}
+
+.ruoyi-probe-check-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ruoyi-probe-progress {
+  font-size: 12px;
+  color: #4A90E2;
+  margin-bottom: 6px;
+  min-height: 16px;
+  font-weight: 500;
+}
+
+.ruoyi-probe-results {
+  max-height: 300px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.ruoyi-probe-stats {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.probe-stat {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.probe-stat.probe-ok {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.probe-stat.probe-redirect {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.probe-stat.probe-auth {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.probe-stat.probe-notfound {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.probe-stat.probe-error {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.probe-stat.probe-other {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.ruoyi-probe-list {
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+
+.ruoyi-probe-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 11px;
+}
+
+.ruoyi-probe-item:last-child {
+  border-bottom: none;
+}
+
+.probe-code {
+  display: inline-block;
+  min-width: 36px;
+  text-align: center;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.probe-code.probe-status-ok {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.probe-code.probe-status-redirect {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.probe-code.probe-status-auth {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.probe-code.probe-status-notfound {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.probe-code.probe-status-error {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.probe-code.probe-status-other {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.probe-path {
+  flex: 1;
+  color: #333;
+  font-family: monospace;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.probe-badge {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.probe-error {
+  color: #ef4444;
+  font-size: 10px;
+}
+
+/* RuoYi — API Traffic */
+.ruoyi-traffic-filter-row {
+  margin-bottom: 8px;
+}
+
+.ruoyi-traffic-filter-row .text-input {
+  width: 100%;
+}
+
+.ruoyi-traffic-stats {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 6px;
+  min-height: 14px;
+}
+
+.ruoyi-traffic-results {
+  max-height: 350px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.ruoyi-traffic-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+
+.ruoyi-traffic-item:hover {
+  background: #f5f5f5;
+}
+
+.ruoyi-traffic-item:last-child {
+  border-bottom: none;
+}
+
+.traffic-method {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #e0e7ff;
+  color: #3730a3;
+  min-width: 36px;
+  text-align: center;
+}
+
+.traffic-status {
+  font-weight: 600;
+  font-size: 11px;
+  min-width: 28px;
+  text-align: center;
+}
+
+.traffic-status.traffic-ok {
+  color: #10b981;
+}
+
+.traffic-status.traffic-err {
+  color: #ef4444;
+}
+
+.traffic-url {
+  flex: 1;
+  color: #333;
+  font-family: monospace;
+  font-size: 11px;
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.traffic-time {
+  color: #999;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.traffic-preview {
+  background: #f8f8f8;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 4px 8px;
+  font-family: monospace;
+  font-size: 10px;
+  color: #555;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Dark theme — Probe & Traffic */
+[data-theme='dark'] .ruoyi-probe-desc,
+[data-theme='dark'] .ruoyi-traffic-desc {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-probe-opts label {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-probe-list {
+  border-color: var(--border-color);
+}
+
+[data-theme='dark'] .ruoyi-probe-item {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .probe-path {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .probe-stat.probe-ok {
+  background: #064e3b;
+  color: #6ee7b7;
+}
+
+[data-theme='dark'] .probe-stat.probe-redirect {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .probe-stat.probe-auth {
+  background: #7f1d1d;
+  color: #fca5a5;
+}
+
+[data-theme='dark'] .probe-stat.probe-notfound {
+  background: #374151;
+  color: #9ca3af;
+}
+
+[data-theme='dark'] .probe-stat.probe-error {
+  background: #831843;
+  color: #f9a8d4;
+}
+
+[data-theme='dark'] .probe-code.probe-status-ok {
+  background: #064e3b;
+  color: #6ee7b7;
+}
+
+[data-theme='dark'] .probe-code.probe-status-redirect {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .probe-code.probe-status-auth {
+  background: #7f1d1d;
+  color: #fca5a5;
+}
+
+[data-theme='dark'] .probe-code.probe-status-notfound {
+  background: #374151;
+  color: #9ca3af;
+}
+
+[data-theme='dark'] .probe-code.probe-status-error {
+  background: #831843;
+  color: #f9a8d4;
+}
+
+[data-theme='dark'] .probe-code.probe-status-other {
+  background: #312e81;
+  color: #a5b4fc;
+}
+
+[data-theme='dark'] .probe-error {
+  color: #fca5a5;
+}
+
+[data-theme='dark'] .ruoyi-traffic-stats {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-traffic-item {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .ruoyi-traffic-item:hover {
+  background: var(--bg-tertiary);
+}
+
+[data-theme='dark'] .traffic-method {
+  background: #312e81;
+  color: #a5b4fc;
+}
+
+[data-theme='dark'] .traffic-url {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .traffic-time {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .traffic-preview {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
 /* ====== Dark Mode ====== */
 [data-theme='dark'] {
   --bg-primary: #1A1A2E;
@@ -3803,6 +4207,62 @@ body {
 [data-theme='dark'] .sm-analysis-progress-text { color: var(--text-secondary); }
 [data-theme='dark'] .sm-analysis-summary { background: var(--bg-tertiary); color: var(--text-secondary); }
 
+/* Webpack — API Endpoint Extraction */
+.sm-api-summary {
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: #f0f7ff;
+  border-radius: 4px;
+}
+
+.sm-api-list-inner {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.sm-api-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 11px;
+}
+
+.sm-api-item:last-child { border-bottom: none; }
+
+.sm-api-url {
+  flex: 1;
+  font-family: monospace;
+  color: #333;
+  word-break: break-all;
+}
+
+.sm-api-source {
+  font-size: 10px;
+  color: #888;
+  white-space: nowrap;
+}
+
+[data-theme='dark'] .sm-api-summary {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .sm-api-item {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .sm-api-url {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .sm-api-source {
+  color: var(--text-secondary);
+}
+
 /* ====== Webpack Scan Button Animation ====== */
 #sourcemap-scan-btn.scanning {
   position: relative;
@@ -4014,3 +4474,208 @@ body {
 [data-theme='dark'] .rules-list { background: var(--bg-primary); }
 [data-theme='dark'] .rules-item { color: var(--text-primary); }
 [data-theme='dark'] .rules-scope-na { color: #f87171; }
+
+/* ====== Vue Store Explorer ====== */
+.vue-store-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.vue-store-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.vue-store-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 14px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+.vue-store-results {
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+.vue-store-actions-list {
+  max-height: 250px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+.vue-store-directives {
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+.vue-store-card {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.vue-store-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  font-weight: 600;
+}
+.vue-store-name { color: var(--accent); }
+.vue-store-type {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(52, 152, 219, 0.1);
+  color: #3498db;
+}
+.vue-store-node { margin-left: 4px; }
+.vue-store-key-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  cursor: default;
+  border-radius: 3px;
+}
+.vue-store-key-row:hover { background: var(--bg-tertiary); }
+.vue-store-toggle {
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--text-secondary);
+  user-select: none;
+  flex-shrink: 0;
+}
+.vue-store-toggle-collapsed { cursor: pointer; }
+.vue-store-toggle-expanded { cursor: pointer; }
+.vue-store-toggle-leaf { visibility: hidden; }
+.vue-store-key {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.vue-store-val {
+  color: var(--text-secondary);
+  word-break: break-all;
+  max-width: 350px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vue-store-null { color: #e67e22; }
+.vue-store-type-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(155, 89, 182, 0.1);
+  color: #9b59b6;
+}
+.vue-store-children {
+  margin-left: 20px;
+}
+.vue-store-children.hidden { display: none; }
+.vue-store-truncated { color: var(--text-secondary); padding-left: 24px; }
+.vue-store-more {
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: 4px 8px 4px 28px;
+}
+.vue-store-section {
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-color);
+}
+.vue-store-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.vue-store-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.vue-store-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(52, 152, 219, 0.1);
+  color: #3498db;
+}
+.vue-store-tag-mut {
+  background: rgba(231, 76, 60, 0.1);
+  color: #e74c3c;
+}
+.vue-store-tag-act {
+  background: rgba(46, 204, 113, 0.1);
+  color: #27ae60;
+}
+.vue-store-api-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vue-store-api-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+}
+.vue-store-api-item code {
+  font-size: 12px;
+  color: var(--accent);
+  word-break: break-all;
+}
+.vue-dir-summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.vue-dir-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.vue-dir-item:hover { background: var(--bg-tertiary); }
+.vue-dir-name {
+  font-weight: 600;
+  color: #e67e22;
+  font-size: 12px;
+}
+.vue-dir-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.vue-dir-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.vue-dir-examples code {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+/* Dark theme - Vue Store Explorer */
+[data-theme='dark'] .vue-store-card { border-color: var(--border-color); }
+[data-theme='dark'] .vue-store-header { background: var(--bg-tertiary); }
+[data-theme='dark'] .vue-store-type { background: rgba(52, 152, 219, 0.2); }
+[data-theme='dark'] .vue-store-key-row:hover { background: var(--bg-tertiary); }
+[data-theme='dark'] .vue-store-api-item { background: var(--bg-tertiary); }
+[data-theme='dark'] .vue-dir-item:hover { background: var(--bg-tertiary); }
+[data-theme='dark'] .vue-dir-examples code { background: var(--bg-tertiary); }
+[data-theme='dark'] .vue-store-section { border-top-color: var(--border-color); }

@@ -211,6 +211,9 @@
     renderPermList,
     startPermAutoRefresh,
     stopPermAutoRefresh,
+    exploreVueStore,
+    copyFullStoreJson,
+    initStoreExplorerEvents,
   } = vue;
 
   Object.defineProperties(window, {
@@ -278,6 +281,13 @@
     toggleSelectAll,
     exportCurlCommands,
     exportHtmlReport,
+    batchProbeRoutes,
+    stopProbe,
+    loadApiTraffic,
+    clearApiTraffic,
+    exportApiTraffic,
+    filterApiTraffic,
+    lookupCve,
   } = ruoyi;
 
   Object.defineProperties(window, {
@@ -388,6 +398,9 @@
     renderSourcemapModules,
     analyzeSourcemaps,
     downloadSingleModule,
+    showApiEndpoints,
+    exportModulesJSON,
+    exportModulesCSV,
   } = sourcemap;
 
   Object.defineProperties(window, {
@@ -1109,6 +1122,15 @@
       btn.addEventListener('click', () => switchVueSubTab(btn.dataset.vstab));
     });
 
+    // Vue Store Explorer
+    const vueStoreReadBtn = utils.get('vue-store-read-btn');
+    if (vueStoreReadBtn) vueStoreReadBtn.addEventListener('click', exploreVueStore);
+    const vueStoreCopyBtn = utils.get('vue-store-copy-btn');
+    if (vueStoreCopyBtn) vueStoreCopyBtn.addEventListener('click', copyFullStoreJson);
+    const vueStoreRefreshBtn = utils.get('vue-store-refresh-btn');
+    if (vueStoreRefreshBtn) vueStoreRefreshBtn.addEventListener('click', exploreVueStore);
+    initStoreExplorerEvents();
+
     // Permission menu interception
     const permStartBtn = utils.get('perm-start-btn');
     if (permStartBtn) permStartBtn.addEventListener('click', startPermInterception);
@@ -1270,6 +1292,22 @@
     if (ruoyiSelectAllBtn) ruoyiSelectAllBtn.addEventListener('click', toggleSelectAll);
     const ruoyiCopyPathsBtn = utils.get('ruoyi-copy-paths-btn');
     if (ruoyiCopyPathsBtn) ruoyiCopyPathsBtn.addEventListener('click', copyExtraPaths);
+
+    // RuoYi batch probe
+    const ruoyiProbeBtn = utils.get('ruoyi-probe-btn');
+    if (ruoyiProbeBtn) ruoyiProbeBtn.addEventListener('click', batchProbeRoutes);
+    const ruoyiProbeStopBtn = utils.get('ruoyi-probe-stop-btn');
+    if (ruoyiProbeStopBtn) ruoyiProbeStopBtn.addEventListener('click', stopProbe);
+
+    // RuoYi API traffic
+    const ruoyiTrafficLoadBtn = utils.get('ruoyi-traffic-load-btn');
+    if (ruoyiTrafficLoadBtn) ruoyiTrafficLoadBtn.addEventListener('click', loadApiTraffic);
+    const ruoyiTrafficClearBtn = utils.get('ruoyi-traffic-clear-btn');
+    if (ruoyiTrafficClearBtn) ruoyiTrafficClearBtn.addEventListener('click', clearApiTraffic);
+    const ruoyiTrafficExportBtn = utils.get('ruoyi-traffic-export-btn');
+    if (ruoyiTrafficExportBtn) ruoyiTrafficExportBtn.addEventListener('click', exportApiTraffic);
+    const ruoyiTrafficFilter = utils.get('ruoyi-traffic-filter');
+    if (ruoyiTrafficFilter) ruoyiTrafficFilter.addEventListener('input', filterApiTraffic);
 
     // Restore perm intercept state
     chrome.storage.local.get(['permInterceptTabId'], result => {
@@ -1493,6 +1531,20 @@
         var card = utils.get('sm-analysis-card');
         if (card) card.classList.add('hidden');
       });
+
+    // Webpack API endpoint extraction
+    var smApiBtn = utils.get('sourcemap-api-btn');
+    if (smApiBtn) smApiBtn.addEventListener('click', showApiEndpoints);
+    var smApiClose = utils.get('sm-api-close');
+    if (smApiClose)
+      smApiClose.addEventListener('click', function () {
+        var card = utils.get('sm-api-card');
+        if (card) card.classList.add('hidden');
+      });
+    var smExportJson = utils.get('sourcemap-export-json-btn');
+    if (smExportJson) smExportJson.addEventListener('click', exportModulesJSON);
+    var smExportCsv = utils.get('sourcemap-export-csv-btn');
+    if (smExportCsv) smExportCsv.addEventListener('click', exportModulesCSV);
 
     // Status bar clock
     const statusTime = utils.get('status-time');

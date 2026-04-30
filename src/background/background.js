@@ -390,6 +390,49 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       return true;
 
+    case 'FETCH_PROBE':
+      // Probing uses the tab's own origin — allow private IPs but validate protocol
+      {
+        let probeUrl;
+        try {
+          probeUrl = new URL(message.url);
+          if (probeUrl.protocol !== 'http:' && probeUrl.protocol !== 'https:') {
+            sendResponse({ error: 'Invalid protocol' });
+            return true;
+          }
+        } catch {
+          sendResponse({ error: 'Invalid URL' });
+          return true;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), message.timeout || 5000);
+        fetch(probeUrl.href, {
+          method: message.method || 'GET',
+          redirect: message.followRedirect !== false ? 'follow' : 'manual',
+          signal: controller.signal,
+          headers: message.headers || {},
+        })
+          .then(resp => {
+            clearTimeout(timer);
+            const hdrs = {};
+            resp.headers.forEach((v, k) => {
+              hdrs[k] = v;
+            });
+            sendResponse({
+              status: resp.status,
+              statusText: resp.statusText,
+              headers: hdrs,
+              redirected: resp.redirected,
+              url: resp.url,
+            });
+          })
+          .catch(e => {
+            clearTimeout(timer);
+            sendResponse({ error: e.message, status: 0 });
+          });
+      }
+      return true;
+
     case 'FETCH_IMAGE':
       if (!isAllowedUrl(message.url)) {
         sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });

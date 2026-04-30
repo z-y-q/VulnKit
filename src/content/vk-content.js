@@ -7,15 +7,39 @@
 
   var extId = chrome.runtime.id;
   var pendingResolve = null;
+  var storeExploreResolve = null;
   var detecting = false;
 
+  // Vue detect response relay
   window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin) return;
+
+    // Vue detection result
     if (e.data && e.data.__vk_detect && pendingResolve) {
-      if (e.origin !== location.origin) return;
-      var result = e.data.result;
-      pendingResolve(result);
+      pendingResolve(e.data.result);
       pendingResolve = null;
       detecting = false;
+      return;
+    }
+
+    // RuoYi hook events → forward to popup
+    if (e.data && e.data.__vk_ruoyi_hook && e.data.event) {
+      chrome.runtime
+        .sendMessage({
+          type: 'VK_RUOYI_HOOK_EVENT',
+          event: e.data.event,
+          augmented: e.data.augmented,
+          injected: e.data.injected,
+        })
+        .catch(function () {});
+      return;
+    }
+
+    // Vue store explorer result
+    if (e.data && e.data.__vk_vue_store && storeExploreResolve) {
+      storeExploreResolve(e.data.result);
+      storeExploreResolve = null;
+      return;
     }
   });
 
@@ -103,6 +127,34 @@
         sendResponse({ status: 'load-failed' });
       };
       (document.head || document.documentElement).appendChild(hookScript);
+      return true;
+    }
+    if (message.type === 'VK_VUE_STORE_EXPLORE') {
+      storeExploreResolve = null;
+      return new Promise(function (resolve) {
+        storeExploreResolve = resolve;
+        var script = document.createElement('script');
+        script.src = chrome.runtime.getURL('src/inject/vue-store-explorer.js');
+        script.onload = function () {
+          script.remove();
+          setTimeout(function () {
+            if (storeExploreResolve) {
+              storeExploreResolve({ error: 'Store explorer timeout' });
+              storeExploreResolve = null;
+            }
+          }, 5000);
+        };
+        script.onerror = function () {
+          script.remove();
+          if (storeExploreResolve) {
+            storeExploreResolve({ error: 'Failed to load store explorer' });
+            storeExploreResolve = null;
+          }
+        };
+        (document.head || document.documentElement).appendChild(script);
+      }).then(function (result) {
+        sendResponse(result);
+      });
       return true;
     }
   });

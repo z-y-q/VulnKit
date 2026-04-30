@@ -1566,25 +1566,126 @@ window.VulnKitSourcemap = (function () {
       ' 个源码模块（Source Map）...</div>';
 
     var securityRules = [
+      // === Critical ===
+      {
+        name: 'AWS Access Key',
+        pattern: /AKIA[0-9A-Z]{16}/g,
+        severity: 'critical',
+      },
+      {
+        name: 'AWS Secret Key',
+        pattern:
+          /(?:aws[_-]?secret[_-]?access[_-]?key|AWS_SECRET_ACCESS_KEY)\s*[:=]\s*['"]([A-Za-z0-9/+=]{40})['"]/gi,
+        severity: 'critical',
+      },
+      {
+        name: 'GitHub Token',
+        pattern: /gh[pousr]_[A-Za-z0-9_]{36,255}/g,
+        severity: 'critical',
+      },
+      {
+        name: 'Stripe Secret Key',
+        pattern: /sk_live_[0-9a-zA-Z]{24,}/g,
+        severity: 'critical',
+      },
+      {
+        name: 'Stripe Publishable Key',
+        pattern: /pk_live_[0-9a-zA-Z]{24,}/g,
+        severity: 'high',
+      },
+      {
+        name: 'Slack Token',
+        pattern: /xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,}/g,
+        severity: 'critical',
+      },
+      {
+        name: 'Slack Webhook',
+        pattern: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[a-zA-Z0-9]+/g,
+        severity: 'high',
+      },
+      {
+        name: 'Google API Key',
+        pattern: /AIza[0-9A-Za-z\-_]{35}/g,
+        severity: 'high',
+      },
+      {
+        name: 'Google OAuth Token',
+        pattern: /ya29\.[0-9A-Za-z\-_]+/g,
+        severity: 'high',
+      },
+      {
+        name: 'SendGrid API Key',
+        pattern: /SG\.[A-Za-z0-9\-_]{22}\.[A-Za-z0-9\-_]{43}/g,
+        severity: 'critical',
+      },
+      {
+        name: 'Twilio API Key',
+        pattern: /SK[0-9a-fA-F]{32}/g,
+        severity: 'critical',
+      },
+      {
+        name: '数据库连接串',
+        pattern: /(?:mongodb|mysql|postgres|postgresql|redis|ftp|smtp|ssh|amqp):\/\/[^\s'"]+/gi,
+        severity: 'critical',
+      },
+      {
+        name: 'MongoDB URI',
+        pattern: /mongodb(?:\+srv)?:\/\/[^\s'"]+/gi,
+        severity: 'critical',
+      },
+      {
+        name: '私钥 (RSA/EC/DSA)',
+        pattern: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/g,
+        severity: 'critical',
+      },
+      // === High ===
       {
         name: 'API 密钥泄露',
-        pattern: /(?:api[_-]?key|apikey|secret[_-]?key)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
+        pattern:
+          /(?:api[_-]?key|apikey|secret[_-]?key|app[_-]?key|app[_-]?secret)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
         severity: 'high',
       },
       {
         name: '硬编码密码',
-        pattern: /(?:password|passwd|pwd)\s*[:=]\s*['"]([^'"]{4,})['"]/gi,
+        pattern: /(?:password|passwd|pwd|pass[_-]?word)\s*[:=]\s*['"]([^'"]{4,})['"]/gi,
         severity: 'high',
       },
       {
         name: 'JWT Secret',
-        pattern: /(?:jwt[_-]?secret|token[_-]?secret)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
+        pattern: /(?:jwt[_-]?secret|token[_-]?secret|jwt[_-]?key)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
         severity: 'high',
       },
       {
-        name: '数据库连接串',
-        pattern: /(?:mongodb|mysql|postgres|redis):\/\/[^\s'"]+/gi,
-        severity: 'critical',
+        name: 'Authorization Header',
+        pattern:
+          /(?:Authorization|Bearer)\s*[:=]\s*['"](?:Bearer\s+)?([A-Za-z0-9\-_.~+/]+=*)['"]/gi,
+        severity: 'high',
+      },
+      {
+        name: 'OAuth Client Secret',
+        pattern: /(?:client[_-]?secret|oauth[_-]?secret)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
+        severity: 'high',
+      },
+      {
+        name: 'Heroku API Key',
+        pattern:
+          /(?:heroku|HEROKU)\s*[:=]\s*['"]([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})['"]/gi,
+        severity: 'high',
+      },
+      {
+        name: 'Firebase URL',
+        pattern: /https:\/\/[a-z0-9-]+\.firebaseio\.com/gi,
+        severity: 'high',
+      },
+      {
+        name: 'Shopify Token',
+        pattern: /shpat_[a-fA-F0-9]{32}/g,
+        severity: 'high',
+      },
+      {
+        name: 'PayPal Braintree Token',
+        pattern: /access_token\$production\$[0-9a-z]{16}\$[0-9a-f]{32}/g,
+        severity: 'high',
       },
       {
         name: '内部IP地址',
@@ -1592,14 +1693,135 @@ window.VulnKitSourcemap = (function () {
           /(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})/g,
         severity: 'medium',
       },
-      { name: '调试代码', pattern: /console\.(?:log|debug|info)\s*\(/g, severity: 'low' },
-      { name: 'TODO/FIXME', pattern: /(?:TODO|FIXME|HACK|XXX)\s*[:\(]/gi, severity: 'info' },
-      { name: 'eval() 使用', pattern: /eval\s*\(/g, severity: 'medium' },
-      { name: 'innerHTML 赋值', pattern: /innerHTML\s*=/g, severity: 'medium' },
       {
-        name: 'localStorage/cookie',
-        pattern: /(?:localStorage|sessionStorage|document\.cookie)/g,
+        name: 'Internal Domain',
+        pattern:
+          /(?:https?:\/\/)?(?:[a-z0-9-]+\.)?(?:internal|intranet|staging|dev|test|local|corp)\.[a-z0-9-]+/gi,
+        severity: 'high',
+      },
+      // === Medium ===
+      {
+        name: 'eval() 使用',
+        pattern: /eval\s*\(/g,
+        severity: 'medium',
+      },
+      {
+        name: 'innerHTML 赋值',
+        pattern: /innerHTML\s*=/g,
+        severity: 'medium',
+      },
+      {
+        name: 'document.write',
+        pattern: /document\.write\s*\(/g,
+        severity: 'medium',
+      },
+      {
+        name: 'CORS 通配符',
+        pattern: /Access-Control-Allow-Origin['"]\s*[:=]\s*['"]\*['"]/gi,
+        severity: 'medium',
+      },
+      {
+        name: 'CSP 禁用',
+        pattern: /Content-Security-Policy['"]\s*[:=]\s*['"]unsafe/gi,
+        severity: 'medium',
+      },
+      {
+        name: '路径穿越',
+        pattern: /\.\.[\/\\]/g,
+        severity: 'medium',
+      },
+      {
+        name: 'XXE 风险',
+        pattern: /DOMParser|xmlHttpRequest|\.parseFromString/gi,
+        severity: 'medium',
+      },
+      {
+        name: '命令拼接风险',
+        pattern: /(?:exec|execSync|spawn|child_process)\s*\(/g,
+        severity: 'medium',
+      },
+      {
+        name: 'SQL 拼接',
+        pattern: /(?:SELECT|INSERT|UPDATE|DELETE|DROP)\s+.*\+\s*(?:req|params|query|body)/gi,
+        severity: 'medium',
+      },
+      {
+        name: 'unsafe eval (CSP)',
+        pattern: /unsafe-eval/gi,
+        severity: 'medium',
+      },
+      {
+        name: 'window.location 赋值',
+        pattern: /(?:window\.)?location\s*=\s*[^=]/g,
         severity: 'low',
+      },
+      {
+        name: 'postMessage 无 origin 校验',
+        pattern: /postMessage\s*\([^)]*\)/g,
+        severity: 'medium',
+      },
+      {
+        name: 'localStorage 敏感数据',
+        pattern:
+          /localStorage\.(?:setItem|set)\s*\(\s*['"](?:token|auth|session|password|secret|key)/gi,
+        severity: 'medium',
+      },
+      // === Low ===
+      {
+        name: '调试代码 (console.log)',
+        pattern: /console\.(?:log|debug|info)\s*\(/g,
+        severity: 'low',
+      },
+      {
+        name: 'localStorage/sessionStorage',
+        pattern: /(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)/g,
+        severity: 'low',
+      },
+      {
+        name: 'document.cookie',
+        pattern: /document\.cookie/g,
+        severity: 'low',
+      },
+      {
+        name: '调试断点 (debugger)',
+        pattern: /debugger\s*;/g,
+        severity: 'low',
+      },
+      // === Info ===
+      {
+        name: 'TODO/FIXME/HACK',
+        pattern: /(?:TODO|FIXME|HACK|XXX|BUG)\s*[:\(]/gi,
+        severity: 'info',
+      },
+      {
+        name: 'Swagger/OpenAPI 端点',
+        pattern: /['"]\/(?:swagger|api-docs|openapi|graphql)(?:\/)?['"]/gi,
+        severity: 'info',
+      },
+      {
+        name: 'Spring Actuator',
+        pattern: /['"]\/(?:actuator|env|health|metrics|trace|beans|mappings)(?:\/)?['"]/gi,
+        severity: 'info',
+      },
+      {
+        name: '备份文件路径',
+        pattern: /['"](?:backup|\.bak|\.old|\.orig|\.save|\.tar|\.zip|\.sql|\.dump)['"]/gi,
+        severity: 'info',
+      },
+      {
+        name: '.git 暴露',
+        pattern: /['"]\/\.git(?:\/|['"])/g,
+        severity: 'high',
+      },
+      {
+        name: '测试文件',
+        pattern: /['"](?:test|spec|mock|fixture|stub)s?['"]/gi,
+        severity: 'info',
+      },
+      {
+        name: '环境配置引用',
+        pattern: /process\.env\.[A-Z_]+/g,
+        severity: 'info',
       },
     ];
 
@@ -1867,6 +2089,128 @@ window.VulnKitSourcemap = (function () {
     }
   }
 
+  // ====== API Endpoint Extraction ======
+
+  function extractApiEndpoints() {
+    var endpoints = {};
+    var patterns = [
+      /(?:axios|http|request|api|fetch)\s*\.\s*(?:get|post|put|delete|patch|head|options)\s*\(\s*['"`]([^'"`\s)]+)['"`]/gi,
+      /fetch\s*\(\s*['"`]([^'"`\s)]+)['"`]/gi,
+      /(?:url|uri|endpoint|apiUrl|baseUrl)\s*[:=]\s*['"`]([^'"`\s)]+)['"`]/gi,
+      /['"`](\/api\/[^\s'"`)]{2,})['"`]/gi,
+      /['"`](\/(?:v[0-9]+)\/[^\s'"`)]{2,})['"`]/gi,
+    ];
+
+    var skipRe = /\.(css|png|jpg|jpeg|gif|svg|ico|woff|ttf|eot|map)(?:\?|$)/i;
+    sourcemapModules.forEach(function (mod) {
+      var source = sourcemapSourceCache[mod.path];
+      if (!source) return;
+      patterns.forEach(function (pat) {
+        var regex = new RegExp(pat.source, pat.flags);
+        var match;
+        while ((match = regex.exec(source)) !== null) {
+          var url = match[1];
+          if (!url || url.length < 3 || skipRe.test(url)) continue;
+          url = url.replace(/\$\{[^}]*\}/g, ':param').replace(/['"`]/g, '');
+          if (!endpoints[url]) {
+            endpoints[url] = [];
+          }
+          if (endpoints[url].indexOf(mod.path) === -1) {
+            endpoints[url].push(mod.path);
+          }
+        }
+      });
+    });
+
+    return endpoints;
+  }
+
+  function showApiEndpoints() {
+    var card = utils.get('sm-api-card');
+    var listEl = utils.get('sm-api-list');
+    if (!card || !listEl) return;
+
+    var endpoints = extractApiEndpoints();
+    var urls = Object.keys(endpoints).sort();
+
+    if (urls.length === 0) {
+      utils.showToast('未提取到 API 端点', 'warning');
+      return;
+    }
+
+    card.classList.remove('hidden');
+    var html =
+      '<div class="sm-api-summary">提取到 <strong>' + urls.length + '</strong> 个 API 端点</div>';
+    html += '<div class="sm-api-list-inner">';
+    urls.forEach(function (url) {
+      html += '<div class="sm-api-item">';
+      html += '<span class="sm-api-url">' + utils.escapeHtml(url) + '</span>';
+      html +=
+        '<span class="sm-api-source">' +
+        utils.escapeHtml(endpoints[url][0].split('/').pop()) +
+        '</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+    html +=
+      '<div class="panel-actions"><button class="btn btn-sm btn-outline" id="sm-api-copy-btn">复制全部</button></div>';
+    listEl.innerHTML = html;
+
+    var copyBtn = utils.get('sm-api-copy-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        utils.copyText(urls.join('\n'));
+        utils.showToast('已复制 ' + urls.length + ' 个端点', 'success');
+      });
+    }
+  }
+
+  // ====== Export Functions ======
+
+  function exportModulesJSON() {
+    if (sourcemapModules.length === 0) {
+      utils.showToast('没有模块数据', 'warning');
+      return;
+    }
+    var data = {
+      exportedAt: new Date().toISOString(),
+      moduleCount: sourcemapModules.length,
+      modules: sourcemapModules.map(function (m) {
+        return {
+          path: m.path,
+          source: m.source,
+          type: SOURCE_TYPE_LABELS[m.source] || m.source,
+          size: m.size || 0,
+          deps: m.deps || [],
+        };
+      }),
+    };
+    utils.copyText(JSON.stringify(data, null, 2));
+    utils.showToast('已导出 ' + sourcemapModules.length + ' 个模块 JSON', 'success');
+  }
+
+  function exportModulesCSV() {
+    if (sourcemapModules.length === 0) {
+      utils.showToast('没有模块数据', 'warning');
+      return;
+    }
+    var lines = ['Path,Source,Size,Deps'];
+    sourcemapModules.forEach(function (m) {
+      lines.push(
+        '"' +
+          (m.path || '').replace(/"/g, '""') +
+          '","' +
+          (m.source || '') +
+          '",' +
+          (m.size || 0) +
+          ',' +
+          (m.deps ? m.deps.length : 0)
+      );
+    });
+    utils.copyText(lines.join('\n'));
+    utils.showToast('已导出 CSV', 'success');
+  }
+
   // --- Public API ---
   return {
     // Functions
@@ -1880,6 +2224,9 @@ window.VulnKitSourcemap = (function () {
     renderSourcemapModules: renderSourcemapModules,
     analyzeSourcemaps: analyzeSourcemaps,
     downloadSingleModule: downloadSingleModule,
+    showApiEndpoints: showApiEndpoints,
+    exportModulesJSON: exportModulesJSON,
+    exportModulesCSV: exportModulesCSV,
 
     // State (getter/setter)
     get sourcemapModules() {

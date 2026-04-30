@@ -10,13 +10,14 @@
   var userInfoUrls = [/\/getUserInfo/i, /\/getInfo/i];
 
   window.__VK_RUOYI_HOOK__ = {
-    version: '1.1',
+    version: '1.2',
     enabled: false,
     capturedRouters: null,
     augmentMode: 'auto',
     extraRoutes: [],
     customRouterUrls: [],
     requestLog: [],
+    apiLog: [],
     hookInstalledAt: Date.now(),
   };
 
@@ -57,6 +58,37 @@
     return userInfoUrls.some(function (p) {
       return p.test(url);
     });
+  }
+
+  function isApiUrl(url) {
+    try {
+      var pathname = new URL(url, location.origin).pathname;
+      return (
+        /^\/(api|admin|system|monitor|tool|gen|auth|login|logout|captcha|code|user|role|menu|dept|post|dict|config|notice|log)\b/i.test(
+          pathname
+        ) ||
+        /\.(json|xml)$/i.test(pathname) ||
+        /\/(get|list|add|edit|update|delete|remove|export|import|upload|download|query)\b/i.test(
+          pathname
+        )
+      );
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function logApiRequest(url, method, status, body) {
+    var hook = window.__VK_RUOYI_HOOK__;
+    if (!hook) return;
+    if (!hook.apiLog) hook.apiLog = [];
+    hook.apiLog.push({
+      url: url,
+      method: method || 'GET',
+      status: status || 0,
+      body: body ? body.substring(0, 5000) : '',
+      time: getTime(),
+    });
+    if (hook.apiLog.length > 200) hook.apiLog = hook.apiLog.slice(-150);
   }
 
   function logRequest(type, url, status, method) {
@@ -227,6 +259,19 @@
         window.postMessage({ __vk_ruoyi_hook: true, event: 'userinfo_captured' }, location.origin);
       }
 
+      // Capture all API traffic
+      if (isApiUrl(url) && !isRouterUrl(url) && !isUserInfoUrl(url)) {
+        response
+          .clone()
+          .text()
+          .then(function (body) {
+            logApiRequest(url, fetchMethod, response.status, body);
+          })
+          .catch(function () {
+            logApiRequest(url, fetchMethod, response.status, '');
+          });
+      }
+
       return response;
     });
   };
@@ -291,6 +336,22 @@
             location.origin
           );
         }
+      });
+    } else if (
+      config &&
+      config.enabled &&
+      this.__vk_ruoyi_url &&
+      isApiUrl(this.__vk_ruoyi_url) &&
+      !isRouterUrl(this.__vk_ruoyi_url) &&
+      !isUserInfoUrl(this.__vk_ruoyi_url)
+    ) {
+      this.addEventListener('load', function () {
+        logApiRequest(
+          self.__vk_ruoyi_url,
+          self.__vk_ruoyi_method,
+          self.status,
+          self.responseText || ''
+        );
       });
     }
     return origSend.apply(this, arguments);

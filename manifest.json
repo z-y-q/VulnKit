@@ -42,7 +42,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/inject/vue-detect.js", "src/inject/ruoyi-route-hook.js"],
+      "resources": ["src/inject/vue-detect.js", "src/inject/ruoyi-route-hook.js", "src/inject/vue-store-explorer.js"],
       "matches": ["<all_urls>"]
     }
   ],

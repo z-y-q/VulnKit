@@ -698,6 +698,7 @@
           <button class="vue-stab" data-vstab="perm">权限菜单</button>
           <button class="vue-stab" data-vstab="jssearch">JS搜索</button>
           <button class="vue-stab" data-vstab="compare">路由对比</button>
+          <button class="vue-stab" data-vstab="store">状态探索</button>
         </div>
 
         <!-- 基础检测 -->
@@ -815,6 +816,32 @@
             <div class="traverse-log" id="traverse-log"></div>
           </div>
         </div>
+
+        <!-- 状态探索 -->
+        <div id="vstab-store" class="vue-subpanel">
+          <div class="vue-store-actions">
+            <button class="btn btn-primary" id="vue-store-read-btn">读取 Store</button>
+            <button class="btn btn-sm btn-outline" id="vue-store-copy-btn">复制 JSON</button>
+            <button class="btn btn-sm btn-secondary" id="vue-store-refresh-btn">刷新</button>
+          </div>
+          <div class="vue-store-status" id="vue-store-status"></div>
+
+          <div class="vue-store-section-label">Store 数据</div>
+          <div class="vue-store-results" id="vue-store-results">
+            <div class="empty-state">点击「读取 Store」探索 Vuex/Pinia 状态数据</div>
+          </div>
+
+          <div class="vue-store-section-label">Actions / API 端点</div>
+          <div class="vue-store-actions-list" id="vue-store-actions">
+            <div class="empty-state">读取 Store 后自动提取</div>
+          </div>
+
+          <div class="vue-store-section-label">自定义指令</div>
+          <div class="vue-store-directives" id="vue-store-directives">
+            <div class="empty-state">读取 Store 后自动扫描</div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -1057,6 +1084,9 @@
           <button class="btn btn-sm btn-outline" id="sourcemap-copy-tree-btn">目录树</button>
           <button class="btn btn-sm btn-outline" id="sourcemap-load-sources-btn">加载到Sources</button>
           <button class="btn btn-sm btn-outline" id="sourcemap-download-all-btn">下载全部</button>
+          <button class="btn btn-sm btn-outline" id="sourcemap-api-btn">提取API</button>
+          <button class="btn btn-sm btn-outline" id="sourcemap-export-json-btn">导出JSON</button>
+          <button class="btn btn-sm btn-outline" id="sourcemap-export-csv-btn">导出CSV</button>
         </div>
         <div class="sourcemap-status" id="sourcemap-status"></div>
         <div class="sm-progress hidden" id="sm-progress">
@@ -1088,6 +1118,15 @@
           <div id="sm-analysis-results"></div>
         </div>
 
+        <!-- API 端点提取 -->
+        <div class="content-card card-spacing hidden" id="sm-api-card">
+          <div class="sourcemap-detail-header">
+            <div class="card-title card-title-flat">API 端点提取</div>
+            <button class="btn btn-sm btn-outline" id="sm-api-close">关闭</button>
+          </div>
+          <div id="sm-api-list"></div>
+        </div>
+
         <!-- 文件详情（点击模块后显示） -->
         <div class="content-card card-spacing hidden" id="sourcemap-detail-card">
           <div class="sourcemap-detail-header">
@@ -1112,6 +1151,8 @@
           <button class="ruoyi-stab active" data-rstab="detect">框架检测</button>
           <button class="ruoyi-stab" data-rstab="hook">路由钩子</button>
           <button class="ruoyi-stab" data-rstab="analyze">JS分析</button>
+          <button class="ruoyi-stab" data-rstab="probe">批量探测</button>
+          <button class="ruoyi-stab" data-rstab="traffic">API流量</button>
         </div>
 
         <!-- 框架检测 -->
@@ -1171,6 +1212,57 @@
           <div class="ruoyi-status" id="ruoyi-analyze-status"></div>
           <div class="ruoyi-analyze-results" id="ruoyi-analyze-results">
             <div class="empty-state">点击「分析JS路由」开始</div>
+          </div>
+        </div>
+
+        <!-- 批量探测 -->
+        <div id="rstab-probe" class="ruoyi-subpanel">
+          <div class="ruoyi-probe-desc">对已发现的路由路径发送 HTTP 请求，快速识别可达/未授权/隐藏接口</div>
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="ruoyi-probe-btn">开始探测</button>
+            <button class="btn btn-sm btn-secondary" id="ruoyi-probe-stop-btn" disabled>停止</button>
+          </div>
+          <div class="ruoyi-probe-opts">
+            <label>并发:</label>
+            <select id="ruoyi-probe-concurrency" class="select-filter">
+              <option value="3">3</option>
+              <option value="5" selected>5</option>
+              <option value="10">10</option>
+            </select>
+            <label>超时(ms):</label>
+            <input type="number" id="ruoyi-probe-timeout" class="text-input text-input-sm" value="5000" min="1000" max="30000" step="1000">
+            <label>方法:</label>
+            <select id="ruoyi-probe-method" class="select-filter">
+              <option value="GET" selected>GET</option>
+              <option value="POST">POST</option>
+              <option value="OPTIONS">OPTIONS</option>
+            </select>
+            <label class="ruoyi-probe-check-label"><input type="checkbox" id="ruoyi-probe-follow-redirect" checked> 跟随重定向</label>
+          </div>
+          <div class="ruoyi-status" id="ruoyi-probe-status"></div>
+          <div class="ruoyi-probe-progress" id="ruoyi-probe-progress"></div>
+          <div class="ruoyi-probe-results" id="ruoyi-probe-results">
+            <div class="empty-state">先检测框架或分析JS路由，获取路径后开始探测</div>
+          </div>
+          <div class="panel-actions">
+            <button class="btn btn-sm btn-outline" id="ruoyi-probe-export-btn">导出结果</button>
+          </div>
+        </div>
+
+        <!-- API流量 -->
+        <div id="rstab-traffic" class="ruoyi-subpanel">
+          <div class="ruoyi-traffic-desc">捕获页面的 API 请求流量（需先安装路由钩子并启用）</div>
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="ruoyi-traffic-load-btn">加载流量</button>
+            <button class="btn btn-sm btn-secondary" id="ruoyi-traffic-clear-btn">清空</button>
+            <button class="btn btn-sm btn-outline" id="ruoyi-traffic-export-btn">导出</button>
+          </div>
+          <div class="ruoyi-traffic-filter-row">
+            <input type="text" id="ruoyi-traffic-filter" class="text-input text-input-sm" placeholder="过滤 URL 关键词...">
+          </div>
+          <div class="ruoyi-traffic-stats" id="ruoyi-traffic-count"></div>
+          <div class="ruoyi-traffic-results" id="ruoyi-traffic-list">
+            <div class="empty-state">安装路由钩子并浏览页面后，点击「加载流量」查看</div>
           </div>
         </div>
       </div>

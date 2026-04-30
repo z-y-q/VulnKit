@@ -710,7 +710,7 @@ window.VulnKitRuoYi = (function () {
         utils.escapeHtml(component.split('/').pop()) +
         '</span>';
     }
-    // Show meta permissions if present
+    // Show meta roles if present
     if (route.meta && route.meta.roles) {
       var roles = Array.isArray(route.meta.roles) ? route.meta.roles : [route.meta.roles];
       if (roles.length > 0) {
@@ -719,6 +719,18 @@ window.VulnKitRuoYi = (function () {
           utils.escapeHtml(roles.join(', ')) +
           '">' +
           utils.escapeHtml(roles.length > 2 ? roles[0] + ',...' : roles.join(', ')) +
+          '</span>';
+      }
+    }
+    // Show meta perms if present
+    if (route.meta && route.meta.perms) {
+      var perms = Array.isArray(route.meta.perms) ? route.meta.perms : [route.meta.perms];
+      if (perms.length > 0) {
+        html +=
+          '<span class="ruoyi-route-perms" title="' +
+          utils.escapeHtml(perms.join(', ')) +
+          '">' +
+          utils.escapeHtml(perms.length > 2 ? perms[0] + ',...' : perms.join(', ')) +
           '</span>';
       }
     }
@@ -1195,6 +1207,318 @@ window.VulnKitRuoYi = (function () {
     });
   }
 
+  // ====== Batch Route Probing ======
+
+  var probeAbortFlag = false;
+
+  async function batchProbeRoutes() {
+    var statusEl = utils.get('ruoyi-probe-progress');
+    var resultsEl = utils.get('ruoyi-probe-results');
+    var probeBtn = utils.get('ruoyi-probe-btn');
+    var stopBtn = utils.get('ruoyi-probe-stop-btn');
+
+    try {
+      var tab = await getActiveTab();
+      if (!tab || !tab.id) {
+        utils.showToast('无法获取当前标签页', 'warning');
+        return;
+      }
+
+      var origin;
+      try {
+        origin = new URL(tab.url).origin;
+      } catch (e) {
+        utils.showToast('无法解析页面URL', 'warning');
+        return;
+      }
+
+      // Collect all paths from captured routes + extra routes
+      var paths = [];
+      if (capturedRouterData) {
+        extractPathsFromData(capturedRouterData.data || capturedRouterData, paths);
+      }
+      extraRoutes.forEach(function (r) {
+        if (r.path && paths.indexOf(r.path) === -1) paths.push(r.path);
+      });
+
+      if (paths.length === 0) {
+        if (resultsEl) resultsEl.innerHTML = '<div class="empty-state">没有可探测的路由路径</div>';
+        return;
+      }
+
+      var concurrency = parseInt((utils.get('ruoyi-probe-concurrency') || {}).value || '5', 10);
+      var method = (utils.get('ruoyi-probe-method') || {}).value || 'GET';
+      var timeout = parseInt((utils.get('ruoyi-probe-timeout') || {}).value || '5000', 10);
+      var followRedirect = (utils.get('ruoyi-probe-follow-redirect') || {}).checked !== false;
+
+      if (probeBtn) probeBtn.disabled = true;
+      if (stopBtn) stopBtn.disabled = false;
+      probeAbortFlag = false;
+
+      var results = [];
+      var completed = 0;
+
+      for (var i = 0; i < paths.length; i += concurrency) {
+        if (probeAbortFlag) break;
+        var batch = paths.slice(i, i + concurrency);
+        var batchResults = await Promise.allSettled(
+          batch.map(function (p) {
+            return chrome.runtime
+              .sendMessage({
+                type: 'FETCH_PROBE',
+                url: origin + p,
+                method: method,
+                timeout: timeout,
+                followRedirect: followRedirect,
+              })
+              .catch(function () {
+                return { error: 'send failed', status: 0 };
+              });
+          })
+        );
+
+        for (var j = 0; j < batchResults.length; j++) {
+          var r = batchResults[j];
+          var val = r.status === 'fulfilled' ? r.value : r.reason;
+          results.push({
+            path: batch[j],
+            status: (val && val.status) || 0,
+            statusText: (val && val.statusText) || '',
+            error: (val && val.error) || '',
+            redirected: (val && val.redirected) || false,
+          });
+          completed++;
+          if (statusEl)
+            statusEl.textContent =
+              '探测中... ' +
+              completed +
+              '/' +
+              paths.length +
+              ' (' +
+              Math.round((completed / paths.length) * 100) +
+              '%)';
+        }
+      }
+
+      if (probeBtn) probeBtn.disabled = false;
+      if (stopBtn) stopBtn.disabled = true;
+      if (statusEl)
+        statusEl.textContent = probeAbortFlag
+          ? '已停止 (' + completed + '/' + paths.length + ')'
+          : '完成 (' + completed + '/' + paths.length + ')';
+
+      renderProbeResults(results, resultsEl);
+    } catch (e) {
+      if (probeBtn) probeBtn.disabled = false;
+      if (stopBtn) stopBtn.disabled = true;
+      utils.showToast('探测失败: ' + e.message, 'error');
+    }
+  }
+
+  function stopProbe() {
+    probeAbortFlag = true;
+  }
+
+  function renderProbeResults(results, containerEl) {
+    if (!containerEl) return;
+    if (results.length === 0) {
+      containerEl.innerHTML = '<div class="empty-state">无结果</div>';
+      return;
+    }
+
+    var stats = { ok: 0, redirect: 0, auth: 0, notfound: 0, error: 0, other: 0 };
+    results.forEach(function (r) {
+      if (r.status >= 200 && r.status < 300) stats.ok++;
+      else if (r.status >= 300 && r.status < 400) stats.redirect++;
+      else if (r.status === 401 || r.status === 403) stats.auth++;
+      else if (r.status === 404) stats.notfound++;
+      else if (r.status === 0) stats.error++;
+      else stats.other++;
+    });
+
+    var html =
+      '<div class="ruoyi-probe-stats">' +
+      '<span class="probe-stat probe-ok">200: ' +
+      stats.ok +
+      '</span>' +
+      '<span class="probe-stat probe-redirect">3xx: ' +
+      stats.redirect +
+      '</span>' +
+      '<span class="probe-stat probe-auth">401/403: ' +
+      stats.auth +
+      '</span>' +
+      '<span class="probe-stat probe-notfound">404: ' +
+      stats.notfound +
+      '</span>' +
+      '<span class="probe-stat probe-error">ERR: ' +
+      stats.error +
+      '</span>' +
+      (stats.other > 0
+        ? '<span class="probe-stat probe-other">Other: ' + stats.other + '</span>'
+        : '') +
+      '</div>';
+
+    html += '<div class="ruoyi-probe-list">';
+    results.forEach(function (r) {
+      var cls = 'probe-status-other';
+      if (r.status >= 200 && r.status < 300) cls = 'probe-status-ok';
+      else if (r.status >= 300 && r.status < 400) cls = 'probe-status-redirect';
+      else if (r.status === 401 || r.status === 403) cls = 'probe-status-auth';
+      else if (r.status === 404) cls = 'probe-status-notfound';
+      else if (r.status === 0) cls = 'probe-status-error';
+      else if (r.status >= 500) cls = 'probe-status-error';
+
+      html += '<div class="ruoyi-probe-item">';
+      html += '<span class="probe-code ' + cls + '">' + (r.status || 'ERR') + '</span>';
+      html += '<span class="probe-path">' + utils.escapeHtml(r.path) + '</span>';
+      if (r.redirected) html += '<span class="probe-badge">R</span>';
+      if (r.error) html += '<span class="probe-error">' + utils.escapeHtml(r.error) + '</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+    containerEl.innerHTML = html;
+  }
+
+  // ====== API Traffic Viewer ======
+
+  async function loadApiTraffic() {
+    var countEl = utils.get('ruoyi-traffic-count');
+    var listEl = utils.get('ruoyi-traffic-list');
+    try {
+      var tab = await getActiveTab();
+      if (!tab || !tab.id) return;
+
+      var results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        world: 'MAIN',
+        func: function () {
+          var hook = window.__VK_RUOYI_HOOK__;
+          if (!hook || !hook.apiLog) return [];
+          return hook.apiLog.slice(-200);
+        },
+      });
+
+      var log = (results && results[0] && results[0].result) || [];
+      if (countEl) countEl.textContent = '已捕获 ' + log.length + ' 个API请求';
+
+      if (log.length === 0) {
+        if (listEl)
+          listEl.innerHTML =
+            '<div class="empty-state">安装路由钩子并浏览页面后，此处显示捕获的API请求</div>';
+        return;
+      }
+
+      var html = '<div class="ruoyi-traffic-list-inner">';
+      log.forEach(function (entry, i) {
+        var statusCls = '';
+        if (entry.status >= 200 && entry.status < 300) statusCls = 'traffic-ok';
+        else if (entry.status >= 400) statusCls = 'traffic-err';
+        else if (entry.status === 0) statusCls = 'traffic-err';
+
+        html += '<div class="ruoyi-traffic-item" data-idx="' + i + '">';
+        html +=
+          '<span class="traffic-method">' + utils.escapeHtml(entry.method || 'GET') + '</span>';
+        html +=
+          '<span class="traffic-status ' + statusCls + '">' + (entry.status || '-') + '</span>';
+        html += '<span class="traffic-url">' + utils.escapeHtml(entry.url || '') + '</span>';
+        html += '<span class="traffic-time">' + utils.escapeHtml(entry.time || '') + '</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+      if (listEl) listEl.innerHTML = html;
+
+      // Click to show body preview
+      listEl.querySelectorAll('.ruoyi-traffic-item').forEach(function (el) {
+        el.addEventListener('click', function () {
+          var idx = parseInt(el.dataset.idx, 10);
+          var entry = log[idx];
+          if (!entry || !entry.body) return;
+          var preview = entry.body.substring(0, 500);
+          var existing = listEl.querySelector('.traffic-preview');
+          if (existing) existing.remove();
+          var pre = document.createElement('div');
+          pre.className = 'traffic-preview';
+          pre.textContent = preview;
+          el.after(pre);
+        });
+      });
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function clearApiTraffic() {
+    var listEl = utils.get('ruoyi-traffic-list');
+    var countEl = utils.get('ruoyi-traffic-count');
+    if (listEl)
+      listEl.innerHTML =
+        '<div class="empty-state">安装路由钩子并浏览页面后，此处显示捕获的API请求</div>';
+    if (countEl) countEl.textContent = '';
+    getActiveTab().then(function (tab) {
+      if (!tab || !tab.id) return;
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        world: 'MAIN',
+        func: function () {
+          if (window.__VK_RUOYI_HOOK__) window.__VK_RUOYI_HOOK__.apiLog = [];
+        },
+      });
+    });
+  }
+
+  function exportApiTraffic() {
+    getActiveTab()
+      .then(function (tab) {
+        if (!tab || !tab.id) return;
+        return chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: function () {
+            return (window.__VK_RUOYI_HOOK__ && window.__VK_RUOYI_HOOK__.apiLog) || [];
+          },
+        });
+      })
+      .then(function (results) {
+        var log = (results && results[0] && results[0].result) || [];
+        if (log.length === 0) {
+          utils.showToast('没有API流量数据', 'warning');
+          return;
+        }
+        utils.copyText(JSON.stringify(log, null, 2));
+        utils.showToast('已导出 ' + log.length + ' 条API流量', 'success');
+      });
+  }
+
+  function filterApiTraffic() {
+    var filterEl = utils.get('ruoyi-traffic-filter');
+    if (!filterEl) return;
+    var query = (filterEl.value || '').toLowerCase().trim();
+    var items = document.querySelectorAll('.ruoyi-traffic-item');
+    items.forEach(function (el) {
+      if (!query) {
+        el.style.display = '';
+        return;
+      }
+      var url = (el.querySelector('.traffic-url') || {}).textContent || '';
+      el.style.display = url.toLowerCase().indexOf(query) !== -1 ? '' : 'none';
+    });
+  }
+
+  // ====== CVE Lookup ======
+
+  function lookupCve(version) {
+    if (!version) {
+      utils.showToast('未检测到版本信息', 'warning');
+      return;
+    }
+    var query = 'RuoYi ' + version;
+    var url =
+      'https://nvd.nist.gov/vuln/search/results?query=' +
+      encodeURIComponent(query) +
+      '&results_type=overview';
+    window.open(url, '_blank');
+  }
+
   // ====== Sub-tab Switching ======
 
   function switchRuoYiSubTab(tab) {
@@ -1263,6 +1587,13 @@ window.VulnKitRuoYi = (function () {
     toggleSelectAll: toggleSelectAll,
     exportCurlCommands: exportCurlCommands,
     exportHtmlReport: exportHtmlReport,
+    batchProbeRoutes: batchProbeRoutes,
+    stopProbe: stopProbe,
+    loadApiTraffic: loadApiTraffic,
+    clearApiTraffic: clearApiTraffic,
+    exportApiTraffic: exportApiTraffic,
+    filterApiTraffic: filterApiTraffic,
+    lookupCve: lookupCve,
     get ruoyiHookActive() {
       return ruoyiHookActive;
     },
