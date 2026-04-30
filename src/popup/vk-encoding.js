@@ -104,8 +104,7 @@ window.VulnKitEncoding = (function () {
       utils.showToast('没有可复制的内容', 'warning');
       return;
     }
-    utils.copyText(outputEl.value);
-    utils.showToast('已复制到剪贴板', 'success');
+    utils.copyAndToast(outputEl.value, '已复制到剪贴板');
   }
 
   function swapFields() {

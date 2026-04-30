@@ -217,30 +217,6 @@ async function fetchUrl(url, tailOnly) {
   }
 }
 
-async function fetchUrlAuth(url, key, header) {
-  try {
-    var controller = new AbortController();
-    var timer = setTimeout(function () {
-      controller.abort();
-    }, 15000);
-    const resp = await fetch(url, {
-      headers: { [header]: key },
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    if (!resp.ok) {
-      var body = await resp.text().catch(function () {
-        return '';
-      });
-      throw new Error('HTTP ' + resp.status + (body ? ': ' + body.slice(0, 200) : ''));
-    }
-    const data = await resp.text();
-    return { success: true, data };
-  } catch (e) {
-    return { success: false, error: e.message || '请求超时' };
-  }
-}
-
 async function fetchImage(url) {
   try {
     const controller = new AbortController();

@@ -106,8 +106,7 @@ window.VulnKitJwt = (function () {
       utils.showToast('请先解码 JWT', 'warning');
       return;
     }
-    utils.copyText(el.textContent);
-    utils.showToast('已复制 Header', 'success');
+    utils.copyAndToast(el.textContent, '已复制 Header');
   }
 
   function copyJwtPayload() {
@@ -116,8 +115,7 @@ window.VulnKitJwt = (function () {
       utils.showToast('请先解码 JWT', 'warning');
       return;
     }
-    utils.copyText(el.textContent);
-    utils.showToast('已复制 Payload', 'success');
+    utils.copyAndToast(el.textContent, '已复制 Payload');
   }
 
   return {

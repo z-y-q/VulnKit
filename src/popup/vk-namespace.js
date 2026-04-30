@@ -64,7 +64,7 @@
   };
 
   utils.getCurrentDomain = async function () {
-    var tab = await this.getActiveTab();
+    var tab = await utils.getActiveTab();
     if (!tab || !tab.url) return '';
     try {
       return new URL(tab.url).hostname;
@@ -73,11 +73,37 @@
     }
   };
 
-  var self = utils;
+  utils.copyAndToast = function (text, msg, type, duration) {
+    utils.copyText(text);
+    utils.showToast(msg || '已复制', type || 'success', duration);
+  };
+
+  utils.downloadCsv = function (csv, filename) {
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    chrome.downloads.download({ url: url, filename: filename, saveAs: true }, function () {
+      URL.revokeObjectURL(url);
+      if (chrome.runtime.lastError) {
+        utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
+        return;
+      }
+      utils.showToast('导出成功', 'success');
+    });
+  };
+
   var utilsProxy = {};
-  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
+  [
+    'get',
+    'escapeHtml',
+    'copyText',
+    'showToast',
+    'copyAndToast',
+    'downloadCsv',
+    'getActiveTab',
+    'getCurrentDomain',
+  ].forEach(function (method) {
     utilsProxy[method] = function () {
-      return self[method].apply(self, arguments);
+      return utils[method].apply(utils, arguments);
     };
   });
   utils.utilsProxy = utilsProxy;

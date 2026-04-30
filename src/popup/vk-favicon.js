@@ -49,7 +49,7 @@ window.VulnKitFavicon = (function () {
 
   async function extractFavicon() {
     try {
-      const utils = window.VulnKitUtils;
+      const utils = window.VulnKitUtils.utilsProxy;
       const tab = await utils.getActiveTab();
       if (!tab?.url) {
         utils.showToast('无法获取当前页面', 'error');
@@ -152,7 +152,7 @@ window.VulnKitFavicon = (function () {
 
       utils.showToast('图标提取成功', 'success');
     } catch (e) {
-      window.VulnKitUtils.showToast('提取失败: ' + e.message, 'error');
+      utils.showToast('提取失败: ' + e.message, 'error');
     }
   }
 
@@ -163,8 +163,7 @@ window.VulnKitFavicon = (function () {
       utils.showToast('请先提取图标', 'warning');
       return;
     }
-    utils.copyText(urlEl.textContent);
-    utils.showToast('已复制图标 URL', 'success');
+    utils.copyAndToast(urlEl.textContent, '已复制图标 URL');
   }
 
   return { extractFavicon, copyFaviconUrl };

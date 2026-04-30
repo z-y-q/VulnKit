@@ -4,7 +4,6 @@ window.VulnKitRuoYiCommon = (function () {
   'use strict';
 
   var utils = window.VulnKitUtils.utilsProxy;
-  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   function updateWorkflowStep(step) {
     var steps = document.querySelectorAll('.ruoyi-wf-step');
@@ -23,7 +22,7 @@ window.VulnKitRuoYiCommon = (function () {
 
   return {
     utils: utils,
-    getActiveTab: getActiveTab,
+    getActiveTab: utils.getActiveTab,
     updateWorkflowStep: updateWorkflowStep,
   };
 })();

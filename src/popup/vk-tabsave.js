@@ -63,8 +63,7 @@ window.VulnKitTabSave = (function () {
         return t.url;
       })
       .join('\n');
-    utils.copyText(text);
-    utils.showToast('已复制 ' + savedTabUrls.length + ' 个 URL', 'success');
+    utils.copyAndToast(text, '已复制 ' + savedTabUrls.length + ' 个 URL');
   }
 
   function exportSavedTabUrls() {

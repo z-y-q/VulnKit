@@ -769,8 +769,7 @@ window.VulnKitRuoYiMar = (function () {
         return r.path || r.component;
       })
       .join('\n');
-    utils.copyText(paths);
-    utils.showToast('已复制 ' + marHiddenRoutes.length + ' 条路径', 'success');
+    utils.copyAndToast(paths, '已复制 ' + marHiddenRoutes.length + ' 条路径');
   }
 
   // ====== Init ======

@@ -8,7 +8,6 @@ window.VulnKitJsCtrl = (function () {
   'use strict';
 
   var utils = window.VulnKitUtils.utilsProxy;
-  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   // ====== JS Control ======
   var currentJsCtrlTab = 'jstoggle';
@@ -77,7 +76,7 @@ window.VulnKitJsCtrl = (function () {
 
     var tab;
     try {
-      tab = await getActiveTab();
+      tab = await utils.getActiveTab();
     } catch (e) {}
     if (!tab || !tab.id) {
       updateJsToggleStatus();
@@ -122,7 +121,7 @@ window.VulnKitJsCtrl = (function () {
 
     var tab;
     try {
-      tab = await getActiveTab();
+      tab = await utils.getActiveTab();
     } catch (e) {}
     if (!tab || !tab.id) {
       updateJsToggleStatus();
@@ -166,7 +165,7 @@ window.VulnKitJsCtrl = (function () {
     updateAntidebugIndicator('warn', '正在扫描...');
 
     try {
-      var tab = await getActiveTab();
+      var tab = await utils.getActiveTab();
       if (!tab || !tab.id) return;
 
       // Phase 1: inline script scan (MAIN world)
@@ -355,7 +354,7 @@ window.VulnKitJsCtrl = (function () {
   }
 
   async function bypassAntiDebug() {
-    var tab = await getActiveTab();
+    var tab = await utils.getActiveTab();
     if (!tab || !tab.id) return;
 
     try {
@@ -448,7 +447,7 @@ window.VulnKitJsCtrl = (function () {
   }
 
   async function clearScriptBlock() {
-    var tab = await getActiveTab();
+    var tab = await utils.getActiveTab();
     if (!tab || !tab.id) return;
 
     try {
@@ -498,7 +497,7 @@ window.VulnKitJsCtrl = (function () {
 
     var tab;
     try {
-      tab = await getActiveTab();
+      tab = await utils.getActiveTab();
     } catch (e) {}
     if (!tab || !tab.id) {
       updateUncopyIndicator('off', '无法获取当前标签页');

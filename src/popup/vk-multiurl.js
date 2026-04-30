@@ -5,7 +5,6 @@ window.VulnKitMultiUrl = (function () {
   var utils = window.VulnKitUtils.utilsProxy;
 
   function parseUrls() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const el = utils.get('multiurl-input');
     if (!el) return [];
     const text = el.value;
@@ -21,13 +20,11 @@ window.VulnKitMultiUrl = (function () {
   }
 
   function updateMultiurlInfo(count) {
-    const utils = window.VulnKitUtils.utilsProxy;
     const el = utils.get('multiurl-info');
     if (el) el.textContent = count > 0 ? '已识别 ' + count + ' 个 URL' : '';
   }
 
   function handleMultiurlOpen() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const urls = parseUrls();
     if (urls.length === 0) {
       utils.showToast('请输入URL', 'warning');
@@ -42,7 +39,6 @@ window.VulnKitMultiUrl = (function () {
   }
 
   function handleMultiurlDedup() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const urls = parseUrls();
     const unique = [...new Set(urls)];
     if (unique.length === urls.length) {
@@ -56,7 +52,6 @@ window.VulnKitMultiUrl = (function () {
   }
 
   function copyAllUrls() {
-    var utils = window.VulnKitUtils.utilsProxy;
     var urls = parseUrls();
     if (urls.length === 0) {
       utils.showToast('没有可复制的URL', 'warning');

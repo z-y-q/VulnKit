@@ -2,7 +2,6 @@ window.VulnKitSourcemap = (function () {
   'use strict';
 
   var utils = window.VulnKitUtils.utilsProxy;
-  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   // --- State ---
   let sourcemapModules = [];
@@ -138,7 +137,7 @@ window.VulnKitSourcemap = (function () {
     smUpdateProgress(0, 1);
 
     try {
-      var tab = await getActiveTab();
+      var tab = await utils.getActiveTab();
       if (!tab || !tab.id || !tab.url || tab.url.startsWith('chrome')) {
         statusEl.textContent = '无法扫描此页面';
         if (scanBtn) {
@@ -1927,8 +1926,7 @@ window.VulnKitSourcemap = (function () {
       })
       .filter(Boolean)
       .join('\n');
-    utils.copyText(paths);
-    utils.showToast('已复制 ' + sourcemapModules.length + ' 个路径', 'success');
+    utils.copyAndToast(paths, '已复制 ' + sourcemapModules.length + ' 个路径');
   }
 
   function generateSourcemapTree() {
@@ -1964,8 +1962,7 @@ window.VulnKitSourcemap = (function () {
 
     var treeLines = renderTree(tree, '', true);
     var output = treeLines.join('\n');
-    utils.copyText(output);
-    utils.showToast('目录树已复制', 'success');
+    utils.copyAndToast(output, '目录树已复制');
   }
 
   async function loadSourcesToDevTools() {
@@ -1981,7 +1978,7 @@ window.VulnKitSourcemap = (function () {
       return;
     }
     try {
-      var tab = await getActiveTab();
+      var tab = await utils.getActiveTab();
       if (!tab || !tab.id) {
         utils.showToast('无法获取当前标签页', 'warning');
         return;
@@ -2073,8 +2070,7 @@ window.VulnKitSourcemap = (function () {
   function copyModuleSource() {
     var codeEl = utils.get('sourcemap-source-code');
     if (codeEl && codeEl.value) {
-      utils.copyText(codeEl.value);
-      utils.showToast('已复制源码', 'success');
+      utils.copyAndToast(codeEl.value, '已复制源码');
     }
   }
 

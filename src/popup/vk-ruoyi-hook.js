@@ -639,8 +639,7 @@ window.VulnKitRuoYiHook = (function () {
     }
 
     html += '</body></html>';
-    utils.copyText(html);
-    utils.showToast('HTML 报告已复制到剪贴板', 'success');
+    utils.copyAndToast(html, 'HTML 报告已复制到剪贴板');
   }
 
   function renderFlatRoutes(routes, emit) {

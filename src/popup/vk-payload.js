@@ -346,7 +346,6 @@ window.VulnKitPayload = (function () {
   };
 
   function renderPayloadCategories(containerId, data, collapsed, filterText) {
-    const utils = window.VulnKitUtils.utilsProxy;
     const container = utils.get(containerId);
     if (!container) return;
     container.innerHTML = '';
@@ -392,8 +391,7 @@ window.VulnKitPayload = (function () {
       });
       cat.querySelectorAll('.payload-item-copy').forEach(btn => {
         btn.addEventListener('click', () => {
-          utils.copyText(btn.dataset.payload);
-          utils.showToast('已复制', 'success', 1000);
+          utils.copyAndToast(btn.dataset.payload, '已复制', 'success', 1000);
         });
       });
       container.appendChild(cat);
@@ -410,7 +408,6 @@ window.VulnKitPayload = (function () {
   }
 
   function generateReverseShell() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const ip = (utils.get('revshell-ip') || {}).value || '';
     const port = (utils.get('revshell-port') || {}).value || '4444';
     const type = (utils.get('revshell-type') || {}).value || 'bash';
@@ -425,7 +422,6 @@ window.VulnKitPayload = (function () {
   }
 
   function renderAllReverseShells() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const container = utils.get('revshell-all');
     if (!container) return;
     container.innerHTML = '<div class="revshell-section-title">全部 Shell 类型一览</div>';
@@ -454,7 +450,6 @@ window.VulnKitPayload = (function () {
   }
 
   function renderSqliPayloads(filterText) {
-    const utils = window.VulnKitUtils.utilsProxy;
     const n = parseInt((utils.get('sqli-columns') || {}).value) || 3;
     const table = (utils.get('sqli-table') || {}).value || 'users';
     renderPayloadCategories('sqli-categories', buildSqliPayloads(n, table), false, filterText);

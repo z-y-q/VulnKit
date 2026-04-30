@@ -5,7 +5,6 @@ window.VulnKitExif = (function () {
   let lastExifData = null;
 
   var utils = window.VulnKitUtils.utilsProxy;
-  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   const EXIF_SECTIONS = [
     {
@@ -298,7 +297,7 @@ window.VulnKitExif = (function () {
     container.innerHTML = '<div class="empty-state">正在扫描...</div>';
 
     try {
-      const tab = await getActiveTab();
+      const tab = await utils.getActiveTab();
       if (!tab?.url) {
         container.innerHTML = '<div class="empty-state">无法获取当前页面</div>';
         return;
@@ -379,8 +378,7 @@ window.VulnKitExif = (function () {
       utils.showToast('请先解析 EXIF 数据', 'warning');
       return;
     }
-    utils.copyText(JSON.stringify(lastExifData, null, 2));
-    utils.showToast('已复制 EXIF JSON', 'success');
+    utils.copyAndToast(JSON.stringify(lastExifData, null, 2), '已复制 EXIF JSON');
   }
 
   function clearExif() {

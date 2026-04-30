@@ -6,11 +6,10 @@ window.VulnKitHistory = (function () {
   let allHistoryResults = [];
 
   var utils = window.VulnKitUtils.utilsProxy;
-  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   function showHistoryQuickLinks(domain) {
     if (!domain) return;
-    const utils = window.VulnKitUtils.utilsProxy;
+
     const quickLinks = utils.get('history-quick-links');
     if (!quickLinks) return;
     quickLinks.innerHTML =
@@ -35,7 +34,6 @@ window.VulnKitHistory = (function () {
   }
 
   function buildCdxUrl(domain) {
-    const utils = window.VulnKitUtils.utilsProxy;
     const matchType = (utils.get('history-match-type') || {}).value || 'domain';
     const outputType = (utils.get('history-output-type') || {}).value || 'json';
     const fields =
@@ -112,7 +110,6 @@ window.VulnKitHistory = (function () {
   }
 
   function renderHistoryResults(items, isFilter) {
-    const utils = window.VulnKitUtils.utilsProxy;
     lastHistoryResults = items;
     if (!isFilter) allHistoryResults = items;
     const container = utils.get('history-timeline');
@@ -212,11 +209,10 @@ window.VulnKitHistory = (function () {
   }
 
   async function queryHistory() {
-    const utils = window.VulnKitUtils.utilsProxy;
     let domainEl = utils.get('history-domain');
     let raw = domainEl ? domainEl.value.trim() : '';
     if (!raw) {
-      const tab = await getActiveTab();
+      const tab = await utils.getActiveTab();
       if (!tab?.url) {
         utils.showToast('请输入域名或打开一个网页', 'warning');
         return;
@@ -266,7 +262,6 @@ window.VulnKitHistory = (function () {
   }
 
   function exportData() {
-    var utils = window.VulnKitUtils.utilsProxy;
     if (!lastHistoryResults || lastHistoryResults.length === 0) {
       utils.showToast('没有可导出的结果', 'warning');
       return;
@@ -289,23 +284,7 @@ window.VulnKitHistory = (function () {
       );
     });
     var csv = lines.join('\n');
-    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    chrome.downloads.download(
-      {
-        url: url,
-        filename: 'vulnkit-history-' + Date.now() + '.csv',
-        saveAs: true,
-      },
-      function () {
-        URL.revokeObjectURL(url);
-        if (chrome.runtime.lastError) {
-          utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
-          return;
-        }
-        utils.showToast('导出成功', 'success');
-      }
-    );
+    utils.downloadCsv(csv, 'vulnkit-history-' + Date.now() + '.csv');
   }
 
   return {

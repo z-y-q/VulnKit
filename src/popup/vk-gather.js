@@ -13,7 +13,6 @@ window.VulnKitGather = (function () {
   var searchFilter = '';
 
   var utils = window.VulnKitUtils.utilsProxy;
-  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   function getHaeRules() {
     return window.VulnKitHaeRules || null;
@@ -32,7 +31,6 @@ window.VulnKitGather = (function () {
   }
 
   function updateSearchVisibility() {
-    var utils = window.VulnKitUtils.utilsProxy;
     var searchInput = utils ? utils.get('gather-search') : null;
     if (!searchInput) return;
     var hasData = Object.keys(gatherData).some(function (k) {
@@ -42,7 +40,6 @@ window.VulnKitGather = (function () {
   }
 
   function renderGatherTab() {
-    var utils = window.VulnKitUtils.utilsProxy;
     var list = getFilteredList();
     var container = utils.get('gather-results');
     var statusEl = utils.get('gather-status');
@@ -87,8 +84,7 @@ window.VulnKitGather = (function () {
 
     container.querySelectorAll('.gather-item-copy').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        utils.copyText(btn.dataset.copy);
-        utils.showToast('已复制', 'success');
+        utils.copyAndToast(btn.dataset.copy);
       });
     });
   }
@@ -96,7 +92,6 @@ window.VulnKitGather = (function () {
   function switchGatherTab(tab) {
     currentGatherTab = tab;
     searchFilter = '';
-    var utils = window.VulnKitUtils.utilsProxy;
     var searchInput = utils ? utils.get('gather-search') : null;
     if (searchInput) searchInput.value = '';
     document.querySelectorAll('.gather-tab').forEach(function (b) {
@@ -111,7 +106,6 @@ window.VulnKitGather = (function () {
   }
 
   function renderSubTabs() {
-    var utils = window.VulnKitUtils.utilsProxy;
     var container = utils ? utils.get('gather-sub-tabs') : null;
     if (!container) return;
 
@@ -270,12 +264,11 @@ window.VulnKitGather = (function () {
   }
 
   async function gatherInfo() {
-    var utils = window.VulnKitUtils.utilsProxy;
     var statusEl = utils.get('gather-status');
     if (statusEl) statusEl.textContent = '正在收集...';
 
     try {
-      var tab = await getActiveTab();
+      var tab = await utils.getActiveTab();
       if (!tab || !tab.url) {
         if (statusEl) statusEl.textContent = '无法获取当前页面';
         return;
@@ -535,7 +528,6 @@ window.VulnKitGather = (function () {
         currentGatherTab = firstGroup;
         renderGatherTab();
 
-        var utils = window.VulnKitUtils.utilsProxy;
         var statusEl = utils.get('gather-status');
         var total = Object.values(gatherData).reduce(function (s, a) {
           return s + (Array.isArray(a) ? a.length : 0);
@@ -546,7 +538,6 @@ window.VulnKitGather = (function () {
   }
 
   function exportAllData() {
-    var utils = window.VulnKitUtils.utilsProxy;
     var total = Object.values(gatherData).reduce(function (s, a) {
       return s + (Array.isArray(a) ? a.length : 0);
     }, 0);
@@ -575,27 +566,10 @@ window.VulnKitGather = (function () {
     });
 
     var csv = lines.join('\n');
-    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    chrome.downloads.download(
-      {
-        url: url,
-        filename: 'vulnkit-gather-' + Date.now() + '.csv',
-        saveAs: true,
-      },
-      function () {
-        URL.revokeObjectURL(url);
-        if (chrome.runtime.lastError) {
-          utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
-          return;
-        }
-        utils.showToast('导出成功', 'success');
-      }
-    );
+    utils.downloadCsv(csv, 'vulnkit-gather-' + Date.now() + '.csv');
   }
 
   function copyAllData() {
-    var utils = window.VulnKitUtils.utilsProxy;
     var list = gatherData[currentGatherTab] || [];
     if (list.length === 0) {
       utils.showToast('当前分组没有数据', 'warning');
@@ -606,8 +580,7 @@ window.VulnKitGather = (function () {
         return item.value;
       })
       .join('\n');
-    utils.copyText(text);
-    utils.showToast('已复制 ' + list.length + ' 条数据', 'success');
+    utils.copyAndToast(text, '已复制 ' + list.length + ' 条数据');
   }
 
   function getActiveRules() {

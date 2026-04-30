@@ -4,14 +4,13 @@ window.VulnKitLinks = (function () {
 
   let allLinks = [];
   var utils = window.VulnKitUtils.utilsProxy;
-  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   async function extractLinks() {
     var statusEl = utils.get('links-count');
     if (statusEl) statusEl.textContent = '正在提取...';
 
     try {
-      const tab = await getActiveTab();
+      const tab = await utils.getActiveTab();
       if (!tab || !tab.url) {
         if (statusEl) statusEl.textContent = '无法获取当前页面';
         return;
@@ -303,8 +302,7 @@ window.VulnKitLinks = (function () {
 
     container.querySelectorAll('.link-item-copy').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        utils.copyText(btn.dataset.href);
-        utils.showToast('已复制', 'success');
+        utils.copyAndToast(btn.dataset.href);
       });
     });
   }
@@ -320,8 +318,7 @@ window.VulnKitLinks = (function () {
         return l.href;
       })
       .join('\n');
-    utils.copyText(urls);
-    utils.showToast('已复制 ' + filtered.length + ' 个 URL', 'success');
+    utils.copyAndToast(urls, '已复制 ' + filtered.length + ' 个 URL');
   }
 
   function exportLinks() {
@@ -348,23 +345,7 @@ window.VulnKitLinks = (function () {
       );
     });
     var csv = lines.join('\n');
-    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    chrome.downloads.download(
-      {
-        url: url,
-        filename: 'vulnkit-links-' + Date.now() + '.csv',
-        saveAs: true,
-      },
-      function () {
-        URL.revokeObjectURL(url);
-        if (chrome.runtime.lastError) {
-          utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
-          return;
-        }
-        utils.showToast('导出成功', 'success');
-      }
-    );
+    utils.downloadCsv(csv, 'vulnkit-links-' + Date.now() + '.csv');
   }
 
   function sendToMultiUrl() {

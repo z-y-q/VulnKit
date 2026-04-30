@@ -10,7 +10,6 @@ window.VulnKitXss = (function () {
   let xssInterceptCountdown = 0;
 
   var utils = window.VulnKitUtils.utilsProxy;
-  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   const XSS_SCAN_PAYLOADS = [
     { name: 'alert(1)', value: '<script>alert(1)</script>' },
@@ -44,7 +43,7 @@ window.VulnKitXss = (function () {
   ];
 
   async function harvestXssParamsFromDom() {
-    const tab = await getActiveTab();
+    const tab = await utils.getActiveTab();
     if (!tab?.id) return [];
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -107,7 +106,7 @@ window.VulnKitXss = (function () {
     utils.get('xssscan-stop-intercept-btn').disabled = false;
     updateXssInterceptStatus();
 
-    var tab = await getActiveTab();
+    var tab = await utils.getActiveTab();
     if (!tab?.id) return;
     const tabId = tab.id;
 
@@ -310,7 +309,7 @@ window.VulnKitXss = (function () {
     utils.get('xssscan-stop-intercept-btn').disabled = true;
     updateXssInterceptStatus();
 
-    var tab = await getActiveTab();
+    var tab = await utils.getActiveTab();
     if (!tab?.id) return;
     chrome.scripting
       .executeScript({
@@ -335,7 +334,6 @@ window.VulnKitXss = (function () {
   }
 
   function updateXssInterceptStatus() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const el = utils.get('xssscan-status');
     if (!el) return;
     if (xssInterceptActive) {
@@ -376,7 +374,6 @@ window.VulnKitXss = (function () {
   }
 
   function renderXssPoints() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const container = utils.get('xssscan-results');
     const countEl = utils.get('xssscan-count');
     if (!container) return;
@@ -480,7 +477,6 @@ window.VulnKitXss = (function () {
   }
 
   function getSelectedPayload() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const selectEl = utils.get('xssscan-payload-select');
     const customEl = utils.get('xssscan-custom-payload');
     if (customEl && customEl.value.trim()) return customEl.value.trim();
@@ -489,7 +485,6 @@ window.VulnKitXss = (function () {
   }
 
   async function handleXssHarvest() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const statusEl = utils.get('xssscan-status');
     if (statusEl) {
       statusEl.textContent = '正在采集页面参数...';
@@ -521,7 +516,6 @@ window.VulnKitXss = (function () {
   }
 
   async function handleBatchOpenXss() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const selected = getSelectedXssPoints();
     if (selected.length === 0) {
       utils.showToast('没有选中的注入点', 'warning');
@@ -542,7 +536,7 @@ window.VulnKitXss = (function () {
     }
 
     if (postPoints.length > 0) {
-      const tab = await getActiveTab();
+      const tab = await utils.getActiveTab();
       if (!tab?.id) {
         utils.showToast('无法获取当前标签页', 'error');
         return;
@@ -603,7 +597,6 @@ window.VulnKitXss = (function () {
   }
 
   function handleCopyXssUrls() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const selected = getSelectedXssPoints();
     if (selected.length === 0) {
       utils.showToast('没有选中的注入点', 'warning');
@@ -631,7 +624,6 @@ window.VulnKitXss = (function () {
   }
 
   function initXssScanPayloadSelect() {
-    const utils = window.VulnKitUtils.utilsProxy;
     const select = utils.get('xssscan-payload-select');
     if (!select) return;
     XSS_SCAN_PAYLOADS.forEach(p => {
@@ -663,7 +655,6 @@ window.VulnKitXss = (function () {
   }
 
   function exportData() {
-    var utils = window.VulnKitUtils.utilsProxy;
     if (xssPoints.length === 0) {
       utils.showToast('没有可导出的注入点', 'warning');
       return;
@@ -686,23 +677,7 @@ window.VulnKitXss = (function () {
       );
     });
     var csv = lines.join('\n');
-    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    chrome.downloads.download(
-      {
-        url: url,
-        filename: 'vulnkit-xss-' + Date.now() + '.csv',
-        saveAs: true,
-      },
-      function () {
-        URL.revokeObjectURL(url);
-        if (chrome.runtime.lastError) {
-          utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
-          return;
-        }
-        utils.showToast('导出成功', 'success');
-      }
-    );
+    utils.downloadCsv(csv, 'vulnkit-xss-' + Date.now() + '.csv');
   }
 
   return {

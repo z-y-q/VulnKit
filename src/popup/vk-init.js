@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const utils = window.VulnKitUtils;
+  const utils = window.VulnKitUtils.utilsProxy;
 
   // ====== Encoding Tools (loaded from vk-encoding.js) ======
   const encoding = window.VulnKitEncoding;
@@ -36,17 +36,19 @@
     rsaGenerateKeyPair,
   } = crypto;
 
-  Object.defineProperties(window, {
-    currentCryptoAlgo: {
+  function exposeGlobal(name, obj, prop) {
+    Object.defineProperty(window, name, {
       get() {
-        return crypto.currentCryptoAlgo;
+        return obj[prop];
       },
       set(v) {
-        crypto.currentCryptoAlgo = v;
+        obj[prop] = v;
       },
       configurable: true,
-    },
-  });
+    });
+  }
+
+  exposeGlobal('currentCryptoAlgo', crypto, 'currentCryptoAlgo');
 
   // ====== Favicon (loaded from vk-favicon.js) ======
   const { extractFavicon, copyFaviconUrl } = window.VulnKitFavicon;
@@ -63,17 +65,9 @@
     exportData: assetExportData,
     applySearchFilter: assetApplySearchFilter,
   } = window.VulnKitAsset;
-  Object.defineProperties(window, {
-    currentAssetSource: {
-      get: () => window.VulnKitAsset.currentAssetSource,
-      set: v => {
-        window.VulnKitAsset.currentAssetSource = v;
-      },
-      configurable: true,
-    },
-  });
-  const getCurrentDomain = window.VulnKitUtils.getCurrentDomain.bind(window.VulnKitUtils);
-  const getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
+  exposeGlobal('currentAssetSource', window.VulnKitAsset, 'currentAssetSource');
+  const getCurrentDomain = utils.getCurrentDomain;
+  const getActiveTab = utils.getActiveTab;
 
   // ====== URL Multi-Open (loaded from vk-multiurl.js) ======
   const { parseUrls, updateMultiurlInfo, handleMultiurlOpen, handleMultiurlDedup, copyAllUrls } =
@@ -86,22 +80,13 @@
   // ====== Info Gather (loaded from vk-gather.js) ======
   const gather = window.VulnKitGather;
   const haeRules = window.VulnKitHaeRules;
-  const renderGatherTab = gather.renderGatherTab.bind(gather);
   const gatherInfo = gather.gatherInfo.bind(gather);
   gather.init();
 
   // ====== Link Extract (loaded from vk-links.js) ======
   const { extractLinks, renderLinks, copyFilteredUrls, exportLinks, sendToMultiUrl } =
     window.VulnKitLinks;
-  Object.defineProperties(window, {
-    allLinks: {
-      get: () => window.VulnKitLinks.allLinks,
-      set: v => {
-        window.VulnKitLinks.allLinks = v;
-      },
-      configurable: true,
-    },
-  });
+  exposeGlobal('allLinks', window.VulnKitLinks, 'allLinks');
 
   // ====== EXIF Viewer (loaded from vk-exif.js) ======
   const {
@@ -113,15 +98,7 @@
     copyExifData,
     clearExif,
   } = window.VulnKitExif;
-  Object.defineProperties(window, {
-    lastExifData: {
-      get: () => window.VulnKitExif.lastExifData,
-      set: v => {
-        window.VulnKitExif.lastExifData = v;
-      },
-      configurable: true,
-    },
-  });
+  exposeGlobal('lastExifData', window.VulnKitExif, 'lastExifData');
 
   // ====== History Archive (loaded from vk-history.js) ======
   const {
@@ -133,22 +110,8 @@
     renderHistoryResults,
     exportData: historyExportData,
   } = window.VulnKitHistory;
-  Object.defineProperties(window, {
-    lastHistoryResults: {
-      get: () => window.VulnKitHistory.lastHistoryResults,
-      set: v => {
-        window.VulnKitHistory.lastHistoryResults = v;
-      },
-      configurable: true,
-    },
-    allHistoryResults: {
-      get: () => window.VulnKitHistory.allHistoryResults,
-      set: v => {
-        window.VulnKitHistory.allHistoryResults = v;
-      },
-      configurable: true,
-    },
-  });
+  exposeGlobal('lastHistoryResults', window.VulnKitHistory, 'lastHistoryResults');
+  exposeGlobal('allHistoryResults', window.VulnKitHistory, 'allHistoryResults');
 
   // ====== Request Spoofing (loaded from vk-spoof.js) ======
   const {
@@ -169,15 +132,7 @@
     resetHeaders,
   } = window.VulnKitSpoof;
   const spoofState = window.VulnKitSpoof.spoofState;
-  Object.defineProperties(window, {
-    currentSpoofTab: {
-      get: () => window.VulnKitSpoof.currentSpoofTab,
-      set: v => {
-        window.VulnKitSpoof.currentSpoofTab = v;
-      },
-      configurable: true,
-    },
-  });
+  exposeGlobal('currentSpoofTab', window.VulnKitSpoof, 'currentSpoofTab');
 
   // ====== Vue Analysis (loaded from vk-vue.js) ======
   const vue = window.VulnKitVue;
@@ -209,53 +164,11 @@
     initStoreExplorerEvents,
   } = vue;
 
-  Object.defineProperties(window, {
-    lastVueResult: {
-      get() {
-        return vue.lastVueResult;
-      },
-      set(v) {
-        vue.lastVueResult = v;
-      },
-      configurable: true,
-    },
-    permInterceptActive: {
-      get() {
-        return vue.permInterceptActive;
-      },
-      set(v) {
-        vue.permInterceptActive = v;
-      },
-      configurable: true,
-    },
-    permCapturedData: {
-      get() {
-        return vue.permCapturedData;
-      },
-      set(v) {
-        vue.permCapturedData = v;
-      },
-      configurable: true,
-    },
-    permSelectedIndex: {
-      get() {
-        return vue.permSelectedIndex;
-      },
-      set(v) {
-        vue.permSelectedIndex = v;
-      },
-      configurable: true,
-    },
-    permViewMode: {
-      get() {
-        return vue.permViewMode;
-      },
-      set(v) {
-        vue.permViewMode = v;
-      },
-      configurable: true,
-    },
-  });
+  exposeGlobal('lastVueResult', vue, 'lastVueResult');
+  exposeGlobal('permInterceptActive', vue, 'permInterceptActive');
+  exposeGlobal('permCapturedData', vue, 'permCapturedData');
+  exposeGlobal('permSelectedIndex', vue, 'permSelectedIndex');
+  exposeGlobal('permViewMode', vue, 'permViewMode');
 
   // ====== RuoYi Route (loaded from vk-ruoyi.js) ======
   const ruoyi = window.VulnKitRuoYi;
@@ -281,33 +194,14 @@
     clearApiTraffic,
     exportApiTraffic,
     filterApiTraffic,
-    lookupCve,
     marScanDynamicRoutes,
     marInjectToRouter,
     marToggleSelectAll,
     marCopyHiddenPaths,
   } = ruoyi;
 
-  Object.defineProperties(window, {
-    ruoyiHookActive: {
-      get() {
-        return ruoyi.ruoyiHookActive;
-      },
-      set(v) {
-        ruoyi.ruoyiHookActive = v;
-      },
-      configurable: true,
-    },
-    ruoyiTabId: {
-      get() {
-        return ruoyi.ruoyiTabId;
-      },
-      set(v) {
-        ruoyi.ruoyiTabId = v;
-      },
-      configurable: true,
-    },
-  });
+  exposeGlobal('ruoyiHookActive', ruoyi, 'ruoyiHookActive');
+  exposeGlobal('ruoyiTabId', ruoyi, 'ruoyiTabId');
 
   // ====== JS Control (loaded from vk-jsctrl.js) ======
   const jsCtrl = window.VulnKitJsCtrl;
@@ -324,17 +218,7 @@
     updateUncopyIndicator,
   } = jsCtrl;
 
-  Object.defineProperties(window, {
-    jsBlocked: {
-      get() {
-        return jsCtrl.jsBlocked;
-      },
-      set(v) {
-        jsCtrl.jsBlocked = v;
-      },
-      configurable: true,
-    },
-  });
+  exposeGlobal('jsBlocked', jsCtrl, 'jsBlocked');
 
   // ====== XSS Scan (loaded from vk-xss.js) ======
   const {
@@ -350,22 +234,8 @@
     exportData: xssExportData,
     setXssSearchText,
   } = window.VulnKitXss;
-  Object.defineProperties(window, {
-    xssPoints: {
-      get: () => window.VulnKitXss.xssPoints,
-      set: v => {
-        window.VulnKitXss.xssPoints = v;
-      },
-      configurable: true,
-    },
-    xssFilterType: {
-      get: () => window.VulnKitXss.xssFilterType,
-      set: v => {
-        window.VulnKitXss.xssFilterType = v;
-      },
-      configurable: true,
-    },
-  });
+  exposeGlobal('xssPoints', window.VulnKitXss, 'xssPoints');
+  exposeGlobal('xssFilterType', window.VulnKitXss, 'xssFilterType');
 
   // ====== Payload Tools (loaded from vk-payload.js) ======
   const XSS_DATA = window.VulnKitPayload.XSS_DATA;
@@ -401,26 +271,8 @@
     exportModulesCSV,
   } = sourcemap;
 
-  Object.defineProperties(window, {
-    sourcemapSearchTerm: {
-      get() {
-        return sourcemap.sourcemapSearchTerm;
-      },
-      set(v) {
-        sourcemap.sourcemapSearchTerm = v;
-      },
-      configurable: true,
-    },
-    sourcemapCurrentModule: {
-      get() {
-        return sourcemap.sourcemapCurrentModule;
-      },
-      set(v) {
-        sourcemap.sourcemapCurrentModule = v;
-      },
-      configurable: true,
-    },
-  });
+  exposeGlobal('sourcemapSearchTerm', sourcemap, 'sourcemapSearchTerm');
+  exposeGlobal('sourcemapCurrentModule', sourcemap, 'sourcemapCurrentModule');
 
   // ====== Init ======
   function initApp() {
@@ -547,8 +399,7 @@
       copyCryptoBtn.addEventListener('click', function () {
         var v = (utils.get('crypto-output') || {}).value;
         if (v) {
-          utils.copyText(v);
-          utils.showToast('已复制', 'success');
+          utils.copyAndToast(v);
         }
       });
 
@@ -612,8 +463,7 @@
           utils.showToast('请先提取图标', 'warning');
           return;
         }
-        utils.copyText(hash);
-        utils.showToast('已复制 Hash', 'success');
+        utils.copyAndToast(hash, '已复制 Hash');
       });
 
     // Asset mapping
@@ -857,8 +707,7 @@
         const domain = extractDomain(raw);
         utils.get('history-domain').value = domain;
         const cdxUrl = buildCdxUrl(domain);
-        utils.copyText(cdxUrl);
-        utils.showToast('查询URL已复制', 'success');
+        utils.copyAndToast(cdxUrl, '查询URL已复制');
       });
     }
 
@@ -881,8 +730,7 @@
           return;
         }
         const text = lastHistoryResults.map(i => i.raw || i.url).join('\n');
-        utils.copyText(text);
-        utils.showToast('已复制 ' + lastHistoryResults.length + ' 条', 'success');
+        utils.copyAndToast(text, '已复制 ' + lastHistoryResults.length + ' 条');
       });
     }
     const historyExportBtn = utils.get('history-export-btn');
@@ -913,8 +761,7 @@
           return;
         }
         const text = filtered.map(i => i.raw || i.url).join('\n');
-        utils.copyText(text);
-        utils.showToast('已复制 ' + filtered.length + ' 条', 'success');
+        utils.copyAndToast(text, '已复制 ' + filtered.length + ' 条');
       });
     }
 
@@ -979,8 +826,7 @@
         const text = Object.entries(lastExifData)
           .map(([k, v]) => k + ': ' + v)
           .join('\n');
-        utils.copyText(text);
-        utils.showToast('已复制全部元数据', 'success');
+        utils.copyAndToast(text, '已复制全部元数据');
       });
     }
     const exifCopyJsonBtn = utils.get('exif-copy-json-btn');
@@ -1072,8 +918,7 @@
           utils.showToast('没有可复制的内容', 'warning');
           return;
         }
-        utils.copyText(lastVueResult);
-        utils.showToast('已复制', 'success');
+        utils.copyAndToast(lastVueResult);
       });
     }
 
@@ -1165,8 +1010,7 @@
           utils.showToast('没有数据', 'warning');
           return;
         }
-        utils.copyText(val);
-        utils.showToast('已复制', 'success');
+        utils.copyAndToast(val);
       });
 
     const permExpandIdsBtn = utils.get('perm-expand-ids');
@@ -1434,8 +1278,7 @@
       revshellCopy.addEventListener('click', () => {
         const output = utils.get('revshell-output');
         if (output && output.value) {
-          utils.copyText(output.value);
-          utils.showToast('已复制命令', 'success', 1000);
+          utils.copyAndToast(output.value, '已复制命令', 'success', 1000);
         }
       });
     const revshellType = utils.get('revshell-type');
