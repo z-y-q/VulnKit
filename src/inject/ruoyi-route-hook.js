@@ -5,39 +5,65 @@
 
   if (window.__VK_RUOYI_HOOK__) return;
 
-  window.__VK_RUOYI_HOOK__ = {
-    version: '1.0',
-    enabled: false,
-    capturedRouters: null,
-    augmentMode: 'auto',
-    extraRoutes: [],
-    hookInstalledAt: Date.now(),
-  };
-
-  var ROUTER_URLS = [
+  var defaultRouterUrls = [
     /\/getRouters/i,
     /\/getRoutes/i,
     /\/system\/menu\/getRouters/i,
   ];
 
-  var USERINFO_URLS = [
+  var userInfoUrls = [
     /\/getUserInfo/i,
     /\/getInfo/i,
   ];
 
+  window.__VK_RUOYI_HOOK__ = {
+    version: '1.1',
+    enabled: false,
+    capturedRouters: null,
+    augmentMode: 'auto',
+    extraRoutes: [],
+    customRouterUrls: [],
+    requestLog: [],
+    hookInstalledAt: Date.now(),
+  };
+
+  function getTime() {
+    var d = new Date();
+    return String(d.getHours()).padStart(2, '0') + ':' +
+      String(d.getMinutes()).padStart(2, '0') + ':' +
+      String(d.getSeconds()).padStart(2, '0');
+  }
+
   function isRouterUrl(url) {
-    return ROUTER_URLS.some(function (p) { return p.test(url); });
+    var hook = window.__VK_RUOYI_HOOK__;
+    var allPatterns = defaultRouterUrls.slice();
+    if (hook.customRouterUrls) {
+      hook.customRouterUrls.forEach(function (custom) {
+        try { allPatterns.push(new RegExp(custom, 'i')); } catch (e) { /* ignore bad regex */ }
+      });
+    }
+    return allPatterns.some(function (p) { return p.test(url); });
   }
 
   function isUserInfoUrl(url) {
-    return USERINFO_URLS.some(function (p) { return p.test(url); });
+    return userInfoUrls.some(function (p) { return p.test(url); });
+  }
+
+  function logRequest(type, url, status) {
+    var hook = window.__VK_RUOYI_HOOK__;
+    if (!hook) return;
+    var entry = { type: type, url: url, status: status || '', time: getTime() };
+    if (!hook.requestLog) hook.requestLog = [];
+    hook.requestLog.push(entry);
+    // Keep log bounded
+    if (hook.requestLog.length > 100) hook.requestLog = hook.requestLog.slice(-50);
   }
 
   function mergeExtraRoutes(raw) {
     var config = window.__VK_RUOYI_HOOK__;
     if (!config.extraRoutes || config.extraRoutes.length === 0) return raw;
     try {
-      var data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      var data = typeof raw === 'string' ? JSON.parse(raw) : JSON.parse(JSON.stringify(raw));
       var routeArray = data.data;
       if (!Array.isArray(routeArray)) return raw;
 
@@ -70,7 +96,8 @@
         injected++;
       });
 
-      return JSON.stringify(data);
+      var modified = JSON.stringify(data);
+      return { body: modified, injected: injected };
     } catch (e) {
       return raw;
     }
@@ -86,24 +113,31 @@
       if (!config || !config.enabled) return response;
 
       if (isRouterUrl(url) && response.ok) {
+        logRequest('router', url, response.status);
         return response.clone().text().then(function (body) {
           config.capturedRouters = body;
-          var modified = body;
           if (config.augmentMode !== 'off' && config.extraRoutes.length > 0) {
-            modified = mergeExtraRoutes(body);
+            var result = mergeExtraRoutes(body);
+            if (typeof result === 'object' && result.body) {
+              logRequest('augment', url, 'injected:' + (result.injected || 0));
+              window.postMessage({
+                __vk_ruoyi_hook: true,
+                event: 'routers_captured',
+                augmented: true,
+                injected: result.injected,
+              }, '*');
+              return new Response(result.body, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers,
+              });
+            }
           }
           window.postMessage({
             __vk_ruoyi_hook: true,
             event: 'routers_captured',
-            augmented: modified !== body,
+            augmented: false,
           }, '*');
-          if (modified !== body) {
-            return new Response(modified, {
-              status: response.status,
-              statusText: response.statusText,
-              headers: response.headers,
-            });
-          }
           return response;
         }).catch(function () {
           return response;
@@ -111,9 +145,8 @@
       }
 
       if (isUserInfoUrl(url) && response.ok) {
-        response.clone().text().then(function () {
-          window.postMessage({ __vk_ruoyi_hook: true, event: 'userinfo_captured' }, '*');
-        }).catch(function () {});
+        logRequest('userinfo', url, response.status);
+        window.postMessage({ __vk_ruoyi_hook: true, event: 'userinfo_captured' }, '*');
       }
 
       return response;
@@ -125,6 +158,7 @@
   var origSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function (method, reqUrl) {
     this.__vk_ruoyi_url = reqUrl;
+    this.__vk_ruoyi_method = method;
     return origOpen.apply(this, arguments);
   };
   XMLHttpRequest.prototype.send = function () {
@@ -134,15 +168,23 @@
       this.addEventListener('readystatechange', function () {
         if (self.readyState === 4 && self.status === 200) {
           var original = self.responseText;
+          logRequest('router', self.__vk_ruoyi_url, self.status);
           config.capturedRouters = original;
           if (config.augmentMode !== 'off' && config.extraRoutes.length > 0) {
-            var modified = mergeExtraRoutes(original);
-            Object.defineProperty(self, 'responseText', { value: modified, writable: true, configurable: true });
-            Object.defineProperty(self, 'response', { value: modified, writable: true, configurable: true });
-            window.postMessage({ __vk_ruoyi_hook: true, event: 'routers_captured', augmented: true }, '*');
-          } else {
-            window.postMessage({ __vk_ruoyi_hook: true, event: 'routers_captured', augmented: false }, '*');
+            var result = mergeExtraRoutes(original);
+            if (typeof result === 'object' && result.body) {
+              Object.defineProperty(self, 'responseText', { value: result.body, writable: true, configurable: true });
+              Object.defineProperty(self, 'response', { value: result.body, writable: true, configurable: true });
+              window.postMessage({
+                __vk_ruoyi_hook: true,
+                event: 'routers_captured',
+                augmented: true,
+                injected: result.injected,
+              }, '*');
+              return;
+            }
           }
+          window.postMessage({ __vk_ruoyi_hook: true, event: 'routers_captured', augmented: false }, '*');
         }
       });
     }
@@ -154,11 +196,13 @@
     var discovered = [];
     var seen = {};
     var routePattern = /path\s*:\s*['"`](\/[a-zA-Z0-9_\-\/]+)['"`]/g;
+    var compPattern = /component\s*:\s*['"`]((?:views|pages|src)\/[^'"`]+?)['"`]/gi;
     var pathPattern = /['"`](\/[a-zA-Z0-9_\-]+(?:\/[a-zA-Z0-9_\-]+){1,})['"`]/g;
-    var skipRe = /\/api\/|\.js$|\.css$|\.(png|jpg|svg|ico|woff|ttf)/i;
+    var skipRe = /\/api\/|\.js$|\.css$|\.(png|jpg|svg|ico|woff|ttf)|\/login$|\/index$/i;
 
     function scanText(text, source) {
       var m;
+      // Route definitions: path: '/xxx'
       routePattern.lastIndex = 0;
       while ((m = routePattern.exec(text)) !== null) {
         var path = m[1];
@@ -168,6 +212,18 @@
           discovered.push({ path: path, source: source, type: 'route-def' });
         }
       }
+
+      // Component references: component: 'views/xxx'
+      compPattern.lastIndex = 0;
+      while ((m = compPattern.exec(text)) !== null) {
+        var comp = m[1];
+        if (!seen[comp]) {
+          seen[comp] = true;
+          discovered.push({ path: '', source: source, type: 'component-ref', component: comp });
+        }
+      }
+
+      // Generic path strings
       pathPattern.lastIndex = 0;
       while ((m = pathPattern.exec(text)) !== null) {
         var p = m[1];

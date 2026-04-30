@@ -1103,7 +1103,6 @@
         <div id="rstab-detect" class="ruoyi-subpanel active">
           <div class="panel-actions">
             <button class="btn btn-primary" id="ruoyi-detect-btn">检测 RuoYi</button>
-            <button class="btn btn-sm btn-outline" id="ruoyi-copy-json-btn">复制路由JSON</button>
           </div>
           <div class="ruoyi-status" id="ruoyi-status">检测当前页面是否使用 RuoYi 框架</div>
           <div class="ruoyi-results" id="ruoyi-results">
@@ -1127,9 +1126,18 @@
               <option value="off">关闭</option>
             </select>
           </div>
+          <div class="ruoyi-custom-url-row">
+            <label>自定义路由URL:</label>
+            <input type="text" id="ruoyi-custom-url" class="text-input text-input-sm" placeholder="如 /api/getRouters (正则)">
+          </div>
           <div class="ruoyi-status" id="ruoyi-hook-status">未安装</div>
           <div class="ruoyi-captured-panel" id="ruoyi-captured-panel">
             <div class="empty-state">安装钩子并刷新页面后，此处显示捕获的路由数据</div>
+          </div>
+          <div class="panel-actions">
+            <button class="btn btn-sm btn-outline" id="ruoyi-export-curl-btn">导出 curl</button>
+            <button class="btn btn-sm btn-outline" id="ruoyi-export-html-btn">导出报告</button>
+            <button class="btn btn-sm btn-outline" id="ruoyi-copy-json-btn">复制JSON</button>
           </div>
         </div>
 

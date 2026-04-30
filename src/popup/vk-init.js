@@ -266,6 +266,8 @@
     copyRouteJson,
     copyExtraPaths,
     toggleSelectAll,
+    exportCurlCommands,
+    exportHtmlReport,
   } = ruoyi;
 
   Object.defineProperties(window, {
@@ -1299,8 +1301,6 @@
     // RuoYi detection
     const ruoyiDetectBtn = utils.get('ruoyi-detect-btn');
     if (ruoyiDetectBtn) ruoyiDetectBtn.addEventListener('click', detectRuoYi);
-    const ruoyiCopyJsonBtn = utils.get('ruoyi-copy-json-btn');
-    if (ruoyiCopyJsonBtn) ruoyiCopyJsonBtn.addEventListener('click', copyRouteJson);
 
     // RuoYi route hook
     const ruoyiHookInstallBtn = utils.get('ruoyi-hook-install-btn');
@@ -1312,6 +1312,14 @@
     const ruoyiAugmentMode = utils.get('ruoyi-augment-mode');
     if (ruoyiAugmentMode)
       ruoyiAugmentMode.addEventListener('change', () => setAugmentMode(ruoyiAugmentMode.value));
+
+    // RuoYi export buttons
+    const ruoyiCopyJsonBtn = utils.get('ruoyi-copy-json-btn');
+    if (ruoyiCopyJsonBtn) ruoyiCopyJsonBtn.addEventListener('click', copyRouteJson);
+    const ruoyiExportCurlBtn = utils.get('ruoyi-export-curl-btn');
+    if (ruoyiExportCurlBtn) ruoyiExportCurlBtn.addEventListener('click', exportCurlCommands);
+    const ruoyiExportHtmlBtn = utils.get('ruoyi-export-html-btn');
+    if (ruoyiExportHtmlBtn) ruoyiExportHtmlBtn.addEventListener('click', exportHtmlReport);
 
     // RuoYi JS analysis
     const ruoyiAnalyzeBtn = utils.get('ruoyi-analyze-btn');
