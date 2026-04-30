@@ -1147,6 +1147,16 @@
     <div id="panel-ruoyi" class="panel">
       <div class="content-card">
         <div class="card-title">RuoYi 路由</div>
+        <div class="ruoyi-module-desc">RuoYi 后台管理系统的路由分析与权限测试工具。发现被权限系统隐藏的菜单和接口。</div>
+        <div class="ruoyi-workflow">
+          <span class="ruoyi-wf-step active">① 检测</span>
+          <span class="ruoyi-wf-arrow">›</span>
+          <span class="ruoyi-wf-step">② 拦截</span>
+          <span class="ruoyi-wf-arrow">›</span>
+          <span class="ruoyi-wf-step">③ 发现隐藏路由</span>
+          <span class="ruoyi-wf-arrow">›</span>
+          <span class="ruoyi-wf-step">④ 探测验证</span>
+        </div>
         <div class="ruoyi-sub-tabs">
           <button class="ruoyi-stab active" data-rstab="detect">框架检测</button>
           <button class="ruoyi-stab" data-rstab="hook">路由钩子</button>
@@ -1158,18 +1168,25 @@
 
         <!-- 框架检测 -->
         <div id="rstab-detect" class="ruoyi-subpanel active">
+          <div class="ruoyi-section-header">
+            <div class="ruoyi-section-title">识别目标系统</div>
+            <div class="ruoyi-section-desc">检测当前页面是否使用 RuoYi 框架，识别版本号和变体（Vue2 前后端分离 / Vue3 / Thymeleaf 模板 / 微服务版本）。这是所有后续操作的前提。</div>
+          </div>
           <div class="panel-actions">
             <button class="btn btn-primary" id="ruoyi-detect-btn">检测 RuoYi</button>
           </div>
-          <div class="ruoyi-status" id="ruoyi-status">检测当前页面是否使用 RuoYi 框架</div>
+          <div class="ruoyi-status" id="ruoyi-status"></div>
           <div class="ruoyi-results" id="ruoyi-results">
-            <div class="empty-state">点击「检测 RuoYi」分析当前页面</div>
+            <div class="empty-state">打开 RuoYi 系统页面后，点击「检测 RuoYi」识别框架</div>
           </div>
         </div>
 
         <!-- 路由钩子 -->
         <div id="rstab-hook" class="ruoyi-subpanel">
-          <div class="ruoyi-hook-desc">钩子已自动注入，会被动拦截 /getRouters 响应。点击「检测」后自动尝试获取路由。如未捕获，请登录后刷新页面。</div>
+          <div class="ruoyi-section-header">
+            <div class="ruoyi-section-title">拦截路由数据 <span class="ruoyi-prereq">需要先检测框架</span></div>
+            <div class="ruoyi-section-desc">注入脚本拦截 /getRouters 接口响应，获取当前用户被授权的完整菜单路由树。需要登录后操作。支持增强模式自动注入额外路由。</div>
+          </div>
           <div class="panel-actions">
             <button class="btn btn-primary" id="ruoyi-hook-install-btn">安装钩子</button>
             <button class="btn btn-sm btn-secondary" id="ruoyi-hook-remove-btn" disabled>移除钩子</button>
@@ -1189,7 +1206,7 @@
           </div>
           <div class="ruoyi-status" id="ruoyi-hook-status">未安装</div>
           <div class="ruoyi-captured-panel" id="ruoyi-captured-panel">
-            <div class="empty-state">点击上方「检测」识别 RuoYi 框架后，自动尝试获取路由数据</div>
+            <div class="empty-state">安装钩子后登录并刷新页面，或点击「检查状态」查看捕获结果</div>
           </div>
           <div class="panel-actions">
             <button class="btn btn-sm btn-outline" id="ruoyi-export-curl-btn">导出 curl</button>
@@ -1198,9 +1215,30 @@
           </div>
         </div>
 
+        <!-- 动态路由 (MaR) -->
+        <div id="rstab-mar" class="ruoyi-subpanel">
+          <div class="ruoyi-section-header">
+            <div class="ruoyi-section-title">发现隐藏路由 <span class="ruoyi-prereq">需要先检测框架</span></div>
+            <div class="ruoyi-section-desc">通过扫描 JS 源码和 RuoYi 标准路由字典（35条），发现被权限系统过滤掉的隐藏菜单路由。找到后可一键注入 Vue Router 直接访问，或复制 URL 手动测试。对非 Vue 应用（Thymeleaf）自动切换为 URL 模式。</div>
+          </div>
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="mar-scan-btn">扫描动态路由</button>
+            <button class="btn btn-sm btn-secondary" id="mar-inject-btn">注入到 Router</button>
+            <button class="btn btn-sm btn-outline" id="mar-selectall-btn">全选/反选</button>
+            <button class="btn btn-sm btn-outline" id="mar-copy-btn">复制路径</button>
+          </div>
+          <div class="ruoyi-status" id="mar-scan-status"></div>
+          <div class="ruoyi-analyze-results" id="mar-scan-results">
+            <div class="empty-state">先「检测 RuoYi」确认框架，再点击「扫描动态路由」查找隐藏菜单</div>
+          </div>
+        </div>
+
         <!-- JS分析 -->
         <div id="rstab-analyze" class="ruoyi-subpanel">
-          <div class="ruoyi-analyze-desc">扫描页面 JS 文件中的路由定义，找出未在 /getRouters 中注册的隐藏路由</div>
+          <div class="ruoyi-section-header">
+            <div class="ruoyi-section-title">深度分析 JS 路由 <span class="ruoyi-prereq">需要先检测框架</span></div>
+            <div class="ruoyi-section-desc">扫描页面所有 JS 文件中的路由定义（path / component / meta），对比已注册路由找出额外的路由入口。适合发现开发者自定义的、未在标准菜单中注册的路由。</div>
+          </div>
           <div class="panel-actions">
             <button class="btn btn-primary" id="ruoyi-analyze-btn">分析JS路由</button>
             <button class="btn btn-sm btn-secondary" id="ruoyi-apply-btn">应用选中路由</button>
@@ -1212,28 +1250,16 @@
           </div>
           <div class="ruoyi-status" id="ruoyi-analyze-status"></div>
           <div class="ruoyi-analyze-results" id="ruoyi-analyze-results">
-            <div class="empty-state">点击「分析JS路由」开始</div>
-          </div>
-        </div>
-
-        <!-- 动态路由 (MaR) -->
-        <div id="rstab-mar" class="ruoyi-subpanel">
-          <div class="ruoyi-analyze-desc">MaR 模式 — 扫描 JS 中的全部动态路由定义，找出权限过滤掉的隐藏路由，并注入到 Vue Router 中</div>
-          <div class="panel-actions">
-            <button class="btn btn-primary" id="mar-scan-btn">扫描动态路由</button>
-            <button class="btn btn-sm btn-secondary" id="mar-inject-btn">注入到 Router</button>
-            <button class="btn btn-sm btn-outline" id="mar-selectall-btn">全选/反选</button>
-            <button class="btn btn-sm btn-outline" id="mar-copy-btn">复制路径</button>
-          </div>
-          <div class="ruoyi-status" id="mar-scan-status"></div>
-          <div class="ruoyi-analyze-results" id="mar-scan-results">
-            <div class="empty-state">点击「扫描动态路由」查找 JS 中定义的全部路由</div>
+            <div class="empty-state">先「检测 RuoYi」确认框架，再点击「分析JS路由」深度扫描</div>
           </div>
         </div>
 
         <!-- 批量探测 -->
         <div id="rstab-probe" class="ruoyi-subpanel">
-          <div class="ruoyi-probe-desc">对已发现的路由路径发送 HTTP 请求，快速识别可达/未授权/隐藏接口</div>
+          <div class="ruoyi-section-header">
+            <div class="ruoyi-section-title">批量请求探测 <span class="ruoyi-prereq">需要先发现路由</span></div>
+            <div class="ruoyi-section-desc">对已发现的路由路径逐个发送 HTTP 请求，根据状态码判断：200 可访问 / 301-302 重定向 / 401 未授权 / 403 禁止 / 404 不存在。快速定位可越权访问的隐藏接口。</div>
+          </div>
           <div class="panel-actions">
             <button class="btn btn-primary" id="ruoyi-probe-btn">开始探测</button>
             <button class="btn btn-sm btn-secondary" id="ruoyi-probe-stop-btn" disabled>停止</button>
@@ -1258,7 +1284,7 @@
           <div class="ruoyi-status" id="ruoyi-probe-status"></div>
           <div class="ruoyi-probe-progress" id="ruoyi-probe-progress"></div>
           <div class="ruoyi-probe-results" id="ruoyi-probe-results">
-            <div class="empty-state">先检测框架或分析JS路由，获取路径后开始探测</div>
+            <div class="empty-state">先通过「动态路由」或「JS分析」发现路径，再在此处批量探测</div>
           </div>
           <div class="panel-actions">
             <button class="btn btn-sm btn-outline" id="ruoyi-probe-export-btn">导出结果</button>
@@ -1267,7 +1293,10 @@
 
         <!-- API流量 -->
         <div id="rstab-traffic" class="ruoyi-subpanel">
-          <div class="ruoyi-traffic-desc">捕获页面的 API 请求流量（需先安装路由钩子并启用）</div>
+          <div class="ruoyi-section-header">
+            <div class="ruoyi-section-title">API 请求监控 <span class="ruoyi-prereq">需要先安装钩子</span></div>
+            <div class="ruoyi-section-desc">被动监控浏览过程中的所有 API 请求，记录请求方法、URL、状态码和响应内容。可用于发现隐藏接口、分析参数和敏感数据泄露。</div>
+          </div>
           <div class="panel-actions">
             <button class="btn btn-primary" id="ruoyi-traffic-load-btn">加载流量</button>
             <button class="btn btn-sm btn-secondary" id="ruoyi-traffic-clear-btn">清空</button>
@@ -1278,7 +1307,7 @@
           </div>
           <div class="ruoyi-traffic-stats" id="ruoyi-traffic-count"></div>
           <div class="ruoyi-traffic-results" id="ruoyi-traffic-list">
-            <div class="empty-state">安装路由钩子并浏览页面后，点击「加载流量」查看</div>
+            <div class="empty-state">先在「路由钩子」中安装钩子，浏览页面后点击「加载流量」查看</div>
           </div>
         </div>
       </div>

@@ -172,6 +172,11 @@
       fillInfo(el.__vue_app__, true);
       break;
     }
+    if (el && el.__vue__) {
+      var vm = el.__vue__.$root || el.__vue__;
+      fillInfo(vm, false);
+      break;
+    }
   }
 
   // Strategy 2: BFS scan (max 1000 nodes)

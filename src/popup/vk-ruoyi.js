@@ -144,6 +144,19 @@ window.VulnKitRuoYi = (function () {
             if (vv) evidence.push('version:vue-' + vv);
             if (/^3\./.test(vv)) variant = variant || 'vue3';
             else if (/^2\./.test(vv)) variant = variant || 'vue';
+          } else if (hasEl) {
+            // Production Vue builds don't expose window.Vue.
+            // Detect via DOM markers and webpack chunk patterns.
+            var vueEl = document.querySelector('#app[data-v-app], #app.__vue_app__');
+            if (vueEl || document.querySelector('#app')) {
+              // Check for Vue 2 vs Vue 3 markers on script URLs
+              var hasVue3Chunk = scriptSrcs.some(function (s) {
+                return /chunk-vendors|chunk-libs/i.test(s);
+              });
+              // If Element UI classes present and #app exists, it's likely a Vue RuoYi
+              if (!variant) variant = 'vue';
+              evidence.push('ui:vue-spa');
+            }
           }
 
           // --- Global objects ---
@@ -165,6 +178,19 @@ window.VulnKitRuoYi = (function () {
             if (document.querySelector('[class*="micro"]') || /microservice/i.test(title)) {
               variant = 'microservice';
               evidence.push('layout:microservice');
+            }
+            // Thymeleaf variant: jQuery + Bootstrap + no Vue + iframe-based navigation
+            if (!variant && !window.Vue && window.jQuery) {
+              var hasThymeleaf =
+                document.querySelector('link[href*="bootstrap"]') ||
+                document.querySelector('iframe');
+              var hasRuoYiJs = scriptSrcs.some(function (s) {
+                return /\/ruoyi\/js\//i.test(s);
+              });
+              if (hasThymeleaf && hasRuoYiJs) {
+                variant = 'thymeleaf';
+                evidence.push('layout:thymeleaf');
+              }
             }
           }
 
@@ -1905,7 +1931,7 @@ window.VulnKitRuoYi = (function () {
         /\/monitor\/online/,
         /\/tool\/gen/,
         /loadView|loadComponent/,
-        /Layout["']/,
+        /\bLayout\b\s*[=:[(]/,
         /ParentView/,
         /getRouters/,
       ];
@@ -1922,6 +1948,15 @@ window.VulnKitRuoYi = (function () {
         var text = jsItem.data || '';
 
         if (text.length < 50) continue;
+
+        // Skip known third-party libraries
+        var jsUrl = (jsItem.url || '').toLowerCase();
+        if (
+          /\/(jquery|bootstrap|lodash|axios|echarts|element-ui|element-plus|vue|react|core-js|babel|webpack|sockjs)\b/i.test(
+            jsUrl
+          )
+        )
+          continue;
 
         // Phase 1: Check for RuoYi markers
         if (!ruoyiRouteContent) {
