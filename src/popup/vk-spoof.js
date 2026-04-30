@@ -3,6 +3,8 @@ window.VulnKitSpoof = (function () {
   'use strict';
 
   let currentSpoofTab = 'ua';
+  let lastCookies = [];
+  let lastCookieDomain = '';
   let spoofState = {
     ua: { enabled: false, current: '', original: '' },
     headers: { xff: '', referer: '', clientIp: '', custom: [] },
@@ -12,14 +14,17 @@ window.VulnKitSpoof = (function () {
     return window.VulnKitUtils || null;
   }
 
+  var utils = {};
+  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
+    utils[method] = function () {
+      var u = getUtils();
+      if (!u || typeof u[method] !== 'function') return undefined;
+      return u[method].apply(u, arguments);
+    };
+  });
+
   function confirmAction(message, onConfirm) {
-    var utils = getUtils();
-    var safeMsg =
-      utils && utils.escapeHtml
-        ? utils.escapeHtml(message)
-        : message.replace(/[&<>"']/g, function (c) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-          });
+    var safeMsg = utils.escapeHtml(message);
     var overlay = document.createElement('div');
     overlay.className = 'confirm-overlay';
     overlay.innerHTML =
@@ -141,7 +146,6 @@ window.VulnKitSpoof = (function () {
   }
 
   function renderUaList(category) {
-    const utils = getUtils();
     const container = utils.get('ua-list');
     const customGroup = utils.get('ua-custom-group');
     if (!container) return;
@@ -192,7 +196,6 @@ window.VulnKitSpoof = (function () {
   }
 
   function updateUaStatus() {
-    const utils = getUtils();
     const el = utils.get('spoof-ua-status');
     if (!el) return;
     el.innerHTML = spoofState.ua.enabled
@@ -201,7 +204,6 @@ window.VulnKitSpoof = (function () {
   }
 
   async function applyUserAgent() {
-    const utils = getUtils();
     const input = utils.get('ua-custom-input');
     if (!input) return;
     const ua = input.value.trim();
@@ -242,7 +244,6 @@ window.VulnKitSpoof = (function () {
   }
 
   async function resetUserAgent() {
-    const utils = getUtils();
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
@@ -265,7 +266,6 @@ window.VulnKitSpoof = (function () {
   }
 
   async function loadCookies() {
-    const utils = getUtils();
     const domainEl = utils.get('cookie-domain-info');
     const listEl = utils.get('cookie-list');
     if (!domainEl || !listEl) return;
@@ -279,68 +279,92 @@ window.VulnKitSpoof = (function () {
 
       const url = new URL(tab.url);
       const domain = url.hostname;
+      lastCookieDomain = domain;
       domainEl.textContent = '当前域名: ' + domain;
 
       const cookies = await chrome.cookies.getAll({ domain: domain });
+      lastCookies = cookies.slice();
 
-      if (cookies.length === 0) {
-        listEl.innerHTML = '<div class="empty-state">当前域名无 Cookie</div>';
-        return;
-      }
-
-      let html = '<div class="cookie-count">共 ' + cookies.length + ' 个 Cookie</div>';
-      cookies.forEach(cookie => {
-        html += '<div class="cookie-item" data-name="' + utils.escapeHtml(cookie.name) + '">';
-        html += '<div class="cookie-item-main">';
-        html += '<span class="cookie-item-name">' + utils.escapeHtml(cookie.name) + '</span>';
-        html += '<span class="cookie-item-value" title="' + utils.escapeHtml(cookie.value) + '">';
-        html += utils.escapeHtml(
-          cookie.value.length > 60 ? cookie.value.substring(0, 60) + '...' : cookie.value
-        );
-        html += '</span></div>';
-        html += '<div class="cookie-item-meta">';
-        html +=
-          '<span>' +
-          utils.escapeHtml(cookie.domain || '') +
-          utils.escapeHtml(cookie.path || '') +
-          '</span>';
-        if (cookie.httpOnly) html += '<span class="cookie-badge">HttpOnly</span>';
-        if (cookie.secure) html += '<span class="cookie-badge">Secure</span>';
-        html +=
-          '<span class="cookie-badge">' +
-          utils.escapeHtml(cookie.sameSite || 'unspecified') +
-          '</span>';
-        html += '</div>';
-        html += '<div class="cookie-item-actions">';
-        html +=
-          '<button class="btn btn-sm btn-outline cookie-edit-btn" data-name="' +
-          utils.escapeHtml(cookie.name) +
-          '">编辑</button>';
-        html +=
-          '<button class="btn btn-sm btn-outline cookie-delete-btn" data-name="' +
-          utils.escapeHtml(cookie.name) +
-          '">删除</button>';
-        html += '</div></div>';
-      });
-      listEl.innerHTML = html;
-
-      listEl.querySelectorAll('.cookie-edit-btn').forEach(btn => {
-        btn.addEventListener('click', () => showCookieEditor(btn.dataset.name, cookies));
-      });
-      listEl.querySelectorAll('.cookie-delete-btn').forEach(btn => {
-        btn.addEventListener('click', () => deleteCookie(btn.dataset.name, domain));
-      });
-
+      renderCookieList(cookies, domain);
       utils.showToast('Cookie 加载完成', 'success');
     } catch (e) {
+      lastCookies = [];
       listEl.innerHTML =
         '<div class="empty-state">加载失败: ' + utils.escapeHtml(e.message) + '</div>';
       utils.showToast('加载 Cookie 失败', 'error');
     }
   }
 
+  function renderCookieList(cookies, domain) {
+    const listEl = utils.get('cookie-list');
+    if (!listEl) return;
+
+    if (cookies.length === 0) {
+      listEl.innerHTML = '<div class="empty-state">当前域名无 Cookie</div>';
+      return;
+    }
+
+    let html = '<div class="cookie-count">共 ' + cookies.length + ' 个 Cookie</div>';
+    cookies.forEach(cookie => {
+      html += '<div class="cookie-item" data-name="' + utils.escapeHtml(cookie.name) + '">';
+      html += '<div class="cookie-item-main">';
+      html += '<span class="cookie-item-name">' + utils.escapeHtml(cookie.name) + '</span>';
+      html += '<span class="cookie-item-value" title="' + utils.escapeHtml(cookie.value) + '">';
+      html += utils.escapeHtml(
+        cookie.value.length > 60 ? cookie.value.substring(0, 60) + '...' : cookie.value
+      );
+      html += '</span></div>';
+      html += '<div class="cookie-item-meta">';
+      html +=
+        '<span>' +
+        utils.escapeHtml(cookie.domain || '') +
+        utils.escapeHtml(cookie.path || '') +
+        '</span>';
+      if (cookie.httpOnly) html += '<span class="cookie-badge">HttpOnly</span>';
+      if (cookie.secure) html += '<span class="cookie-badge">Secure</span>';
+      html +=
+        '<span class="cookie-badge">' +
+        utils.escapeHtml(cookie.sameSite || 'unspecified') +
+        '</span>';
+      html += '</div>';
+      html += '<div class="cookie-item-actions">';
+      html +=
+        '<button class="btn btn-sm btn-outline cookie-edit-btn" data-name="' +
+        utils.escapeHtml(cookie.name) +
+        '">编辑</button>';
+      html +=
+        '<button class="btn btn-sm btn-outline cookie-delete-btn" data-name="' +
+        utils.escapeHtml(cookie.name) +
+        '">删除</button>';
+      html += '</div></div>';
+    });
+    listEl.innerHTML = html;
+
+    listEl.querySelectorAll('.cookie-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => showCookieEditor(btn.dataset.name, cookies));
+    });
+    listEl.querySelectorAll('.cookie-delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => deleteCookie(btn.dataset.name, domain));
+    });
+  }
+
+  function filterCookies(searchText) {
+    var text = (searchText || '').toLowerCase();
+    if (!text) {
+      renderCookieList(lastCookies, lastCookieDomain);
+      return;
+    }
+    var filtered = lastCookies.filter(function (c) {
+      return (
+        c.name.toLowerCase().indexOf(text) !== -1 ||
+        c.value.toLowerCase().indexOf(text) !== -1 ||
+        (c.domain || '').toLowerCase().indexOf(text) !== -1
+      );
+    });
+    renderCookieList(filtered, lastCookieDomain);
+  }
+
   function renderCookieEditor(cookieData, isNew) {
-    const utils = getUtils();
     const listEl = utils.get('cookie-list');
     if (!listEl) return;
 
@@ -413,7 +437,6 @@ window.VulnKitSpoof = (function () {
   }
 
   async function saveCookieEdit(isNew) {
-    const utils = getUtils();
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.url) return;
     const url = new URL(tab.url);
@@ -453,7 +476,6 @@ window.VulnKitSpoof = (function () {
   }
 
   function deleteCookie(cookieName) {
-    var utils = getUtils();
     confirmAction('确定删除 Cookie「' + cookieName + '」？', function () {
       chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
         if (!tabs[0]?.url) return;
@@ -471,7 +493,6 @@ window.VulnKitSpoof = (function () {
   }
 
   function showCookieImportDialog() {
-    const utils = getUtils();
     const listEl = utils.get('cookie-list');
     if (!listEl) return;
 
@@ -500,7 +521,6 @@ window.VulnKitSpoof = (function () {
   }
 
   async function importCookieString(cookieStr) {
-    const utils = getUtils();
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.url) return;
     const url = new URL(tab.url);
@@ -533,7 +553,6 @@ window.VulnKitSpoof = (function () {
   }
 
   function clearAllCookies() {
-    var utils = getUtils();
     confirmAction('确定清除当前域名所有 Cookie？此操作不可撤销。', function () {
       chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
         if (!tabs[0]?.url) return;
@@ -552,7 +571,6 @@ window.VulnKitSpoof = (function () {
   }
 
   async function applyHeaders() {
-    const utils = getUtils();
     const xffEl = utils.get('header-xff');
     const refererPresetEl = utils.get('referer-preset');
     const refererEl = utils.get('header-referer');
@@ -608,7 +626,6 @@ window.VulnKitSpoof = (function () {
   }
 
   function addCustomHeaderRow() {
-    const utils = getUtils();
     const container = utils.get('custom-headers');
     if (!container) return;
     const row = document.createElement('div');
@@ -622,7 +639,6 @@ window.VulnKitSpoof = (function () {
   }
 
   async function resetHeaders() {
-    const utils = getUtils();
     const xffEl = utils.get('header-xff');
     const refererEl = utils.get('header-referer');
     const refererPresetEl = utils.get('referer-preset');
@@ -659,7 +675,6 @@ window.VulnKitSpoof = (function () {
   }
 
   async function exportCookies() {
-    const utils = getUtils();
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.url) {
       utils.showToast('无法获取当前页面', 'error');
@@ -688,17 +703,19 @@ window.VulnKitSpoof = (function () {
     });
 
     var json = JSON.stringify(exportData, null, 2);
-    var blob = new Blob([json], { type: 'application/json' });
-    var link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = domain.replace(/\./g, '_') + '_cookies.json';
-    link.click();
-    URL.revokeObjectURL(link.href);
-    utils.showToast('已导出 ' + exportData.length + ' 个 Cookie', 'success');
+    var blobUrl = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    var filename = domain.replace(/\./g, '_') + '_cookies.json';
+    chrome.downloads.download({ url: blobUrl, filename: filename, saveAs: true }, function () {
+      URL.revokeObjectURL(blobUrl);
+      if (chrome.runtime.lastError) {
+        utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
+        return;
+      }
+      utils.showToast('已导出 ' + exportData.length + ' 个 Cookie', 'success');
+    });
   }
 
   function showCookieFileImportDialog() {
-    const utils = getUtils();
     const listEl = utils.get('cookie-list');
     if (!listEl) return;
 
@@ -738,7 +755,6 @@ window.VulnKitSpoof = (function () {
   }
 
   async function importCookieJson(jsonStr) {
-    const utils = getUtils();
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.url) return;
     const url = new URL(tab.url);
@@ -794,6 +810,7 @@ window.VulnKitSpoof = (function () {
     showCookieFileImportDialog,
     exportCookies,
     clearAllCookies,
+    filterCookies,
     applyHeaders,
     addCustomHeaderRow,
     resetHeaders,

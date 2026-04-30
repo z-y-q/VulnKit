@@ -60,6 +60,7 @@
         </div>
         <div class="result-actions">
           <button class="btn btn-sm btn-outline" id="copy-encoding-btn">复制结果</button>
+          <button class="btn btn-sm btn-outline" id="encoding-swap-btn">交换</button>
         </div>
         </div>
 
@@ -87,6 +88,10 @@
               <pre class="jwt-pre jwt-sig" id="jwt-signature"></pre>
             </div>
             <div id="jwt-claims" class="jwt-claims"></div>
+            <div class="result-actions">
+              <button class="btn btn-sm btn-outline" id="jwt-copy-header-btn">复制 Header</button>
+              <button class="btn btn-sm btn-outline" id="jwt-copy-payload-btn">复制 Payload</button>
+            </div>
           </div>
           <div id="jwt-error" class="empty-state hidden"></div>
         </div>
@@ -583,6 +588,8 @@
           </div>
           <div class="exif-actions">
             <button class="btn btn-sm btn-outline" id="exif-copy-all-btn">复制全部元数据</button>
+            <button class="btn btn-sm btn-outline" id="exif-copy-json-btn">复制 JSON</button>
+            <button class="btn btn-sm btn-outline" id="exif-clear-btn">清除</button>
           </div>
           <div class="exif-sections" id="exif-sections"></div>
         </div>
@@ -631,6 +638,7 @@
             <button class="btn btn-sm btn-outline" id="cookie-export-btn">导出</button>
             <button class="btn btn-sm btn-outline" id="cookie-clear-btn">清除全部</button>
           </div>
+          <input type="text" id="cookie-search" class="input" placeholder="搜索 Cookie 名称/值/域名...">
           <div class="cookie-domain-info" id="cookie-domain-info"></div>
           <div class="cookie-list" id="cookie-list">
             <div class="empty-state">点击「刷新 Cookie」获取当前域名的 Cookie</div>
@@ -998,6 +1006,7 @@
           <button class="xssscan-filter-btn" data-xfilter="form">表单</button>
           <button class="xssscan-filter-btn" data-xfilter="url">URL</button>
           <button class="xssscan-filter-btn" data-xfilter="ajax">AJAX</button>
+          <input type="text" id="xssscan-search" class="input" placeholder="搜索URL/参数..." style="margin-left:8px;max-width:160px;">
         </div>
         <div class="xssscan-count" id="xssscan-count"></div>
         <div class="xssscan-results" id="xssscan-results">
@@ -1214,8 +1223,6 @@
 <script src="vk-vue.js"></script>
 <script src="vk-ruoyi.js"></script>
 <script src="vk-jsctrl.js"></script>
-<!-- Utilities -->
-<script src="vk-export.js"></script>
 <!-- Init (must load last) -->
 <script src="vk-init.js"></script>
 </body>

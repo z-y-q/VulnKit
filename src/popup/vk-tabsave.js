@@ -89,8 +89,6 @@ window.VulnKitTabSave = (function () {
     var text = lines.join('\n\n');
     var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
     var now = new Date();
     var ts =
       now.getFullYear() +
@@ -101,12 +99,15 @@ window.VulnKitTabSave = (function () {
       '_' +
       String(now.getHours()).padStart(2, '0') +
       String(now.getMinutes()).padStart(2, '0');
-    a.download = 'tabs_' + ts + '.txt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    utils.showToast('已导出 tabs_' + ts + '.txt', 'success');
+    var filename = 'tabs_' + ts + '.txt';
+    chrome.downloads.download({ url: url, filename: filename, saveAs: true }, function () {
+      URL.revokeObjectURL(url);
+      if (chrome.runtime.lastError) {
+        utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
+        return;
+      }
+      utils.showToast('已导出 ' + filename, 'success');
+    });
   }
 
   return {

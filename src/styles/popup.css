@@ -2367,6 +2367,11 @@ body {
   flex-wrap: wrap;
 }
 
+#cookie-search {
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
 .cookie-domain-info {
   font-size: 12px;
   color: #666;

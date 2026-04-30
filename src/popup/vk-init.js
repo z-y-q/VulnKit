@@ -13,11 +13,15 @@
   const handleDecode = encoding.handleDecode;
   const clearEncodingFields = encoding.clearEncodingFields;
   const switchEncodingTab = encoding.switchEncodingTab;
+  const copyEncodingOutput = encoding.copyOutput;
+  const swapEncodingFields = encoding.swapFields;
 
   // ====== JWT (loaded from vk-jwt.js) ======
   const jwt = window.VulnKitJwt;
   const decodeJwt = jwt.decodeJwt;
   const clearJwt = jwt.clearJwt;
+  const copyJwtHeader = jwt.copyJwtHeader;
+  const copyJwtPayload = jwt.copyJwtPayload;
 
   // ====== Crypto (AES/DES/RC4/SM2/SM4/Bcrypt) ======
 
@@ -115,8 +119,15 @@
   });
 
   // ====== EXIF Viewer (loaded from vk-exif.js) ======
-  const { initExifDragDrop, switchExifMode, fetchExifFromUrl, scanPageImages, checkExifPending } =
-    window.VulnKitExif;
+  const {
+    initExifDragDrop,
+    switchExifMode,
+    fetchExifFromUrl,
+    scanPageImages,
+    checkExifPending,
+    copyExifData,
+    clearExif,
+  } = window.VulnKitExif;
   Object.defineProperties(window, {
     lastExifData: {
       get: () => window.VulnKitExif.lastExifData,
@@ -167,6 +178,7 @@
     showCookieFileImportDialog,
     exportCookies,
     clearAllCookies,
+    filterCookies,
     applyHeaders,
     addCustomHeaderRow,
     resetHeaders,
@@ -336,6 +348,7 @@
     initXssScanPayloadSelect,
     clearResults: xssClearResults,
     exportData: xssExportData,
+    setXssSearchText,
   } = window.VulnKitXss;
   Object.defineProperties(window, {
     xssPoints: {
@@ -465,18 +478,8 @@
       { id: 'encode-btn', handler: handleEncode },
       { id: 'decode-btn', handler: handleDecode },
       { id: 'clear-encoding-btn', handler: clearEncodingFields },
-      {
-        id: 'copy-encoding-btn',
-        handler: () => {
-          const v = utils.get('encoding-output').value;
-          if (!v) {
-            utils.showToast('没有可复制的内容', 'warning');
-            return;
-          }
-          utils.copyText(v);
-          utils.showToast('已复制', 'success');
-        },
-      },
+      { id: 'copy-encoding-btn', handler: copyEncodingOutput },
+      { id: 'encoding-swap-btn', handler: swapEncodingFields },
     ];
     encodingBindings.forEach(({ id, handler }) => {
       const el = utils.get(id);
@@ -496,6 +499,10 @@
       });
     var jwtClearBtn = utils.get('jwt-clear-btn');
     if (jwtClearBtn) jwtClearBtn.addEventListener('click', clearJwt);
+    var jwtCopyHeaderBtn = utils.get('jwt-copy-header-btn');
+    if (jwtCopyHeaderBtn) jwtCopyHeaderBtn.addEventListener('click', copyJwtHeader);
+    var jwtCopyPayloadBtn = utils.get('jwt-copy-payload-btn');
+    if (jwtCopyPayloadBtn) jwtCopyPayloadBtn.addEventListener('click', copyJwtPayload);
 
     // Crypto algo tabs
     document.querySelectorAll('.crypto-algo-btn').forEach(function (btn) {
@@ -957,6 +964,10 @@
         utils.showToast('已复制全部元数据', 'success');
       });
     }
+    const exifCopyJsonBtn = utils.get('exif-copy-json-btn');
+    if (exifCopyJsonBtn) exifCopyJsonBtn.addEventListener('click', copyExifData);
+    const exifClearBtn = utils.get('exif-clear-btn');
+    if (exifClearBtn) exifClearBtn.addEventListener('click', clearExif);
 
     // Request Spoofing
     document.querySelectorAll('.spoof-tab').forEach(btn => {
@@ -984,6 +995,12 @@
     if (cookieExportBtn) cookieExportBtn.addEventListener('click', exportCookies);
     const cookieClearBtn = utils.get('cookie-clear-btn');
     if (cookieClearBtn) cookieClearBtn.addEventListener('click', clearAllCookies);
+    const cookieSearchInput = utils.get('cookie-search');
+    if (cookieSearchInput) {
+      cookieSearchInput.addEventListener('input', function () {
+        filterCookies(this.value);
+      });
+    }
 
     const headerApplyBtn = utils.get('header-apply');
     if (headerApplyBtn) headerApplyBtn.addEventListener('click', applyHeaders);
@@ -1401,6 +1418,12 @@
         renderXssPoints();
       });
     });
+    var xssSearchInput = utils.get('xssscan-search');
+    if (xssSearchInput) {
+      xssSearchInput.addEventListener('input', function () {
+        setXssSearchText(this.value);
+      });
+    }
     var xssSelectAllBtn = utils.get('xssscan-selectall-btn');
     if (xssSelectAllBtn) {
       xssSelectAllBtn.addEventListener('click', function () {

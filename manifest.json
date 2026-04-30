@@ -10,7 +10,8 @@
     "scripting",
     "contextMenus",
     "declarativeNetRequest",
-    "cookies"
+    "cookies",
+    "downloads"
   ],
   "host_permissions": [
     "https://web.archive.org/*",

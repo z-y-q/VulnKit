@@ -8,6 +8,15 @@ window.VulnKitExif = (function () {
     return window.VulnKitUtils || null;
   }
 
+  var utils = {};
+  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
+    utils[method] = function () {
+      var u = getUtils();
+      if (!u || typeof u[method] !== 'function') return undefined;
+      return u[method].apply(u, arguments);
+    };
+  });
+
   const EXIF_SECTIONS = [
     {
       title: '拍摄信息',
@@ -87,13 +96,12 @@ window.VulnKitExif = (function () {
   }
 
   async function handleExifFile(file) {
-    const utils = getUtils();
-    const resultEl = utils.get('exif-result');
-    const emptyEl = utils.get('exif-empty');
-    const sectionsEl = utils.get('exif-sections');
-    const previewImg = utils.get('exif-preview-img');
-    const fileNameEl = utils.get('exif-file-name');
-    const fileSizeEl = utils.get('exif-file-size');
+    var resultEl = utils.get('exif-result');
+    var emptyEl = utils.get('exif-empty');
+    var sectionsEl = utils.get('exif-sections');
+    var previewImg = utils.get('exif-preview-img');
+    var fileNameEl = utils.get('exif-file-name');
+    var fileSizeEl = utils.get('exif-file-size');
 
     if (!resultEl || !emptyEl || !sectionsEl) return;
     resultEl.classList.add('hidden');
@@ -209,7 +217,6 @@ window.VulnKitExif = (function () {
   }
 
   function initExifDragDrop() {
-    const utils = getUtils();
     const area = utils.get('exif-upload-area');
     const fileInput = utils.get('exif-file-input');
     if (!area || !fileInput) return;
@@ -232,7 +239,6 @@ window.VulnKitExif = (function () {
   }
 
   function switchExifMode(mode) {
-    const utils = getUtils();
     document
       .querySelectorAll('.exif-mode-btn')
       .forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
@@ -245,7 +251,6 @@ window.VulnKitExif = (function () {
   }
 
   async function fetchExifFromUrl(url) {
-    const utils = getUtils();
     const resultEl = utils.get('exif-result');
     const emptyEl = utils.get('exif-empty');
     const sectionsEl = utils.get('exif-sections');
@@ -291,7 +296,6 @@ window.VulnKitExif = (function () {
   }
 
   async function scanPageImages() {
-    const utils = getUtils();
     const container = utils.get('exif-page-images');
     container.innerHTML = '<div class="empty-state">正在扫描...</div>';
 
@@ -361,7 +365,6 @@ window.VulnKitExif = (function () {
   }
 
   function checkExifPending() {
-    const utils = getUtils();
     chrome.storage.local.get(['exif_pending_url'], result => {
       const url = result.exif_pending_url;
       if (!url) return;
@@ -372,12 +375,35 @@ window.VulnKitExif = (function () {
     });
   }
 
+  function copyExifData() {
+    if (!lastExifData) {
+      utils.showToast('请先解析 EXIF 数据', 'warning');
+      return;
+    }
+    utils.copyText(JSON.stringify(lastExifData, null, 2));
+    utils.showToast('已复制 EXIF JSON', 'success');
+  }
+
+  function clearExif() {
+    var resultEl = utils.get('exif-result');
+    var emptyEl = utils.get('exif-empty');
+    var sectionsEl = utils.get('exif-sections');
+    var previewImg = utils.get('exif-preview-img');
+    if (resultEl) resultEl.classList.add('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (sectionsEl) sectionsEl.innerHTML = '';
+    if (previewImg) previewImg.src = '';
+    lastExifData = null;
+  }
+
   return {
     initExifDragDrop,
     switchExifMode,
     fetchExifFromUrl,
     scanPageImages,
     checkExifPending,
+    copyExifData,
+    clearExif,
     get lastExifData() {
       return lastExifData;
     },

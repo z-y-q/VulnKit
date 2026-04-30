@@ -5,10 +5,18 @@ window.VulnKitEncoding = (function () {
   const ENCODING_NAMES = { base64: 'Base64', url: 'URL', html: 'HTML', hex: 'Hex' };
   let currentEncodingType = 'base64';
 
-  // Forward reference to utils (populated by inline-optimized.js after this loads)
   function getUtils() {
     return window.VulnKitUtils || null;
   }
+
+  var utils = {};
+  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
+    utils[method] = function () {
+      var u = getUtils();
+      if (!u || typeof u[method] !== 'function') return undefined;
+      return u[method].apply(u, arguments);
+    };
+  });
 
   const encodingTools = {
     base64: {
@@ -58,46 +66,71 @@ window.VulnKitEncoding = (function () {
   };
 
   function handleEncode() {
-    const utils = getUtils();
-    const input = utils.get('encoding-input').value;
+    var inputEl = utils.get('encoding-input');
+    if (!inputEl) return;
+    var input = inputEl.value;
     if (!input) {
       utils.showToast('请输入文本', 'warning');
       return;
     }
-    const result = encodingTools[currentEncodingType]?.encode(input);
+    var result =
+      encodingTools[currentEncodingType] && encodingTools[currentEncodingType].encode(input);
     if (result === undefined) {
       utils.showToast('未知编码类型', 'error');
       return;
     }
-    utils.get('encoding-output').value = result;
+    var outputEl = utils.get('encoding-output');
+    if (outputEl) outputEl.value = result;
     utils.showToast('编码成功', 'success');
   }
 
   function handleDecode() {
-    const utils = getUtils();
-    const input = utils.get('encoding-input').value;
+    var inputEl = utils.get('encoding-input');
+    if (!inputEl) return;
+    var input = inputEl.value;
     if (!input) {
       utils.showToast('请输入文本', 'warning');
       return;
     }
-    const result = encodingTools[currentEncodingType]?.decode(input);
+    var result =
+      encodingTools[currentEncodingType] && encodingTools[currentEncodingType].decode(input);
     if (result === undefined) {
       utils.showToast('未知编码类型', 'error');
       return;
     }
-    utils.get('encoding-output').value = result;
+    var outputEl = utils.get('encoding-output');
+    if (outputEl) outputEl.value = result;
     utils.showToast('解码成功', 'success');
   }
 
   function clearEncodingFields() {
-    const utils = getUtils();
-    utils.get('encoding-input').value = '';
-    utils.get('encoding-output').value = '';
+    var inputEl = utils.get('encoding-input');
+    var outputEl = utils.get('encoding-output');
+    if (inputEl) inputEl.value = '';
+    if (outputEl) outputEl.value = '';
+  }
+
+  function copyOutput() {
+    var outputEl = utils.get('encoding-output');
+    if (!outputEl || !outputEl.value) {
+      utils.showToast('没有可复制的内容', 'warning');
+      return;
+    }
+    utils.copyText(outputEl.value);
+    utils.showToast('已复制到剪贴板', 'success');
+  }
+
+  function swapFields() {
+    var inputEl = utils.get('encoding-input');
+    var outputEl = utils.get('encoding-output');
+    if (!inputEl || !outputEl) return;
+    var tmp = inputEl.value;
+    inputEl.value = outputEl.value;
+    outputEl.value = tmp;
   }
 
   function switchEncodingTab(type) {
     currentEncodingType = type;
-    const utils = getUtils();
     document.querySelectorAll('.sub-tab-btn').forEach(function (b) {
       b.classList.toggle('active', b.dataset.type === type);
     });
@@ -127,6 +160,8 @@ window.VulnKitEncoding = (function () {
     handleEncode: handleEncode,
     handleDecode: handleDecode,
     clearEncodingFields: clearEncodingFields,
+    copyOutput: copyOutput,
+    swapFields: swapFields,
     switchEncodingTab: switchEncodingTab,
   };
 })();

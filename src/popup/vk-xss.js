@@ -4,6 +4,7 @@ window.VulnKitXss = (function () {
 
   let xssPoints = [];
   let xssFilterType = 'all';
+  let xssSearchText = '';
   let xssInterceptTimer = null;
   let xssInterceptActive = false;
   let xssInterceptCountdown = 0;
@@ -360,8 +361,23 @@ window.VulnKitXss = (function () {
   }
 
   function getFilteredXssPoints() {
-    if (xssFilterType === 'all') return xssPoints;
-    return xssPoints.filter(p => p.source === xssFilterType);
+    var list = xssPoints;
+    if (xssFilterType !== 'all') {
+      list = list.filter(function (p) {
+        return p.source === xssFilterType;
+      });
+    }
+    if (xssSearchText) {
+      var lower = xssSearchText.toLowerCase();
+      list = list.filter(function (p) {
+        return (
+          (p.url && p.url.toLowerCase().indexOf(lower) !== -1) ||
+          (p.param && p.param.toLowerCase().indexOf(lower) !== -1) ||
+          (p.source && p.source.toLowerCase().indexOf(lower) !== -1)
+        );
+      });
+    }
+    return list;
   }
 
   function renderXssPoints() {
@@ -370,12 +386,14 @@ window.VulnKitXss = (function () {
     const countEl = utils.get('xssscan-count');
     if (!container) return;
     const filtered = getFilteredXssPoints();
-    if (countEl)
+    if (countEl) {
+      var hasFilter = xssFilterType !== 'all' || xssSearchText;
       countEl.textContent =
         '共发现 ' +
         xssPoints.length +
         ' 个注入点' +
-        (xssFilterType !== 'all' ? '（筛选: ' + filtered.length + '）' : '');
+        (hasFilter ? '（显示: ' + filtered.length + '）' : '');
+    }
     if (filtered.length === 0) {
       container.innerHTML = '<div class="empty-state">暂无注入点</div>';
       return;
@@ -671,6 +689,10 @@ window.VulnKitXss = (function () {
     },
     set xssFilterType(v) {
       xssFilterType = v;
+    },
+    setXssSearchText: function (text) {
+      xssSearchText = (text || '').trim();
+      renderXssPoints();
     },
   };
 })();

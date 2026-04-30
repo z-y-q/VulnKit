@@ -6,6 +6,15 @@ window.VulnKitJwt = (function () {
     return window.VulnKitUtils || null;
   }
 
+  var utils = {};
+  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
+    utils[method] = function () {
+      var u = getUtils();
+      if (!u || typeof u[method] !== 'function') return undefined;
+      return u[method].apply(u, arguments);
+    };
+  });
+
   function base64UrlDecode(str) {
     var base64 = str.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4 !== 0) base64 += '=';
@@ -16,7 +25,6 @@ window.VulnKitJwt = (function () {
   }
 
   function decodeJwt(token) {
-    var utils = getUtils();
     var resultEl = utils.get('jwt-result');
     var errorEl = utils.get('jwt-error');
     var headerEl = utils.get('jwt-header');
@@ -56,7 +64,6 @@ window.VulnKitJwt = (function () {
 
     sigEl.textContent = parts[2];
 
-    var timeClaims = ['exp', 'iat', 'nbf'];
     var now = Math.floor(Date.now() / 1000);
     var claimsHtml = '';
 
@@ -96,11 +103,38 @@ window.VulnKitJwt = (function () {
   }
 
   function clearJwt() {
-    var utils = getUtils();
-    utils.get('jwt-input').value = '';
-    utils.get('jwt-result').classList.add('hidden');
-    utils.get('jwt-error').classList.add('hidden');
+    var inputEl = utils.get('jwt-input');
+    var resultEl = utils.get('jwt-result');
+    var errorEl = utils.get('jwt-error');
+    if (inputEl) inputEl.value = '';
+    if (resultEl) resultEl.classList.add('hidden');
+    if (errorEl) errorEl.classList.add('hidden');
   }
 
-  return { decodeJwt: decodeJwt, clearJwt: clearJwt };
+  function copyJwtHeader() {
+    var el = utils.get('jwt-header');
+    if (!el || !el.textContent) {
+      utils.showToast('请先解码 JWT', 'warning');
+      return;
+    }
+    utils.copyText(el.textContent);
+    utils.showToast('已复制 Header', 'success');
+  }
+
+  function copyJwtPayload() {
+    var el = utils.get('jwt-payload');
+    if (!el || !el.textContent) {
+      utils.showToast('请先解码 JWT', 'warning');
+      return;
+    }
+    utils.copyText(el.textContent);
+    utils.showToast('已复制 Payload', 'success');
+  }
+
+  return {
+    decodeJwt: decodeJwt,
+    clearJwt: clearJwt,
+    copyJwtHeader: copyJwtHeader,
+    copyJwtPayload: copyJwtPayload,
+  };
 })();

@@ -1827,16 +1827,15 @@ window.VulnKitSourcemap = (function () {
     });
     var blob = new Blob([content], { type: 'text/plain' });
     var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'webpack-sources-' + Date.now() + '.txt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function () {
+    var filename = 'webpack-sources-' + Date.now() + '.txt';
+    chrome.downloads.download({ url: url, filename: filename, saveAs: true }, function () {
       URL.revokeObjectURL(url);
-    }, 1000);
-    utils.showToast('已下载 ' + resolved.length + ' 个源文件', 'success');
+      if (chrome.runtime.lastError) {
+        utils.showToast('下载失败: ' + chrome.runtime.lastError.message, 'error');
+        return;
+      }
+      utils.showToast('已下载 ' + resolved.length + ' 个源文件', 'success');
+    });
   }
 
   function downloadSingleModule(index) {
@@ -1850,14 +1849,14 @@ window.VulnKitSourcemap = (function () {
     var fileName = mod.path.split('/').pop() || 'module.js';
     var blob = new Blob([source], { type: 'text/javascript' });
     var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    utils.showToast('已下载 ' + fileName, 'success');
+    chrome.downloads.download({ url: url, filename: fileName, saveAs: true }, function () {
+      URL.revokeObjectURL(url);
+      if (chrome.runtime.lastError) {
+        utils.showToast('下载失败: ' + chrome.runtime.lastError.message, 'error');
+        return;
+      }
+      utils.showToast('已下载 ' + fileName, 'success');
+    });
   }
 
   function copyModuleSource() {
