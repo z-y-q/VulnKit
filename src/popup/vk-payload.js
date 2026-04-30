@@ -347,22 +347,31 @@ window.VulnKitPayload = (function () {
     ],
   };
 
-  function renderPayloadCategories(containerId, data, collapsed) {
+  function renderPayloadCategories(containerId, data, collapsed, filterText) {
     const utils = getUtils();
     const container = utils.get(containerId);
     if (!container) return;
     container.innerHTML = '';
+    var lower = filterText ? filterText.toLowerCase() : '';
     Object.entries(data).forEach(([title, items]) => {
+      var filtered = lower
+        ? items.filter(function (item) {
+            return (
+              item.toLowerCase().indexOf(lower) !== -1 || title.toLowerCase().indexOf(lower) !== -1
+            );
+          })
+        : items;
+      if (filtered.length === 0) return;
       const isOpen = !collapsed;
       const cat = document.createElement('div');
       cat.className = 'payload-category';
       cat.innerHTML = `
         <div class="payload-category-title">
-          <span>${utils.escapeHtml(title)} <span class="payload-count-badge">${items.length}</span></span>
+          <span>${utils.escapeHtml(title)} <span class="payload-count-badge">${filtered.length}</span></span>
           <span class="payload-category-arrow${isOpen ? ' open' : ''}">&#9654;</span>
         </div>
         <div class="payload-category-items${isOpen ? ' open' : ''}">
-          ${items
+          ${filtered
             .map(
               item => `
             <div class="payload-item">
@@ -446,11 +455,19 @@ window.VulnKitPayload = (function () {
     container.appendChild(list);
   }
 
-  function renderSqliPayloads() {
+  function renderSqliPayloads(filterText) {
     const utils = getUtils();
     const n = parseInt((utils.get('sqli-columns') || {}).value) || 3;
     const table = (utils.get('sqli-table') || {}).value || 'users';
-    renderPayloadCategories('sqli-categories', buildSqliPayloads(n, table), false);
+    renderPayloadCategories('sqli-categories', buildSqliPayloads(n, table), false, filterText);
+  }
+
+  function applySearch(text) {
+    renderPayloadCategories('xss-categories', XSS_DATA, false, text);
+    renderSqliPayloads(text);
+    renderPayloadCategories('lfi-categories', LFI_DATA, false, text);
+    renderPayloadCategories('webshell-categories', WEBSHELL_DATA, false, text);
+    renderPayloadCategories('cmdref-categories', CMDREF_DATA, false, text);
   }
 
   return {
@@ -463,6 +480,7 @@ window.VulnKitPayload = (function () {
     renderPayloadCategories,
     switchPayloadTab,
     generateReverseShell,
+    applySearch,
     renderAllReverseShells,
     renderSqliPayloads,
   };

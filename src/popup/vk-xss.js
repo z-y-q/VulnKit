@@ -605,6 +605,50 @@ window.VulnKitXss = (function () {
     }
   }
 
+  function clearResults() {
+    xssPoints = [];
+    renderXssPoints();
+    updateXssInterceptStatus();
+  }
+
+  function exportData() {
+    var utils = getUtils();
+    if (xssPoints.length === 0) {
+      utils.showToast('没有可导出的注入点', 'warning');
+      return;
+    }
+    var lines = ['Source,URL,Param,Method'];
+    xssPoints.forEach(function (p) {
+      lines.push(
+        '"' +
+          (p.source || '').replace(/"/g, '""') +
+          '",' +
+          '"' +
+          (p.url || '').replace(/"/g, '""') +
+          '",' +
+          '"' +
+          (p.param || '').replace(/"/g, '""') +
+          '",' +
+          '"' +
+          (p.method || '').replace(/"/g, '""') +
+          '"'
+      );
+    });
+    var csv = lines.join('\n');
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    chrome.downloads.download(
+      {
+        url: url,
+        filename: 'vulnkit-xss-' + Date.now() + '.csv',
+        saveAs: true,
+      },
+      function () {
+        utils.showToast('导出成功', 'success');
+      }
+    );
+  }
+
   return {
     startXssIntercept,
     stopXssIntercept,
@@ -614,6 +658,8 @@ window.VulnKitXss = (function () {
     handleBatchOpenXss,
     handleCopyXssUrls,
     initXssScanPayloadSelect,
+    clearResults,
+    exportData,
     get xssPoints() {
       return xssPoints;
     },

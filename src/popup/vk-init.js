@@ -47,7 +47,7 @@
   });
 
   // ====== Favicon (loaded from vk-favicon.js) ======
-  const extractFavicon = window.VulnKitFavicon.extractFavicon;
+  const { extractFavicon, copyFaviconUrl } = window.VulnKitFavicon;
 
   // ====== Asset Mapping (loaded from vk-asset.js) ======
   const {
@@ -58,6 +58,8 @@
     saveApiKeys,
     loadApiKeys,
     clearApiKeys,
+    exportData: assetExportData,
+    applySearchFilter: assetApplySearchFilter,
   } = window.VulnKitAsset;
   Object.defineProperties(window, {
     currentAssetSource: {
@@ -79,7 +81,7 @@
   }
 
   // ====== URL Multi-Open (loaded from vk-multiurl.js) ======
-  const { parseUrls, updateMultiurlInfo, handleMultiurlOpen, handleMultiurlDedup } =
+  const { parseUrls, updateMultiurlInfo, handleMultiurlOpen, handleMultiurlDedup, copyAllUrls } =
     window.VulnKitMultiUrl;
 
   // ====== Tab Save (loaded from vk-tabsave.js) ======
@@ -94,7 +96,14 @@
   gather.init();
 
   // ====== Link Extract (loaded from vk-links.js) ======
-  const { extractLinks, getFilteredLinks, renderLinks } = window.VulnKitLinks;
+  const {
+    extractLinks,
+    getFilteredLinks,
+    renderLinks,
+    copyFilteredUrls,
+    exportLinks,
+    sendToMultiUrl,
+  } = window.VulnKitLinks;
   Object.defineProperties(window, {
     allLinks: {
       get: () => window.VulnKitLinks.allLinks,
@@ -126,6 +135,7 @@
     extractDomain,
     queryHistory,
     renderHistoryResults,
+    exportData: historyExportData,
   } = window.VulnKitHistory;
   Object.defineProperties(window, {
     lastHistoryResults: {
@@ -324,6 +334,8 @@
     handleBatchOpenXss,
     handleCopyXssUrls,
     initXssScanPayloadSelect,
+    clearResults: xssClearResults,
+    exportData: xssExportData,
   } = window.VulnKitXss;
   Object.defineProperties(window, {
     xssPoints: {
@@ -354,6 +366,7 @@
     generateReverseShell,
     renderAllReverseShells,
     renderSqliPayloads,
+    applySearch: payloadApplySearch,
   } = window.VulnKitPayload;
 
   // ====== Webpack Module Mapping (Source Map Scan v2) ======
@@ -568,6 +581,8 @@
     // Favicon buttons
     const faviconBtn = utils.get('extract-favicon-btn');
     if (faviconBtn) faviconBtn.addEventListener('click', extractFavicon);
+    const copyFaviconUrlBtn = utils.get('copy-favicon-url-btn');
+    if (copyFaviconUrlBtn) copyFaviconUrlBtn.addEventListener('click', copyFaviconUrl);
 
     const copyHashBtn = utils.get('copy-favicon-hash-btn');
     if (copyHashBtn)
@@ -594,27 +609,12 @@
         toggleCustomQueryMode(!customToggle.classList.contains('active'))
       );
     const assetExportBtn = utils.get('asset-export-btn');
-    if (assetExportBtn) {
-      assetExportBtn.addEventListener('click', function () {
-        var exportLib = window.VulnKitExport;
-        var results = asset.lastAssetResults;
-        if (!results || results.length === 0) {
-          utils.showToast('没有可导出的结果', 'warning');
-          return;
-        }
-        exportLib.createDropdown(
-          assetExportBtn,
-          function () {
-            return results;
-          },
-          [
-            { key: 'host', label: 'IP/域名' },
-            { key: 'port', label: '端口' },
-            { key: 'protocol', label: '协议' },
-            { key: 'title', label: '标题' },
-          ],
-          'asset_' + asset.currentAssetSource
-        );
+    if (assetExportBtn) assetExportBtn.addEventListener('click', assetExportData);
+
+    const assetSearchInput = document.getElementById('asset-search');
+    if (assetSearchInput) {
+      assetSearchInput.addEventListener('input', function () {
+        assetApplySearchFilter(assetSearchInput.value.trim());
       });
     }
 
@@ -632,43 +632,19 @@
     // Info gather
     const gatherBtn = utils.get('gather-btn');
     if (gatherBtn) gatherBtn.addEventListener('click', gatherInfo);
+    const gatherSearchInput = document.getElementById('gather-search');
+    if (gatherSearchInput) {
+      gatherSearchInput.addEventListener('input', function () {
+        gather.applySearchFilter(gatherSearchInput.value.trim());
+      });
+    }
     const gatherCopyBtn = utils.get('gather-copy-btn');
     if (gatherCopyBtn) {
-      gatherCopyBtn.addEventListener('click', () => {
-        const data = gather.gatherData;
-        const tab = gather.currentGatherTab;
-        const list = data[tab] || [];
-        if (list.length === 0) {
-          utils.showToast('没有可复制的内容', 'warning');
-          return;
-        }
-        const text = list.map(i => i.value).join('\n');
-        utils.copyText(text);
-        utils.showToast('已复制 ' + list.length + ' 条', 'success');
-      });
+      gatherCopyBtn.addEventListener('click', gather.copyAllData);
     }
     const gatherExportBtn = utils.get('gather-export-btn');
     if (gatherExportBtn) {
-      gatherExportBtn.addEventListener('click', function () {
-        var exportLib = window.VulnKitExport;
-        var tab = gather.currentGatherTab;
-        var list = gather.gatherData[tab] || [];
-        if (list.length === 0) {
-          utils.showToast('没有可导出的内容', 'warning');
-          return;
-        }
-        exportLib.createDropdown(
-          gatherExportBtn,
-          function () {
-            return list;
-          },
-          [
-            { key: 'name', label: '类型' },
-            { key: 'value', label: '值' },
-          ],
-          'gather_' + tab
-        );
-      });
+      gatherExportBtn.addEventListener('click', gather.exportAllData);
     }
 
     // Rules management
@@ -783,57 +759,15 @@
     if (linksExtractBtn) linksExtractBtn.addEventListener('click', extractLinks);
     const linksCopyBtn = utils.get('links-copy-btn');
     if (linksCopyBtn) {
-      linksCopyBtn.addEventListener('click', () => {
-        const filtered = getFilteredLinks();
-        if (filtered.length === 0) {
-          utils.showToast('没有链接', 'warning');
-          return;
-        }
-        utils.copyText(filtered.map(l => l.href).join('\n'));
-        utils.showToast('已复制 ' + filtered.length + ' 个链接', 'success');
-      });
+      linksCopyBtn.addEventListener('click', copyFilteredUrls);
     }
     const linksExportBtn = utils.get('links-export-btn');
     if (linksExportBtn) {
-      linksExportBtn.addEventListener('click', function () {
-        var exportLib = window.VulnKitExport;
-        var filtered = getFilteredLinks();
-        if (filtered.length === 0) {
-          utils.showToast('没有链接', 'warning');
-          return;
-        }
-        exportLib.createDropdown(
-          linksExportBtn,
-          function () {
-            return filtered;
-          },
-          [
-            { key: 'href', label: 'URL' },
-            { key: 'text', label: '文本' },
-            { key: 'tag', label: '标签类型' },
-            { key: 'domain', label: '域名' },
-          ],
-          'links'
-        );
-      });
+      linksExportBtn.addEventListener('click', exportLinks);
     }
     const linksSendBtn = utils.get('links-send-multiurl-btn');
     if (linksSendBtn) {
-      linksSendBtn.addEventListener('click', () => {
-        const filtered = getFilteredLinks().filter(l => !l.isMailto && !l.isJS);
-        if (filtered.length === 0) {
-          utils.showToast('没有可发送的链接', 'warning');
-          return;
-        }
-        utils.get('multiurl-input').value = filtered.map(l => l.href).join('\n');
-        updateMultiurlInfo(filtered.length);
-        document
-          .querySelectorAll('.tab-btn')
-          .forEach(b => b.classList.toggle('active', b.dataset.panel === 'multiurl'));
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        document.getElementById('panel-multiurl').classList.add('active');
-        utils.showToast('已发送 ' + filtered.length + ' 个链接', 'success');
-      });
+      linksSendBtn.addEventListener('click', sendToMultiUrl);
     }
     const linksFilter = utils.get('links-filter');
     if (linksFilter) linksFilter.addEventListener('input', renderLinks);
@@ -849,6 +783,8 @@
     if (multiurlOpenBtn) multiurlOpenBtn.addEventListener('click', handleMultiurlOpen);
     const multiurlDedupBtn = utils.get('multiurl-dedup-btn');
     if (multiurlDedupBtn) multiurlDedupBtn.addEventListener('click', handleMultiurlDedup);
+    const multiurlCopyBtn = utils.get('multiurl-copy-btn');
+    if (multiurlCopyBtn) multiurlCopyBtn.addEventListener('click', copyAllUrls);
     const multiurlClearBtn = utils.get('multiurl-clear-btn');
     if (multiurlClearBtn)
       multiurlClearBtn.addEventListener('click', () => {
@@ -925,29 +861,7 @@
       });
     }
     const historyExportBtn = utils.get('history-export-btn');
-    if (historyExportBtn) {
-      historyExportBtn.addEventListener('click', function () {
-        var exportLib = window.VulnKitExport;
-        var results = lastHistoryResults;
-        if (!results || results.length === 0) {
-          utils.showToast('没有可导出的结果', 'warning');
-          return;
-        }
-        exportLib.createDropdown(
-          historyExportBtn,
-          function () {
-            return results;
-          },
-          [
-            { key: 'timestamp', label: '时间戳' },
-            { key: 'url', label: 'URL' },
-            { key: 'statuscode', label: '状态码' },
-            { key: 'mimetype', label: 'MIME类型' },
-          ],
-          'history'
-        );
-      });
-    }
+    if (historyExportBtn) historyExportBtn.addEventListener('click', historyExportData);
 
     const historyTypeFilter = utils.get('history-type-filter');
     if (historyTypeFilter) {
@@ -1427,6 +1341,14 @@
     renderPayloadCategories('cmdref-categories', CMDREF_DATA, false);
     renderAllReverseShells();
 
+    // Payload search
+    const payloadSearchInput = document.getElementById('payload-search');
+    if (payloadSearchInput) {
+      payloadSearchInput.addEventListener('input', function () {
+        payloadApplySearch(payloadSearchInput.value.trim());
+      });
+    }
+
     // Reverse shell
     const revshellGen = utils.get('revshell-gen-btn');
     if (revshellGen) revshellGen.addEventListener('click', generateReverseShell);
@@ -1465,9 +1387,7 @@
     var xssClearBtn = utils.get('xssscan-clear-btn');
     if (xssClearBtn) {
       xssClearBtn.addEventListener('click', function () {
-        xssPoints = [];
-        renderXssPoints();
-        updateXssInterceptStatus();
+        xssClearResults();
         utils.showToast('已清空', 'info');
       });
     }
@@ -1499,27 +1419,7 @@
     if (xssCopyAllBtn) xssCopyAllBtn.addEventListener('click', handleCopyXssUrls);
     var xssExportBtn = utils.get('xssscan-export-btn');
     if (xssExportBtn) {
-      xssExportBtn.addEventListener('click', function () {
-        var exportLib = window.VulnKitExport;
-        var points = xss.xssPoints;
-        if (!points || points.length === 0) {
-          utils.showToast('没有可导出的注入点', 'warning');
-          return;
-        }
-        exportLib.createDropdown(
-          xssExportBtn,
-          function () {
-            return points;
-          },
-          [
-            { key: 'source', label: '来源' },
-            { key: 'url', label: 'URL' },
-            { key: 'param', label: '参数' },
-            { key: 'method', label: '方法' },
-          ],
-          'xss_points'
-        );
-      });
+      xssExportBtn.addEventListener('click', xssExportData);
     }
 
     // Webpack Module Mapping (Source Map Scan)

@@ -155,5 +155,16 @@ window.VulnKitFavicon = (function () {
     }
   }
 
-  return { extractFavicon };
+  function copyFaviconUrl() {
+    var utils = getUtils();
+    var urlEl = utils.get('favicon-url');
+    if (!urlEl || urlEl.textContent === '-') {
+      utils.showToast('请先提取图标', 'warning');
+      return;
+    }
+    utils.copyText(urlEl.textContent);
+    utils.showToast('已复制图标 URL', 'success');
+  }
+
+  return { extractFavicon, copyFaviconUrl };
 })();

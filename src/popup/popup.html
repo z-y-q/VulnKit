@@ -280,6 +280,7 @@
                 <span class="detail-value hash-value" id="favicon-hash">-</span>
               </div>
               <div class="detail-row">
+                <button class="btn btn-sm btn-outline" id="copy-favicon-url-btn">复制 URL</button>
                 <button class="btn btn-sm btn-outline" id="copy-favicon-hash-btn">复制 Hash</button>
               </div>
             </div>
@@ -302,6 +303,7 @@
         <div class="gather-sub-tabs" id="gather-sub-tabs">
           <!-- 由 JS 动态生成 -->
         </div>
+        <input type="text" id="gather-search" class="input" placeholder="搜索过滤结果..." style="margin-bottom:4px;display:none;">
         <div class="gather-status" id="gather-status"></div>
         <div class="gather-results" id="gather-results">
           <div class="empty-state">点击「收集当前页面」开始</div>
@@ -358,6 +360,7 @@
         <div class="asset-actions-row" id="asset-actions-row" style="display:none">
           <button id="asset-export-btn" class="btn btn-sm btn-outline">导出结果</button>
         </div>
+        <input type="text" id="asset-search" class="input" placeholder="搜索结果..." style="display:none;margin:6px 0;">
         <div class="asset-results" id="asset-results"></div>
 
         <div class="card-spacing">
@@ -421,6 +424,7 @@
             <option value="internal">内部链接</option>
           </select>
         </div>
+        <div class="links-stats" id="links-stats"></div>
         <div class="link-count" id="links-count"></div>
         <div class="link-results" id="links-results">
           <div class="empty-state">点击「提取链接」开始</div>
@@ -456,6 +460,7 @@
         <div class="form-actions">
           <button class="btn btn-primary" id="multiurl-open-btn">批量打开</button>
           <button class="btn btn-secondary" id="multiurl-dedup-btn">去重</button>
+          <button class="btn btn-sm btn-secondary" id="multiurl-copy-btn">复制全部</button>
           <button class="btn btn-outline" id="multiurl-clear-btn">清空</button>
         </div>
       </div>
@@ -880,6 +885,7 @@
           <button class="payload-tab" data-ptab="webshell">WebShell</button>
           <button class="payload-tab" data-ptab="cmdref">常用命令</button>
         </div>
+        <input type="text" id="payload-search" class="input" placeholder="搜索 Payload..." style="margin:6px 0;">
 
         <!-- XSS -->
         <div id="ptab-xss" class="payload-panel active">

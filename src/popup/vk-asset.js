@@ -71,21 +71,47 @@ window.VulnKitAsset = (function () {
     return el ? parseInt(el.value, 10) || 10 : 10;
   }
 
+  var currentSearchFilter = '';
+
   function renderAssetResults(data) {
+    var filtered = data || lastAssetResults || [];
+    if (currentSearchFilter && filtered.length > 0) {
+      var lower = currentSearchFilter.toLowerCase();
+      filtered = filtered.filter(function (item) {
+        return (
+          (item.host || '').toLowerCase().indexOf(lower) !== -1 ||
+          String(item.port || '')
+            .toLowerCase()
+            .indexOf(lower) !== -1 ||
+          (item.protocol || '').toLowerCase().indexOf(lower) !== -1 ||
+          (item.title || '').toLowerCase().indexOf(lower) !== -1
+        );
+      });
+    }
     const utils = getUtils();
     const container = utils.get('asset-results');
     if (!container) return;
     var actionsRow = document.getElementById('asset-actions-row');
-    lastAssetResults = data || [];
-    if (actionsRow) actionsRow.style.display = lastAssetResults.length > 0 ? 'flex' : 'none';
-    if (!data || data.length === 0) {
+    if (data) lastAssetResults = data;
+    var hasResults = lastAssetResults.length > 0;
+    if (actionsRow) actionsRow.style.display = hasResults ? 'flex' : 'none';
+    var searchInput = document.getElementById('asset-search');
+    if (searchInput) searchInput.style.display = hasResults ? '' : 'none';
+    if (filtered.length === 0 && !hasResults) {
       container.innerHTML = '<div class="empty-state">未找到结果</div>';
       return;
     }
-    let html = '<div class="asset-count">共 ' + data.length + ' 条结果</div>';
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="empty-state">无匹配结果</div>';
+      return;
+    }
+    var countLabel = currentSearchFilter
+      ? '匹配 ' + filtered.length + ' / ' + lastAssetResults.length + ' 条结果'
+      : '共 ' + filtered.length + ' 条结果';
+    var html = '<div class="asset-count">' + countLabel + '</div>';
     html +=
       '<table class="asset-table"><thead><tr><th>IP/域名</th><th>端口</th><th>协议</th><th>标题</th></tr></thead><tbody>';
-    data.forEach(item => {
+    filtered.forEach(function (item) {
       html += '<tr>';
       html +=
         '<td title="' +
@@ -105,6 +131,63 @@ window.VulnKitAsset = (function () {
     });
     html += '</tbody></table>';
     container.innerHTML = html;
+  }
+
+  function applySearchFilter(text) {
+    currentSearchFilter = text || '';
+    renderAssetResults();
+  }
+
+  function exportData() {
+    var utils = getUtils();
+    if (!lastAssetResults || lastAssetResults.length === 0) {
+      utils.showToast('没有可导出的结果', 'warning');
+      return;
+    }
+    var data = lastAssetResults;
+    if (currentSearchFilter) {
+      var lower = currentSearchFilter.toLowerCase();
+      data = data.filter(function (item) {
+        return (
+          (item.host || '').toLowerCase().indexOf(lower) !== -1 ||
+          String(item.port || '')
+            .toLowerCase()
+            .indexOf(lower) !== -1 ||
+          (item.protocol || '').toLowerCase().indexOf(lower) !== -1 ||
+          (item.title || '').toLowerCase().indexOf(lower) !== -1
+        );
+      });
+    }
+    var lines = ['IP/域名,端口,协议,标题'];
+    data.forEach(function (item) {
+      lines.push(
+        '"' +
+          (item.host || '').replace(/"/g, '""') +
+          '",' +
+          '"' +
+          String(item.port || '').replace(/"/g, '""') +
+          '",' +
+          '"' +
+          (item.protocol || '').replace(/"/g, '""') +
+          '",' +
+          '"' +
+          (item.title || '').replace(/"/g, '""') +
+          '"'
+      );
+    });
+    var csv = lines.join('\n');
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    chrome.downloads.download(
+      {
+        url: url,
+        filename: 'vulnkit-asset-' + currentAssetSource + '-' + Date.now() + '.csv',
+        saveAs: true,
+      },
+      function () {
+        utils.showToast('导出成功', 'success');
+      }
+    );
   }
 
   async function scanFofa(query) {
@@ -619,6 +702,8 @@ window.VulnKitAsset = (function () {
     saveApiKeys,
     loadApiKeys,
     clearApiKeys,
+    exportData,
+    applySearchFilter,
     get currentAssetSource() {
       return currentAssetSource;
     },

@@ -57,5 +57,22 @@ window.VulnKitMultiUrl = (function () {
     utils.showToast('去重完成，移除 ' + (urls.length - unique.length) + ' 个重复', 'success');
   }
 
-  return { parseUrls, updateMultiurlInfo, handleMultiurlOpen, handleMultiurlDedup };
+  function copyAllUrls() {
+    var utils = getUtils();
+    var urls = parseUrls();
+    if (urls.length === 0) {
+      utils.showToast('没有可复制的URL', 'warning');
+      return;
+    }
+    utils.copyText(urls.join('\n'));
+    utils.showToast('已复制 ' + urls.length + ' 个URL', 'success');
+  }
+
+  return {
+    parseUrls,
+    updateMultiurlInfo,
+    handleMultiurlOpen,
+    handleMultiurlDedup,
+    copyAllUrls,
+  };
 })();

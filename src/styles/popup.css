@@ -584,6 +584,23 @@ body {
   margin-bottom: 4px;
 }
 
+.links-stats {
+  margin-bottom: 4px;
+}
+
+.links-stats-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 4px 0;
+  font-size: 11px;
+}
+
+.links-stat {
+  color: #888;
+  font-weight: 500;
+}
+
 .link-results {
   max-height: 240px;
   overflow-y: auto;

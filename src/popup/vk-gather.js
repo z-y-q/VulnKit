@@ -10,6 +10,7 @@ window.VulnKitGather = (function () {
   var gatherData = {};
   var currentGatherTab = DOM_GROUP;
   var loadedRules = [];
+  var searchFilter = '';
 
   function getUtils() {
     return window.VulnKitUtils || null;
@@ -19,20 +20,54 @@ window.VulnKitGather = (function () {
     return window.VulnKitHaeRules || null;
   }
 
+  function getFilteredList() {
+    var list = gatherData[currentGatherTab] || [];
+    if (!searchFilter) return list;
+    var lower = searchFilter.toLowerCase();
+    return list.filter(function (item) {
+      return (
+        (item.value && item.value.toLowerCase().indexOf(lower) !== -1) ||
+        (item.name && item.name.toLowerCase().indexOf(lower) !== -1)
+      );
+    });
+  }
+
+  function updateSearchVisibility() {
+    var searchInput = document.getElementById('gather-search');
+    if (!searchInput) return;
+    var hasData = Object.keys(gatherData).some(function (k) {
+      return Array.isArray(gatherData[k]) && gatherData[k].length > 0;
+    });
+    searchInput.style.display = hasData ? '' : 'none';
+  }
+
   function renderGatherTab() {
     var utils = getUtils();
-    var list = gatherData[currentGatherTab] || [];
+    var list = getFilteredList();
     var container = utils.get('gather-results');
     var statusEl = utils.get('gather-status');
     if (!container || !statusEl) return;
 
-    if (list.length === 0) {
+    updateSearchVisibility();
+
+    var fullList = gatherData[currentGatherTab] || [];
+    if (fullList.length === 0) {
       container.innerHTML = '<div class="empty-state">点击「收集当前页面」开始</div>';
       statusEl.textContent = '';
       return;
     }
 
-    statusEl.textContent = '共 ' + list.length + ' 条';
+    var statusText = '共 ' + fullList.length + ' 条';
+    if (searchFilter && list.length !== fullList.length) {
+      statusText += '（筛选: ' + list.length + '）';
+    }
+    statusEl.textContent = statusText;
+
+    if (list.length === 0) {
+      container.innerHTML = '<div class="empty-state">没有匹配的结果</div>';
+      return;
+    }
+
     var html = '';
     list.forEach(function (item) {
       html += '<div class="gather-item">';
@@ -60,9 +95,17 @@ window.VulnKitGather = (function () {
 
   function switchGatherTab(tab) {
     currentGatherTab = tab;
+    searchFilter = '';
+    var searchInput = document.getElementById('gather-search');
+    if (searchInput) searchInput.value = '';
     document.querySelectorAll('.gather-tab').forEach(function (b) {
       b.classList.toggle('active', b.dataset.gather === tab);
     });
+    renderGatherTab();
+  }
+
+  function applySearchFilter(text) {
+    searchFilter = text;
     renderGatherTab();
   }
 
@@ -77,6 +120,7 @@ window.VulnKitGather = (function () {
     groups.forEach(function (group, i) {
       var active = i === 0 ? ' active' : '';
       var label = group === DOM_GROUP ? 'DOM分析' : group;
+      var count = (gatherData[group] || []).length;
       html +=
         '<button class="gather-tab' +
         active +
@@ -84,6 +128,7 @@ window.VulnKitGather = (function () {
         group +
         '">' +
         label +
+        (count > 0 ? ' <span class="gather-tab-count">' + count + '</span>' : '') +
         '</button>';
     });
     container.innerHTML = html;
@@ -95,6 +140,7 @@ window.VulnKitGather = (function () {
     });
 
     currentGatherTab = DOM_GROUP;
+    updateSearchVisibility();
   }
 
   function init() {
@@ -347,6 +393,15 @@ window.VulnKitGather = (function () {
             if (c.p.test(pageHtml)) addDom('cloud', c.l);
           });
 
+          // HTTP Security Headers (from meta http-equiv)
+          document.querySelectorAll('meta[http-equiv]').forEach(function (m) {
+            var header = m.getAttribute('http-equiv');
+            var content = m.getAttribute('content');
+            if (header && content) {
+              addDom('header', header + ': ' + content);
+            }
+          });
+
           // HaE rules matching
           var pageScopes = ['response body', 'response', 'request', 'header', 'any'];
           haeRules.forEach(function (group) {
@@ -478,11 +533,71 @@ window.VulnKitGather = (function () {
         var utils = getUtils();
         var statusEl = utils.get('gather-status');
         var total = Object.values(gatherData).reduce(function (s, a) {
-          return s + a.length;
+          return s + (Array.isArray(a) ? a.length : 0);
         }, 0);
         if (statusEl) statusEl.textContent = '已恢复，共 ' + total + ' 条';
       }
     });
+  }
+
+  function exportAllData() {
+    var utils = getUtils();
+    var total = Object.values(gatherData).reduce(function (s, a) {
+      return s + (Array.isArray(a) ? a.length : 0);
+    }, 0);
+    if (total === 0) {
+      utils.showToast('没有数据可导出', 'warning');
+      return;
+    }
+
+    var lines = ['Group,Type,Value'];
+    Object.keys(gatherData).forEach(function (group) {
+      var items = gatherData[group];
+      if (!Array.isArray(items)) return;
+      items.forEach(function (item) {
+        lines.push(
+          '"' +
+            group.replace(/"/g, '""') +
+            '",' +
+            '"' +
+            (item.name || '').replace(/"/g, '""') +
+            '",' +
+            '"' +
+            (item.value || '').replace(/"/g, '""') +
+            '"'
+        );
+      });
+    });
+
+    var csv = lines.join('\n');
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    chrome.downloads.download(
+      {
+        url: url,
+        filename: 'vulnkit-gather-' + Date.now() + '.csv',
+        saveAs: true,
+      },
+      function () {
+        utils.showToast('导出成功', 'success');
+      }
+    );
+  }
+
+  function copyAllData() {
+    var utils = getUtils();
+    var list = gatherData[currentGatherTab] || [];
+    if (list.length === 0) {
+      utils.showToast('当前分组没有数据', 'warning');
+      return;
+    }
+    var text = list
+      .map(function (item) {
+        return item.value;
+      })
+      .join('\n');
+    utils.copyText(text);
+    utils.showToast('已复制 ' + list.length + ' 条数据', 'success');
   }
 
   function getActiveRules() {
@@ -502,6 +617,9 @@ window.VulnKitGather = (function () {
     renderSubTabs: renderSubTabs,
     gatherInfo: gatherInfo,
     restoreData: restoreData,
+    applySearchFilter: applySearchFilter,
+    exportAllData: exportAllData,
+    copyAllData: copyAllData,
     getActiveRules: getActiveRules,
     updateRules: updateRules,
     get gatherData() {

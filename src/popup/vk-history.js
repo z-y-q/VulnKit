@@ -255,6 +255,44 @@ window.VulnKitHistory = (function () {
     });
   }
 
+  function exportData() {
+    var utils = getUtils();
+    if (!lastHistoryResults || lastHistoryResults.length === 0) {
+      utils.showToast('没有可导出的结果', 'warning');
+      return;
+    }
+    var lines = ['时间戳,URL,状态码,MIME类型'];
+    lastHistoryResults.forEach(function (item) {
+      lines.push(
+        '"' +
+          (item.timestamp || '').replace(/"/g, '""') +
+          '",' +
+          '"' +
+          (item.url || '').replace(/"/g, '""') +
+          '",' +
+          '"' +
+          (item.statuscode || '').replace(/"/g, '""') +
+          '",' +
+          '"' +
+          (item.mimetype || '').replace(/"/g, '""') +
+          '"'
+      );
+    });
+    var csv = lines.join('\n');
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    chrome.downloads.download(
+      {
+        url: url,
+        filename: 'vulnkit-history-' + Date.now() + '.csv',
+        saveAs: true,
+      },
+      function () {
+        utils.showToast('导出成功', 'success');
+      }
+    );
+  }
+
   return {
     showHistoryQuickLinks,
     buildCdxUrl,
@@ -262,6 +300,7 @@ window.VulnKitHistory = (function () {
     extractDomain,
     queryHistory,
     renderHistoryResults,
+    exportData,
     get lastHistoryResults() {
       return lastHistoryResults;
     },
