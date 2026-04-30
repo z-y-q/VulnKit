@@ -13,6 +13,7 @@ window.VulnKitHistory = (function () {
     if (!domain) return;
     const utils = getUtils();
     const quickLinks = utils.get('history-quick-links');
+    if (!quickLinks) return;
     quickLinks.innerHTML =
       '<button class="quick-link-btn" data-url="https://web.archive.org/web/*/' +
       encodeURIComponent(domain) +
@@ -20,7 +21,7 @@ window.VulnKitHistory = (function () {
       '<button id="history-latest-btn" class="quick-link-btn quick-latest hidden" data-url="">查看最新快照</button>';
 
     if (!showHistoryQuickLinks._bound) {
-      const panel = document.getElementById('panel-history');
+      const panel = utils.get('panel-history');
       if (panel) {
         panel.addEventListener('click', e => {
           const btn = e.target.closest('[data-url]');
@@ -117,7 +118,8 @@ window.VulnKitHistory = (function () {
     if (!isFilter) allHistoryResults = items;
     const container = utils.get('history-timeline');
     const statusEl = utils.get('history-status');
-    const fields = utils.get('history-fields').value;
+    const fieldsEl = utils.get('history-fields');
+    const fields = fieldsEl ? fieldsEl.value : '';
     const hasTs = fields.includes('timestamp');
 
     if (items.length === 0) {
@@ -127,7 +129,8 @@ window.VulnKitHistory = (function () {
     }
 
     statusEl.textContent = '共 ' + items.length + ' 条记录';
-    utils.get('history-total').textContent = items.length;
+    var totalEl = utils.get('history-total');
+    if (totalEl) totalEl.textContent = items.length;
 
     if (hasTs) {
       const timestamps = items
@@ -136,9 +139,12 @@ window.VulnKitHistory = (function () {
         .sort();
       if (timestamps.length > 0) {
         const fmt = ts => ts.substring(0, 4) + '-' + ts.substring(4, 6) + '-' + ts.substring(6, 8);
-        utils.get('history-first').textContent = fmt(timestamps[0]);
-        utils.get('history-last').textContent = fmt(timestamps[timestamps.length - 1]);
-        utils.get('history-summary').classList.remove('hidden');
+        var firstEl = utils.get('history-first');
+        var lastEl = utils.get('history-last');
+        var summaryEl = utils.get('history-summary');
+        if (firstEl) firstEl.textContent = fmt(timestamps[0]);
+        if (lastEl) lastEl.textContent = fmt(timestamps[timestamps.length - 1]);
+        if (summaryEl) summaryEl.classList.remove('hidden');
       }
     }
 
@@ -208,7 +214,8 @@ window.VulnKitHistory = (function () {
 
   async function queryHistory() {
     const utils = getUtils();
-    let raw = utils.get('history-domain').value.trim();
+    let domainEl = utils.get('history-domain');
+    let raw = domainEl ? domainEl.value.trim() : '';
     if (!raw) {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.url) {
@@ -227,6 +234,10 @@ window.VulnKitHistory = (function () {
 
     const cdxUrl = buildCdxUrl(domain);
     chrome.runtime.sendMessage({ type: 'FETCH_URL', url: cdxUrl }, response => {
+      if (chrome.runtime.lastError) {
+        utils.get('history-status').textContent = '查询失败: ' + chrome.runtime.lastError.message;
+        return;
+      }
       if (response?.error) {
         utils.get('history-status').textContent = '查询失败: ' + response.error;
         return;
@@ -242,7 +253,7 @@ window.VulnKitHistory = (function () {
 
         const latest = items[items.length - 1];
         if (latest && latest.timestamp) {
-          const latestBtn = document.getElementById('history-latest-btn');
+          const latestBtn = utils.get('history-latest-btn');
           if (latestBtn) {
             latestBtn.dataset.url =
               'https://web.archive.org/web/' + latest.timestamp + '/' + latest.url;
@@ -288,6 +299,11 @@ window.VulnKitHistory = (function () {
         saveAs: true,
       },
       function () {
+        URL.revokeObjectURL(url);
+        if (chrome.runtime.lastError) {
+          utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
+          return;
+        }
         utils.showToast('导出成功', 'success');
       }
     );

@@ -135,7 +135,12 @@ window.VulnKitLinks = (function () {
               inputs.push(inp.getAttribute('name'));
             });
             links.push({
-              href: action + ' [' + method + ']' + (inputs.length ? ' {' + inputs.join(', ') + '}' : ''),
+              href:
+                action +
+                ' [' +
+                method +
+                ']' +
+                (inputs.length ? ' {' + inputs.join(', ') + '}' : ''),
               text: inputs.length ? inputs.join(', ') : '',
               tag: 'form',
               domain: '',
@@ -206,13 +211,29 @@ window.VulnKitLinks = (function () {
       }
     });
 
-    var externalCount = allLinks.filter(function (l) { return l.isExternal; }).length;
+    var externalCount = allLinks.filter(function (l) {
+      return l.isExternal;
+    }).length;
 
     var html = '<div class="links-stats-bar">';
     html += '<span class="links-stat">总计: ' + allLinks.length + '</span>';
 
-    var tagLabels = { a: '链接', img: '图片', script: '脚本', link: '资源', iframe: '框架', form: '表单' };
-    var tagColors = { a: '#4A90E2', img: '#27ae60', script: '#e67e22', link: '#9b59b6', iframe: '#e74c3c', form: '#f39c12' };
+    var tagLabels = {
+      a: '链接',
+      img: '图片',
+      script: '脚本',
+      link: '资源',
+      iframe: '框架',
+      form: '表单',
+    };
+    var tagColors = {
+      a: '#4A90E2',
+      img: '#27ae60',
+      script: '#e67e22',
+      link: '#9b59b6',
+      iframe: '#e74c3c',
+      form: '#f39c12',
+    };
     Object.keys(counts).forEach(function (tag) {
       html += '<span class="links-stat" style="color:' + (tagColors[tag] || '#888') + '">';
       html += (tagLabels[tag] || tag) + ': ' + counts[tag];
@@ -248,15 +269,34 @@ window.VulnKitLinks = (function () {
       return;
     }
 
-    var tagColors = { a: '#4A90E2', img: '#27ae60', script: '#e67e22', link: '#9b59b6', iframe: '#e74c3c', form: '#f39c12' };
+    var tagColors = {
+      a: '#4A90E2',
+      img: '#27ae60',
+      script: '#e67e22',
+      link: '#9b59b6',
+      iframe: '#e74c3c',
+      form: '#f39c12',
+    };
 
     var html = '';
     filtered.forEach(function (link) {
       var tagClass = 'tag-' + link.tag;
       html += '<div class="link-item">';
-      html += '<span class="link-item-tag ' + tagClass + '" style="background:' + (tagColors[link.tag] || '#888') + '">' + link.tag + '</span>';
+      html +=
+        '<span class="link-item-tag ' +
+        tagClass +
+        '" style="background:' +
+        (tagColors[link.tag] || '#888') +
+        '">' +
+        link.tag +
+        '</span>';
       html += '<span class="link-item-text">';
-      html += '<span class="link-item-href" title="' + utils.escapeHtml(link.href) + '">' + utils.escapeHtml(link.href) + '</span>';
+      html +=
+        '<span class="link-item-href" title="' +
+        utils.escapeHtml(link.href) +
+        '">' +
+        utils.escapeHtml(link.href) +
+        '</span>';
       if (link.domain) {
         html += '<span class="link-item-domain">' + utils.escapeHtml(link.domain);
         if (link.text) html += ' - ' + utils.escapeHtml(link.text);
@@ -265,7 +305,10 @@ window.VulnKitLinks = (function () {
         html += '<span class="link-item-domain">' + utils.escapeHtml(link.text) + '</span>';
       }
       html += '</span>';
-      html += '<button class="link-item-copy" data-href="' + utils.escapeHtml(link.href) + '">复制</button>';
+      html +=
+        '<button class="link-item-copy" data-href="' +
+        utils.escapeHtml(link.href) +
+        '">复制</button>';
       html += '</div>';
     });
     container.innerHTML = html;
@@ -284,7 +327,11 @@ window.VulnKitLinks = (function () {
       utils.showToast('没有可复制的链接', 'warning');
       return;
     }
-    var urls = filtered.map(function (l) { return l.href; }).join('\n');
+    var urls = filtered
+      .map(function (l) {
+        return l.href;
+      })
+      .join('\n');
     utils.copyText(urls);
     utils.showToast('已复制 ' + filtered.length + ' 个 URL', 'success');
   }
@@ -298,23 +345,33 @@ window.VulnKitLinks = (function () {
     var lines = ['URL,Tag,Domain,Text,External'];
     filtered.forEach(function (l) {
       lines.push(
-        '"' + l.href.replace(/"/g, '""') + '",' +
-        l.tag + ',' +
-        '"' + (l.domain || '').replace(/"/g, '""') + '",' +
-        '"' + (l.text || '').replace(/"/g, '""') + '",' +
-        (l.isExternal ? 'Yes' : 'No')
+        '"' +
+          l.href.replace(/"/g, '""') +
+          '",' +
+          l.tag +
+          ',' +
+          '"' +
+          (l.domain || '').replace(/"/g, '""') +
+          '",' +
+          '"' +
+          (l.text || '').replace(/"/g, '""') +
+          '",' +
+          (l.isExternal ? 'Yes' : 'No')
       );
     });
     var csv = lines.join('\n');
     var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
     var url = URL.createObjectURL(blob);
-    chrome.downloads.download({
-      url: url,
-      filename: 'vulnkit-links-' + Date.now() + '.csv',
-      saveAs: true,
-    }, function () {
-      utils.showToast('导出成功', 'success');
-    });
+    chrome.downloads.download(
+      {
+        url: url,
+        filename: 'vulnkit-links-' + Date.now() + '.csv',
+        saveAs: true,
+      },
+      function () {
+        utils.showToast('导出成功', 'success');
+      }
+    );
   }
 
   function sendToMultiUrl() {
@@ -324,8 +381,12 @@ window.VulnKitLinks = (function () {
       return;
     }
     var urls = filtered
-      .filter(function (l) { return l.tag === 'a' || l.tag === 'iframe'; })
-      .map(function (l) { return l.href; });
+      .filter(function (l) {
+        return l.tag === 'a' || l.tag === 'iframe';
+      })
+      .map(function (l) {
+        return l.href;
+      });
     if (urls.length === 0) {
       utils.showToast('没有可发送的 URL 类型的链接', 'warning');
       return;
@@ -334,7 +395,7 @@ window.VulnKitLinks = (function () {
     if (inputEl) {
       inputEl.value = urls.join('\n');
       if (window.VulnKitMultiUrl && window.VulnKitMultiUrl.updateMultiurlInfo) {
-        window.VulnKitMultiUrl.updateMultiurlInfo();
+        window.VulnKitMultiUrl.updateMultiurlInfo(urls.length);
       }
       // Switch to multiurl panel
       var multiurlBtn = document.querySelector('[data-panel="multiurl"]');

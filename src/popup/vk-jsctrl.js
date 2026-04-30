@@ -302,6 +302,10 @@ window.VulnKitJsCtrl = (function () {
               { type: 'FETCH_URL', url: externalUrls[u] },
               function (resp) {
                 clearTimeout(timer);
+                if (chrome.runtime.lastError) {
+                  resolve(null);
+                  return;
+                }
                 resolve(resp);
               }
             );

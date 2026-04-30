@@ -268,6 +268,13 @@ window.VulnKitExif = (function () {
     if (fileSizeEl) fileSizeEl.textContent = '';
 
     chrome.runtime.sendMessage({ type: 'FETCH_IMAGE', url }, response => {
+      if (chrome.runtime.lastError) {
+        resultEl.classList.remove('hidden');
+        emptyEl.classList.remove('hidden');
+        emptyEl.textContent = '获取失败: ' + chrome.runtime.lastError.message;
+        sectionsEl.innerHTML = '';
+        return;
+      }
       if (!response || response.error) {
         resultEl.classList.remove('hidden');
         emptyEl.classList.remove('hidden');
@@ -297,6 +304,7 @@ window.VulnKitExif = (function () {
 
   async function scanPageImages() {
     const container = utils.get('exif-page-images');
+    if (!container) return;
     container.innerHTML = '<div class="empty-state">正在扫描...</div>';
 
     try {
@@ -370,7 +378,8 @@ window.VulnKitExif = (function () {
       if (!url) return;
       chrome.storage.local.remove(['exif_pending_url']);
       switchExifMode('url');
-      utils.get('exif-url-input').value = url;
+      var urlInput = utils.get('exif-url-input');
+      if (urlInput) urlInput.value = url;
       fetchExifFromUrl(url);
     });
   }

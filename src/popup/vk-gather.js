@@ -33,7 +33,8 @@ window.VulnKitGather = (function () {
   }
 
   function updateSearchVisibility() {
-    var searchInput = document.getElementById('gather-search');
+    var utils = getUtils();
+    var searchInput = utils ? utils.get('gather-search') : null;
     if (!searchInput) return;
     var hasData = Object.keys(gatherData).some(function (k) {
       return Array.isArray(gatherData[k]) && gatherData[k].length > 0;
@@ -96,7 +97,8 @@ window.VulnKitGather = (function () {
   function switchGatherTab(tab) {
     currentGatherTab = tab;
     searchFilter = '';
-    var searchInput = document.getElementById('gather-search');
+    var utils = getUtils();
+    var searchInput = utils ? utils.get('gather-search') : null;
     if (searchInput) searchInput.value = '';
     document.querySelectorAll('.gather-tab').forEach(function (b) {
       b.classList.toggle('active', b.dataset.gather === tab);
@@ -110,7 +112,8 @@ window.VulnKitGather = (function () {
   }
 
   function renderSubTabs() {
-    var container = document.getElementById('gather-sub-tabs');
+    var utils = getUtils();
+    var container = utils ? utils.get('gather-sub-tabs') : null;
     if (!container) return;
 
     var groups = [DOM_GROUP];
@@ -194,6 +197,10 @@ window.VulnKitGather = (function () {
       }, 12000);
       chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url, tailOnly: false }, function (resp) {
         clearTimeout(timer);
+        if (chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
         if (resp && resp.data) resolve(resp.data);
         else resolve(null);
       });
@@ -579,6 +586,11 @@ window.VulnKitGather = (function () {
         saveAs: true,
       },
       function () {
+        URL.revokeObjectURL(url);
+        if (chrome.runtime.lastError) {
+          utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
+          return;
+        }
         utils.showToast('导出成功', 'success');
       }
     );

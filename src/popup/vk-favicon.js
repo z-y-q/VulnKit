@@ -75,10 +75,15 @@ window.VulnKitFavicon = (function () {
       const faviconUrl = results?.[0]?.result || `https://${domain}/favicon.ico`;
       const resolvedUrl = new URL(faviconUrl, tab.url).href;
 
-      utils.get('favicon-img').src = resolvedUrl;
-      utils.get('favicon-img').classList.remove('hidden');
-      utils.get('favicon-placeholder').classList.add('hidden');
-      utils.get('favicon-url').textContent = resolvedUrl;
+      var faviconImg = utils.get('favicon-img');
+      var faviconPlaceholder = utils.get('favicon-placeholder');
+      var faviconUrlEl = utils.get('favicon-url');
+      if (faviconImg) {
+        faviconImg.src = resolvedUrl;
+        faviconImg.classList.remove('hidden');
+      }
+      if (faviconPlaceholder) faviconPlaceholder.classList.add('hidden');
+      if (faviconUrlEl) faviconUrlEl.textContent = resolvedUrl;
 
       try {
         const response = await new Promise(function (resolve) {

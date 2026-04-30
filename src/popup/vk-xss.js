@@ -662,6 +662,11 @@ window.VulnKitXss = (function () {
         saveAs: true,
       },
       function () {
+        URL.revokeObjectURL(url);
+        if (chrome.runtime.lastError) {
+          utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
+          return;
+        }
         utils.showToast('导出成功', 'success');
       }
     );

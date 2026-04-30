@@ -91,11 +91,11 @@ window.VulnKitAsset = (function () {
     const utils = getUtils();
     const container = utils.get('asset-results');
     if (!container) return;
-    var actionsRow = document.getElementById('asset-actions-row');
+    var actionsRow = utils.get('asset-actions-row');
     if (data) lastAssetResults = data;
     var hasResults = lastAssetResults.length > 0;
     if (actionsRow) actionsRow.style.display = hasResults ? 'flex' : 'none';
-    var searchInput = document.getElementById('asset-search');
+    var searchInput = utils.get('asset-search');
     if (searchInput) searchInput.style.display = hasResults ? '' : 'none';
     if (filtered.length === 0 && !hasResults) {
       container.innerHTML = '<div class="empty-state">未找到结果</div>';
@@ -185,6 +185,11 @@ window.VulnKitAsset = (function () {
         saveAs: true,
       },
       function () {
+        URL.revokeObjectURL(url);
+        if (chrome.runtime.lastError) {
+          utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
+          return;
+        }
         utils.showToast('导出成功', 'success');
       }
     );
@@ -419,10 +424,7 @@ window.VulnKitAsset = (function () {
         .catch(function (err) {
           container.innerHTML =
             '<div style="color:#ff6b6b;padding:8px;">查询失败: ' +
-            String(err.message || err)
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;') +
+            utils.escapeHtml(String(err.message || err)) +
             '</div>';
         });
     }
@@ -647,14 +649,14 @@ window.VulnKitAsset = (function () {
     customQueryMode = enabled;
     const utils = getUtils();
     const queryInput = utils.get('asset-query');
-    const hint = document.getElementById('asset-query-hint');
+    const hint = utils.get('asset-query-hint');
     if (queryInput) {
       queryInput.placeholder = enabled
         ? '输入自定义查询语法，如 domain="x.com" && title="login"'
         : '留空使用当前页面域名';
     }
     if (hint) hint.textContent = enabled ? '自定义模式：直接输入引擎查询语法' : '';
-    var toggle = document.getElementById('asset-custom-toggle');
+    var toggle = utils.get('asset-custom-toggle');
     if (toggle) toggle.classList.toggle('active', enabled);
   }
 

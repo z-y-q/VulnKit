@@ -4,8 +4,6 @@
 
   const utils = window.VulnKitUtils;
 
-  let currentAssetSource = 'fofa';
-
   // ====== Encoding Tools (loaded from vk-encoding.js) ======
   const encoding = window.VulnKitEncoding;
   const ENCODING_NAMES = encoding.ENCODING_NAMES;
@@ -462,9 +460,19 @@
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        const target = document.getElementById('panel-' + panel);
+        const target = utils.get('panel-' + panel);
         if (target) target.classList.add('active');
         utils.get('status-text').textContent = btn.textContent;
+
+        // Auto-fill history domain when switching to history panel
+        if (panel === 'history') {
+          var historyDomainInput = utils.get('history-domain');
+          if (historyDomainInput && !historyDomainInput.value.trim()) {
+            getCurrentDomain().then(d => {
+              if (d && !historyDomainInput.value.trim()) historyDomainInput.value = d;
+            });
+          }
+        }
       });
     });
 
@@ -610,6 +618,15 @@
 
     const scanBtn = utils.get('asset-scan-btn');
     if (scanBtn) scanBtn.addEventListener('click', handleAssetScan);
+    const assetQueryInput = utils.get('asset-query');
+    if (assetQueryInput) {
+      assetQueryInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleAssetScan();
+        }
+      });
+    }
     const customToggle = utils.get('asset-custom-toggle');
     if (customToggle)
       customToggle.addEventListener('click', () =>
@@ -618,7 +635,7 @@
     const assetExportBtn = utils.get('asset-export-btn');
     if (assetExportBtn) assetExportBtn.addEventListener('click', assetExportData);
 
-    const assetSearchInput = document.getElementById('asset-search');
+    const assetSearchInput = utils.get('asset-search');
     if (assetSearchInput) {
       assetSearchInput.addEventListener('input', function () {
         assetApplySearchFilter(assetSearchInput.value.trim());
@@ -627,6 +644,15 @@
 
     const shodanHostBtn = utils.get('shodan-host-btn');
     if (shodanHostBtn) shodanHostBtn.addEventListener('click', shodanHostLookup);
+    const shodanHostInput = utils.get('shodan-host-input');
+    if (shodanHostInput) {
+      shodanHostInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          shodanHostLookup();
+        }
+      });
+    }
 
     const saveKeysBtn = utils.get('save-keys-btn');
     if (saveKeysBtn) saveKeysBtn.addEventListener('click', saveApiKeys);
@@ -639,7 +665,7 @@
     // Info gather
     const gatherBtn = utils.get('gather-btn');
     if (gatherBtn) gatherBtn.addEventListener('click', gatherInfo);
-    const gatherSearchInput = document.getElementById('gather-search');
+    const gatherSearchInput = utils.get('gather-search');
     if (gatherSearchInput) {
       gatherSearchInput.addEventListener('input', function () {
         gather.applySearchFilter(gatherSearchInput.value.trim());
@@ -656,14 +682,14 @@
 
     // Rules management
     const rulesBtn = utils.get('gather-rules-btn');
-    const rulesModal = document.getElementById('rules-modal');
-    const rulesModalClose = document.getElementById('rules-modal-close');
+    const rulesModal = utils.get('rules-modal');
+    const rulesModalClose = utils.get('rules-modal-close');
     const rulesImportBtn = utils.get('rules-import-btn');
     const rulesResetBtn = utils.get('rules-reset-btn');
-    const rulesFileInput = document.getElementById('rules-file-input');
+    const rulesFileInput = utils.get('rules-file-input');
 
     function renderRulesList() {
-      const container = document.getElementById('rules-list');
+      const container = utils.get('rules-list');
       if (!container || !haeRules) return;
       const rules = gather.getActiveRules();
       let html = '';
@@ -840,19 +866,6 @@
         const val = historyDomainInput.value.trim();
         if (val) showHistoryQuickLinks(val);
       });
-
-      // Auto-fill domain when switching to history panel
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          if (btn.dataset.panel === 'history') {
-            if (!historyDomainInput.value.trim()) {
-              getCurrentDomain().then(d => {
-                if (d) historyDomainInput.value = d;
-              });
-            }
-          }
-        });
-      });
     }
 
     const historyCopyResultBtn = utils.get('history-copy-result-btn');
@@ -918,7 +931,8 @@
           .querySelectorAll('.tab-btn')
           .forEach(b => b.classList.toggle('active', b.dataset.panel === 'multiurl'));
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        document.getElementById('panel-multiurl').classList.add('active');
+        var multiurlPanel = utils.get('panel-multiurl');
+        if (multiurlPanel) multiurlPanel.classList.add('active');
         utils.showToast('已发送 ' + urls.length + ' 个链接', 'success');
       });
     }
@@ -1058,42 +1072,43 @@
       });
     }
 
-    // Route URL open buttons (event delegation)
-    document.getElementById('vue-results').addEventListener('click', e => {
-      if (e.target.classList.contains('vue-route-open-btn')) {
-        chrome.tabs.create({ url: e.target.dataset.url });
-      }
-    });
-    // Batch copy History/Hash URLs
-    document.getElementById('vue-results').addEventListener('click', e => {
-      if (
-        e.target.classList.contains('vue-copy-hist-btn') ||
-        e.target.classList.contains('vue-copy-hash-btn')
-      ) {
-        if (!lastVueResult) {
-          utils.showToast('请先检测 Vue', 'warning');
+    // Vue results event delegation (route open + batch copy)
+    var vueResultsEl = utils.get('vue-results');
+    if (vueResultsEl) {
+      vueResultsEl.addEventListener('click', e => {
+        if (e.target.classList.contains('vue-route-open-btn')) {
+          chrome.tabs.create({ url: e.target.dataset.url });
           return;
         }
-        try {
-          var data = JSON.parse(lastVueResult);
-          if (!data.routes || !data.routes.length) {
-            utils.showToast('无路由数据', 'warning');
+        if (
+          e.target.classList.contains('vue-copy-hist-btn') ||
+          e.target.classList.contains('vue-copy-hash-btn')
+        ) {
+          if (!lastVueResult) {
+            utils.showToast('请先检测 Vue', 'warning');
             return;
           }
-          var mode = e.target.classList.contains('vue-copy-hist-btn') ? 'history' : 'hash';
-          var base = (data.routerInfo && data.routerInfo.base) || '/';
-          var paths = collectAllPathsFromVue(data.routes, '', base, mode);
-          if (paths.length === 0) {
-            utils.showToast('无静态路由路径', 'warning');
-            return;
+          try {
+            var data = JSON.parse(lastVueResult);
+            if (!data.routes || !data.routes.length) {
+              utils.showToast('无路由数据', 'warning');
+              return;
+            }
+            var mode = e.target.classList.contains('vue-copy-hist-btn') ? 'history' : 'hash';
+            var base = (data.routerInfo && data.routerInfo.base) || '/';
+            var paths = collectAllPathsFromVue(data.routes, '', base, mode);
+            if (paths.length === 0) {
+              utils.showToast('无静态路由路径', 'warning');
+              return;
+            }
+            utils.copyText(paths.map(p => p.url).join('\n'));
+            utils.showToast('已复制 ' + paths.length + ' 条 ' + mode + ' URL', 'success');
+          } catch (err) {
+            utils.showToast('复制失败', 'error');
           }
-          utils.copyText(paths.map(p => p.url).join('\n'));
-          utils.showToast('已复制 ' + paths.length + ' 条 ' + mode + ' URL', 'success');
-        } catch (err) {
-          utils.showToast('复制失败', 'error');
         }
-      }
-    });
+      });
+    }
 
     // Vue sub-tabs
     document.querySelectorAll('.vue-stab').forEach(btn => {
@@ -1332,7 +1347,7 @@
     });
 
     // Theme toggle
-    const themeBtn = document.getElementById('theme-toggle');
+    const themeBtn = utils.get('theme-toggle');
     if (themeBtn) {
       const themes = ['light', 'dark'];
       const saved = localStorage.getItem('pentest-theme');
@@ -1359,7 +1374,7 @@
     renderAllReverseShells();
 
     // Payload search
-    const payloadSearchInput = document.getElementById('payload-search');
+    const payloadSearchInput = utils.get('payload-search');
     if (payloadSearchInput) {
       payloadSearchInput.addEventListener('input', function () {
         payloadApplySearch(payloadSearchInput.value.trim());

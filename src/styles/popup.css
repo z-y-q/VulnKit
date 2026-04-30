@@ -3979,3 +3979,30 @@ body {
   color: #ef4444;
   font-size: 9px;
 }
+
+/* ====== Dark Theme — History / Spoof / HaE Rules ====== */
+[data-theme='dark'] .timeline-url { color: var(--accent); }
+[data-theme='dark'] .status-200 { background: #1a3a2a; color: #6ee7b7; }
+[data-theme='dark'] .status-301 { background: #3a3a1a; color: #fcd34d; }
+[data-theme='dark'] .status-404 { background: #3a1a1a; color: #fca5a5; }
+[data-theme='dark'] .status-other { background: #1a2a3a; color: #93c5fd; }
+
+[data-theme='dark'] .ua-item { border-color: var(--border-color); }
+[data-theme='dark'] .ua-item:hover { background: var(--bg-tertiary); }
+[data-theme='dark'] .ua-item.ua-selected { background: rgba(74, 144, 226, 0.15); border-left-color: var(--accent); }
+[data-theme='dark'] .ua-item-label { color: var(--text-primary); }
+[data-theme='dark'] .ua-item-value { color: var(--text-secondary); }
+
+[data-theme='dark'] .cookie-domain-info { color: var(--text-secondary); }
+[data-theme='dark'] .cookie-count { color: var(--text-secondary); }
+[data-theme='dark'] .cookie-item { border-color: var(--border-color); }
+[data-theme='dark'] .cookie-item:hover { background: var(--bg-tertiary); }
+[data-theme='dark'] .cookie-item-name { color: var(--accent); }
+[data-theme='dark'] .cookie-item-value { color: var(--text-primary); }
+[data-theme='dark'] .cookie-item-meta { color: var(--text-secondary); }
+[data-theme='dark'] .cookie-badge { background: var(--bg-tertiary); color: var(--text-secondary); }
+[data-theme='dark'] .cookie-edit-flags { color: var(--text-secondary); }
+
+[data-theme='dark'] .rules-list { background: var(--bg-primary); }
+[data-theme='dark'] .rules-item { color: var(--text-primary); }
+[data-theme='dark'] .rules-scope-na { color: #f87171; }
