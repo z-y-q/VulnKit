@@ -296,18 +296,12 @@
       if (scrollRightBtn) scrollRightBtn.disabled = page >= totalPages - 1;
     }
 
-    var scrollLeftBtn = utils.get('tab-scroll-left');
-    var scrollRightBtn = utils.get('tab-scroll-right');
-    if (scrollLeftBtn) {
-      scrollLeftBtn.addEventListener('click', function () {
-        if (currentPage > 0) showTabPage(currentPage - 1);
-      });
-    }
-    if (scrollRightBtn) {
-      scrollRightBtn.addEventListener('click', function () {
-        if (currentPage < totalPages - 1) showTabPage(currentPage + 1);
-      });
-    }
+    var scrollLeftBtn = utils.bindClick('tab-scroll-left', function () {
+      if (currentPage > 0) showTabPage(currentPage - 1);
+    });
+    var scrollRightBtn = utils.bindClick('tab-scroll-right', function () {
+      if (currentPage < totalPages - 1) showTabPage(currentPage + 1);
+    });
     showTabPage(0);
 
     // Main panel tabs
@@ -376,57 +370,41 @@
     var cryptoDecBtn = utils.bindClick('crypto-dec-btn', doCryptoDecrypt);
     var cryptoVerifyBtn = utils.bindClick('crypto-verify-btn', doCryptoVerify);
     var hashHmacCheck = utils.on('hash-hmac', 'change', toggleHashHmac);
-    var cryptoClearBtn = utils.get('crypto-clear-btn');
-    if (cryptoClearBtn)
-      cryptoClearBtn.addEventListener('click', function () {
-        var ci = utils.get('crypto-input');
-        if (ci) ci.value = '';
-        var co = utils.get('crypto-output');
-        if (co) co.value = '';
-      });
-    var copyCryptoBtn = utils.get('copy-crypto-btn');
-    if (copyCryptoBtn)
-      copyCryptoBtn.addEventListener('click', function () {
-        var v = (utils.get('crypto-output') || {}).value;
-        if (v) utils.copyAndToast(v);
-      });
+    utils.bindClick('crypto-clear-btn', function () {
+      var ci = utils.get('crypto-input');
+      if (ci) ci.value = '';
+      var co = utils.get('crypto-output');
+      if (co) co.value = '';
+    });
+    utils.bindClick('copy-crypto-btn', function () {
+      var v = (utils.get('crypto-output') || {}).value;
+      if (v) utils.copyAndToast(v);
+    });
 
     // Crypto mode/IV toggle listeners
-    var aesMode = utils.get('aes-mode');
-    if (aesMode)
-      aesMode.addEventListener('change', () =>
-        toggleIvVisibility('aes', 'aes-iv-group', 'aes-mode')
-      );
-    var desMode = utils.get('des-mode');
-    if (desMode)
-      desMode.addEventListener('change', () =>
-        toggleIvVisibility('des', 'des-iv-group', 'des-mode')
-      );
-    var sm4Mode = utils.get('sm4-mode');
-    if (sm4Mode)
-      sm4Mode.addEventListener('change', () => {
-        var ivG = utils.get('sm4-iv-group');
-        if (ivG) {
-          if (sm4Mode.value === 'cbc') ivG.classList.remove('hidden');
-          else ivG.classList.add('hidden');
-        }
-      });
+    utils.on('aes-mode', 'change', () => toggleIvVisibility('aes', 'aes-iv-group', 'aes-mode'));
+    utils.on('des-mode', 'change', () => toggleIvVisibility('des', 'des-iv-group', 'des-mode'));
+    utils.on('sm4-mode', 'change', function () {
+      var ivG = utils.get('sm4-iv-group');
+      if (ivG) {
+        if (this.value === 'cbc') ivG.classList.remove('hidden');
+        else ivG.classList.add('hidden');
+      }
+    });
 
     // SM2 generate keypair
-    var sm2GenBtn = utils.get('sm2-genkey-btn');
-    if (sm2GenBtn)
-      sm2GenBtn.addEventListener('click', function () {
-        try {
-          var kp = sm2.generateKeyPairHex();
-          var pubEl = utils.get('sm2-pubkey');
-          if (pubEl) pubEl.value = kp.publicKey;
-          var priEl = utils.get('sm2-prikey');
-          if (priEl) priEl.value = kp.privateKey;
-          utils.showToast('密钥对已生成', 'success');
-        } catch (e) {
-          utils.showToast('生成失败: ' + e.message, 'error');
-        }
-      });
+    utils.bindClick('sm2-genkey-btn', function () {
+      try {
+        var kp = sm2.generateKeyPairHex();
+        var pubEl = utils.get('sm2-pubkey');
+        if (pubEl) pubEl.value = kp.publicKey;
+        var priEl = utils.get('sm2-prikey');
+        if (priEl) priEl.value = kp.privateKey;
+        utils.showToast('密钥对已生成', 'success');
+      } catch (e) {
+        utils.showToast('生成失败: ' + e.message, 'error');
+      }
+    });
 
     // Initial IV visibility
     toggleIvVisibility('aes', 'aes-iv-group', 'aes-mode');
@@ -440,16 +418,14 @@
     utils.bindClick('extract-favicon-btn', extractFavicon);
     utils.bindClick('copy-favicon-url-btn', copyFaviconUrl);
 
-    const copyHashBtn = utils.get('copy-favicon-hash-btn');
-    if (copyHashBtn)
-      copyHashBtn.addEventListener('click', () => {
-        const hash = utils.get('favicon-hash').textContent;
-        if (hash === '-') {
-          utils.showToast('请先提取图标', 'warning');
-          return;
-        }
-        utils.copyAndToast(hash, '已复制 Hash');
-      });
+    utils.bindClick('copy-favicon-hash-btn', () => {
+      const hash = utils.get('favicon-hash').textContent;
+      if (hash === '-') {
+        utils.showToast('请先提取图标', 'warning');
+        return;
+      }
+      utils.copyAndToast(hash, '已复制 Hash');
+    });
 
     // Asset mapping
     document.querySelectorAll('.source-btn').forEach(btn => {
@@ -457,39 +433,28 @@
     });
 
     utils.bindClick('asset-scan-btn', handleAssetScan);
-    const assetQueryInput = utils.get('asset-query');
-    if (assetQueryInput) {
-      assetQueryInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          handleAssetScan();
-        }
-      });
-    }
-    const customToggle = utils.get('asset-custom-toggle');
-    if (customToggle)
-      customToggle.addEventListener('click', () =>
-        toggleCustomQueryMode(!customToggle.classList.contains('active'))
-      );
+    utils.on('asset-query', 'keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAssetScan();
+      }
+    });
+    utils.bindClick('asset-custom-toggle', function () {
+      toggleCustomQueryMode(!this.classList.contains('active'));
+    });
     utils.bindClick('asset-export-btn', assetExportData);
 
-    const assetSearchInput = utils.get('asset-search');
-    if (assetSearchInput) {
-      assetSearchInput.addEventListener('input', function () {
-        assetApplySearchFilter(assetSearchInput.value.trim());
-      });
-    }
+    utils.on('asset-search', 'input', function () {
+      assetApplySearchFilter(this.value.trim());
+    });
 
     utils.bindClick('shodan-host-btn', shodanHostLookup);
-    const shodanHostInput = utils.get('shodan-host-input');
-    if (shodanHostInput) {
-      shodanHostInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          shodanHostLookup();
-        }
-      });
-    }
+    utils.on('shodan-host-input', 'keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        shodanHostLookup();
+      }
+    });
 
     utils.bindClick('save-keys-btn', saveApiKeys);
     utils.bindClick('clear-keys-btn', clearApiKeys);
@@ -498,12 +463,9 @@
 
     // Info gather
     utils.bindClick('gather-btn', gatherInfo);
-    const gatherSearchInput = utils.get('gather-search');
-    if (gatherSearchInput) {
-      gatherSearchInput.addEventListener('input', function () {
-        gather.applySearchFilter(gatherSearchInput.value.trim());
-      });
-    }
+    utils.on('gather-search', 'input', function () {
+      gather.applySearchFilter(this.value.trim());
+    });
     const gatherCopyBtn = utils.bindClick('gather-copy-btn', gather.copyAllData);
     const gatherExportBtn = utils.bindClick('gather-export-btn', gather.exportAllData);
 
@@ -623,19 +585,14 @@
     utils.on('links-filter-type', 'change', renderLinks);
 
     // URL multi-open
-    const multiurlInput = utils.get('multiurl-input');
-    if (multiurlInput) {
-      multiurlInput.addEventListener('input', () => updateMultiurlInfo(parseUrls().length));
-    }
+    utils.on('multiurl-input', 'input', () => updateMultiurlInfo(parseUrls().length));
     utils.bindClick('multiurl-open-btn', handleMultiurlOpen);
     utils.bindClick('multiurl-dedup-btn', handleMultiurlDedup);
     utils.bindClick('multiurl-copy-btn', copyAllUrls);
-    const multiurlClearBtn = utils.get('multiurl-clear-btn');
-    if (multiurlClearBtn)
-      multiurlClearBtn.addEventListener('click', () => {
-        utils.get('multiurl-input').value = '';
-        updateMultiurlInfo(0);
-      });
+    utils.bindClick('multiurl-clear-btn', () => {
+      utils.get('multiurl-input').value = '';
+      updateMultiurlInfo(0);
+    });
 
     // Tab save
     utils.bindClick('tabsave-grab-btn', grabAllTabs);
@@ -645,101 +602,84 @@
     // History
     utils.bindClick('history-query-btn', queryHistory);
 
-    const historyCopyUrlBtn = utils.get('history-copy-url-btn');
-    if (historyCopyUrlBtn) {
-      historyCopyUrlBtn.addEventListener('click', async () => {
-        let raw = utils.get('history-domain').value.trim();
-        if (!raw) {
-          const d = await getCurrentDomain();
-          if (!d) {
-            utils.showToast('请输入域名或打开一个网页', 'warning');
-            return;
-          }
-          raw = d;
-        }
-        const domain = extractDomain(raw);
-        utils.get('history-domain').value = domain;
-        const cdxUrl = buildCdxUrl(domain);
-        utils.copyAndToast(cdxUrl, '查询URL已复制');
-      });
-    }
-
-    const historyDomainInput = utils.get('history-domain');
-    if (historyDomainInput) {
-      historyDomainInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter') queryHistory();
-      });
-      historyDomainInput.addEventListener('blur', () => {
-        const val = historyDomainInput.value.trim();
-        if (val) showHistoryQuickLinks(val);
-      });
-    }
-
-    const historyCopyResultBtn = utils.get('history-copy-result-btn');
-    if (historyCopyResultBtn) {
-      historyCopyResultBtn.addEventListener('click', () => {
-        if (lastHistoryResults.length === 0) {
-          utils.showToast('没有结果', 'warning');
+    utils.bindClick('history-copy-url-btn', async () => {
+      let raw = utils.get('history-domain').value.trim();
+      if (!raw) {
+        const d = await getCurrentDomain();
+        if (!d) {
+          utils.showToast('请输入域名或打开一个网页', 'warning');
           return;
         }
-        const text = lastHistoryResults.map(i => i.raw || i.url).join('\n');
-        utils.copyAndToast(text, '已复制 ' + lastHistoryResults.length + ' 条');
-      });
-    }
+        raw = d;
+      }
+      const domain = extractDomain(raw);
+      utils.get('history-domain').value = domain;
+      const cdxUrl = buildCdxUrl(domain);
+      utils.copyAndToast(cdxUrl, '查询URL已复制');
+    });
+
+    utils.on('history-domain', 'keydown', function (e) {
+      if (e.key === 'Enter') queryHistory();
+    });
+    utils.on('history-domain', 'blur', function () {
+      const val = this.value.trim();
+      if (val) showHistoryQuickLinks(val);
+    });
+
+    utils.bindClick('history-copy-result-btn', () => {
+      if (lastHistoryResults.length === 0) {
+        utils.showToast('没有结果', 'warning');
+        return;
+      }
+      const text = lastHistoryResults.map(i => i.raw || i.url).join('\n');
+      utils.copyAndToast(text, '已复制 ' + lastHistoryResults.length + ' 条');
+    });
     utils.bindClick('history-export-btn', historyExportData);
 
-    const historyTypeFilter = utils.get('history-type-filter');
-    if (historyTypeFilter) {
-      historyTypeFilter.addEventListener('input', () => {
-        if (allHistoryResults.length === 0) return;
-        const filtered = filterByType(allHistoryResults, historyTypeFilter.value);
-        renderHistoryResults(filtered, true);
-        utils.get('history-status').textContent =
-          '筛选: ' + filtered.length + ' / ' + allHistoryResults.length + ' 条';
-      });
-    }
+    utils.on('history-type-filter', 'input', function () {
+      if (allHistoryResults.length === 0) return;
+      const filtered = filterByType(allHistoryResults, this.value);
+      renderHistoryResults(filtered, true);
+      utils.get('history-status').textContent =
+        '筛选: ' + filtered.length + ' / ' + allHistoryResults.length + ' 条';
+    });
 
-    const historyCopyFilteredBtn = utils.get('history-copy-filtered-btn');
-    if (historyCopyFilteredBtn) {
-      historyCopyFilteredBtn.addEventListener('click', () => {
-        if (lastHistoryResults.length === 0) {
-          utils.showToast('没有结果', 'warning');
-          return;
-        }
-        const typeFilter = historyTypeFilter ? historyTypeFilter.value : '';
-        const filtered = filterByType(lastHistoryResults, typeFilter);
-        if (filtered.length === 0) {
-          utils.showToast('没有匹配的结果', 'warning');
-          return;
-        }
-        const text = filtered.map(i => i.raw || i.url).join('\n');
-        utils.copyAndToast(text, '已复制 ' + filtered.length + ' 条');
-      });
-    }
+    utils.bindClick('history-copy-filtered-btn', () => {
+      if (lastHistoryResults.length === 0) {
+        utils.showToast('没有结果', 'warning');
+        return;
+      }
+      var tfEl = utils.get('history-type-filter');
+      const typeFilter = tfEl ? tfEl.value : '';
+      const filtered = filterByType(lastHistoryResults, typeFilter);
+      if (filtered.length === 0) {
+        utils.showToast('没有匹配的结果', 'warning');
+        return;
+      }
+      const text = filtered.map(i => i.raw || i.url).join('\n');
+      utils.copyAndToast(text, '已复制 ' + filtered.length + ' 条');
+    });
 
-    const historySendLinksBtn = utils.get('history-send-links-btn');
-    if (historySendLinksBtn) {
-      historySendLinksBtn.addEventListener('click', () => {
-        if (lastHistoryResults.length === 0) {
-          utils.showToast('没有结果', 'warning');
-          return;
-        }
-        const urls = lastHistoryResults.map(i => i.url).filter(u => u && !u.startsWith('mailto:'));
-        if (urls.length === 0) {
-          utils.showToast('没有可用的URL', 'warning');
-          return;
-        }
-        utils.get('multiurl-input').value = urls.join('\n');
-        updateMultiurlInfo(urls.length);
-        document
-          .querySelectorAll('.tab-btn')
-          .forEach(b => b.classList.toggle('active', b.dataset.panel === 'multiurl'));
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        var multiurlPanel = utils.get('panel-multiurl');
-        if (multiurlPanel) multiurlPanel.classList.add('active');
-        utils.showToast('已发送 ' + urls.length + ' 个链接', 'success');
-      });
-    }
+    utils.bindClick('history-send-links-btn', () => {
+      if (lastHistoryResults.length === 0) {
+        utils.showToast('没有结果', 'warning');
+        return;
+      }
+      const urls = lastHistoryResults.map(i => i.url).filter(u => u && !u.startsWith('mailto:'));
+      if (urls.length === 0) {
+        utils.showToast('没有可用的URL', 'warning');
+        return;
+      }
+      utils.get('multiurl-input').value = urls.join('\n');
+      updateMultiurlInfo(urls.length);
+      document
+        .querySelectorAll('.tab-btn')
+        .forEach(b => b.classList.toggle('active', b.dataset.panel === 'multiurl'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      var multiurlPanel = utils.get('panel-multiurl');
+      if (multiurlPanel) multiurlPanel.classList.add('active');
+      utils.showToast('已发送 ' + urls.length + ' 个链接', 'success');
+    });
 
     // EXIF viewer
     initExifDragDrop();
@@ -749,37 +689,31 @@
       btn.addEventListener('click', () => switchExifMode(btn.dataset.mode));
     });
 
-    const exifFetchBtn = utils.get('exif-fetch-btn');
-    if (exifFetchBtn) {
-      const handler = () => {
-        const url = utils.get('exif-url-input').value.trim();
-        if (!url) {
-          utils.showToast('请输入图片URL', 'warning');
-          return;
-        }
-        fetchExifFromUrl(url);
-      };
-      exifFetchBtn.addEventListener('click', handler);
-      utils.get('exif-url-input')?.addEventListener('keydown', e => {
-        if (e.key === 'Enter') handler();
-      });
-    }
+    var exifFetchHandler = function () {
+      const url = utils.get('exif-url-input').value.trim();
+      if (!url) {
+        utils.showToast('请输入图片URL', 'warning');
+        return;
+      }
+      fetchExifFromUrl(url);
+    };
+    utils.bindClick('exif-fetch-btn', exifFetchHandler);
+    utils.on('exif-url-input', 'keydown', function (e) {
+      if (e.key === 'Enter') exifFetchHandler();
+    });
 
     utils.bindClick('exif-scan-page-btn', scanPageImages);
 
-    const exifCopyAllBtn = utils.get('exif-copy-all-btn');
-    if (exifCopyAllBtn) {
-      exifCopyAllBtn.addEventListener('click', () => {
-        if (!lastExifData) {
-          utils.showToast('没有元数据', 'warning');
-          return;
-        }
-        const text = Object.entries(lastExifData)
-          .map(([k, v]) => k + ': ' + v)
-          .join('\n');
-        utils.copyAndToast(text, '已复制全部元数据');
-      });
-    }
+    utils.bindClick('exif-copy-all-btn', () => {
+      if (!lastExifData) {
+        utils.showToast('没有元数据', 'warning');
+        return;
+      }
+      const text = Object.entries(lastExifData)
+        .map(([k, v]) => k + ': ' + v)
+        .join('\n');
+      utils.copyAndToast(text, '已复制全部元数据');
+    });
     utils.bindClick('exif-copy-json-btn', copyExifData);
     utils.bindClick('exif-clear-btn', clearExif);
 
@@ -788,11 +722,10 @@
       btn.addEventListener('click', () => switchSpoofTab(btn.dataset.spoof));
     });
 
-    const uaCategoryEl = utils.get('ua-category');
-    if (uaCategoryEl) {
-      uaCategoryEl.addEventListener('change', () => renderUaList(uaCategoryEl.value));
-      renderUaList('desktop');
-    }
+    utils.on('ua-category', 'change', function () {
+      renderUaList(this.value);
+    });
+    renderUaList('desktop');
 
     utils.bindClick('spoof-ua-apply', applyUserAgent);
     utils.bindClick('spoof-ua-reset', resetUserAgent);
@@ -802,12 +735,9 @@
     utils.bindClick('cookie-import-btn', showCookieFileImportDialog);
     utils.bindClick('cookie-export-btn', exportCookies);
     utils.bindClick('cookie-clear-btn', clearAllCookies);
-    const cookieSearchInput = utils.get('cookie-search');
-    if (cookieSearchInput) {
-      cookieSearchInput.addEventListener('input', function () {
-        filterCookies(this.value);
-      });
-    }
+    utils.on('cookie-search', 'input', function () {
+      filterCookies(this.value);
+    });
 
     utils.bindClick('header-apply', applyHeaders);
     utils.bindClick('header-reset', resetHeaders);
@@ -819,18 +749,15 @@
         this.closest('.custom-header-row').remove();
       });
 
-    const refererPresetEl = utils.get('referer-preset');
-    if (refererPresetEl) {
-      refererPresetEl.addEventListener('change', () => {
-        const v = refererPresetEl.value;
-        const refererInput = utils.get('header-referer');
-        if (!refererInput) return;
-        if (v === 'none') refererInput.value = '';
-        else if (v === 'google') refererInput.value = 'https://www.google.com/';
-        else if (v === 'baidu') refererInput.value = 'https://www.baidu.com/';
-        else if (v === 'same') refererInput.value = '';
-      });
-    }
+    utils.on('referer-preset', 'change', function () {
+      const v = this.value;
+      const refererInput = utils.get('header-referer');
+      if (!refererInput) return;
+      if (v === 'none') refererInput.value = '';
+      else if (v === 'google') refererInput.value = 'https://www.google.com/';
+      else if (v === 'baidu') refererInput.value = 'https://www.baidu.com/';
+      else if (v === 'same') refererInput.value = '';
+    });
 
     chrome.storage.local.get(['pentest_spoof'], result => {
       const saved = result.pentest_spoof;
@@ -846,56 +773,48 @@
     utils.bindClick('vue-export-routes-btn', exportVueRoutes);
     utils.bindClick('vue-bypass-guards-btn', bypassVueGuards);
     utils.bindClick('vue-disable-auth-btn', disableRouteAuth);
-    const vueCopyBtn = utils.get('vue-copy-btn');
-    if (vueCopyBtn) {
-      vueCopyBtn.addEventListener('click', () => {
-        if (!lastVueResult) {
-          utils.showToast('没有可复制的内容', 'warning');
-          return;
-        }
-        utils.copyAndToast(lastVueResult);
-      });
-    }
+    utils.bindClick('vue-copy-btn', () => {
+      if (!lastVueResult) {
+        utils.showToast('没有可复制的内容', 'warning');
+        return;
+      }
+      utils.copyAndToast(lastVueResult);
+    });
 
     // Vue results event delegation (route open + batch copy)
-    var vueResultsEl = utils.get('vue-results');
-    if (vueResultsEl) {
-      vueResultsEl.addEventListener('click', e => {
-        if (e.target.classList.contains('vue-route-open-btn')) {
-          chrome.tabs.create({ url: e.target.dataset.url });
+    var vueResultsEl = utils.on('vue-results', 'click', function (e) {
+      if (e.target.classList.contains('vue-route-open-btn')) {
+        chrome.tabs.create({ url: e.target.dataset.url });
+        return;
+      }
+      if (
+        e.target.classList.contains('vue-copy-hist-btn') ||
+        e.target.classList.contains('vue-copy-hash-btn')
+      ) {
+        if (!lastVueResult) {
+          utils.showToast('请先检测 Vue', 'warning');
           return;
         }
-        if (
-          e.target.classList.contains('vue-copy-hist-btn') ||
-          e.target.classList.contains('vue-copy-hash-btn')
-        ) {
-          if (!lastVueResult) {
-            utils.showToast('请先检测 Vue', 'warning');
+        try {
+          var data = JSON.parse(lastVueResult);
+          if (!data.routes || !data.routes.length) {
+            utils.showToast('无路由数据', 'warning');
             return;
           }
-          try {
-            var data = JSON.parse(lastVueResult);
-            if (!data.routes || !data.routes.length) {
-              utils.showToast('无路由数据', 'warning');
-              return;
-            }
-            var mode = e.target.classList.contains('vue-copy-hist-btn') ? 'history' : 'hash';
-            var base = (data.routerInfo && data.routerInfo.base) || '/';
-            var paths = collectAllPathsFromVue(data.routes, '', base, mode);
-            if (paths.length === 0) {
-              utils.showToast('无静态路由路径', 'warning');
-              return;
-            }
-            utils.copyText(paths.map(p => p.url).join('\n'));
-            utils.showToast('已复制 ' + paths.length + ' 条 ' + mode + ' URL', 'success');
-          } catch (err) {
-            utils.showToast('复制失败', 'error');
+          var mode = e.target.classList.contains('vue-copy-hist-btn') ? 'history' : 'hash';
+          var base = (data.routerInfo && data.routerInfo.base) || '/';
+          var paths = collectAllPathsFromVue(data.routes, '', base, mode);
+          if (paths.length === 0) {
+            utils.showToast('无静态路由路径', 'warning');
+            return;
           }
+          utils.copyText(paths.map(p => p.url).join('\n'));
+          utils.showToast('已复制 ' + paths.length + ' 条 ' + mode + ' URL', 'success');
+        } catch (err) {
+          utils.showToast('复制失败', 'error');
         }
-      });
-    }
-
-    // Vue sub-tabs
+      }
+    });
     document.querySelectorAll('.vue-stab').forEach(btn => {
       btn.addEventListener('click', () => switchVueSubTab(btn.dataset.vstab));
     });
@@ -912,57 +831,48 @@
     utils.bindClick('perm-refresh-btn', refreshPermCaptured);
     utils.on('perm-filter', 'input', renderPermList);
     utils.on('perm-type-filter', 'change', renderPermList);
-    const permDetailBack = utils.get('perm-detail-back');
-    if (permDetailBack)
-      permDetailBack.addEventListener('click', () => {
-        permViewMode = 'list';
-        const permList = utils.get('perm-captured-list');
-        if (permList) permList.classList.remove('hidden');
-        const filterRow = utils.get('perm-filter-row');
-        if (filterRow) filterRow.classList.remove('hidden');
-        const permDetail = utils.get('perm-detail');
-        if (permDetail) permDetail.classList.add('hidden');
-      });
+    utils.bindClick('perm-detail-back', () => {
+      permViewMode = 'list';
+      const permList = utils.get('perm-captured-list');
+      if (permList) permList.classList.remove('hidden');
+      const filterRow = utils.get('perm-filter-row');
+      if (filterRow) filterRow.classList.remove('hidden');
+      const permDetail = utils.get('perm-detail');
+      if (permDetail) permDetail.classList.add('hidden');
+    });
     utils.bindClick('perm-open-all', permOpenAll);
     utils.bindClick('perm-change-admin', permChangeAdmin);
     utils.bindClick('perm-apply-btn', applyPermOverride);
-    const permCopyJsonBtn = utils.get('perm-copy-json');
-    if (permCopyJsonBtn)
-      permCopyJsonBtn.addEventListener('click', () => {
-        const val = utils.get('perm-json-editor').value;
-        if (!val) {
-          utils.showToast('没有数据', 'warning');
-          return;
-        }
-        utils.copyAndToast(val);
-      });
+    utils.bindClick('perm-copy-json', () => {
+      const val = utils.get('perm-json-editor').value;
+      if (!val) {
+        utils.showToast('没有数据', 'warning');
+        return;
+      }
+      utils.copyAndToast(val);
+    });
 
     utils.bindClick('perm-expand-ids', permExpandMenuIds);
 
-    const compareInjectBtn = utils.get('compare-inject-btn');
-    if (compareInjectBtn)
-      compareInjectBtn.addEventListener('click', () => {
-        switchVueSubTab('perm');
-        if (permSelectedIndex < 0 && permCapturedData.length > 0) {
-          permSelectedIndex = 0;
-          showPermDetail(0);
-        } else if (permSelectedIndex >= 0) {
-          showPermDetail(permSelectedIndex);
-        }
-        autoInjectHiddenRoutes();
-      });
+    utils.bindClick('compare-inject-btn', () => {
+      switchVueSubTab('perm');
+      if (permSelectedIndex < 0 && permCapturedData.length > 0) {
+        permSelectedIndex = 0;
+        showPermDetail(0);
+      } else if (permSelectedIndex >= 0) {
+        showPermDetail(permSelectedIndex);
+      }
+      autoInjectHiddenRoutes();
+    });
 
     // JS keyword search
-    const jssearchBtn = utils.get('jssearch-btn');
-    if (jssearchBtn)
-      jssearchBtn.addEventListener('click', () => {
-        searchJsKeywords(utils.get('jssearch-keyword').value.trim());
-      });
-    const jssearchInput = utils.get('jssearch-keyword');
-    if (jssearchInput)
-      jssearchInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter') searchJsKeywords(jssearchInput.value.trim());
-      });
+    var doJsSearch = function () {
+      searchJsKeywords(utils.get('jssearch-keyword').value.trim());
+    };
+    utils.bindClick('jssearch-btn', doJsSearch);
+    utils.on('jssearch-keyword', 'keydown', function (e) {
+      if (e.key === 'Enter') doJsSearch();
+    });
     document.querySelectorAll('.jssearch-preset').forEach(btn => {
       btn.addEventListener('click', () => {
         utils.get('jssearch-keyword').value = btn.dataset.kw;
@@ -972,24 +882,22 @@
 
     // Route vs menu comparison
     utils.bindClick('compare-btn', compareRoutesAndMenu);
-    const compareCopyHidden = utils.get('compare-copy-hidden');
-    if (compareCopyHidden)
-      compareCopyHidden.addEventListener('click', () => {
-        const items = utils.get('compare-results').querySelectorAll('.compare-route-path');
-        const hiddenPaths = [];
-        items.forEach(el => {
-          const parentItem = el.closest('.compare-route-item');
-          if (parentItem && parentItem.querySelector('.compare-route-hidden')) {
-            hiddenPaths.push(el.textContent);
-          }
-        });
-        if (hiddenPaths.length === 0) {
-          utils.showToast('没有隐藏路由', 'warning');
-          return;
+    utils.bindClick('compare-copy-hidden', () => {
+      const items = utils.get('compare-results').querySelectorAll('.compare-route-path');
+      const hiddenPaths = [];
+      items.forEach(el => {
+        const parentItem = el.closest('.compare-route-item');
+        if (parentItem && parentItem.querySelector('.compare-route-hidden')) {
+          hiddenPaths.push(el.textContent);
         }
-        utils.copyText(hiddenPaths.join('\n'));
-        utils.showToast('已复制 ' + hiddenPaths.length + ' 条隐藏路由', 'success');
       });
+      if (hiddenPaths.length === 0) {
+        utils.showToast('没有隐藏路由', 'warning');
+        return;
+      }
+      utils.copyText(hiddenPaths.join('\n'));
+      utils.showToast('已复制 ' + hiddenPaths.length + ' 条隐藏路由', 'success');
+    });
 
     // Auto-traverse routes
     utils.bindClick('traverse-start-btn', startTraverseRoutes);
@@ -1021,9 +929,9 @@
     utils.bindClick('ruoyi-hook-install-btn', installRouteHook);
     utils.bindClick('ruoyi-hook-remove-btn', removeRouteHook);
     utils.bindClick('ruoyi-hook-check-btn', checkHookStatus);
-    const ruoyiAugmentMode = utils.get('ruoyi-augment-mode');
-    if (ruoyiAugmentMode)
-      ruoyiAugmentMode.addEventListener('change', () => setAugmentMode(ruoyiAugmentMode.value));
+    utils.on('ruoyi-augment-mode', 'change', function () {
+      setAugmentMode(this.value);
+    });
 
     // RuoYi export buttons
     utils.bindClick('ruoyi-copy-json-btn', copyRouteJson);
@@ -1127,18 +1035,15 @@
     });
 
     // Theme toggle
-    const themeBtn = utils.get('theme-toggle');
-    if (themeBtn) {
-      const themes = ['light', 'dark'];
-      const saved = localStorage.getItem('pentest-theme');
-      if (saved) document.documentElement.setAttribute('data-theme', saved);
-      themeBtn.addEventListener('click', () => {
-        const current = document.documentElement.getAttribute('data-theme') || 'light';
-        const next = themes[(themes.indexOf(current) + 1) % themes.length];
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('pentest-theme', next);
-      });
-    }
+    var themes = ['light', 'dark'];
+    var savedTheme = localStorage.getItem('pentest-theme');
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+    utils.bindClick('theme-toggle', () => {
+      var current = document.documentElement.getAttribute('data-theme') || 'light';
+      var next = themes[(themes.indexOf(current) + 1) % themes.length];
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('pentest-theme', next);
+    });
 
     // Payload tab switching
     document.querySelectorAll('.payload-tab').forEach(btn => {
@@ -1154,23 +1059,18 @@
     renderAllReverseShells();
 
     // Payload search
-    const payloadSearchInput = utils.get('payload-search');
-    if (payloadSearchInput) {
-      payloadSearchInput.addEventListener('input', function () {
-        payloadApplySearch(payloadSearchInput.value.trim());
-      });
-    }
+    utils.on('payload-search', 'input', function () {
+      payloadApplySearch(this.value.trim());
+    });
 
     // Reverse shell
     utils.bindClick('revshell-gen-btn', generateReverseShell);
-    const revshellCopy = utils.get('revshell-copy-btn');
-    if (revshellCopy)
-      revshellCopy.addEventListener('click', () => {
-        const output = utils.get('revshell-output');
-        if (output && output.value) {
-          utils.copyAndToast(output.value, '已复制命令', 'success', 1000);
-        }
-      });
+    utils.bindClick('revshell-copy-btn', () => {
+      var output = utils.get('revshell-output');
+      if (output && output.value) {
+        utils.copyAndToast(output.value, '已复制命令', 'success', 1000);
+      }
+    });
     utils.on('revshell-type', 'change', generateReverseShell);
     utils.on('revshell-ip', 'input', generateReverseShell);
     utils.on('revshell-port', 'input', generateReverseShell);
@@ -1185,13 +1085,10 @@
     utils.bindClick('xssscan-harvest-btn', handleXssHarvest);
     utils.bindClick('xssscan-start-intercept-btn', startXssIntercept);
     utils.bindClick('xssscan-stop-intercept-btn', stopXssIntercept);
-    var xssClearBtn = utils.get('xssscan-clear-btn');
-    if (xssClearBtn) {
-      xssClearBtn.addEventListener('click', function () {
-        xssClearResults();
-        utils.showToast('已清空', 'info');
-      });
-    }
+    utils.bindClick('xssscan-clear-btn', function () {
+      xssClearResults();
+      utils.showToast('已清空', 'info');
+    });
     document.querySelectorAll('.xssscan-filter-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         xssFilterType = btn.dataset.xfilter;
@@ -1202,24 +1099,18 @@
         renderXssPoints();
       });
     });
-    var xssSearchInput = utils.get('xssscan-search');
-    if (xssSearchInput) {
-      xssSearchInput.addEventListener('input', function () {
-        setXssSearchText(this.value);
+    utils.on('xssscan-search', 'input', function () {
+      setXssSearchText(this.value);
+    });
+    utils.bindClick('xssscan-selectall-btn', function () {
+      var checks = document.querySelectorAll('.xssscan-point-check');
+      var allChecked = Array.from(checks).every(function (cb) {
+        return cb.checked;
       });
-    }
-    var xssSelectAllBtn = utils.get('xssscan-selectall-btn');
-    if (xssSelectAllBtn) {
-      xssSelectAllBtn.addEventListener('click', function () {
-        var checks = document.querySelectorAll('.xssscan-point-check');
-        var allChecked = Array.from(checks).every(function (cb) {
-          return cb.checked;
-        });
-        checks.forEach(function (cb) {
-          cb.checked = !allChecked;
-        });
+      checks.forEach(function (cb) {
+        cb.checked = !allChecked;
       });
-    }
+    });
     utils.bindClick('xssscan-batchopen-btn', handleBatchOpenXss);
     utils.bindClick('xssscan-copyall-btn', handleCopyXssUrls);
     utils.bindClick('xssscan-export-btn', xssExportData);
@@ -1232,38 +1123,29 @@
     utils.bindClick('sourcemap-download-all-btn', downloadAllSourcemapSources);
     utils.bindClick('sourcemap-detail-back', backToSourcemapList);
     utils.bindClick('sourcemap-copy-src-btn', copyModuleSource);
-    var smDlBtn = utils.get('sourcemap-download-btn');
-    if (smDlBtn)
-      smDlBtn.addEventListener('click', function () {
-        if (sourcemapCurrentModule !== null) downloadSingleModule(sourcemapCurrentModule);
-      });
-    var smSearch = utils.get('sourcemap-search-input');
-    if (smSearch) {
-      var smSearchTimer = null;
-      smSearch.addEventListener('input', function () {
-        clearTimeout(smSearchTimer);
-        smSearchTimer = setTimeout(function () {
-          sourcemapSearchTerm = smSearch.value.trim().toLowerCase();
-          renderSourcemapModules();
-        }, 200);
-      });
-    }
+    utils.bindClick('sourcemap-download-btn', function () {
+      if (sourcemapCurrentModule !== null) downloadSingleModule(sourcemapCurrentModule);
+    });
+    var smSearchTimer = null;
+    utils.on('sourcemap-search-input', 'input', function () {
+      clearTimeout(smSearchTimer);
+      smSearchTimer = setTimeout(function () {
+        sourcemapSearchTerm = this.value.trim().toLowerCase();
+        renderSourcemapModules();
+      }, 200);
+    });
     utils.bindClick('sourcemap-analyze-btn', analyzeSourcemaps);
-    var smAnalysisClose = utils.get('sm-analysis-close');
-    if (smAnalysisClose)
-      smAnalysisClose.addEventListener('click', function () {
-        var card = utils.get('sm-analysis-card');
-        if (card) card.classList.add('hidden');
-      });
+    utils.bindClick('sm-analysis-close', function () {
+      var card = utils.get('sm-analysis-card');
+      if (card) card.classList.add('hidden');
+    });
 
     // Webpack API endpoint extraction
     utils.bindClick('sourcemap-api-btn', showApiEndpoints);
-    var smApiClose = utils.get('sm-api-close');
-    if (smApiClose)
-      smApiClose.addEventListener('click', function () {
-        var card = utils.get('sm-api-card');
-        if (card) card.classList.add('hidden');
-      });
+    utils.bindClick('sm-api-close', function () {
+      var card = utils.get('sm-api-card');
+      if (card) card.classList.add('hidden');
+    });
     utils.bindClick('sourcemap-export-json-btn', exportModulesJSON);
     utils.bindClick('sourcemap-export-csv-btn', exportModulesCSV);
 

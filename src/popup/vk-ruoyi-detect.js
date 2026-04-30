@@ -51,151 +51,144 @@ window.VulnKitRuoYiDetect = (function () {
         return;
       }
 
-      var results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          var evidence = [];
-          var variant = null;
-          var version = null;
+      var results = await utils.execInTab(tab.id, function () {
+        var evidence = [];
+        var variant = null;
+        var version = null;
 
-          // --- Script filenames ---
-          var scripts = document.querySelectorAll('script[src]');
-          var scriptSrcs = [];
-          scripts.forEach(function (s) {
-            var src = s.src || '';
-            scriptSrcs.push(src);
-            if (/\/request\.js/i.test(src)) evidence.push('script:request.js');
-            if (/\/auth\.js/i.test(src)) evidence.push('script:auth.js');
-            if (/\/permission\.js/i.test(src)) evidence.push('script:permission.js');
-            if (/\/validate\.js/i.test(src)) evidence.push('script:validate.js');
-            if (/\/ruoyi/i.test(src)) evidence.push('script:ruoyi');
-            if (/\/router\/index\.js/i.test(src)) evidence.push('script:router/index.js');
-            if (/\/store\/modules\/(user|permission|app)\.js/i.test(src))
-              evidence.push('script:store');
-            if (/\/gateway\/js\//i.test(src)) {
+        // --- Script filenames ---
+        var scripts = document.querySelectorAll('script[src]');
+        var scriptSrcs = [];
+        scripts.forEach(function (s) {
+          var src = s.src || '';
+          scriptSrcs.push(src);
+          if (/\/request\.js/i.test(src)) evidence.push('script:request.js');
+          if (/\/auth\.js/i.test(src)) evidence.push('script:auth.js');
+          if (/\/permission\.js/i.test(src)) evidence.push('script:permission.js');
+          if (/\/validate\.js/i.test(src)) evidence.push('script:validate.js');
+          if (/\/ruoyi/i.test(src)) evidence.push('script:ruoyi');
+          if (/\/router\/index\.js/i.test(src)) evidence.push('script:router/index.js');
+          if (/\/store\/modules\/(user|permission|app)\.js/i.test(src))
+            evidence.push('script:store');
+          if (/\/gateway\/js\//i.test(src)) {
+            variant = variant || 'cloud';
+            evidence.push('script:gateway');
+          }
+          if (/\/uni\.js|\/manifest\.js/i.test(src)) {
+            variant = variant || 'app';
+            evidence.push('script:uni-app');
+          }
+        });
+
+        // --- Layout ---
+        if (
+          document.querySelector('.app-container') &&
+          document.querySelector('.sidebar-container')
+        ) {
+          evidence.push('layout:ruoyi-sidebar');
+        }
+        if (
+          document.querySelector('.fixed-header') &&
+          document.querySelector('.sidebar-logo-container')
+        ) {
+          variant = variant || 'vue';
+          evidence.push('layout:ruoyi-vue');
+        }
+
+        // --- Title ---
+        var title = document.title || '';
+        if (/若依|RuoYi|管理系统/i.test(title)) evidence.push('title:若依/RuoYi');
+
+        // --- UI Framework ---
+        var hasEl = !!window.ELEMENT || !!window.ElPlus || document.querySelector('[class*="el-"]');
+        if (hasEl) evidence.push('ui:element');
+
+        // --- Version detection ---
+        if (window.ELEMENT) {
+          version = (window.ELEMENT.version || '').replace(/^[^0-9]*/, '') || null;
+          if (version) evidence.push('version:element-ui-' + version);
+        }
+        if (window.ElPlus) {
+          version = (window.ElPlus.version || '').replace(/^[^0-9]*/, '') || null;
+          if (version) evidence.push('version:element-plus-' + version);
+        }
+
+        // Check Vue version for variant identification
+        if (window.Vue) {
+          var vv = window.Vue.version;
+          if (vv) evidence.push('version:vue-' + vv);
+          if (/^3\./.test(vv)) variant = variant || 'vue3';
+          else if (/^2\./.test(vv)) variant = variant || 'vue';
+        } else if (hasEl) {
+          var vueEl = document.querySelector('#app[data-v-app], #app.__vue_app__');
+          if (vueEl || document.querySelector('#app')) {
+            var hasVue3Chunk = scriptSrcs.some(function (s) {
+              return /chunk-vendors|chunk-libs/i.test(s);
+            });
+            if (!variant) variant = 'vue';
+            evidence.push('ui:vue-spa');
+          }
+        }
+
+        // --- Global objects ---
+        if (window.__CONFIG__) evidence.push('global:__CONFIG__');
+        if (window.__APP_BASE_API__) evidence.push('global:__APP_BASE_API__');
+
+        // --- Cookie token ---
+        var cookies = document.cookie || '';
+        if (/Admin-Token/i.test(cookies)) evidence.push('cookie:Admin-Token');
+        if (/token=|JSESSIONID/i.test(cookies)) evidence.push('cookie:session-token');
+
+        // --- RuoYi variant markers ---
+        if (variant !== 'cloud' && variant !== 'app') {
+          var metaGen = document.querySelector('meta[name="generator"]');
+          if (metaGen && /ruoyi/i.test(metaGen.content)) {
+            evidence.push('meta:generator-ruoyi');
+          }
+          if (document.querySelector('[class*="micro"]') || /microservice/i.test(title)) {
+            variant = 'microservice';
+            evidence.push('layout:microservice');
+          }
+          if (!variant && !window.Vue && window.jQuery) {
+            var hasThymeleaf =
+              document.querySelector('link[href*="bootstrap"]') || document.querySelector('iframe');
+            var hasRuoYiJs = scriptSrcs.some(function (s) {
+              return /\/ruoyi\/js\//i.test(s);
+            });
+            if (hasThymeleaf && hasRuoYiJs) {
+              variant = 'thymeleaf';
+              evidence.push('layout:thymeleaf');
+            }
+          }
+        }
+
+        // --- Inline script patterns ---
+        var inline = document.querySelectorAll('script:not([src])');
+        inline.forEach(function (s) {
+          var t = s.textContent || '';
+          if (/getRouters|getUserInfo|permission\.js|store\.dispatch.*permission/i.test(t)) {
+            if (evidence.indexOf('code:ruoyi-pattern') === -1) evidence.push('code:ruoyi-pattern');
+          }
+          if (/\/auth\/login|\/auth\/logout|\/auth\/getInfo/i.test(t)) {
+            if (evidence.indexOf('code:cloud-auth') === -1) {
+              evidence.push('code:cloud-auth');
               variant = variant || 'cloud';
-              evidence.push('script:gateway');
-            }
-            if (/\/uni\.js|\/manifest\.js/i.test(src)) {
-              variant = variant || 'app';
-              evidence.push('script:uni-app');
-            }
-          });
-
-          // --- Layout ---
-          if (
-            document.querySelector('.app-container') &&
-            document.querySelector('.sidebar-container')
-          ) {
-            evidence.push('layout:ruoyi-sidebar');
-          }
-          if (
-            document.querySelector('.fixed-header') &&
-            document.querySelector('.sidebar-logo-container')
-          ) {
-            variant = variant || 'vue';
-            evidence.push('layout:ruoyi-vue');
-          }
-
-          // --- Title ---
-          var title = document.title || '';
-          if (/若依|RuoYi|管理系统/i.test(title)) evidence.push('title:若依/RuoYi');
-
-          // --- UI Framework ---
-          var hasEl =
-            !!window.ELEMENT || !!window.ElPlus || document.querySelector('[class*="el-"]');
-          if (hasEl) evidence.push('ui:element');
-
-          // --- Version detection ---
-          if (window.ELEMENT) {
-            version = (window.ELEMENT.version || '').replace(/^[^0-9]*/, '') || null;
-            if (version) evidence.push('version:element-ui-' + version);
-          }
-          if (window.ElPlus) {
-            version = (window.ElPlus.version || '').replace(/^[^0-9]*/, '') || null;
-            if (version) evidence.push('version:element-plus-' + version);
-          }
-
-          // Check Vue version for variant identification
-          if (window.Vue) {
-            var vv = window.Vue.version;
-            if (vv) evidence.push('version:vue-' + vv);
-            if (/^3\./.test(vv)) variant = variant || 'vue3';
-            else if (/^2\./.test(vv)) variant = variant || 'vue';
-          } else if (hasEl) {
-            var vueEl = document.querySelector('#app[data-v-app], #app.__vue_app__');
-            if (vueEl || document.querySelector('#app')) {
-              var hasVue3Chunk = scriptSrcs.some(function (s) {
-                return /chunk-vendors|chunk-libs/i.test(s);
-              });
-              if (!variant) variant = 'vue';
-              evidence.push('ui:vue-spa');
             }
           }
+        });
 
-          // --- Global objects ---
-          if (window.__CONFIG__) evidence.push('global:__CONFIG__');
-          if (window.__APP_BASE_API__) evidence.push('global:__APP_BASE_API__');
+        if (!variant && evidence.length >= 2) variant = 'unknown';
 
-          // --- Cookie token ---
-          var cookies = document.cookie || '';
-          if (/Admin-Token/i.test(cookies)) evidence.push('cookie:Admin-Token');
-          if (/token=|JSESSIONID/i.test(cookies)) evidence.push('cookie:session-token');
-
-          // --- RuoYi variant markers ---
-          if (variant !== 'cloud' && variant !== 'app') {
-            var metaGen = document.querySelector('meta[name="generator"]');
-            if (metaGen && /ruoyi/i.test(metaGen.content)) {
-              evidence.push('meta:generator-ruoyi');
-            }
-            if (document.querySelector('[class*="micro"]') || /microservice/i.test(title)) {
-              variant = 'microservice';
-              evidence.push('layout:microservice');
-            }
-            if (!variant && !window.Vue && window.jQuery) {
-              var hasThymeleaf =
-                document.querySelector('link[href*="bootstrap"]') ||
-                document.querySelector('iframe');
-              var hasRuoYiJs = scriptSrcs.some(function (s) {
-                return /\/ruoyi\/js\//i.test(s);
-              });
-              if (hasThymeleaf && hasRuoYiJs) {
-                variant = 'thymeleaf';
-                evidence.push('layout:thymeleaf');
-              }
-            }
-          }
-
-          // --- Inline script patterns ---
-          var inline = document.querySelectorAll('script:not([src])');
-          inline.forEach(function (s) {
-            var t = s.textContent || '';
-            if (/getRouters|getUserInfo|permission\.js|store\.dispatch.*permission/i.test(t)) {
-              if (evidence.indexOf('code:ruoyi-pattern') === -1)
-                evidence.push('code:ruoyi-pattern');
-            }
-            if (/\/auth\/login|\/auth\/logout|\/auth\/getInfo/i.test(t)) {
-              if (evidence.indexOf('code:cloud-auth') === -1) {
-                evidence.push('code:cloud-auth');
-                variant = variant || 'cloud';
-              }
-            }
-          });
-
-          if (!variant && evidence.length >= 2) variant = 'unknown';
-
-          return {
-            detected: evidence.length >= 2,
-            evidence: evidence,
-            variant: variant,
-            version: version,
-            cookieToken: /Admin-Token/i.test(cookies),
-          };
-        },
+        return {
+          detected: evidence.length >= 2,
+          evidence: evidence,
+          variant: variant,
+          version: version,
+          cookieToken: /Admin-Token/i.test(cookies),
+        };
       });
 
-      var data = (results && results[0] && results[0].result) || {
+      var data = utils.execResult(results) || {
         detected: false,
         evidence: [],
         variant: null,
@@ -269,18 +262,14 @@ window.VulnKitRuoYiDetect = (function () {
     var hookStatusEl = utils.get('ruoyi-hook-status');
     var panelEl = utils.get('ruoyi-captured-panel');
     try {
-      var checkResult = await chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        world: 'MAIN',
-        func: function () {
-          var hook = window.__VK_RUOYI_HOOK__;
-          return {
-            installed: !!hook,
-            captured: hook ? !!hook.capturedRouters : false,
-          };
-        },
+      var checkResult = await utils.execInTab(tabId, function () {
+        var hook = window.__VK_RUOYI_HOOK__;
+        return {
+          installed: !!hook,
+          captured: hook ? !!hook.capturedRouters : false,
+        };
       });
-      var status = checkResult && checkResult[0] && checkResult[0].result;
+      var status = utils.execResult(checkResult);
 
       if (status && status.captured) {
         if (hookStatusEl) hookStatusEl.textContent = '已捕获路由数据 (被动捕获模式)';
@@ -289,14 +278,10 @@ window.VulnKitRuoYiDetect = (function () {
       }
 
       if (hasToken) {
-        var cookieResult = await chrome.scripting.executeScript({
-          target: { tabId: tabId },
-          world: 'MAIN',
-          func: function () {
-            return document.cookie || '';
-          },
+        var cookieResult = await utils.execInTab(tabId, function () {
+          return document.cookie || '';
         });
-        var cookies = (cookieResult && cookieResult[0] && cookieResult[0].result) || '';
+        var cookies = utils.execResult(cookieResult) || '';
         var cookieHeader = cookies ? { Cookie: cookies } : {};
 
         var routerPaths = [
@@ -325,16 +310,15 @@ window.VulnKitRuoYiDetect = (function () {
             });
 
           if (resp && resp.status === 200 && resp.body) {
-            await chrome.scripting.executeScript({
-              target: { tabId: tabId },
-              world: 'MAIN',
-              func: function (body) {
+            await utils.execInTab(
+              tabId,
+              function (body) {
                 if (window.__VK_RUOYI_HOOK__) {
                   window.__VK_RUOYI_HOOK__.capturedRouters = body;
                 }
               },
-              args: [resp.body],
-            });
+              { args: [resp.body] }
+            );
             if (hookStatusEl) hookStatusEl.textContent = '已主动获取路由数据';
             await fetchCapturedRoutes();
             return;
@@ -384,20 +368,16 @@ window.VulnKitRuoYiDetect = (function () {
       var tab = await getActiveTab();
       if (!tab || !tab.id) return;
 
-      var results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          if (!window.__VK_RUOYI_HOOK__ || !window.__VK_RUOYI_HOOK__.capturedRouters) return null;
-          try {
-            return JSON.parse(window.__VK_RUOYI_HOOK__.capturedRouters);
-          } catch (e) {
-            return { _raw: window.__VK_RUOYI_HOOK__.capturedRouters, _parseError: true };
-          }
-        },
+      var results = await utils.execInTab(tab.id, function () {
+        if (!window.__VK_RUOYI_HOOK__ || !window.__VK_RUOYI_HOOK__.capturedRouters) return null;
+        try {
+          return JSON.parse(window.__VK_RUOYI_HOOK__.capturedRouters);
+        } catch (e) {
+          return { _raw: window.__VK_RUOYI_HOOK__.capturedRouters, _parseError: true };
+        }
       });
 
-      var data = results && results[0] && results[0].result;
+      var data = utils.execResult(results);
       if (!data) return;
       if (state) state.capturedRouterData = data;
       // Delegate rendering to hook module if available

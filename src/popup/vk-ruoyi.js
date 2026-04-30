@@ -44,21 +44,17 @@ window.VulnKitRuoYi = (function () {
       var tab = await getActiveTab();
       if (!tab || !tab.id) return;
 
-      var discoverResults = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          if (
-            window.__VK_RUOYI_HOOK__ &&
-            typeof window.__VK_RUOYI_HOOK__.discoverRoutesFromJs === 'function'
-          ) {
-            return window.__VK_RUOYI_HOOK__.discoverRoutesFromJs();
-          }
-          return null;
-        },
+      var discoverResults = await utils.execInTab(tab.id, function () {
+        if (
+          window.__VK_RUOYI_HOOK__ &&
+          typeof window.__VK_RUOYI_HOOK__.discoverRoutesFromJs === 'function'
+        ) {
+          return window.__VK_RUOYI_HOOK__.discoverRoutesFromJs();
+        }
+        return null;
       });
 
-      var result = (discoverResults && discoverResults[0] && discoverResults[0].result) || {
+      var result = utils.execResult(discoverResults) || {
         discovered: [],
         extUrls: [],
       };
@@ -277,17 +273,16 @@ window.VulnKitRuoYi = (function () {
         return r;
       });
 
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function (routes) {
+      await utils.execInTab(
+        tab.id,
+        function (routes) {
           if (window.__VK_RUOYI_HOOK__) {
             window.__VK_RUOYI_HOOK__.extraRoutes = routes;
             window.__VK_RUOYI_HOOK__.augmentMode = 'auto';
           }
         },
-        args: [routesToApply],
-      });
+        { args: [routesToApply] }
+      );
 
       state.extraRoutes = routesToApply;
       if (statusEl)
@@ -302,15 +297,11 @@ window.VulnKitRuoYi = (function () {
     try {
       var tab = await getActiveTab();
       if (tab && tab.id) {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: 'MAIN',
-          func: function () {
-            if (window.__VK_RUOYI_HOOK__) {
-              window.__VK_RUOYI_HOOK__.extraRoutes = [];
-              window.__VK_RUOYI_HOOK__.augmentMode = 'off';
-            }
-          },
+        await utils.execInTab(tab.id, function () {
+          if (window.__VK_RUOYI_HOOK__) {
+            window.__VK_RUOYI_HOOK__.extraRoutes = [];
+            window.__VK_RUOYI_HOOK__.augmentMode = 'off';
+          }
         });
       }
       state.extraRoutes = [];
@@ -330,14 +321,13 @@ window.VulnKitRuoYi = (function () {
     try {
       var tab = await getActiveTab();
       if (!tab || !tab.id) return;
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function (m) {
+      await utils.execInTab(
+        tab.id,
+        function (m) {
           if (window.__VK_RUOYI_HOOK__) window.__VK_RUOYI_HOOK__.augmentMode = m;
         },
-        args: [mode],
-      });
+        { args: [mode] }
+      );
     } catch (e) {
       console.warn('[VulnKit] setAugmentMode:', e);
     }
@@ -554,17 +544,13 @@ window.VulnKitRuoYi = (function () {
       var tab = await getActiveTab();
       if (!tab || !tab.id) return;
 
-      var results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          var hook = window.__VK_RUOYI_HOOK__;
-          if (!hook || !hook.apiLog) return [];
-          return hook.apiLog.slice(-200);
-        },
+      var results = await utils.execInTab(tab.id, function () {
+        var hook = window.__VK_RUOYI_HOOK__;
+        if (!hook || !hook.apiLog) return [];
+        return hook.apiLog.slice(-200);
       });
 
-      var log = (results && results[0] && results[0].result) || [];
+      var log = utils.execResult(results) || [];
       if (countEl) countEl.textContent = '已捕获 ' + log.length + ' 个API请求';
 
       if (log.length === 0) {
@@ -619,12 +605,8 @@ window.VulnKitRuoYi = (function () {
     if (countEl) countEl.textContent = '';
     getActiveTab().then(function (tab) {
       if (!tab || !tab.id) return;
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          if (window.__VK_RUOYI_HOOK__) window.__VK_RUOYI_HOOK__.apiLog = [];
-        },
+      utils.execInTab(tab.id, function () {
+        if (window.__VK_RUOYI_HOOK__) window.__VK_RUOYI_HOOK__.apiLog = [];
       });
     });
   }
@@ -633,16 +615,12 @@ window.VulnKitRuoYi = (function () {
     getActiveTab()
       .then(function (tab) {
         if (!tab || !tab.id) return;
-        return chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: 'MAIN',
-          func: function () {
-            return (window.__VK_RUOYI_HOOK__ && window.__VK_RUOYI_HOOK__.apiLog) || [];
-          },
+        return utils.execInTab(tab.id, function () {
+          return (window.__VK_RUOYI_HOOK__ && window.__VK_RUOYI_HOOK__.apiLog) || [];
         });
       })
       .then(function (results) {
-        var log = (results && results[0] && results[0].result) || [];
+        var log = utils.execResult(results) || [];
         if (log.length === 0) {
           utils.showToast('没有API流量数据', 'warning');
           return;

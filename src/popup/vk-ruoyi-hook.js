@@ -20,11 +20,7 @@ window.VulnKitRuoYiHook = (function () {
 
   async function injectHookCode(tabId) {
     try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        world: 'MAIN',
-        files: ['src/inject/ruoyi-route-hook.js'],
-      });
+      await utils.execInTab(tabId, ['src/inject/ruoyi-route-hook.js']);
       return 'files';
     } catch (e) {
       try {
@@ -33,14 +29,10 @@ window.VulnKitRuoYiHook = (function () {
           await new Promise(function (r) {
             setTimeout(r, 100);
           });
-          var check = await chrome.scripting.executeScript({
-            target: { tabId: tabId },
-            world: 'MAIN',
-            func: function () {
-              return !!window.__VK_RUOYI_HOOK__;
-            },
+          var check = await utils.execInTab(tabId, function () {
+            return !!window.__VK_RUOYI_HOOK__;
           });
-          if (check && check[0] && check[0].result) return 'content-script';
+          if (utils.execResult(check)) return 'content-script';
         }
         return null;
       } catch (e2) {
@@ -80,14 +72,11 @@ window.VulnKitRuoYiHook = (function () {
       var customUrlInput = utils.get('ruoyi-custom-url');
       var customUrl = (customUrlInput && customUrlInput.value.trim()) || '';
 
-      var hookResult = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: enableHookFunc,
+      var hookResult = await utils.execInTab(tab.id, enableHookFunc, {
         args: [{ mode: augmentMode, customUrl: customUrl }],
       });
 
-      if (hookResult && hookResult[0] && hookResult[0].result) {
+      if (utils.execResult(hookResult)) {
         if (state) {
           state.ruoyiHookActive = true;
           state.ruoyiTabId = tab.id;
@@ -96,18 +85,14 @@ window.VulnKitRuoYiHook = (function () {
         chrome.storage.local.set({ ruoyiHookTabId: tab.id, ruoyiHookEnabled: true });
         setHookUI(true);
 
-        var capCheck = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: 'MAIN',
-          func: function () {
-            var hook = window.__VK_RUOYI_HOOK__;
-            return {
-              captured: !!hook.capturedRouters,
-              logCount: (hook.requestLog || []).length,
-            };
-          },
+        var capCheck = await utils.execInTab(tab.id, function () {
+          var hook = window.__VK_RUOYI_HOOK__;
+          return {
+            captured: !!hook.capturedRouters,
+            logCount: (hook.requestLog || []).length,
+          };
         });
-        var capData = capCheck && capCheck[0] && capCheck[0].result;
+        var capData = utils.execResult(capCheck);
 
         if (capData && capData.captured) {
           if (statusEl) statusEl.textContent = '钩子已启用 — 路由数据已被动捕获';
@@ -134,14 +119,11 @@ window.VulnKitRuoYiHook = (function () {
         setTimeout(r, 400);
       });
 
-      var retryResult = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: enableHookFunc,
+      var retryResult = await utils.execInTab(tab.id, enableHookFunc, {
         args: [{ mode: augmentMode, customUrl: customUrl }],
       });
 
-      if (!(retryResult && retryResult[0] && retryResult[0].result)) {
+      if (!utils.execResult(retryResult)) {
         if (statusEl) statusEl.textContent = '注入后未检测到钩子';
         utils.showToast('钩子注入失败 [' + method + ']，请刷新页面后重试', 'warning');
         return;
@@ -171,21 +153,17 @@ window.VulnKitRuoYiHook = (function () {
       var tab = await getActiveTab();
       if (!tab || !tab.id) return;
 
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          if (window.__VK_RUOYI_HOOK__) {
-            window.__VK_RUOYI_HOOK__.enabled = false;
-            window.__VK_RUOYI_HOOK__.extraRoutes = [];
-            window.__VK_RUOYI_HOOK__.capturedRouters = null;
-            window.__VK_RUOYI_HOOK__.requestLog = [];
-            window.__VK_RUOYI_HOOK__.customRouterUrls = [];
-            if (typeof window.__VK_RUOYI_HOOK__.clearConfig === 'function') {
-              window.__VK_RUOYI_HOOK__.clearConfig();
-            }
+      await utils.execInTab(tab.id, function () {
+        if (window.__VK_RUOYI_HOOK__) {
+          window.__VK_RUOYI_HOOK__.enabled = false;
+          window.__VK_RUOYI_HOOK__.extraRoutes = [];
+          window.__VK_RUOYI_HOOK__.capturedRouters = null;
+          window.__VK_RUOYI_HOOK__.requestLog = [];
+          window.__VK_RUOYI_HOOK__.customRouterUrls = [];
+          if (typeof window.__VK_RUOYI_HOOK__.clearConfig === 'function') {
+            window.__VK_RUOYI_HOOK__.clearConfig();
           }
-        },
+        }
       });
 
       if (state) {
@@ -210,28 +188,24 @@ window.VulnKitRuoYiHook = (function () {
       var tab = await getActiveTab();
       if (!tab || !tab.id) return;
 
-      var results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          var hook = window.__VK_RUOYI_HOOK__;
-          if (!hook) return { installed: false, pageUrl: location.href };
-          return {
-            installed: true,
-            pageUrl: location.href,
-            enabled: hook.enabled,
-            alwaysCapture: !!hook.alwaysCapture,
-            captured: !!hook.capturedRouters,
-            augmentMode: hook.augmentMode,
-            extraRouteCount: (hook.extraRoutes || []).length,
-            logCount: (hook.requestLog || []).length,
-            customUrls: hook.customRouterUrls || [],
-            restored: !!hook.restoredFromStorage,
-          };
-        },
+      var results = await utils.execInTab(tab.id, function () {
+        var hook = window.__VK_RUOYI_HOOK__;
+        if (!hook) return { installed: false, pageUrl: location.href };
+        return {
+          installed: true,
+          pageUrl: location.href,
+          enabled: hook.enabled,
+          alwaysCapture: !!hook.alwaysCapture,
+          captured: !!hook.capturedRouters,
+          augmentMode: hook.augmentMode,
+          extraRouteCount: (hook.extraRoutes || []).length,
+          logCount: (hook.requestLog || []).length,
+          customUrls: hook.customRouterUrls || [],
+          restored: !!hook.restoredFromStorage,
+        };
       });
 
-      var data = (results && results[0] && results[0].result) || { installed: false };
+      var data = utils.execResult(results) || { installed: false };
 
       if (!data.installed) {
         var urlHint = data.pageUrl ? ' [' + utils.escapeHtml(data.pageUrl) + ']' : '';
@@ -280,17 +254,13 @@ window.VulnKitRuoYiHook = (function () {
 
   async function renderRequestLog(tabId) {
     try {
-      var results = await chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        world: 'MAIN',
-        func: function () {
-          var hook = window.__VK_RUOYI_HOOK__;
-          if (!hook || !hook.requestLog) return [];
-          return hook.requestLog.slice(-20);
-        },
+      var results = await utils.execInTab(tabId, function () {
+        var hook = window.__VK_RUOYI_HOOK__;
+        if (!hook || !hook.requestLog) return [];
+        return hook.requestLog.slice(-20);
       });
 
-      var log = (results && results[0] && results[0].result) || [];
+      var log = utils.execResult(results) || [];
       if (log.length === 0) return;
 
       var panelEl = utils.get('ruoyi-captured-panel');
@@ -551,16 +521,12 @@ window.VulnKitRuoYiHook = (function () {
 
       var cookieHeader = '';
       try {
-        var cookieResult = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: 'MAIN',
-          func: function () {
-            var cookies = document.cookie || '';
-            var match = cookies.match(/Admin-Token=[^;]*/i);
-            return match ? match[0] : '';
-          },
+        var cookieResult = await utils.execInTab(tab.id, function () {
+          var cookies = document.cookie || '';
+          var match = cookies.match(/Admin-Token=[^;]*/i);
+          return match ? match[0] : '';
         });
-        var token = cookieResult && cookieResult[0] && cookieResult[0].result;
+        var token = utils.execResult(cookieResult);
         if (token) {
           var safeToken = token.replace(/'/g, "'\\''");
           cookieHeader = " -H 'Cookie: " + safeToken + "'";

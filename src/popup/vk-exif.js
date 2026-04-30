@@ -303,9 +303,9 @@ window.VulnKitExif = (function () {
         return;
       }
 
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => {
+      const results = await utils.execInTab(
+        tab.id,
+        () => {
           const imgs = [];
           document.querySelectorAll('img[src]').forEach(img => {
             if (img.src && img.naturalWidth > 50 && img.naturalHeight > 50) {
@@ -327,9 +327,10 @@ window.VulnKitExif = (function () {
           const unique = [...new Map(imgs.map(i => [i.src, i])).values()];
           return unique.slice(0, 50);
         },
-      });
+        { world: 'ISOLATED' }
+      );
 
-      const images = results?.[0]?.result || [];
+      const images = utils.execResult(results) || [];
       if (images.length === 0) {
         container.innerHTML = utils.emptyHtml('未找到图片');
         return;

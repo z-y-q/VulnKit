@@ -17,14 +17,7 @@ window.VulnKitJsCtrl = (function () {
 
   function switchJsCtrlTab(tab) {
     currentJsCtrlTab = tab;
-    document.querySelectorAll('.jsctrl-tab').forEach(function (b) {
-      return b.classList.toggle('active', b.dataset.ctrl === tab);
-    });
-    document.querySelectorAll('.jsctrl-panel').forEach(function (p) {
-      return p.classList.remove('active');
-    });
-    var target = document.getElementById('jsctrl-' + tab);
-    if (target) target.classList.add('active');
+    utils.switchSubTabs('jsctrl-tab', 'ctrl', 'jsctrl', tab);
   }
 
   function updateJsToggleStatus() {
@@ -169,75 +162,71 @@ window.VulnKitJsCtrl = (function () {
       if (!tab || !tab.id) return;
 
       // Phase 1: inline script scan (MAIN world)
-      var inlineResults = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          var detections = [];
-          var isNative = function (fn) {
-            return /\[native code\]/.test(Function.prototype.toString.call(fn));
-          };
+      var inlineResults = await utils.execInTab(tab.id, function () {
+        var detections = [];
+        var isNative = function (fn) {
+          return /\[native code\]/.test(Function.prototype.toString.call(fn));
+        };
 
-          // Check for debugger statement in inline scripts
-          var scripts = document.querySelectorAll('script');
-          for (var i = 0; i < scripts.length; i++) {
-            if (scripts[i].textContent && scripts[i].textContent.indexOf('debugger') !== -1) {
-              detections.push({
-                type: 'debugger语句',
-                desc: '检测到 inline script 中的 debugger 语句',
-              });
-              break;
-            }
-          }
-
-          // Check for Function constructor abuse
-          if (!isNative(Function.prototype.constructor)) {
+        // Check for debugger statement in inline scripts
+        var scripts = document.querySelectorAll('script');
+        for (var i = 0; i < scripts.length; i++) {
+          if (scripts[i].textContent && scripts[i].textContent.indexOf('debugger') !== -1) {
             detections.push({
-              type: 'Function劫持',
-              desc: 'Function.prototype.constructor 已被重写',
+              type: 'debugger语句',
+              desc: '检测到 inline script 中的 debugger 语句',
             });
+            break;
           }
+        }
 
-          // Check for setInterval/setTimeout debugger loops
-          if (!isNative(setInterval)) {
-            detections.push({ type: '定时器劫持', desc: 'setInterval 已被重写，可能用于反调试' });
-          }
-          if (!isNative(setTimeout)) {
-            detections.push({ type: '定时器劫持', desc: 'setTimeout 已被重写，可能用于反调试' });
-          }
+        // Check for Function constructor abuse
+        if (!isNative(Function.prototype.constructor)) {
+          detections.push({
+            type: 'Function劫持',
+            desc: 'Function.prototype.constructor 已被重写',
+          });
+        }
 
-          // Check for console overrides
-          if (!isNative(console.log)) {
-            detections.push({ type: 'Console劫持', desc: 'console.log 已被重写' });
-          }
+        // Check for setInterval/setTimeout debugger loops
+        if (!isNative(setInterval)) {
+          detections.push({ type: '定时器劫持', desc: 'setInterval 已被重写，可能用于反调试' });
+        }
+        if (!isNative(setTimeout)) {
+          detections.push({ type: '定时器劫持', desc: 'setTimeout 已被重写，可能用于反调试' });
+        }
 
-          // Check for devtools detection in inline scripts
-          for (var j = 0; j < scripts.length; j++) {
-            var text = scripts[j].textContent || '';
-            if (/outerWidth\s*-\s*innerWidth\s*>\s*\d+/.test(text)) {
-              detections.push({ type: 'DevTools检测', desc: '通过窗口尺寸差检测开发者工具' });
-              break;
-            }
-            if (/Firebug|firebug|chrome\.devtools/.test(text)) {
-              detections.push({ type: 'DevTools检测', desc: '检测到 Firebug/DevTools 探测代码' });
-              break;
-            }
-            if (/new\s+Image.*onerror.*devtools/i.test(text)) {
-              detections.push({ type: 'DevTools检测', desc: '通过 Image.onerror 检测开发者工具' });
-              break;
-            }
-          }
+        // Check for console overrides
+        if (!isNative(console.log)) {
+          detections.push({ type: 'Console劫持', desc: 'console.log 已被重写' });
+        }
 
-          // Collect external JS URLs for phase 2
-          var externalUrls = [];
-          for (var k = 0; k < scripts.length; k++) {
-            if (scripts[k].src) externalUrls.push(scripts[k].src);
+        // Check for devtools detection in inline scripts
+        for (var j = 0; j < scripts.length; j++) {
+          var text = scripts[j].textContent || '';
+          if (/outerWidth\s*-\s*innerWidth\s*>\s*\d+/.test(text)) {
+            detections.push({ type: 'DevTools检测', desc: '通过窗口尺寸差检测开发者工具' });
+            break;
           }
-          return { detections: detections, externalUrls: externalUrls };
-        },
+          if (/Firebug|firebug|chrome\.devtools/.test(text)) {
+            detections.push({ type: 'DevTools检测', desc: '检测到 Firebug/DevTools 探测代码' });
+            break;
+          }
+          if (/new\s+Image.*onerror.*devtools/i.test(text)) {
+            detections.push({ type: 'DevTools检测', desc: '通过 Image.onerror 检测开发者工具' });
+            break;
+          }
+        }
+
+        // Collect external JS URLs for phase 2
+        var externalUrls = [];
+        for (var k = 0; k < scripts.length; k++) {
+          if (scripts[k].src) externalUrls.push(scripts[k].src);
+        }
+        return { detections: detections, externalUrls: externalUrls };
       });
 
-      var inline = (inlineResults && inlineResults[0] && inlineResults[0].result) || {
+      var inline = utils.execResult(inlineResults) || {
         detections: [],
         externalUrls: [],
       };
@@ -357,82 +346,78 @@ window.VulnKitJsCtrl = (function () {
     if (!tab || !tab.id) return;
 
     try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          // Save native references before any overrides
-          var nativeConsoleLog = (function () {
-            var iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            document.head.appendChild(iframe);
-            var log = iframe.contentWindow.console.log;
-            document.head.removeChild(iframe);
-            return log;
-          })();
+      await utils.execInTab(tab.id, function () {
+        // Save native references before any overrides
+        var nativeConsoleLog = (function () {
+          var iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          document.head.appendChild(iframe);
+          var log = iframe.contentWindow.console.log;
+          document.head.removeChild(iframe);
+          return log;
+        })();
 
-          // Override Function constructor to strip debugger
-          var OriginalFunction = Function.prototype.constructor;
-          Function.prototype.constructor = function () {
-            var args = Array.prototype.slice.call(arguments);
-            if (args.length > 0 && typeof args[0] === 'string') {
-              args[0] = args[0].replace(/debugger/g, '');
-              if (/^\s*$/.test(args[0])) return function () {};
-            }
-            return new (Function.prototype.bind.apply(OriginalFunction, [null].concat(args)))();
-          };
+        // Override Function constructor to strip debugger
+        var OriginalFunction = Function.prototype.constructor;
+        Function.prototype.constructor = function () {
+          var args = Array.prototype.slice.call(arguments);
+          if (args.length > 0 && typeof args[0] === 'string') {
+            args[0] = args[0].replace(/debugger/g, '');
+            if (/^\s*$/.test(args[0])) return function () {};
+          }
+          return new (Function.prototype.bind.apply(OriginalFunction, [null].concat(args)))();
+        };
 
-          // Override eval to strip debugger
-          var originalEval = window.eval;
-          window.eval = function (code) {
-            if (typeof code === 'string') {
-              code = code.replace(/debugger/g, '');
-            }
-            return originalEval.call(window, code);
-          };
+        // Override eval to strip debugger
+        var originalEval = window.eval;
+        window.eval = function (code) {
+          if (typeof code === 'string') {
+            code = code.replace(/debugger/g, '');
+          }
+          return originalEval.call(window, code);
+        };
 
-          // Override setInterval/setTimeout to neutralize debugger callbacks
-          var originalSetInterval = window.setInterval;
-          var originalSetTimeout = window.setTimeout;
+        // Override setInterval/setTimeout to neutralize debugger callbacks
+        var originalSetInterval = window.setInterval;
+        var originalSetTimeout = window.setTimeout;
 
-          function cleanCallback(fn) {
-            if (typeof fn === 'string') {
-              return fn.replace(/debugger/g, '');
-            }
-            if (typeof fn === 'function') {
-              var fnStr = fn.toString();
-              if (fnStr.includes('debugger')) {
-                try {
-                  var cleaned = fnStr.replace(/debugger/g, '');
-                  return new Function(
-                    cleaned.replace(/^function\s*\w*\s*\([^)]*\)\s*\{/, '').replace(/\}$/, '')
-                  );
-                } catch (e) {
-                  return function () {};
-                }
+        function cleanCallback(fn) {
+          if (typeof fn === 'string') {
+            return fn.replace(/debugger/g, '');
+          }
+          if (typeof fn === 'function') {
+            var fnStr = fn.toString();
+            if (fnStr.includes('debugger')) {
+              try {
+                var cleaned = fnStr.replace(/debugger/g, '');
+                return new Function(
+                  cleaned.replace(/^function\s*\w*\s*\([^)]*\)\s*\{/, '').replace(/\}$/, '')
+                );
+              } catch (e) {
+                return function () {};
               }
             }
-            return fn;
           }
+          return fn;
+        }
 
-          window.setInterval = function (fn, delay) {
-            var args = Array.prototype.slice.call(arguments, 2);
-            return originalSetInterval.apply(window, [cleanCallback(fn), delay].concat(args));
-          };
+        window.setInterval = function (fn, delay) {
+          var args = Array.prototype.slice.call(arguments, 2);
+          return originalSetInterval.apply(window, [cleanCallback(fn), delay].concat(args));
+        };
 
-          window.setTimeout = function (fn, delay) {
-            var args = Array.prototype.slice.call(arguments, 2);
-            return originalSetTimeout.apply(window, [cleanCallback(fn), delay].concat(args));
-          };
+        window.setTimeout = function (fn, delay) {
+          var args = Array.prototype.slice.call(arguments, 2);
+          return originalSetTimeout.apply(window, [cleanCallback(fn), delay].concat(args));
+        };
 
-          // Restore console if overridden
-          if (!console.log.restore) {
-            console.log = nativeConsoleLog;
-            console.log.restore = true;
-          }
+        // Restore console if overridden
+        if (!console.log.restore) {
+          console.log = nativeConsoleLog;
+          console.log.restore = true;
+        }
 
-          return true;
-        },
+        return true;
       });
 
       antiDebugBypassActive = true;
@@ -517,106 +502,102 @@ window.VulnKitJsCtrl = (function () {
         ].join('\n'),
       });
 
-      var results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          var log = {};
+      var results = await utils.execInTab(tab.id, function () {
+        var log = {};
 
-          // 1. Count elements with user-select: none (now overridden by injected CSS)
-          var allEls = document.querySelectorAll('*');
-          var userSelectCount = 0;
-          for (var i = 0; i < allEls.length; i++) {
-            var style = window.getComputedStyle(allEls[i]);
-            var us = style.getPropertyValue('user-select') || style.webkitUserSelect;
-            if (us === 'none' || us === '-webkit-none') {
-              userSelectCount++;
+        // 1. Count elements with user-select: none (now overridden by injected CSS)
+        var allEls = document.querySelectorAll('*');
+        var userSelectCount = 0;
+        for (var i = 0; i < allEls.length; i++) {
+          var style = window.getComputedStyle(allEls[i]);
+          var us = style.getPropertyValue('user-select') || style.webkitUserSelect;
+          if (us === 'none' || us === '-webkit-none') {
+            userSelectCount++;
+          }
+        }
+        log.userSelect = userSelectCount;
+
+        // 2. Remove inline oncopy/oncut/onpaste/onselectstart/oncontextmenu/ondragstart
+        var eventAttrs = [
+          'oncopy',
+          'oncut',
+          'onpaste',
+          'onselectstart',
+          'oncontextmenu',
+          'ondragstart',
+          'onbeforecopy',
+          'onbeforecut',
+          'onbeforepaste',
+        ];
+        var inlineAttrCount = 0;
+        for (var j = 0; j < allEls.length; j++) {
+          for (var a = 0; a < eventAttrs.length; a++) {
+            if (allEls[j].hasAttribute(eventAttrs[a])) {
+              allEls[j].removeAttribute(eventAttrs[a]);
+              inlineAttrCount++;
             }
           }
-          log.userSelect = userSelectCount;
+        }
+        log.inlineAttrs = inlineAttrCount;
 
-          // 2. Remove inline oncopy/oncut/onpaste/onselectstart/oncontextmenu/ondragstart
-          var eventAttrs = [
-            'oncopy',
-            'oncut',
-            'onpaste',
-            'onselectstart',
-            'oncontextmenu',
-            'ondragstart',
-            'onbeforecopy',
-            'onbeforecut',
-            'onbeforepaste',
-          ];
-          var inlineAttrCount = 0;
-          for (var j = 0; j < allEls.length; j++) {
-            for (var a = 0; a < eventAttrs.length; a++) {
-              if (allEls[j].hasAttribute(eventAttrs[a])) {
-                allEls[j].removeAttribute(eventAttrs[a]);
-                inlineAttrCount++;
-              }
+        // 3. Remove body-level event listeners via addEventListener capture override
+        var blockEvents = ['copy', 'cut', 'paste', 'selectstart', 'contextmenu', 'dragstart'];
+        var listenerCount = 0;
+        blockEvents.forEach(function (evt) {
+          document.addEventListener(
+            evt,
+            function (e) {
+              e.stopImmediatePropagation();
+            },
+            true
+          );
+          document.body.addEventListener(
+            evt,
+            function (e) {
+              e.stopImmediatePropagation();
+            },
+            true
+          );
+          listenerCount++;
+        });
+        log.captureListeners = blockEvents.length;
+
+        log.preventOverride = true;
+
+        // 5. Count pointer-events: none overlays (CSS injected separately handles this)
+        var pointerCount = 0;
+        for (var k = 0; k < allEls.length; k++) {
+          var s = window.getComputedStyle(allEls[k]);
+          if (s.getPropertyValue('pointer-events') === 'none') {
+            var tag = allEls[k].tagName.toLowerCase();
+            var isTransparent =
+              s.getPropertyValue('opacity') === '0' ||
+              s.getPropertyValue('background') === 'rgba(0, 0, 0, 0)' ||
+              s.backgroundColor === 'transparent';
+            if (
+              isTransparent &&
+              (tag === 'div' || tag === 'span' || tag === 'a' || tag === 'img')
+            ) {
+              allEls[k].classList.add('__vk-hidden');
+              pointerCount++;
             }
           }
-          log.inlineAttrs = inlineAttrCount;
+        }
+        log.pointerOverlays = pointerCount;
 
-          // 3. Remove body-level event listeners via addEventListener capture override
-          var blockEvents = ['copy', 'cut', 'paste', 'selectstart', 'contextmenu', 'dragstart'];
-          var listenerCount = 0;
-          blockEvents.forEach(function (evt) {
-            document.addEventListener(
-              evt,
-              function (e) {
-                e.stopImmediatePropagation();
-              },
-              true
-            );
-            document.body.addEventListener(
-              evt,
-              function (e) {
-                e.stopImmediatePropagation();
-              },
-              true
-            );
-            listenerCount++;
-          });
-          log.captureListeners = blockEvents.length;
-
-          log.preventOverride = true;
-
-          // 5. Count pointer-events: none overlays (CSS injected separately handles this)
-          var pointerCount = 0;
-          for (var k = 0; k < allEls.length; k++) {
-            var s = window.getComputedStyle(allEls[k]);
-            if (s.getPropertyValue('pointer-events') === 'none') {
-              var tag = allEls[k].tagName.toLowerCase();
-              var isTransparent =
-                s.getPropertyValue('opacity') === '0' ||
-                s.getPropertyValue('background') === 'rgba(0, 0, 0, 0)' ||
-                s.backgroundColor === 'transparent';
-              if (
-                isTransparent &&
-                (tag === 'div' || tag === 'span' || tag === 'a' || tag === 'img')
-              ) {
-                allEls[k].classList.add('__vk-hidden');
-                pointerCount++;
-              }
-            }
+        // 6. Count -webkit-user-drag: none (now overridden by injected CSS)
+        var dragCount = 0;
+        for (var m = 0; m < allEls.length; m++) {
+          if (allEls[m].style.webkitUserDrag === 'none') {
+            dragCount++;
           }
-          log.pointerOverlays = pointerCount;
+        }
+        log.dragRestrictions = dragCount;
 
-          // 6. Count -webkit-user-drag: none (now overridden by injected CSS)
-          var dragCount = 0;
-          for (var m = 0; m < allEls.length; m++) {
-            if (allEls[m].style.webkitUserDrag === 'none') {
-              dragCount++;
-            }
-          }
-          log.dragRestrictions = dragCount;
-
-          return log;
-        },
+        return log;
       });
 
-      var log = (results && results[0] && results[0].result) || null;
+      var log = utils.execResult(results) || null;
       if (!log) {
         updateUncopyIndicator('off', '注入失败');
         if (btn) btn.disabled = false;

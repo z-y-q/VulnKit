@@ -94,6 +94,26 @@
     return '<div class="empty-state">' + utils.escapeHtml(msg) + '</div>';
   };
 
+  utils.execInTab = async function (tabId, inject, options) {
+    var opts = { target: { tabId: tabId } };
+    if (typeof inject === 'function') {
+      opts.func = inject;
+    } else if (Array.isArray(inject)) {
+      opts.files = inject;
+    }
+    if (options) {
+      if (options.world) opts.world = options.world;
+      if (options.args) opts.args = options.args;
+    } else {
+      opts.world = 'MAIN';
+    }
+    return chrome.scripting.executeScript(opts);
+  };
+
+  utils.execResult = function (results) {
+    return results && results[0] && results[0].result;
+  };
+
   utils.switchSubTabs = function (btnClass, dataAttr, panelPrefix, tab) {
     document.querySelectorAll('.' + btnClass).forEach(function (b) {
       b.classList.toggle('active', b.dataset[dataAttr] === tab);
@@ -130,6 +150,8 @@
     'on',
     'emptyHtml',
     'switchSubTabs',
+    'execInTab',
+    'execResult',
     'getActiveTab',
     'getCurrentDomain',
   ].forEach(function (method) {

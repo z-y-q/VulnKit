@@ -39,10 +39,7 @@ window.VulnKitVue = (function () {
     } catch (e) {
       // Content script not loaded yet, inject it on-the-fly then retry
       try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tabId },
-          files: ['src/content/vk-content.js'],
-        });
+        await utils.execInTab(tabId, ['src/content/vk-content.js'], { world: 'ISOLATED' });
         await sleep(100);
         var data2 = await chrome.tabs.sendMessage(tabId, { type: 'VK_VUE_DETECT' });
         if (!data2 || !data2.detected) return data2;
@@ -238,50 +235,46 @@ window.VulnKitVue = (function () {
     if (!tab?.id) return;
 
     try {
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: () => {
-          function safeSerialize(obj) {
-            try {
-              return JSON.parse(JSON.stringify(obj));
-            } catch (e) {
-              return null;
-            }
+      const results = await utils.execInTab(tab.id, () => {
+        function safeSerialize(obj) {
+          try {
+            return JSON.parse(JSON.stringify(obj));
+          } catch (e) {
+            return null;
           }
-          function getRoutes(router) {
-            if (!router) return null;
-            if (typeof router.getRoutes === 'function') {
-              return router.getRoutes().map(function (r) {
-                return { path: r.path, name: r.name || '', meta: safeSerialize(r.meta) || {} };
-              });
-            }
-            return router.options ? safeSerialize(router.options.routes) || null : null;
+        }
+        function getRoutes(router) {
+          if (!router) return null;
+          if (typeof router.getRoutes === 'function') {
+            return router.getRoutes().map(function (r) {
+              return { path: r.path, name: r.name || '', meta: safeSerialize(r.meta) || {} };
+            });
           }
-          const appEl =
-            document.querySelector('#app') ||
-            document.querySelector('[data-v-app]') ||
-            document.querySelector('[id^="app"]') ||
-            document.querySelector('#root') ||
-            document.querySelector('#application') ||
-            document.querySelector('#main');
-          if (appEl && appEl.__vue_app__) {
-            var r = getRoutes(appEl.__vue_app__.config.globalProperties.$router);
-            if (r) return r;
+          return router.options ? safeSerialize(router.options.routes) || null : null;
+        }
+        const appEl =
+          document.querySelector('#app') ||
+          document.querySelector('[data-v-app]') ||
+          document.querySelector('[id^="app"]') ||
+          document.querySelector('#root') ||
+          document.querySelector('#application') ||
+          document.querySelector('#main');
+        if (appEl && appEl.__vue_app__) {
+          var r = getRoutes(appEl.__vue_app__.config.globalProperties.$router);
+          if (r) return r;
+        }
+        const allEls = document.querySelectorAll('*');
+        for (const el of allEls) {
+          if (el.__vue__) {
+            const vm = el.__vue__.$root || el.__vue__;
+            var r2 = getRoutes(vm.$router);
+            if (r2) return r2;
           }
-          const allEls = document.querySelectorAll('*');
-          for (const el of allEls) {
-            if (el.__vue__) {
-              const vm = el.__vue__.$root || el.__vue__;
-              var r2 = getRoutes(vm.$router);
-              if (r2) return r2;
-            }
-          }
-          return null;
-        },
+        }
+        return null;
       });
 
-      const routes = results?.[0]?.result;
+      const routes = utils.execResult(results);
       if (!routes) {
         utils.showToast('未找到 Vue Router', 'warning');
         return;
@@ -301,58 +294,54 @@ window.VulnKitVue = (function () {
     if (!tab?.id) return;
 
     try {
-      const bypassResults = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: () => {
-          // Vue 3
-          const appEl =
-            document.querySelector('#app') ||
-            document.querySelector('[data-v-app]') ||
-            document.querySelector('[id^="app"]') ||
-            document.querySelector('#root') ||
-            document.querySelector('#application') ||
-            document.querySelector('#main');
-          if (appEl && appEl.__vue_app__) {
-            const router = appEl.__vue_app__.config.globalProperties.$router;
-            if (router) {
-              // Vue Router 4: clear internal guard arrays
-              if (Array.isArray(router.beforeGuards)) router.beforeGuards.length = 0;
-              if (Array.isArray(router.afterGuards)) router.afterGuards.length = 0;
-              if (Array.isArray(router.beforeResolveGuards)) router.beforeResolveGuards.length = 0;
-              // Clear per-route beforeEnter guards
-              if (router.options && Array.isArray(router.options.routes)) {
-                (function clearRouteGuards(routes) {
-                  for (var i = 0; i < routes.length; i++) {
-                    if (typeof routes[i].beforeEnter === 'function') {
-                      routes[i].beforeEnter = undefined;
-                    }
-                    if (routes[i].children) clearRouteGuards(routes[i].children);
+      const bypassResults = await utils.execInTab(tab.id, () => {
+        // Vue 3
+        const appEl =
+          document.querySelector('#app') ||
+          document.querySelector('[data-v-app]') ||
+          document.querySelector('[id^="app"]') ||
+          document.querySelector('#root') ||
+          document.querySelector('#application') ||
+          document.querySelector('#main');
+        if (appEl && appEl.__vue_app__) {
+          const router = appEl.__vue_app__.config.globalProperties.$router;
+          if (router) {
+            // Vue Router 4: clear internal guard arrays
+            if (Array.isArray(router.beforeGuards)) router.beforeGuards.length = 0;
+            if (Array.isArray(router.afterGuards)) router.afterGuards.length = 0;
+            if (Array.isArray(router.beforeResolveGuards)) router.beforeResolveGuards.length = 0;
+            // Clear per-route beforeEnter guards
+            if (router.options && Array.isArray(router.options.routes)) {
+              (function clearRouteGuards(routes) {
+                for (var i = 0; i < routes.length; i++) {
+                  if (typeof routes[i].beforeEnter === 'function') {
+                    routes[i].beforeEnter = undefined;
                   }
-                })(router.options.routes);
-              }
-              return 'vue3';
+                  if (routes[i].children) clearRouteGuards(routes[i].children);
+                }
+              })(router.options.routes);
+            }
+            return 'vue3';
+          }
+        }
+        // Vue 2
+        const allEls = document.querySelectorAll('*');
+        for (const el of allEls) {
+          if (el.__vue__) {
+            const vm = el.__vue__.$root || el.__vue__;
+            if (vm.$router) {
+              if (Array.isArray(vm.$router.beforeHooks)) vm.$router.beforeHooks.length = 0;
+              if (Array.isArray(vm.$router.afterHooks)) vm.$router.afterHooks.length = 0;
+              if (Array.isArray(vm.$router.beforeResolveHooks))
+                vm.$router.beforeResolveHooks.length = 0;
+              return 'vue2';
             }
           }
-          // Vue 2
-          const allEls = document.querySelectorAll('*');
-          for (const el of allEls) {
-            if (el.__vue__) {
-              const vm = el.__vue__.$root || el.__vue__;
-              if (vm.$router) {
-                if (Array.isArray(vm.$router.beforeHooks)) vm.$router.beforeHooks.length = 0;
-                if (Array.isArray(vm.$router.afterHooks)) vm.$router.afterHooks.length = 0;
-                if (Array.isArray(vm.$router.beforeResolveHooks))
-                  vm.$router.beforeResolveHooks.length = 0;
-                return 'vue2';
-              }
-            }
-          }
-          return null;
-        },
+        }
+        return null;
       });
 
-      const result = bypassResults?.[0]?.result;
+      const result = utils.execResult(bypassResults);
       if (!result) {
         utils.showToast('未找到 Vue Router', 'warning');
         return;
@@ -368,85 +357,81 @@ window.VulnKitVue = (function () {
     if (!tab?.id) return;
 
     try {
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: () => {
-          var authKeys = [
-            'auth',
-            'requireAuth',
-            'requiresAuth',
-            'login',
-            'needLogin',
-            'requiresLogin',
-          ];
-          var changed = 0;
+      const results = await utils.execInTab(tab.id, () => {
+        var authKeys = [
+          'auth',
+          'requireAuth',
+          'requiresAuth',
+          'login',
+          'needLogin',
+          'requiresLogin',
+        ];
+        var changed = 0;
 
-          function clearAuthMeta(routes, depth) {
-            if (!routes || !Array.isArray(routes) || depth > 20) return;
-            for (var i = 0; i < routes.length; i++) {
-              var route = routes[i];
-              if (route.meta && typeof route.meta === 'object') {
-                for (var j = 0; j < authKeys.length; j++) {
-                  if (authKeys[j] in route.meta && route.meta[authKeys[j]]) {
-                    route.meta[authKeys[j]] = false;
-                    changed++;
-                  }
+        function clearAuthMeta(routes, depth) {
+          if (!routes || !Array.isArray(routes) || depth > 20) return;
+          for (var i = 0; i < routes.length; i++) {
+            var route = routes[i];
+            if (route.meta && typeof route.meta === 'object') {
+              for (var j = 0; j < authKeys.length; j++) {
+                if (authKeys[j] in route.meta && route.meta[authKeys[j]]) {
+                  route.meta[authKeys[j]] = false;
+                  changed++;
                 }
               }
-              if (route.children) clearAuthMeta(route.children, depth + 1);
             }
+            if (route.children) clearAuthMeta(route.children, depth + 1);
           }
+        }
 
-          // Vue 3
-          var appEl =
-            document.querySelector('#app') ||
-            document.querySelector('[data-v-app]') ||
-            document.querySelector('[id^="app"]') ||
-            document.querySelector('#root') ||
-            document.querySelector('#application') ||
-            document.querySelector('#main');
-          if (appEl && appEl.__vue_app__) {
-            var router = appEl.__vue_app__.config.globalProperties.$router;
-            if (router) {
-              if (router.options && router.options.routes) clearAuthMeta(router.options.routes, 0);
-              var flatRoutes;
-              try {
-                flatRoutes = router.getRoutes();
-              } catch (e) {}
-              if (flatRoutes) {
-                for (var k = 0; k < flatRoutes.length; k++) {
-                  if (flatRoutes[k].meta && typeof flatRoutes[k].meta === 'object') {
-                    for (var m = 0; m < authKeys.length; m++) {
-                      if (authKeys[m] in flatRoutes[k].meta && flatRoutes[k].meta[authKeys[m]]) {
-                        flatRoutes[k].meta[authKeys[m]] = false;
-                        changed++;
-                      }
+        // Vue 3
+        var appEl =
+          document.querySelector('#app') ||
+          document.querySelector('[data-v-app]') ||
+          document.querySelector('[id^="app"]') ||
+          document.querySelector('#root') ||
+          document.querySelector('#application') ||
+          document.querySelector('#main');
+        if (appEl && appEl.__vue_app__) {
+          var router = appEl.__vue_app__.config.globalProperties.$router;
+          if (router) {
+            if (router.options && router.options.routes) clearAuthMeta(router.options.routes, 0);
+            var flatRoutes;
+            try {
+              flatRoutes = router.getRoutes();
+            } catch (e) {}
+            if (flatRoutes) {
+              for (var k = 0; k < flatRoutes.length; k++) {
+                if (flatRoutes[k].meta && typeof flatRoutes[k].meta === 'object') {
+                  for (var m = 0; m < authKeys.length; m++) {
+                    if (authKeys[m] in flatRoutes[k].meta && flatRoutes[k].meta[authKeys[m]]) {
+                      flatRoutes[k].meta[authKeys[m]] = false;
+                      changed++;
                     }
                   }
                 }
               }
-              return { version: 'vue3', changed: changed };
+            }
+            return { version: 'vue3', changed: changed };
+          }
+        }
+
+        // Vue 2
+        var allEls = document.querySelectorAll('*');
+        for (var n = 0; n < allEls.length; n++) {
+          if (allEls[n].__vue__) {
+            var vm = allEls[n].__vue__.$root || allEls[n].__vue__;
+            if (vm.$router && vm.$router.options && vm.$router.options.routes) {
+              clearAuthMeta(vm.$router.options.routes, 0);
+              return { version: 'vue2', changed: changed };
             }
           }
+        }
 
-          // Vue 2
-          var allEls = document.querySelectorAll('*');
-          for (var n = 0; n < allEls.length; n++) {
-            if (allEls[n].__vue__) {
-              var vm = allEls[n].__vue__.$root || allEls[n].__vue__;
-              if (vm.$router && vm.$router.options && vm.$router.options.routes) {
-                clearAuthMeta(vm.$router.options.routes, 0);
-                return { version: 'vue2', changed: changed };
-              }
-            }
-          }
-
-          return null;
-        },
+        return null;
       });
 
-      const result = results?.[0]?.result;
+      const result = utils.execResult(results);
       if (!result) {
         utils.showToast('未找到 Vue Router', 'warning');
         return;
@@ -915,19 +900,11 @@ window.VulnKitVue = (function () {
         if (statusEl) statusEl.textContent = '无法获取当前标签页';
         return;
       }
-      var results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: permInterceptorFunc,
-      });
-      var status = results && results[0] && results[0].result;
+      var results = await utils.execInTab(tab.id, permInterceptorFunc);
+      var status = utils.execResult(results);
       if (status === 'already_injected') {
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: 'MAIN',
-          func: function () {
-            if (window.__PERM_INTERCEPTOR__) window.__PERM_INTERCEPTOR__.start();
-          },
+        await utils.execInTab(tab.id, function () {
+          if (window.__PERM_INTERCEPTOR__) window.__PERM_INTERCEPTOR__.start();
         });
       }
       permInterceptActive = true;
@@ -940,11 +917,7 @@ window.VulnKitVue = (function () {
       utils.showToast('拦截已启动，请操作页面或刷新页面', 'success');
       // Try to read already-loaded data from Vue/Pinia/Vuex stores
       try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: 'MAIN',
-          func: permStoreReaderFunc,
-        });
+        await utils.execInTab(tab.id, permStoreReaderFunc);
       } catch (e) {
         // Non-critical: store reading is best-effort
       }
@@ -960,12 +933,8 @@ window.VulnKitVue = (function () {
     try {
       const tab = await utils.getActiveTab();
       if (!tab?.id) return;
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          if (window.__PERM_INTERCEPTOR__) window.__PERM_INTERCEPTOR__.stop();
-        },
+      await utils.execInTab(tab.id, function () {
+        if (window.__PERM_INTERCEPTOR__) window.__PERM_INTERCEPTOR__.stop();
       });
       permInterceptActive = false;
       chrome.storage.local.remove('permInterceptTabId');
@@ -989,16 +958,12 @@ window.VulnKitVue = (function () {
     try {
       const tab = await utils.getActiveTab();
       if (!tab?.id) return;
-      var results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          if (!window.__PERM_INTERCEPTOR__) return { items: [], length: 0 };
-          var captured = window.__PERM_INTERCEPTOR__.getCaptured();
-          return { items: captured, length: captured.length };
-        },
+      var results = await utils.execInTab(tab.id, function () {
+        if (!window.__PERM_INTERCEPTOR__) return { items: [], length: 0 };
+        var captured = window.__PERM_INTERCEPTOR__.getCaptured();
+        return { items: captured, length: captured.length };
       });
-      var result = (results && results[0] && results[0].result) || { items: [], length: 0 };
+      var result = utils.execResult(results) || { items: [], length: 0 };
       if (result.length === permCapturedLength) return;
       permCapturedLength = result.length;
       permCapturedData = result.items || [];
@@ -1443,10 +1408,9 @@ window.VulnKitVue = (function () {
         utils.showToast('无法获取当前标签页', 'error');
         return;
       }
-      var results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function (overrideData) {
+      var results = await utils.execInTab(
+        tab.id,
+        function (overrideData) {
           if (!window.__PERM_INTERCEPTOR__) return false;
           window.__PERM_INTERCEPTOR__.setOverride(overrideData);
 
@@ -1572,9 +1536,9 @@ window.VulnKitVue = (function () {
 
           return { success: true, storagePatchCount: storagePatchCount };
         },
-        args: [modifiedData],
-      });
-      var overrideResult = results && results[0] && results[0].result;
+        { args: [modifiedData] }
+      );
+      var overrideResult = utils.execResult(results);
       if (!overrideResult || !overrideResult.success) {
         utils.showToast('拦截器未注入，请先启动权限拦截', 'error');
         return;
@@ -1606,9 +1570,9 @@ window.VulnKitVue = (function () {
       if (!tab?.id) return;
 
       // 1. Search inline scripts
-      var inlineResults = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: function (kw) {
+      var inlineResults = await utils.execInTab(
+        tab.id,
+        function (kw) {
           var matches = [];
           var seen = {};
           var scripts = document.querySelectorAll('script:not([src])');
@@ -1645,10 +1609,10 @@ window.VulnKitVue = (function () {
           });
           return { matches: matches, extUrls: extUrls };
         },
-        args: [keyword],
-      });
+        { args: [keyword], world: 'ISOLATED' }
+      );
 
-      var inlineData = (inlineResults && inlineResults[0] && inlineResults[0].result) || {};
+      var inlineData = utils.execResult(inlineResults) || {};
       var matchList = inlineData.matches || [];
       var extUrls = inlineData.extUrls || [];
 
@@ -2084,13 +2048,9 @@ window.VulnKitVue = (function () {
     }
     utils.getActiveTab().then(function (tab) {
       if (!tab?.id) return;
-      chrome.scripting
-        .executeScript({
-          target: { tabId: tab.id },
-          world: 'MAIN',
-          func: function () {
-            window.__VULN_TRAVERSE_ACTIVE__ = false;
-          },
+      utils
+        .execInTab(tab.id, function () {
+          window.__VULN_TRAVERSE_ACTIVE__ = false;
         })
         .catch(function () {});
     });
@@ -2121,68 +2081,64 @@ window.VulnKitVue = (function () {
           utils.showToast('无法获取当前标签页', 'error');
           return;
         }
-        var routeResults = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: 'MAIN',
-          func: function () {
-            var routes = [];
-            var seen = {};
-            function extract(rts, prefix) {
-              rts.forEach(function (r) {
-                var childPath = r.path || '/';
-                var path;
-                if (childPath.charAt(0) === '/') path = childPath;
-                else if (prefix === '' || prefix === '/') path = '/' + childPath;
-                else path = prefix + '/' + childPath;
-                if (r.path && r.path !== '*' && !seen[path]) {
-                  seen[path] = true;
-                  routes.push(path);
+        var routeResults = await utils.execInTab(tab.id, function () {
+          var routes = [];
+          var seen = {};
+          function extract(rts, prefix) {
+            rts.forEach(function (r) {
+              var childPath = r.path || '/';
+              var path;
+              if (childPath.charAt(0) === '/') path = childPath;
+              else if (prefix === '' || prefix === '/') path = '/' + childPath;
+              else path = prefix + '/' + childPath;
+              if (r.path && r.path !== '*' && !seen[path]) {
+                seen[path] = true;
+                routes.push(path);
+              }
+              if (r.children) extract(r.children, path === '/' ? '/' : path);
+            });
+          }
+          var appEl =
+            document.querySelector('#app') ||
+            document.querySelector('[data-v-app]') ||
+            document.querySelector('#root') ||
+            document.querySelector('#main');
+          if (appEl && appEl.__vue_app__) {
+            var router = appEl.__vue_app__.config.globalProperties.$router;
+            if (router && typeof router.getRoutes === 'function') {
+              router.getRoutes().forEach(function (r) {
+                if (r.path && r.path !== '*' && !seen[r.path]) {
+                  seen[r.path] = true;
+                  routes.push(r.path);
                 }
-                if (r.children) extract(r.children, path === '/' ? '/' : path);
               });
+            } else if (router && router.options && router.options.routes) {
+              extract(router.options.routes, '');
             }
-            var appEl =
-              document.querySelector('#app') ||
-              document.querySelector('[data-v-app]') ||
-              document.querySelector('#root') ||
-              document.querySelector('#main');
-            if (appEl && appEl.__vue_app__) {
-              var router = appEl.__vue_app__.config.globalProperties.$router;
-              if (router && typeof router.getRoutes === 'function') {
-                router.getRoutes().forEach(function (r) {
-                  if (r.path && r.path !== '*' && !seen[r.path]) {
-                    seen[r.path] = true;
-                    routes.push(r.path);
+          } else {
+            var els = document.querySelectorAll('*');
+            for (var i = 0; i < els.length; i++) {
+              if (els[i].__vue__) {
+                var vm = els[i].__vue__.$root || els[i].__vue__;
+                if (vm.$router) {
+                  if (typeof vm.$router.getRoutes === 'function') {
+                    vm.$router.getRoutes().forEach(function (r) {
+                      if (r.path && r.path !== '*' && !seen[r.path]) {
+                        seen[r.path] = true;
+                        routes.push(r.path);
+                      }
+                    });
+                  } else if (vm.$router.options && vm.$router.options.routes) {
+                    extract(vm.$router.options.routes, '');
                   }
-                });
-              } else if (router && router.options && router.options.routes) {
-                extract(router.options.routes, '');
-              }
-            } else {
-              var els = document.querySelectorAll('*');
-              for (var i = 0; i < els.length; i++) {
-                if (els[i].__vue__) {
-                  var vm = els[i].__vue__.$root || els[i].__vue__;
-                  if (vm.$router) {
-                    if (typeof vm.$router.getRoutes === 'function') {
-                      vm.$router.getRoutes().forEach(function (r) {
-                        if (r.path && r.path !== '*' && !seen[r.path]) {
-                          seen[r.path] = true;
-                          routes.push(r.path);
-                        }
-                      });
-                    } else if (vm.$router.options && vm.$router.options.routes) {
-                      extract(vm.$router.options.routes, '');
-                    }
-                  }
-                  if (routes.length > 0) break;
                 }
+                if (routes.length > 0) break;
               }
             }
-            return routes;
-          },
+          }
+          return routes;
         });
-        routes = (routeResults && routeResults[0] && routeResults[0].result) || [];
+        routes = utils.execResult(routeResults) || [];
       } catch (e) {
         utils.showToast('获取路由失败: ' + e.message, 'error');
         return;
@@ -2229,11 +2185,10 @@ window.VulnKitVue = (function () {
       var path = routes[currentIdx];
       updateTraverseProgress(currentIdx + 1, total, path);
 
-      chrome.scripting
-        .executeScript({
-          target: { tabId: tabId },
-          world: 'MAIN',
-          func: function (p) {
+      utils
+        .execInTab(
+          tabId,
+          function (p) {
             var router = null;
             var appEl =
               document.querySelector('#app') ||
@@ -2264,10 +2219,10 @@ window.VulnKitVue = (function () {
             }
             return { path: p, ok: false, error: 'no router' };
           },
-          args: [path],
-        })
+          { args: [path] }
+        )
         .then(function (results) {
-          var res = results && results[0] && results[0].result;
+          var res = utils.execResult(results);
           if (res && res.ok) {
             addTraverseLog(currentIdx + 1, path, 'ok');
           } else {
@@ -2301,78 +2256,70 @@ window.VulnKitVue = (function () {
         if (statusEl) statusEl.textContent = '无法获取当前标签页';
         return;
       }
-      var routeResults = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          var routes = [];
-          var seen = {};
-          function extract(rts, prefix) {
-            rts.forEach(function (r) {
-              var childPath = r.path || '/';
-              var path;
-              if (childPath.charAt(0) === '/') {
-                path = childPath;
-              } else if (prefix === '' || prefix === '/') {
-                path = '/' + childPath;
-              } else {
-                path = prefix + '/' + childPath;
-              }
-              if (r.path && r.path !== '*' && !seen[path]) {
-                seen[path] = true;
-                routes.push({ path: path, name: r.name || '' });
-              }
-              if (r.children) extract(r.children, path === '/' ? '/' : path);
-            });
-          }
-          function getAndExtract(router) {
-            if (!router) return;
-            if (typeof router.getRoutes === 'function') {
-              var flat = router.getRoutes();
-              for (var i = 0; i < flat.length; i++) {
-                var p = flat[i].path;
-                if (p && p !== '*' && !seen[p]) {
-                  seen[p] = true;
-                  routes.push({ path: p, name: flat[i].name || '' });
-                }
-              }
-            } else if (router.options && router.options.routes) {
-              extract(router.options.routes, '');
+      var routeResults = await utils.execInTab(tab.id, function () {
+        var routes = [];
+        var seen = {};
+        function extract(rts, prefix) {
+          rts.forEach(function (r) {
+            var childPath = r.path || '/';
+            var path;
+            if (childPath.charAt(0) === '/') {
+              path = childPath;
+            } else if (prefix === '' || prefix === '/') {
+              path = '/' + childPath;
+            } else {
+              path = prefix + '/' + childPath;
             }
-          }
-          var appEl =
-            document.querySelector('#app') ||
-            document.querySelector('[data-v-app]') ||
-            document.querySelector('[id^="app"]') ||
-            document.querySelector('#root') ||
-            document.querySelector('#application') ||
-            document.querySelector('#main');
-          if (appEl && appEl.__vue_app__) {
-            getAndExtract(appEl.__vue_app__.config.globalProperties.$router);
-          } else {
-            var els = document.querySelectorAll('*');
-            for (var i = 0; i < els.length; i++) {
-              if (els[i].__vue__) {
-                var vm = els[i].__vue__.$root || els[i].__vue__;
-                getAndExtract(vm.$router);
-                if (routes.length > 0) break;
+            if (r.path && r.path !== '*' && !seen[path]) {
+              seen[path] = true;
+              routes.push({ path: path, name: r.name || '' });
+            }
+            if (r.children) extract(r.children, path === '/' ? '/' : path);
+          });
+        }
+        function getAndExtract(router) {
+          if (!router) return;
+          if (typeof router.getRoutes === 'function') {
+            var flat = router.getRoutes();
+            for (var i = 0; i < flat.length; i++) {
+              var p = flat[i].path;
+              if (p && p !== '*' && !seen[p]) {
+                seen[p] = true;
+                routes.push({ path: p, name: flat[i].name || '' });
               }
             }
+          } else if (router.options && router.options.routes) {
+            extract(router.options.routes, '');
           }
-          return routes;
-        },
+        }
+        var appEl =
+          document.querySelector('#app') ||
+          document.querySelector('[data-v-app]') ||
+          document.querySelector('[id^="app"]') ||
+          document.querySelector('#root') ||
+          document.querySelector('#application') ||
+          document.querySelector('#main');
+        if (appEl && appEl.__vue_app__) {
+          getAndExtract(appEl.__vue_app__.config.globalProperties.$router);
+        } else {
+          var els = document.querySelectorAll('*');
+          for (var i = 0; i < els.length; i++) {
+            if (els[i].__vue__) {
+              var vm = els[i].__vue__.$root || els[i].__vue__;
+              getAndExtract(vm.$router);
+              if (routes.length > 0) break;
+            }
+          }
+        }
+        return routes;
       });
 
-      var routeList = (routeResults && routeResults[0] && routeResults[0].result) || [];
+      var routeList = utils.execResult(routeResults) || [];
 
-      var menuResults = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          return window.__PERM_INTERCEPTOR__ ? window.__PERM_INTERCEPTOR__.getCaptured() : [];
-        },
+      var menuResults = await utils.execInTab(tab.id, function () {
+        return window.__PERM_INTERCEPTOR__ ? window.__PERM_INTERCEPTOR__.getCaptured() : [];
       });
-      var captured = (menuResults && menuResults[0] && menuResults[0].result) || [];
+      var captured = utils.execResult(menuResults) || [];
 
       var menuPaths = new Set();
       for (var i = 0; i < captured.length; i++) extractMenuPaths(captured[i].data, menuPaths);

@@ -59,16 +59,17 @@ window.VulnKitFavicon = (function () {
       const url = new URL(tab.url);
       const domain = url.hostname;
 
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => {
+      const results = await utils.execInTab(
+        tab.id,
+        () => {
           const links = document.querySelectorAll('link[rel*="icon"], link[rel="shortcut icon"]');
           if (links.length > 0) return links[0].href;
           return '/favicon.ico';
         },
-      });
+        { world: 'ISOLATED' }
+      );
 
-      const faviconUrl = results?.[0]?.result || `https://${domain}/favicon.ico`;
+      const faviconUrl = utils.execResult(results) || `https://${domain}/favicon.ico`;
       const resolvedUrl = new URL(faviconUrl, tab.url).href;
 
       var faviconImg = utils.get('favicon-img');

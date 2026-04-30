@@ -283,9 +283,9 @@ window.VulnKitGather = (function () {
         );
       });
 
-      var results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: function (haeRules, domGroup) {
+      var results = await utils.execInTab(
+        tab.id,
+        function (haeRules, domGroup) {
           var pageUrl = location.href;
           var rawHtml = document.documentElement.outerHTML;
           var truncated = rawHtml.length > 500000;
@@ -454,11 +454,12 @@ window.VulnKitGather = (function () {
           collected._scriptSrcs = scriptSrcs;
           return collected;
         },
-        args: [rulesForInjection, DOM_GROUP],
-      });
+        { args: [rulesForInjection, DOM_GROUP], world: 'ISOLATED' }
+      );
 
-      if (results && results[0] && results[0].result) {
-        gatherData = results[0].result;
+      var extracted = utils.execResult(results);
+      if (extracted) {
+        gatherData = extracted;
         var meta = gatherData._meta;
         delete gatherData._meta;
         var scriptSrcs = gatherData._scriptSrcs || [];

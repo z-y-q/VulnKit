@@ -45,9 +45,9 @@ window.VulnKitXss = (function () {
   async function harvestXssParamsFromDom() {
     const tab = await utils.getActiveTab();
     if (!tab?.id) return [];
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: () => {
+    const results = await utils.execInTab(
+      tab.id,
+      () => {
         const pageUrl = location.href;
         const collected = [];
         const seen = new Set();
@@ -95,8 +95,9 @@ window.VulnKitXss = (function () {
 
         return collected;
       },
-    });
-    return results?.[0]?.result || [];
+      { world: 'ISOLATED' }
+    );
+    return utils.execResult(results) || [];
   }
 
   async function startXssIntercept() {
@@ -110,161 +111,153 @@ window.VulnKitXss = (function () {
     if (!tab?.id) return;
     const tabId = tab.id;
 
-    chrome.scripting.executeScript({
-      target: { tabId },
-      world: 'MAIN',
-      func: () => {
-        if (window.__XSS_INTERCEPT__) return 'already_injected';
-        window.__XSS_INTERCEPT__ = [];
-        window.__XSS_ORIGINAL__ = {
-          xhrOpen: XMLHttpRequest.prototype.open,
-          xhrSend: XMLHttpRequest.prototype.send,
-          fetch: window.fetch,
-        };
-        const origOpen = window.__XSS_ORIGINAL__.xhrOpen;
-        const origSend = window.__XSS_ORIGINAL__.xhrSend;
-        const origFetch = window.__XSS_ORIGINAL__.fetch;
+    await utils.execInTab(tabId, () => {
+      if (window.__XSS_INTERCEPT__) return 'already_injected';
+      window.__XSS_INTERCEPT__ = [];
+      window.__XSS_ORIGINAL__ = {
+        xhrOpen: XMLHttpRequest.prototype.open,
+        xhrSend: XMLHttpRequest.prototype.send,
+        fetch: window.fetch,
+      };
+      const origOpen = window.__XSS_ORIGINAL__.xhrOpen;
+      const origSend = window.__XSS_ORIGINAL__.xhrSend;
+      const origFetch = window.__XSS_ORIGINAL__.fetch;
 
-        XMLHttpRequest.prototype.open = function (method, url) {
-          this.__xss_method = method;
-          this.__xss_url = url;
-          return origOpen.apply(this, arguments);
-        };
-        XMLHttpRequest.prototype.send = function (body) {
-          if (this.__xss_url) {
-            try {
-              const u = new URL(this.__xss_url, location.href);
-              u.searchParams.forEach((_, k) => {
-                window.__XSS_INTERCEPT__.push({
-                  url: u.origin + u.pathname + u.search,
-                  param: k,
-                  method: this.__xss_method || 'GET',
-                });
-              });
-            } catch {}
-          }
-          if (typeof body === 'string' && body) {
-            try {
-              const params = new URLSearchParams(body);
-              params.forEach((_, k) => {
-                const fallbackUrl = this.__xss_url || location.href;
-                try {
-                  const u = new URL(fallbackUrl, location.href);
-                  window.__XSS_INTERCEPT__.push({
-                    url: u.origin + u.pathname,
-                    param: k,
-                    method: this.__xss_method || 'POST',
-                  });
-                } catch {}
-              });
-            } catch {}
-            try {
-              const jsonBody = JSON.parse(body);
-              if (typeof jsonBody === 'object' && jsonBody !== null) {
-                const fallbackUrl2 = this.__xss_url || location.href;
-                let parsedUrl2;
-                try {
-                  parsedUrl2 = new URL(fallbackUrl2, location.href);
-                } catch {
-                  return;
-                }
-                var xssSelf = this;
-                Object.keys(jsonBody).forEach(function (k) {
-                  if (
-                    typeof jsonBody[k] === 'object' &&
-                    jsonBody[k] !== null &&
-                    !Array.isArray(jsonBody[k])
-                  ) {
-                    Object.keys(jsonBody[k]).forEach(function (nk) {
-                      window.__XSS_INTERCEPT__.push({
-                        url: parsedUrl2.origin + parsedUrl2.pathname,
-                        param: k + '.' + nk,
-                        method: xssSelf.__xss_method || 'POST',
-                      });
-                    });
-                  } else {
-                    window.__XSS_INTERCEPT__.push({
-                      url: parsedUrl2.origin + parsedUrl2.pathname,
-                      param: k,
-                      method: xssSelf.__xss_method || 'POST',
-                    });
-                  }
-                });
-              }
-            } catch {}
-          }
-          return origSend.apply(this, arguments);
-        };
-
-        window.fetch = function (input, init) {
-          const url =
-            typeof input === 'string'
-              ? input
-              : input instanceof Request
-                ? input.url
-                : String(input);
+      XMLHttpRequest.prototype.open = function (method, url) {
+        this.__xss_method = method;
+        this.__xss_url = url;
+        return origOpen.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function (body) {
+        if (this.__xss_url) {
           try {
-            const u = new URL(url, location.href);
+            const u = new URL(this.__xss_url, location.href);
             u.searchParams.forEach((_, k) => {
               window.__XSS_INTERCEPT__.push({
                 url: u.origin + u.pathname + u.search,
                 param: k,
-                method: (init?.method || 'GET').toUpperCase(),
+                method: this.__xss_method || 'GET',
               });
             });
           } catch {}
-          if (init?.body && typeof init.body === 'string') {
-            try {
-              const params = new URLSearchParams(init.body);
-              params.forEach((_, k) => {
-                try {
-                  const u = new URL(url, location.href);
-                  window.__XSS_INTERCEPT__.push({
-                    url: u.origin + u.pathname,
-                    param: k,
-                    method: (init?.method || 'POST').toUpperCase(),
-                  });
-                } catch {}
-              });
-            } catch {}
-            try {
-              const jsonBody = JSON.parse(init.body);
-              if (typeof jsonBody === 'object' && jsonBody !== null) {
-                let parsedUrl;
-                try {
-                  parsedUrl = new URL(url, location.href);
-                } catch {
-                  return origFetch.apply(this, arguments);
-                }
-                const fetchMethod = (init?.method || 'POST').toUpperCase();
-                Object.keys(jsonBody).forEach(function (k) {
-                  if (
-                    typeof jsonBody[k] === 'object' &&
-                    jsonBody[k] !== null &&
-                    !Array.isArray(jsonBody[k])
-                  ) {
-                    Object.keys(jsonBody[k]).forEach(function (nk) {
-                      window.__XSS_INTERCEPT__.push({
-                        url: parsedUrl.origin + parsedUrl.pathname,
-                        param: k + '.' + nk,
-                        method: fetchMethod,
-                      });
+        }
+        if (typeof body === 'string' && body) {
+          try {
+            const params = new URLSearchParams(body);
+            params.forEach((_, k) => {
+              const fallbackUrl = this.__xss_url || location.href;
+              try {
+                const u = new URL(fallbackUrl, location.href);
+                window.__XSS_INTERCEPT__.push({
+                  url: u.origin + u.pathname,
+                  param: k,
+                  method: this.__xss_method || 'POST',
+                });
+              } catch {}
+            });
+          } catch {}
+          try {
+            const jsonBody = JSON.parse(body);
+            if (typeof jsonBody === 'object' && jsonBody !== null) {
+              const fallbackUrl2 = this.__xss_url || location.href;
+              let parsedUrl2;
+              try {
+                parsedUrl2 = new URL(fallbackUrl2, location.href);
+              } catch {
+                return;
+              }
+              var xssSelf = this;
+              Object.keys(jsonBody).forEach(function (k) {
+                if (
+                  typeof jsonBody[k] === 'object' &&
+                  jsonBody[k] !== null &&
+                  !Array.isArray(jsonBody[k])
+                ) {
+                  Object.keys(jsonBody[k]).forEach(function (nk) {
+                    window.__XSS_INTERCEPT__.push({
+                      url: parsedUrl2.origin + parsedUrl2.pathname,
+                      param: k + '.' + nk,
+                      method: xssSelf.__xss_method || 'POST',
                     });
-                  } else {
+                  });
+                } else {
+                  window.__XSS_INTERCEPT__.push({
+                    url: parsedUrl2.origin + parsedUrl2.pathname,
+                    param: k,
+                    method: xssSelf.__xss_method || 'POST',
+                  });
+                }
+              });
+            }
+          } catch {}
+        }
+        return origSend.apply(this, arguments);
+      };
+
+      window.fetch = function (input, init) {
+        const url =
+          typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
+        try {
+          const u = new URL(url, location.href);
+          u.searchParams.forEach((_, k) => {
+            window.__XSS_INTERCEPT__.push({
+              url: u.origin + u.pathname + u.search,
+              param: k,
+              method: (init?.method || 'GET').toUpperCase(),
+            });
+          });
+        } catch {}
+        if (init?.body && typeof init.body === 'string') {
+          try {
+            const params = new URLSearchParams(init.body);
+            params.forEach((_, k) => {
+              try {
+                const u = new URL(url, location.href);
+                window.__XSS_INTERCEPT__.push({
+                  url: u.origin + u.pathname,
+                  param: k,
+                  method: (init?.method || 'POST').toUpperCase(),
+                });
+              } catch {}
+            });
+          } catch {}
+          try {
+            const jsonBody = JSON.parse(init.body);
+            if (typeof jsonBody === 'object' && jsonBody !== null) {
+              let parsedUrl;
+              try {
+                parsedUrl = new URL(url, location.href);
+              } catch {
+                return origFetch.apply(this, arguments);
+              }
+              const fetchMethod = (init?.method || 'POST').toUpperCase();
+              Object.keys(jsonBody).forEach(function (k) {
+                if (
+                  typeof jsonBody[k] === 'object' &&
+                  jsonBody[k] !== null &&
+                  !Array.isArray(jsonBody[k])
+                ) {
+                  Object.keys(jsonBody[k]).forEach(function (nk) {
                     window.__XSS_INTERCEPT__.push({
                       url: parsedUrl.origin + parsedUrl.pathname,
-                      param: k,
+                      param: k + '.' + nk,
                       method: fetchMethod,
                     });
-                  }
-                });
-              }
-            } catch {}
-          }
-          return origFetch.apply(this, arguments);
-        };
-        return 'injected';
-      },
+                  });
+                } else {
+                  window.__XSS_INTERCEPT__.push({
+                    url: parsedUrl.origin + parsedUrl.pathname,
+                    param: k,
+                    method: fetchMethod,
+                  });
+                }
+              });
+            }
+          } catch {}
+        }
+        return origFetch.apply(this, arguments);
+      };
+      return 'injected';
     });
 
     xssInterceptTimer = setInterval(async () => {
@@ -275,16 +268,12 @@ window.VulnKitXss = (function () {
         return;
       }
       try {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId },
-          world: 'MAIN',
-          func: () => {
-            const data = window.__XSS_INTERCEPT__ || [];
-            window.__XSS_INTERCEPT__ = [];
-            return data;
-          },
+        const results = await utils.execInTab(tabId, () => {
+          const data = window.__XSS_INTERCEPT__ || [];
+          window.__XSS_INTERCEPT__ = [];
+          return data;
         });
-        const captured = results?.[0]?.result || [];
+        const captured = utils.execResult(results) || [];
         if (captured.length > 0) {
           const existing = new Set(xssPoints.map(p => p.url + '|' + p.param + '|' + p.method));
           const newPoints = captured
@@ -311,24 +300,20 @@ window.VulnKitXss = (function () {
 
     var tab = await utils.getActiveTab();
     if (!tab?.id) return;
-    chrome.scripting
-      .executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: () => {
-          if (!window.__XSS_ORIGINAL__) return;
-          if (window.__XSS_ORIGINAL__.xhrOpen) {
-            XMLHttpRequest.prototype.open = window.__XSS_ORIGINAL__.xhrOpen;
-          }
-          if (window.__XSS_ORIGINAL__.xhrSend) {
-            XMLHttpRequest.prototype.send = window.__XSS_ORIGINAL__.xhrSend;
-          }
-          if (window.__XSS_ORIGINAL__.fetch) {
-            window.fetch = window.__XSS_ORIGINAL__.fetch;
-          }
-          delete window.__XSS_INTERCEPT__;
-          delete window.__XSS_ORIGINAL__;
-        },
+    utils
+      .execInTab(tab.id, () => {
+        if (!window.__XSS_ORIGINAL__) return;
+        if (window.__XSS_ORIGINAL__.xhrOpen) {
+          XMLHttpRequest.prototype.open = window.__XSS_ORIGINAL__.xhrOpen;
+        }
+        if (window.__XSS_ORIGINAL__.xhrSend) {
+          XMLHttpRequest.prototype.send = window.__XSS_ORIGINAL__.xhrSend;
+        }
+        if (window.__XSS_ORIGINAL__.fetch) {
+          window.fetch = window.__XSS_ORIGINAL__.fetch;
+        }
+        delete window.__XSS_INTERCEPT__;
+        delete window.__XSS_ORIGINAL__;
       })
       .catch(() => {});
   }
@@ -544,9 +529,9 @@ window.VulnKitXss = (function () {
       for (const point of postPoints) {
         const targetUrl = point.url;
         try {
-          await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: (url, param, pl) => {
+          await utils.execInTab(
+            tab.id,
+            (url, param, pl) => {
               const form = document.createElement('form');
               form.method = 'POST';
               form.action = url;
@@ -561,8 +546,8 @@ window.VulnKitXss = (function () {
               form.submit();
               form.remove();
             },
-            args: [targetUrl, point.param, payload],
-          });
+            { world: 'ISOLATED', args: [targetUrl, point.param, payload] }
+          );
           opened++;
         } catch {
           try {

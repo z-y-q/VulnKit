@@ -126,12 +126,7 @@ window.VulnKitSpoof = (function () {
 
   function switchSpoofTab(tab) {
     currentSpoofTab = tab;
-    document
-      .querySelectorAll('.spoof-tab')
-      .forEach(b => b.classList.toggle('active', b.dataset.spoof === tab));
-    document.querySelectorAll('.spoof-panel').forEach(p => p.classList.remove('active'));
-    const target = document.getElementById('spoof-' + tab);
-    if (target) target.classList.add('active');
+    utils.switchSubTabs('spoof-tab', 'spoof', 'spoof', tab);
   }
 
   function renderUaList(category) {

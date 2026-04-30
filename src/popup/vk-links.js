@@ -16,140 +16,133 @@ window.VulnKitLinks = (function () {
         return;
       }
 
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => {
-          const pageUrl = location.href;
-          const pageDomain = location.hostname;
-          const links = [];
+      const results = await utils.execInTab(tab.id, () => {
+        const pageUrl = location.href;
+        const pageDomain = location.hostname;
+        const links = [];
 
-          document.querySelectorAll('a[href]').forEach(el => {
-            const href = el.href;
-            if (!href || href === '#' || href.startsWith('javascript:')) return;
-            let domain = '';
-            try {
-              domain = new URL(href, pageUrl).hostname;
-            } catch {}
-            links.push({
-              href,
-              text:
-                (el.textContent || '').trim().substring(0, 60) || el.getAttribute('title') || '',
-              tag: 'a',
-              domain,
-              isExternal: domain !== pageDomain,
-              isJS: false,
-              isMailto: href.startsWith('mailto:'),
-            });
+        document.querySelectorAll('a[href]').forEach(el => {
+          const href = el.href;
+          if (!href || href === '#' || href.startsWith('javascript:')) return;
+          let domain = '';
+          try {
+            domain = new URL(href, pageUrl).hostname;
+          } catch {}
+          links.push({
+            href,
+            text: (el.textContent || '').trim().substring(0, 60) || el.getAttribute('title') || '',
+            tag: 'a',
+            domain,
+            isExternal: domain !== pageDomain,
+            isJS: false,
+            isMailto: href.startsWith('mailto:'),
           });
+        });
 
-          document.querySelectorAll('img[src]').forEach(el => {
-            var entry = {
-              href: el.src,
-              text: el.alt || '',
-              tag: 'img',
-              domain: '',
-              isExternal: false,
-              isJS: false,
-              isMailto: false,
-            };
-            try {
-              entry.domain = new URL(el.src, pageUrl).hostname;
-              entry.isExternal = entry.domain !== pageDomain;
-            } catch {}
-            links.push(entry);
-          });
+        document.querySelectorAll('img[src]').forEach(el => {
+          var entry = {
+            href: el.src,
+            text: el.alt || '',
+            tag: 'img',
+            domain: '',
+            isExternal: false,
+            isJS: false,
+            isMailto: false,
+          };
+          try {
+            entry.domain = new URL(el.src, pageUrl).hostname;
+            entry.isExternal = entry.domain !== pageDomain;
+          } catch {}
+          links.push(entry);
+        });
 
-          document.querySelectorAll('script[src]').forEach(el => {
-            const src = el.src;
-            let domain = '';
-            try {
-              domain = new URL(src, pageUrl).hostname;
-            } catch {}
-            links.push({
-              href: src,
-              text: '',
-              tag: 'script',
-              domain,
-              isExternal: domain !== pageDomain,
-              isJS: false,
-              isMailto: false,
-            });
+        document.querySelectorAll('script[src]').forEach(el => {
+          const src = el.src;
+          let domain = '';
+          try {
+            domain = new URL(src, pageUrl).hostname;
+          } catch {}
+          links.push({
+            href: src,
+            text: '',
+            tag: 'script',
+            domain,
+            isExternal: domain !== pageDomain,
+            isJS: false,
+            isMailto: false,
           });
+        });
 
-          document.querySelectorAll('link[href]').forEach(el => {
-            const href = el.href;
-            let domain = '';
-            try {
-              domain = new URL(href, pageUrl).hostname;
-            } catch {}
-            links.push({
-              href,
-              text: el.rel || '',
-              tag: 'link',
-              domain,
-              isExternal: domain !== pageDomain,
-              isJS: false,
-              isMailto: false,
-            });
+        document.querySelectorAll('link[href]').forEach(el => {
+          const href = el.href;
+          let domain = '';
+          try {
+            domain = new URL(href, pageUrl).hostname;
+          } catch {}
+          links.push({
+            href,
+            text: el.rel || '',
+            tag: 'link',
+            domain,
+            isExternal: domain !== pageDomain,
+            isJS: false,
+            isMailto: false,
           });
+        });
 
-          document.querySelectorAll('iframe[src],frame[src]').forEach(el => {
-            const src = el.src;
-            let domain = '';
-            try {
-              domain = new URL(src, pageUrl).hostname;
-            } catch {}
-            links.push({
-              href: src,
-              text: '',
-              tag: 'iframe',
-              domain,
-              isExternal: domain !== pageDomain,
-              isJS: false,
-              isMailto: false,
-            });
+        document.querySelectorAll('iframe[src],frame[src]').forEach(el => {
+          const src = el.src;
+          let domain = '';
+          try {
+            domain = new URL(src, pageUrl).hostname;
+          } catch {}
+          links.push({
+            href: src,
+            text: '',
+            tag: 'iframe',
+            domain,
+            isExternal: domain !== pageDomain,
+            isJS: false,
+            isMailto: false,
           });
+        });
 
-          // Extract forms
-          document.querySelectorAll('form').forEach(el => {
-            var action = el.getAttribute('action') || pageUrl;
-            var method = (el.getAttribute('method') || 'GET').toUpperCase();
-            try {
-              action = new URL(action, pageUrl).href;
-            } catch {}
-            var inputs = [];
-            el.querySelectorAll('input[name],select[name],textarea[name]').forEach(function (inp) {
-              inputs.push(inp.getAttribute('name'));
-            });
-            links.push({
-              href:
-                action +
-                ' [' +
-                method +
-                ']' +
-                (inputs.length ? ' {' + inputs.join(', ') + '}' : ''),
-              text: inputs.length ? inputs.join(', ') : '',
-              tag: 'form',
-              domain: '',
-              isExternal: false,
-              isJS: false,
-              isMailto: false,
-              formMethod: method,
-              formInputs: inputs,
-            });
+        // Extract forms
+        document.querySelectorAll('form').forEach(el => {
+          var action = el.getAttribute('action') || pageUrl;
+          var method = (el.getAttribute('method') || 'GET').toUpperCase();
+          try {
+            action = new URL(action, pageUrl).href;
+          } catch {}
+          var inputs = [];
+          el.querySelectorAll('input[name],select[name],textarea[name]').forEach(function (inp) {
+            inputs.push(inp.getAttribute('name'));
           });
+          links.push({
+            href:
+              action + ' [' + method + ']' + (inputs.length ? ' {' + inputs.join(', ') + '}' : ''),
+            text: inputs.length ? inputs.join(', ') : '',
+            tag: 'form',
+            domain: '',
+            isExternal: false,
+            isJS: false,
+            isMailto: false,
+            formMethod: method,
+            formInputs: inputs,
+          });
+        });
 
-          const seen = new Set();
-          return links.filter(l => {
-            if (seen.has(l.href)) return false;
-            seen.add(l.href);
-            return true;
-          });
-        },
+        const seen = new Set();
+        return links.filter(l => {
+          if (seen.has(l.href)) return false;
+          seen.add(l.href);
+          return true;
+        });
       });
 
-      if (results && results[0] && results[0].result) {
-        allLinks = results[0].result;
+      var extractedLinks = utils.execResult(results);
+      if (extractedLinks) {
+        allLinks = extractedLinks;
         renderLinks();
         renderStats();
         if (statusEl) statusEl.textContent = '提取完成，共 ' + allLinks.length + ' 个链接';

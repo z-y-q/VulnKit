@@ -60,23 +60,19 @@ window.VulnKitRuoYiMar = (function () {
       }
 
       // Step 1: Get external script URLs + inline scripts
-      var scriptResult = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          var urls = [];
-          document.querySelectorAll('script[src]').forEach(function (s) {
-            urls.push(s.src);
-          });
-          var inlineTexts = [];
-          document.querySelectorAll('script:not([src])').forEach(function (s) {
-            var t = s.textContent || '';
-            if (t.length > 10 && t.length < 500000) inlineTexts.push(t);
-          });
-          return { urls: urls, inlineTexts: inlineTexts };
-        },
+      var scriptResult = await utils.execInTab(tab.id, function () {
+        var urls = [];
+        document.querySelectorAll('script[src]').forEach(function (s) {
+          urls.push(s.src);
+        });
+        var inlineTexts = [];
+        document.querySelectorAll('script:not([src])').forEach(function (s) {
+          var t = s.textContent || '';
+          if (t.length > 10 && t.length < 500000) inlineTexts.push(t);
+        });
+        return { urls: urls, inlineTexts: inlineTexts };
       });
-      var scriptData = (scriptResult && scriptResult[0] && scriptResult[0].result) || {};
+      var scriptData = utils.execResult(scriptResult) || {};
       var scriptUrls = scriptData.urls || [];
       var inlineTexts = scriptData.inlineTexts || [];
 
@@ -95,10 +91,9 @@ window.VulnKitRuoYiMar = (function () {
       for (var bi = 0; bi < scriptUrls.length; bi += CONCURRENCY) {
         var batch = scriptUrls.slice(bi, bi + CONCURRENCY);
 
-        var batchFetchResult = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: 'MAIN',
-          func: function (urls) {
+        var batchFetchResult = await utils.execInTab(
+          tab.id,
+          function (urls) {
             return Promise.all(
               urls.map(function (url) {
                 return fetch(url)
@@ -114,11 +109,10 @@ window.VulnKitRuoYiMar = (function () {
               })
             );
           },
-          args: [batch],
-        });
+          { args: [batch] }
+        );
 
-        var batchResults =
-          (batchFetchResult && batchFetchResult[0] && batchFetchResult[0].result) || [];
+        var batchResults = utils.execResult(batchFetchResult) || [];
         batchResults.forEach(function (r) {
           if (r && r.data) allJsContents.push(r);
         });
@@ -302,18 +296,14 @@ window.VulnKitRuoYiMar = (function () {
           extractPaths(capturedRouterData.data || capturedRouterData, capturedPaths);
       }
 
-      var routerResult = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          var hook = window.__VK_RUOYI_HOOK__;
-          if (hook && typeof hook.getRouterInfo === 'function') {
-            return hook.getRouterInfo();
-          }
-          return { found: false, routes: [], currentRoutes: [] };
-        },
+      var routerResult = await utils.execInTab(tab.id, function () {
+        var hook = window.__VK_RUOYI_HOOK__;
+        if (hook && typeof hook.getRouterInfo === 'function') {
+          return hook.getRouterInfo();
+        }
+        return { found: false, routes: [], currentRoutes: [] };
       });
-      var routerInfo = (routerResult && routerResult[0] && routerResult[0].result) || {};
+      var routerInfo = utils.execResult(routerResult) || {};
 
       if (routerInfo.currentRoutes) {
         routerInfo.currentRoutes.forEach(function (rp) {
@@ -512,55 +502,51 @@ window.VulnKitRuoYiMar = (function () {
       });
 
       // Step 1: Check if Vue Router exists
-      var routerCheck = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function () {
-          function findRouter() {
-            if (window.__vue_app__) {
-              try {
-                var cfg = window.__vue_app__.config;
-                if (cfg && cfg.globalProperties && cfg.globalProperties.$router)
-                  return cfg.globalProperties.$router;
-              } catch (e) {}
-            }
-            var selectors = ['#app', '[data-v-app]', '.app-wrapper', '#app-main'];
-            for (var si = 0; si < selectors.length; si++) {
-              var els = document.querySelectorAll(selectors[si]);
-              for (var ei = 0; ei < els.length; ei++) {
-                var el = els[ei];
-                if (el.__vue_app__) {
-                  try {
-                    var r = el.__vue_app__.config.globalProperties.$router;
-                    if (r) return r;
-                  } catch (e) {}
-                }
-                if (el.__vue__) {
-                  var r2 = el.__vue__.$router || (el.__vue__.$root && el.__vue__.$root.$router);
-                  if (r2) return r2;
-                }
+      var routerCheck = await utils.execInTab(tab.id, function () {
+        function findRouter() {
+          if (window.__vue_app__) {
+            try {
+              var cfg = window.__vue_app__.config;
+              if (cfg && cfg.globalProperties && cfg.globalProperties.$router)
+                return cfg.globalProperties.$router;
+            } catch (e) {}
+          }
+          var selectors = ['#app', '[data-v-app]', '.app-wrapper', '#app-main'];
+          for (var si = 0; si < selectors.length; si++) {
+            var els = document.querySelectorAll(selectors[si]);
+            for (var ei = 0; ei < els.length; ei++) {
+              var el = els[ei];
+              if (el.__vue_app__) {
+                try {
+                  var r = el.__vue_app__.config.globalProperties.$router;
+                  if (r) return r;
+                } catch (e) {}
+              }
+              if (el.__vue__) {
+                var r2 = el.__vue__.$router || (el.__vue__.$root && el.__vue__.$root.$router);
+                if (r2) return r2;
               }
             }
-            var allEls = document.querySelectorAll('*');
-            for (var ai = 0; ai < allEls.length; ai++) {
-              var ael = allEls[ai];
-              if (ael.__vue__ && ael.__vue__.$router) return ael.__vue__.$router;
-              if (ael.__vue__ && ael.__vue__.$root && ael.__vue__.$root.$router)
-                return ael.__vue__.$root.$router;
-            }
-            return null;
           }
-          var router = findRouter();
-          return {
-            hasVue: !!window.Vue || !!window.__vue_app__,
-            hasRouter: !!router,
-            routerMode: router ? router.mode || 'unknown' : null,
-            currentPath: location.pathname + location.hash,
-          };
-        },
+          var allEls = document.querySelectorAll('*');
+          for (var ai = 0; ai < allEls.length; ai++) {
+            var ael = allEls[ai];
+            if (ael.__vue__ && ael.__vue__.$router) return ael.__vue__.$router;
+            if (ael.__vue__ && ael.__vue__.$root && ael.__vue__.$root.$router)
+              return ael.__vue__.$root.$router;
+          }
+          return null;
+        }
+        var router = findRouter();
+        return {
+          hasVue: !!window.Vue || !!window.__vue_app__,
+          hasRouter: !!router,
+          routerMode: router ? router.mode || 'unknown' : null,
+          currentPath: location.pathname + location.hash,
+        };
       });
 
-      var pageState = (routerCheck && routerCheck[0] && routerCheck[0].result) || {};
+      var pageState = utils.execResult(routerCheck) || {};
 
       if (!pageState.hasRouter) {
         var origin;
@@ -596,10 +582,9 @@ window.VulnKitRuoYiMar = (function () {
       }
 
       // Step 2: Vue Router found — inject routes
-      var injectResult = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        world: 'MAIN',
-        func: function (routes) {
+      var injectResult = await utils.execInTab(
+        tab.id,
+        function (routes) {
           var result = { injected: 0, skipped: 0, errors: [], routerFound: false, routerMode: '' };
 
           function findRouter() {
@@ -722,10 +707,10 @@ window.VulnKitRuoYiMar = (function () {
 
           return result;
         },
-        args: [routesToInject],
-      });
+        { args: [routesToInject] }
+      );
 
-      var result = (injectResult && injectResult[0] && injectResult[0].result) || {};
+      var result = utils.execResult(injectResult) || {};
 
       if (!result.routerFound) {
         if (statusEl) statusEl.textContent = '注入失败: Vue Router 未找到';
