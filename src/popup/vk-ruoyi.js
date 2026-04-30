@@ -94,12 +94,12 @@ window.VulnKitRuoYi = (function () {
               evidence.push('script:store');
             // RuoYi-Cloud gateway patterns
             if (/\/gateway\/js\//i.test(src)) {
-              variant = 'cloud';
+              variant = variant || 'cloud';
               evidence.push('script:gateway');
             }
             // RuoYi-App / uni-app patterns
             if (/\/uni\.js|\/manifest\.js/i.test(src)) {
-              variant = 'app';
+              variant = variant || 'app';
               evidence.push('script:uni-app');
             }
           });
@@ -356,7 +356,7 @@ window.VulnKitRuoYi = (function () {
       }
 
       await new Promise(function (r) {
-        setTimeout(r, 150);
+        setTimeout(r, 400);
       });
 
       var retryResult = await chrome.scripting.executeScript({
@@ -448,7 +448,7 @@ window.VulnKitRuoYi = (function () {
       var data = (results && results[0] && results[0].result) || { installed: false };
 
       if (!data.installed) {
-        var urlHint = data.pageUrl ? ' [' + data.pageUrl + ']' : '';
+        var urlHint = data.pageUrl ? ' [' + utils.escapeHtml(data.pageUrl) + ']' : '';
         if (statusEl) statusEl.textContent = '钩子未安装，页面: ' + (data.pageUrl || '未知');
         hookStatus = 'idle';
         if (panelEl)
@@ -496,7 +496,10 @@ window.VulnKitRuoYi = (function () {
       html += '<div class="ruoyi-log-title">请求拦截日志 (' + log.length + ')</div>';
       html += '<div class="ruoyi-log-list">';
       log.forEach(function (entry) {
-        var cls = entry.type === 'router' ? 'log-router' : 'log-info';
+        var cls = 'log-info';
+        if (entry.type === 'router') cls = 'log-router';
+        else if (entry.type === 'router-error') cls = 'log-error';
+        else if (entry.type === 'userinfo') cls = 'log-userinfo';
         html += '<div class="ruoyi-log-entry ' + cls + '">';
         html +=
           '<span class="ruoyi-log-type">' + utils.escapeHtml(entry.method || 'GET') + '</span>';
@@ -653,6 +656,9 @@ window.VulnKitRuoYi = (function () {
                   toggle.textContent = '▼';
                 }
               }
+              if (parent.classList && parent.classList.contains('ruoyi-route-node')) {
+                parent.style.display = '';
+              }
               parent = parent.parentElement;
             }
           }
@@ -687,7 +693,7 @@ window.VulnKitRuoYi = (function () {
       var typeLabel = typeLabels[metaType] || metaType;
       html +=
         '<span class="ruoyi-route-type" title="type:' +
-        metaType +
+        utils.escapeHtml(metaType) +
         '">' +
         utils.escapeHtml(typeLabel) +
         '</span>';
@@ -1010,6 +1016,7 @@ window.VulnKitRuoYi = (function () {
         });
       }
       extraRoutes = [];
+      augmentMode = 'off';
       var statusEl = utils.get('ruoyi-analyze-status');
       var resultsEl = utils.get('ruoyi-analyze-results');
       if (statusEl) statusEl.textContent = '';

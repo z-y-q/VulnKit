@@ -1088,7 +1088,8 @@ window.VulnKitVue = (function () {
 
     if (typeof showPermSuggestions === 'function') showPermSuggestions(classification);
 
-    utils.get('perm-json-editor').value = JSON.stringify(item.data, null, 2);
+    var permEditor = utils.get('perm-json-editor');
+    if (permEditor) permEditor.value = JSON.stringify(item.data, null, 2);
   }
 
   function classifyPermType(data) {
@@ -1266,18 +1267,22 @@ window.VulnKitVue = (function () {
     var sugCompareInject = utils.get('sug-compare-inject');
     if (sugCompareInject)
       sugCompareInject.addEventListener('click', async function () {
-        switchVueSubTab('compare');
-        await compareRoutesAndMenu();
-        if (lastCompareHiddenRoutes.length > 0) {
-          switchVueSubTab('perm');
-          if (permSelectedIndex < 0 && permCapturedData.length > 0) {
-            permSelectedIndex = 0;
-            showPermDetail(0);
+        try {
+          switchVueSubTab('compare');
+          await compareRoutesAndMenu();
+          if (lastCompareHiddenRoutes.length > 0) {
+            switchVueSubTab('perm');
+            if (permSelectedIndex < 0 && permCapturedData.length > 0) {
+              permSelectedIndex = 0;
+              showPermDetail(0);
+            }
+            autoInjectHiddenRoutes();
+          } else {
+            utils.showToast('路由对比未发现隐藏路由', 'info');
+            switchVueSubTab('perm');
           }
-          autoInjectHiddenRoutes();
-        } else {
-          utils.showToast('路由对比未发现隐藏路由', 'info');
-          switchVueSubTab('perm');
+        } catch (e) {
+          utils.showToast('对比执行失败: ' + (e instanceof Error ? e.message : String(e)), 'error');
         }
       });
     var sugAutoSearch = utils.get('sug-auto-search');
@@ -1318,6 +1323,7 @@ window.VulnKitVue = (function () {
 
   function permOpenAll() {
     var editor = utils.get('perm-json-editor');
+    if (!editor) return;
     try {
       var data = JSON.parse(editor.value);
       data = transformShowAll(data);
@@ -1364,6 +1370,7 @@ window.VulnKitVue = (function () {
 
   function permChangeAdmin() {
     var editor = utils.get('perm-json-editor');
+    if (!editor) return;
     try {
       var data = JSON.parse(editor.value);
       data = transformAdmin(data);
@@ -1408,6 +1415,7 @@ window.VulnKitVue = (function () {
 
   function permExpandMenuIds() {
     var editor = utils.get('perm-json-editor');
+    if (!editor) return;
     try {
       var data = JSON.parse(editor.value);
       data = expandMenuIds(data);
@@ -1420,6 +1428,10 @@ window.VulnKitVue = (function () {
 
   async function applyPermOverride() {
     var editor = utils.get('perm-json-editor');
+    if (!editor) {
+      utils.showToast('编辑器未就绪', 'error');
+      return;
+    }
     var modifiedData;
     try {
       modifiedData = JSON.parse(editor.value);

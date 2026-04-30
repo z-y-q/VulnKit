@@ -1762,6 +1762,14 @@ body {
   border-left: 3px solid #3b82f6;
 }
 
+.ruoyi-log-entry.log-error {
+  border-left: 3px solid #ef4444;
+}
+
+.ruoyi-log-entry.log-userinfo {
+  border-left: 3px solid #f59e0b;
+}
+
 .ruoyi-log-type {
   font-weight: 600;
   color: #10b981;

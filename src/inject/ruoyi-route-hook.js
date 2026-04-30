@@ -260,11 +260,20 @@
                 writable: true,
                 configurable: true,
               });
-              Object.defineProperty(self, 'response', {
-                value: result.body,
-                writable: true,
-                configurable: true,
-              });
+              try {
+                var parsed = JSON.parse(result.body);
+                Object.defineProperty(self, 'response', {
+                  value: parsed,
+                  writable: true,
+                  configurable: true,
+                });
+              } catch (ex) {
+                Object.defineProperty(self, 'response', {
+                  value: result.body,
+                  writable: true,
+                  configurable: true,
+                });
+              }
               window.postMessage(
                 {
                   __vk_ruoyi_hook: true,
