@@ -86,7 +86,7 @@ window.VulnKitVue = (function () {
 
       if (!data) {
         statusEl.textContent = '未检测到 Vue';
-        resultsEl.innerHTML = '<div class="empty-state">当前页面未使用 Vue 框架</div>';
+        resultsEl.innerHTML = utils.emptyHtml('当前页面未使用 Vue 框架');
         return;
       }
 
@@ -133,7 +133,7 @@ window.VulnKitVue = (function () {
       lastVueResult = JSON.stringify(data, null, 2);
     } catch (e) {
       statusEl.textContent = '检测出错';
-      resultsEl.innerHTML = '<div class="empty-state">' + utils.escapeHtml(e.message) + '</div>';
+      resultsEl.innerHTML = utils.emptyHtml(e.message);
     }
   }
 
@@ -471,14 +471,7 @@ window.VulnKitVue = (function () {
   // ====== Vue Sub-tab Switching ======
 
   function switchVueSubTab(tab) {
-    document.querySelectorAll('.vue-stab').forEach(function (b) {
-      b.classList.toggle('active', b.dataset.vstab === tab);
-    });
-    document.querySelectorAll('.vue-subpanel').forEach(function (p) {
-      p.classList.remove('active');
-    });
-    var target = document.getElementById('vstab-' + tab);
-    if (target) target.classList.add('active');
+    utils.switchSubTabs('vue-stab', 'vstab', 'vstab', tab);
   }
 
   // ====== Store Reader (injected into page to read Pinia/Vuex/localStorage) ======
@@ -1029,7 +1022,7 @@ window.VulnKitVue = (function () {
     });
 
     if (filtered.length === 0) {
-      container.innerHTML = '<div class="empty-state">暂无捕获数据，请先操作页面触发菜单请求</div>';
+      container.innerHTML = utils.emptyHtml('暂无捕获数据，请先操作页面触发菜单请求');
       if (countEl)
         countEl.textContent =
           permCapturedData.length > 0 ? '共 ' + permCapturedData.length + ' 条 (筛选后 0)' : '';
@@ -1698,9 +1691,7 @@ window.VulnKitVue = (function () {
 
       if (matchList.length === 0) {
         if (statusEl) statusEl.textContent = '未找到匹配';
-        if (resultsEl)
-          resultsEl.innerHTML =
-            '<div class="empty-state">在页面JS中未找到「' + utils.escapeHtml(keyword) + '」</div>';
+        if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('在页面JS中未找到「' + keyword + '」');
         return;
       }
 
@@ -2388,7 +2379,7 @@ window.VulnKitVue = (function () {
 
       if (routeList.length === 0) {
         if (statusEl) statusEl.textContent = '未找到路由';
-        resultsEl.innerHTML = '<div class="empty-state">请先在「基础检测」中检测 Vue 路由</div>';
+        resultsEl.innerHTML = utils.emptyHtml('请先在「基础检测」中检测 Vue 路由');
         return;
       }
 
@@ -2480,13 +2471,13 @@ window.VulnKitVue = (function () {
       var data = await chrome.tabs.sendMessage(tab.id, { type: 'VK_VUE_STORE_EXPLORE' });
       if (!data) {
         if (statusEl) statusEl.textContent = '无响应';
-        resultsEl.innerHTML = '<div class="empty-state">未能获取 Store 数据</div>';
+        resultsEl.innerHTML = utils.emptyHtml('未能获取 Store 数据');
         return;
       }
 
       if (data.error) {
         if (statusEl) statusEl.textContent = '错误: ' + data.error;
-        resultsEl.innerHTML = '<div class="empty-state">' + utils.escapeHtml(data.error) + '</div>';
+        resultsEl.innerHTML = utils.emptyHtml(data.error);
         return;
       }
 
@@ -2510,7 +2501,7 @@ window.VulnKitVue = (function () {
       // Render stores
       var html = '';
       if (storeKeys.length === 0) {
-        html += '<div class="empty-state">未发现 Vuex/Pinia Store 数据</div>';
+        html += utils.emptyHtml('未发现 Vuex/Pinia Store 数据');
       } else {
         storeKeys.forEach(function (storeId) {
           var storeData = storeInfo.stores[storeId];
@@ -2574,7 +2565,7 @@ window.VulnKitVue = (function () {
         var apiEndpoints = actionsInfo.apiEndpoints || [];
 
         if (actionNames.length === 0 && apiEndpoints.length === 0) {
-          actionHtml = '<div class="empty-state">未发现 Action 或 API 端点</div>';
+          actionHtml = utils.emptyHtml('未发现 Action 或 API 端点');
         } else {
           if (apiEndpoints.length > 0) {
             actionHtml += '<div class="vue-store-section">';
@@ -2630,7 +2621,7 @@ window.VulnKitVue = (function () {
       if (directivesEl) {
         var dirHtml = '';
         if (dirsInfo.length === 0) {
-          dirHtml = '<div class="empty-state">未发现自定义指令</div>';
+          dirHtml = utils.emptyHtml('未发现自定义指令');
         } else {
           dirHtml += '<div class="vue-dir-summary">发现 ' + dirsInfo.length + ' 个自定义指令</div>';
           dirsInfo.forEach(function (d) {
@@ -2657,9 +2648,7 @@ window.VulnKitVue = (function () {
       }
     } catch (e) {
       if (statusEl) statusEl.textContent = '探索失败';
-      if (resultsEl)
-        resultsEl.innerHTML =
-          '<div class="empty-state">错误: ' + utils.escapeHtml(e.message) + '</div>';
+      if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('错误: ' + e.message);
     }
   }
 

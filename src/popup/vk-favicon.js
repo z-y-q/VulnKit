@@ -157,7 +157,7 @@ window.VulnKitFavicon = (function () {
   }
 
   function copyFaviconUrl() {
-    var utils = window.VulnKitUtils;
+    var utils = window.VulnKitUtils.utilsProxy;
     var urlEl = utils.get('favicon-url');
     if (!urlEl || urlEl.textContent === '-') {
       utils.showToast('请先提取图标', 'warning');

@@ -317,10 +317,9 @@ window.VulnKitJsCtrl = (function () {
         antiDebugScanned = true;
         antiDebugBypassActive = false;
         statusEl.textContent = '';
-        resultsEl.innerHTML =
-          '<div class="empty-state">未发现常见的反调试手段（已扫描 ' +
-          scannedCount +
-          ' 个外部 JS）</div>';
+        resultsEl.innerHTML = utils.emptyHtml(
+          '未发现常见的反调试手段（已扫描 ' + scannedCount + ' 个外部 JS）'
+        );
         updateAntidebugIndicator('on', '扫描完成 — 未检测到反调试');
       } else {
         antiDebugScanned = true;
@@ -348,7 +347,7 @@ window.VulnKitJsCtrl = (function () {
     } catch (e) {
       antiDebugScanned = false;
       statusEl.textContent = '扫描失败';
-      resultsEl.innerHTML = '<div class="empty-state">' + utils.escapeHtml(e.message) + '</div>';
+      resultsEl.innerHTML = utils.emptyHtml(e.message);
       updateAntidebugIndicator('off', '扫描失败');
     }
   }
@@ -467,8 +466,7 @@ window.VulnKitJsCtrl = (function () {
       if (statusEl) statusEl.textContent = '';
       var resultsEl = utils.get('antidebug-results');
       if (resultsEl) {
-        resultsEl.innerHTML =
-          '<div class="empty-state">点击「扫描反调试」检测页面中的反调试手段</div>';
+        resultsEl.innerHTML = utils.emptyHtml('点击「扫描反调试」检测页面中的反调试手段');
       }
       utils.showToast('已清除所有脚本拦截规则', 'success');
     } catch (e) {

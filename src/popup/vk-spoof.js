@@ -148,7 +148,7 @@ window.VulnKitSpoof = (function () {
 
     const presets = UA_PRESETS[category] || [];
     if (presets.length === 0) {
-      container.innerHTML = '<div class="empty-state">无预设项</div>';
+      container.innerHTML = utils.emptyHtml('无预设项');
       return;
     }
 
@@ -286,8 +286,7 @@ window.VulnKitSpoof = (function () {
       utils.showToast('Cookie 加载完成', 'success');
     } catch (e) {
       lastCookies = [];
-      listEl.innerHTML =
-        '<div class="empty-state">加载失败: ' + utils.escapeHtml(e.message) + '</div>';
+      listEl.innerHTML = utils.emptyHtml('加载失败: ' + e.message);
       utils.showToast('加载 Cookie 失败', 'error');
     }
   }
@@ -297,7 +296,7 @@ window.VulnKitSpoof = (function () {
     if (!listEl) return;
 
     if (cookies.length === 0) {
-      listEl.innerHTML = '<div class="empty-state">当前域名无 Cookie</div>';
+      listEl.innerHTML = utils.emptyHtml('当前域名无 Cookie');
       return;
     }
 

@@ -78,6 +78,33 @@
     utils.showToast(msg || '已复制', type || 'success', duration);
   };
 
+  utils.bindClick = function (id, handler) {
+    var el = utils.get(id);
+    if (el) el.addEventListener('click', handler);
+    return el;
+  };
+
+  utils.on = function (id, event, handler) {
+    var el = utils.get(id);
+    if (el) el.addEventListener(event, handler);
+    return el;
+  };
+
+  utils.emptyHtml = function (msg) {
+    return '<div class="empty-state">' + utils.escapeHtml(msg) + '</div>';
+  };
+
+  utils.switchSubTabs = function (btnClass, dataAttr, panelPrefix, tab) {
+    document.querySelectorAll('.' + btnClass).forEach(function (b) {
+      b.classList.toggle('active', b.dataset[dataAttr] === tab);
+    });
+    document.querySelectorAll('.' + panelPrefix + '-subpanel').forEach(function (p) {
+      p.classList.remove('active');
+    });
+    var target = document.getElementById(panelPrefix + '-' + tab);
+    if (target) target.classList.add('active');
+  };
+
   utils.downloadCsv = function (csv, filename) {
     var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
     var url = URL.createObjectURL(blob);
@@ -99,6 +126,10 @@
     'showToast',
     'copyAndToast',
     'downloadCsv',
+    'bindClick',
+    'on',
+    'emptyHtml',
+    'switchSubTabs',
     'getActiveTab',
     'getCurrentDomain',
   ].forEach(function (method) {

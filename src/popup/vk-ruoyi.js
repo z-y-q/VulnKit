@@ -219,10 +219,9 @@ window.VulnKitRuoYi = (function () {
       } else {
         updateWorkflowStep(3);
         if (resultsEl)
-          resultsEl.innerHTML =
-            '<div class="empty-state">' +
-            (state.discoveredRoutes.length > 0 ? '所有发现的路径均已注册' : '未发现路由定义') +
-            '</div>';
+          resultsEl.innerHTML = utils.emptyHtml(
+            state.discoveredRoutes.length > 0 ? '所有发现的路径均已注册' : '未发现路由定义'
+          );
       }
     } catch (e) {
       if (statusEl) statusEl.textContent = '分析出错';
@@ -319,7 +318,7 @@ window.VulnKitRuoYi = (function () {
       var statusEl = utils.get('ruoyi-analyze-status');
       var resultsEl = utils.get('ruoyi-analyze-results');
       if (statusEl) statusEl.textContent = '';
-      if (resultsEl) resultsEl.innerHTML = '<div class="empty-state">已清除</div>';
+      if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('已清除');
       utils.showToast('已清除额外路由', 'info');
     } catch (e) {
       console.warn('[VulnKit] clearExtraRoutes:', e);
@@ -392,7 +391,7 @@ window.VulnKitRuoYi = (function () {
       var paths = getAllPaths();
 
       if (paths.length === 0) {
-        if (resultsEl) resultsEl.innerHTML = '<div class="empty-state">没有可探测的路由路径</div>';
+        if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('没有可探测的路由路径');
         return;
       }
 
@@ -489,7 +488,7 @@ window.VulnKitRuoYi = (function () {
   function renderProbeResults(results, containerEl) {
     if (!containerEl) return;
     if (results.length === 0) {
-      containerEl.innerHTML = '<div class="empty-state">无结果</div>';
+      containerEl.innerHTML = utils.emptyHtml('无结果');
       return;
     }
 
@@ -570,8 +569,7 @@ window.VulnKitRuoYi = (function () {
 
       if (log.length === 0) {
         if (listEl)
-          listEl.innerHTML =
-            '<div class="empty-state">安装路由钩子并浏览页面后，此处显示捕获的API请求</div>';
+          listEl.innerHTML = utils.emptyHtml('安装路由钩子并浏览页面后，此处显示捕获的API请求');
         return;
       }
 
@@ -617,8 +615,7 @@ window.VulnKitRuoYi = (function () {
     var listEl = utils.get('ruoyi-traffic-list');
     var countEl = utils.get('ruoyi-traffic-count');
     if (listEl)
-      listEl.innerHTML =
-        '<div class="empty-state">安装路由钩子并浏览页面后，此处显示捕获的API请求</div>';
+      listEl.innerHTML = utils.emptyHtml('安装路由钩子并浏览页面后，此处显示捕获的API请求');
     if (countEl) countEl.textContent = '';
     getActiveTab().then(function (tab) {
       if (!tab || !tab.id) return;
@@ -673,14 +670,7 @@ window.VulnKitRuoYi = (function () {
   // ====== Sub-tab Switching ======
 
   function switchRuoYiSubTab(tab) {
-    document.querySelectorAll('.ruoyi-stab').forEach(function (b) {
-      b.classList.toggle('active', b.dataset.rstab === tab);
-    });
-    document.querySelectorAll('.ruoyi-subpanel').forEach(function (p) {
-      p.classList.remove('active');
-    });
-    var target = document.getElementById('rstab-' + tab);
-    if (target) target.classList.add('active');
+    utils.switchSubTabs('ruoyi-stab', 'rstab', 'rstab', tab);
   }
 
   // ====== Utility Functions ======

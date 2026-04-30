@@ -387,7 +387,7 @@ window.VulnKitXss = (function () {
         (hasFilter ? '（显示: ' + filtered.length + '）' : '');
     }
     if (filtered.length === 0) {
-      container.innerHTML = '<div class="empty-state">暂无注入点</div>';
+      container.innerHTML = utils.emptyHtml('暂无注入点');
       return;
     }
     const sourceLabels = { link: '链接', form: '表单', url: 'URL', ajax: 'AJAX' };

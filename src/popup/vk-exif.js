@@ -95,7 +95,7 @@ window.VulnKitExif = (function () {
     if (!resultEl || !emptyEl || !sectionsEl) return;
     resultEl.classList.add('hidden');
     emptyEl.classList.add('hidden');
-    sectionsEl.innerHTML = '<div class="empty-state">正在解析...</div>';
+    sectionsEl.innerHTML = utils.emptyHtml('正在解析...');
 
     const objectUrl = URL.createObjectURL(file);
     if (previewImg) {
@@ -250,7 +250,7 @@ window.VulnKitExif = (function () {
     if (!resultEl || !emptyEl || !sectionsEl) return;
     resultEl.classList.add('hidden');
     emptyEl.classList.add('hidden');
-    sectionsEl.innerHTML = '<div class="empty-state">正在获取图片...</div>';
+    sectionsEl.innerHTML = utils.emptyHtml('正在获取图片...');
 
     if (previewImg) previewImg.src = url;
     if (fileNameEl) fileNameEl.textContent = url.split('/').pop() || url;
@@ -294,12 +294,12 @@ window.VulnKitExif = (function () {
   async function scanPageImages() {
     const container = utils.get('exif-page-images');
     if (!container) return;
-    container.innerHTML = '<div class="empty-state">正在扫描...</div>';
+    container.innerHTML = utils.emptyHtml('正在扫描...');
 
     try {
       const tab = await utils.getActiveTab();
       if (!tab?.url) {
-        container.innerHTML = '<div class="empty-state">无法获取当前页面</div>';
+        container.innerHTML = utils.emptyHtml('无法获取当前页面');
         return;
       }
 
@@ -331,7 +331,7 @@ window.VulnKitExif = (function () {
 
       const images = results?.[0]?.result || [];
       if (images.length === 0) {
-        container.innerHTML = '<div class="empty-state">未找到图片</div>';
+        container.innerHTML = utils.emptyHtml('未找到图片');
         return;
       }
 
@@ -356,8 +356,7 @@ window.VulnKitExif = (function () {
         });
       });
     } catch (e) {
-      container.innerHTML =
-        '<div class="empty-state">扫描失败: ' + utils.escapeHtml(e.message) + '</div>';
+      container.innerHTML = utils.emptyHtml('扫描失败: ' + e.message);
     }
   }
 

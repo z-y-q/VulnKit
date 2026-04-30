@@ -137,8 +137,7 @@ window.VulnKitRuoYiMar = (function () {
 
       if (totalJs === 0) {
         if (statusEl) statusEl.textContent = '未找到任何 JS 文件';
-        if (resultsEl)
-          resultsEl.innerHTML = '<div class="empty-state">当前页面未加载任何 JS 脚本。</div>';
+        if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('当前页面未加载任何 JS 脚本。');
         return;
       }
 
@@ -288,7 +287,7 @@ window.VulnKitRuoYiMar = (function () {
 
       if (extractedRoutes.length === 0) {
         if (statusEl) statusEl.textContent = '未发现任何路由';
-        if (resultsEl) resultsEl.innerHTML = '<div class="empty-state">未发现路由定义</div>';
+        if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('未发现路由定义');
         return;
       }
 
@@ -424,7 +423,7 @@ window.VulnKitRuoYiMar = (function () {
     html += '</div>';
 
     if (hiddenRoutes.length === 0) {
-      html += '<div class="empty-state">所有路由均已注册，无需额外加载</div>';
+      html += utils.emptyHtml('所有路由均已注册，无需额外加载');
       if (statusEl) statusEl.textContent = '扫描完成 — 未发现隐藏路由';
       resultsEl.innerHTML = html;
       return;

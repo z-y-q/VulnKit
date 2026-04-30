@@ -84,11 +84,11 @@ window.VulnKitAsset = (function () {
     var searchInput = utils.get('asset-search');
     if (searchInput) searchInput.style.display = hasResults ? '' : 'none';
     if (filtered.length === 0 && !hasResults) {
-      container.innerHTML = '<div class="empty-state">未找到结果</div>';
+      container.innerHTML = utils.emptyHtml('未找到结果');
       return;
     }
     if (filtered.length === 0) {
-      container.innerHTML = '<div class="empty-state">无匹配结果</div>';
+      container.innerHTML = utils.emptyHtml('无匹配结果');
       return;
     }
     var countLabel = currentSearchFilter

@@ -238,8 +238,7 @@ window.VulnKitRuoYiHook = (function () {
         if (statusEl) statusEl.textContent = '钩子未安装，页面: ' + (data.pageUrl || '未知');
         if (state) state.hookStatus = 'idle';
         if (panelEl)
-          panelEl.innerHTML =
-            '<div class="empty-state">钩子未注入 — 请先点击「安装钩子」' + urlHint + '</div>';
+          panelEl.innerHTML = utils.emptyHtml('钩子未注入 — 请先点击「安装钩子」' + urlHint);
       } else if (data.captured) {
         if (state) state.hookStatus = data.enabled ? 'captured' : 'passive-captured';
         updateWorkflowStep(2);
@@ -329,8 +328,7 @@ window.VulnKitRuoYiHook = (function () {
     if (!containerEl) return;
     var routes = data.data || data;
     if (!Array.isArray(routes)) {
-      containerEl.innerHTML =
-        '<div class="empty-state">' + (data._raw ? '响应解析失败' : '无路由数据') + '</div>';
+      containerEl.innerHTML = utils.emptyHtml(data._raw ? '响应解析失败' : '无路由数据');
       return;
     }
 

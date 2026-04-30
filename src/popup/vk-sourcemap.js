@@ -1251,7 +1251,7 @@ window.VulnKitSourcemap = (function () {
     if (!container) return;
 
     if (sourcemapModules.length === 0) {
-      container.innerHTML = '<div class="empty-state">未找到 Webpack 模块</div>';
+      container.innerHTML = utils.emptyHtml('未找到 Webpack 模块');
       return;
     }
 

@@ -346,10 +346,7 @@
       { id: 'copy-encoding-btn', handler: copyEncodingOutput },
       { id: 'encoding-swap-btn', handler: swapEncodingFields },
     ];
-    encodingBindings.forEach(({ id, handler }) => {
-      const el = utils.get(id);
-      if (el) el.addEventListener('click', handler);
-    });
+    encodingBindings.forEach(({ id, handler }) => utils.bindClick(id, handler));
 
     // JWT buttons
     var jwtDecodeBtn = utils.get('jwt-decode-btn');
@@ -362,12 +359,9 @@
         }
         decodeJwt(input);
       });
-    var jwtClearBtn = utils.get('jwt-clear-btn');
-    if (jwtClearBtn) jwtClearBtn.addEventListener('click', clearJwt);
-    var jwtCopyHeaderBtn = utils.get('jwt-copy-header-btn');
-    if (jwtCopyHeaderBtn) jwtCopyHeaderBtn.addEventListener('click', copyJwtHeader);
-    var jwtCopyPayloadBtn = utils.get('jwt-copy-payload-btn');
-    if (jwtCopyPayloadBtn) jwtCopyPayloadBtn.addEventListener('click', copyJwtPayload);
+    var jwtClearBtn = utils.bindClick('jwt-clear-btn', clearJwt);
+    var jwtCopyHeaderBtn = utils.bindClick('jwt-copy-header-btn', copyJwtHeader);
+    var jwtCopyPayloadBtn = utils.bindClick('jwt-copy-payload-btn', copyJwtPayload);
 
     // Crypto algo tabs
     document.querySelectorAll('.crypto-algo-btn').forEach(function (btn) {
@@ -378,14 +372,10 @@
     });
 
     // Crypto action buttons
-    var cryptoEncBtn = utils.get('crypto-enc-btn');
-    if (cryptoEncBtn) cryptoEncBtn.addEventListener('click', doCryptoEncrypt);
-    var cryptoDecBtn = utils.get('crypto-dec-btn');
-    if (cryptoDecBtn) cryptoDecBtn.addEventListener('click', doCryptoDecrypt);
-    var cryptoVerifyBtn = utils.get('crypto-verify-btn');
-    if (cryptoVerifyBtn) cryptoVerifyBtn.addEventListener('click', doCryptoVerify);
-    var hashHmacCheck = utils.get('hash-hmac');
-    if (hashHmacCheck) hashHmacCheck.addEventListener('change', toggleHashHmac);
+    var cryptoEncBtn = utils.bindClick('crypto-enc-btn', doCryptoEncrypt);
+    var cryptoDecBtn = utils.bindClick('crypto-dec-btn', doCryptoDecrypt);
+    var cryptoVerifyBtn = utils.bindClick('crypto-verify-btn', doCryptoVerify);
+    var hashHmacCheck = utils.on('hash-hmac', 'change', toggleHashHmac);
     var cryptoClearBtn = utils.get('crypto-clear-btn');
     if (cryptoClearBtn)
       cryptoClearBtn.addEventListener('click', function () {
@@ -398,25 +388,23 @@
     if (copyCryptoBtn)
       copyCryptoBtn.addEventListener('click', function () {
         var v = (utils.get('crypto-output') || {}).value;
-        if (v) {
-          utils.copyAndToast(v);
-        }
+        if (v) utils.copyAndToast(v);
       });
 
     // Crypto mode/IV toggle listeners
     var aesMode = utils.get('aes-mode');
     if (aesMode)
-      aesMode.addEventListener('change', function () {
-        toggleIvVisibility('aes', 'aes-iv-group', 'aes-mode');
-      });
+      aesMode.addEventListener('change', () =>
+        toggleIvVisibility('aes', 'aes-iv-group', 'aes-mode')
+      );
     var desMode = utils.get('des-mode');
     if (desMode)
-      desMode.addEventListener('change', function () {
-        toggleIvVisibility('des', 'des-iv-group', 'des-mode');
-      });
+      desMode.addEventListener('change', () =>
+        toggleIvVisibility('des', 'des-iv-group', 'des-mode')
+      );
     var sm4Mode = utils.get('sm4-mode');
     if (sm4Mode)
-      sm4Mode.addEventListener('change', function () {
+      sm4Mode.addEventListener('change', () => {
         var ivG = utils.get('sm4-iv-group');
         if (ivG) {
           if (sm4Mode.value === 'cbc') ivG.classList.remove('hidden');
@@ -446,14 +434,11 @@
     switchCryptoAlgo('aes');
 
     // RSA genkey
-    var rsaGenBtn = utils.get('rsa-genkey-btn');
-    if (rsaGenBtn) rsaGenBtn.addEventListener('click', rsaGenerateKeyPair);
+    utils.bindClick('rsa-genkey-btn', rsaGenerateKeyPair);
 
     // Favicon buttons
-    const faviconBtn = utils.get('extract-favicon-btn');
-    if (faviconBtn) faviconBtn.addEventListener('click', extractFavicon);
-    const copyFaviconUrlBtn = utils.get('copy-favicon-url-btn');
-    if (copyFaviconUrlBtn) copyFaviconUrlBtn.addEventListener('click', copyFaviconUrl);
+    utils.bindClick('extract-favicon-btn', extractFavicon);
+    utils.bindClick('copy-favicon-url-btn', copyFaviconUrl);
 
     const copyHashBtn = utils.get('copy-favicon-hash-btn');
     if (copyHashBtn)
@@ -471,8 +456,7 @@
       btn.addEventListener('click', () => switchAssetSource(btn.dataset.source));
     });
 
-    const scanBtn = utils.get('asset-scan-btn');
-    if (scanBtn) scanBtn.addEventListener('click', handleAssetScan);
+    utils.bindClick('asset-scan-btn', handleAssetScan);
     const assetQueryInput = utils.get('asset-query');
     if (assetQueryInput) {
       assetQueryInput.addEventListener('keydown', e => {
@@ -487,8 +471,7 @@
       customToggle.addEventListener('click', () =>
         toggleCustomQueryMode(!customToggle.classList.contains('active'))
       );
-    const assetExportBtn = utils.get('asset-export-btn');
-    if (assetExportBtn) assetExportBtn.addEventListener('click', assetExportData);
+    utils.bindClick('asset-export-btn', assetExportData);
 
     const assetSearchInput = utils.get('asset-search');
     if (assetSearchInput) {
@@ -497,8 +480,7 @@
       });
     }
 
-    const shodanHostBtn = utils.get('shodan-host-btn');
-    if (shodanHostBtn) shodanHostBtn.addEventListener('click', shodanHostLookup);
+    utils.bindClick('shodan-host-btn', shodanHostLookup);
     const shodanHostInput = utils.get('shodan-host-input');
     if (shodanHostInput) {
       shodanHostInput.addEventListener('keydown', e => {
@@ -509,31 +491,21 @@
       });
     }
 
-    const saveKeysBtn = utils.get('save-keys-btn');
-    if (saveKeysBtn) saveKeysBtn.addEventListener('click', saveApiKeys);
-
-    const clearKeysBtn = utils.get('clear-keys-btn');
-    if (clearKeysBtn) clearKeysBtn.addEventListener('click', clearApiKeys);
+    utils.bindClick('save-keys-btn', saveApiKeys);
+    utils.bindClick('clear-keys-btn', clearApiKeys);
 
     loadApiKeys();
 
     // Info gather
-    const gatherBtn = utils.get('gather-btn');
-    if (gatherBtn) gatherBtn.addEventListener('click', gatherInfo);
+    utils.bindClick('gather-btn', gatherInfo);
     const gatherSearchInput = utils.get('gather-search');
     if (gatherSearchInput) {
       gatherSearchInput.addEventListener('input', function () {
         gather.applySearchFilter(gatherSearchInput.value.trim());
       });
     }
-    const gatherCopyBtn = utils.get('gather-copy-btn');
-    if (gatherCopyBtn) {
-      gatherCopyBtn.addEventListener('click', gather.copyAllData);
-    }
-    const gatherExportBtn = utils.get('gather-export-btn');
-    if (gatherExportBtn) {
-      gatherExportBtn.addEventListener('click', gather.exportAllData);
-    }
+    const gatherCopyBtn = utils.bindClick('gather-copy-btn', gather.copyAllData);
+    const gatherExportBtn = utils.bindClick('gather-export-btn', gather.exportAllData);
 
     // Rules management
     const rulesBtn = utils.get('gather-rules-btn');
@@ -643,36 +615,21 @@
     }
 
     // Link extract
-    const linksExtractBtn = utils.get('links-extract-btn');
-    if (linksExtractBtn) linksExtractBtn.addEventListener('click', extractLinks);
-    const linksCopyBtn = utils.get('links-copy-btn');
-    if (linksCopyBtn) {
-      linksCopyBtn.addEventListener('click', copyFilteredUrls);
-    }
-    const linksExportBtn = utils.get('links-export-btn');
-    if (linksExportBtn) {
-      linksExportBtn.addEventListener('click', exportLinks);
-    }
-    const linksSendBtn = utils.get('links-send-multiurl-btn');
-    if (linksSendBtn) {
-      linksSendBtn.addEventListener('click', sendToMultiUrl);
-    }
-    const linksFilter = utils.get('links-filter');
-    if (linksFilter) linksFilter.addEventListener('input', renderLinks);
-    const linksFilterType = utils.get('links-filter-type');
-    if (linksFilterType) linksFilterType.addEventListener('change', renderLinks);
+    utils.bindClick('links-extract-btn', extractLinks);
+    utils.bindClick('links-copy-btn', copyFilteredUrls);
+    utils.bindClick('links-export-btn', exportLinks);
+    utils.bindClick('links-send-multiurl-btn', sendToMultiUrl);
+    utils.on('links-filter', 'input', renderLinks);
+    utils.on('links-filter-type', 'change', renderLinks);
 
     // URL multi-open
     const multiurlInput = utils.get('multiurl-input');
     if (multiurlInput) {
       multiurlInput.addEventListener('input', () => updateMultiurlInfo(parseUrls().length));
     }
-    const multiurlOpenBtn = utils.get('multiurl-open-btn');
-    if (multiurlOpenBtn) multiurlOpenBtn.addEventListener('click', handleMultiurlOpen);
-    const multiurlDedupBtn = utils.get('multiurl-dedup-btn');
-    if (multiurlDedupBtn) multiurlDedupBtn.addEventListener('click', handleMultiurlDedup);
-    const multiurlCopyBtn = utils.get('multiurl-copy-btn');
-    if (multiurlCopyBtn) multiurlCopyBtn.addEventListener('click', copyAllUrls);
+    utils.bindClick('multiurl-open-btn', handleMultiurlOpen);
+    utils.bindClick('multiurl-dedup-btn', handleMultiurlDedup);
+    utils.bindClick('multiurl-copy-btn', copyAllUrls);
     const multiurlClearBtn = utils.get('multiurl-clear-btn');
     if (multiurlClearBtn)
       multiurlClearBtn.addEventListener('click', () => {
@@ -681,16 +638,12 @@
       });
 
     // Tab save
-    const tabsaveGrabBtn = utils.get('tabsave-grab-btn');
-    if (tabsaveGrabBtn) tabsaveGrabBtn.addEventListener('click', grabAllTabs);
-    const tabsaveCopyBtn = utils.get('tabsave-copy-btn');
-    if (tabsaveCopyBtn) tabsaveCopyBtn.addEventListener('click', copySavedTabUrls);
-    const tabsaveExportBtn = utils.get('tabsave-export-btn');
-    if (tabsaveExportBtn) tabsaveExportBtn.addEventListener('click', exportSavedTabUrls);
+    utils.bindClick('tabsave-grab-btn', grabAllTabs);
+    utils.bindClick('tabsave-copy-btn', copySavedTabUrls);
+    utils.bindClick('tabsave-export-btn', exportSavedTabUrls);
 
     // History
-    const historyBtn = utils.get('history-query-btn');
-    if (historyBtn) historyBtn.addEventListener('click', queryHistory);
+    utils.bindClick('history-query-btn', queryHistory);
 
     const historyCopyUrlBtn = utils.get('history-copy-url-btn');
     if (historyCopyUrlBtn) {
@@ -733,8 +686,7 @@
         utils.copyAndToast(text, '已复制 ' + lastHistoryResults.length + ' 条');
       });
     }
-    const historyExportBtn = utils.get('history-export-btn');
-    if (historyExportBtn) historyExportBtn.addEventListener('click', historyExportData);
+    utils.bindClick('history-export-btn', historyExportData);
 
     const historyTypeFilter = utils.get('history-type-filter');
     if (historyTypeFilter) {
@@ -813,8 +765,7 @@
       });
     }
 
-    const exifScanBtn = utils.get('exif-scan-page-btn');
-    if (exifScanBtn) exifScanBtn.addEventListener('click', scanPageImages);
+    utils.bindClick('exif-scan-page-btn', scanPageImages);
 
     const exifCopyAllBtn = utils.get('exif-copy-all-btn');
     if (exifCopyAllBtn) {
@@ -829,10 +780,8 @@
         utils.copyAndToast(text, '已复制全部元数据');
       });
     }
-    const exifCopyJsonBtn = utils.get('exif-copy-json-btn');
-    if (exifCopyJsonBtn) exifCopyJsonBtn.addEventListener('click', copyExifData);
-    const exifClearBtn = utils.get('exif-clear-btn');
-    if (exifClearBtn) exifClearBtn.addEventListener('click', clearExif);
+    utils.bindClick('exif-copy-json-btn', copyExifData);
+    utils.bindClick('exif-clear-btn', clearExif);
 
     // Request Spoofing
     document.querySelectorAll('.spoof-tab').forEach(btn => {
@@ -845,21 +794,14 @@
       renderUaList('desktop');
     }
 
-    const uaApplyBtn = utils.get('spoof-ua-apply');
-    if (uaApplyBtn) uaApplyBtn.addEventListener('click', applyUserAgent);
-    const uaResetBtn = utils.get('spoof-ua-reset');
-    if (uaResetBtn) uaResetBtn.addEventListener('click', resetUserAgent);
+    utils.bindClick('spoof-ua-apply', applyUserAgent);
+    utils.bindClick('spoof-ua-reset', resetUserAgent);
 
-    const cookieRefreshBtn = utils.get('cookie-refresh-btn');
-    if (cookieRefreshBtn) cookieRefreshBtn.addEventListener('click', loadCookies);
-    const cookieAddBtn = utils.get('cookie-add-btn');
-    if (cookieAddBtn) cookieAddBtn.addEventListener('click', showCookieAddEditor);
-    const cookieImportBtn = utils.get('cookie-import-btn');
-    if (cookieImportBtn) cookieImportBtn.addEventListener('click', showCookieFileImportDialog);
-    const cookieExportBtn = utils.get('cookie-export-btn');
-    if (cookieExportBtn) cookieExportBtn.addEventListener('click', exportCookies);
-    const cookieClearBtn = utils.get('cookie-clear-btn');
-    if (cookieClearBtn) cookieClearBtn.addEventListener('click', clearAllCookies);
+    utils.bindClick('cookie-refresh-btn', loadCookies);
+    utils.bindClick('cookie-add-btn', showCookieAddEditor);
+    utils.bindClick('cookie-import-btn', showCookieFileImportDialog);
+    utils.bindClick('cookie-export-btn', exportCookies);
+    utils.bindClick('cookie-clear-btn', clearAllCookies);
     const cookieSearchInput = utils.get('cookie-search');
     if (cookieSearchInput) {
       cookieSearchInput.addEventListener('input', function () {
@@ -867,12 +809,9 @@
       });
     }
 
-    const headerApplyBtn = utils.get('header-apply');
-    if (headerApplyBtn) headerApplyBtn.addEventListener('click', applyHeaders);
-    const headerResetBtn = utils.get('header-reset');
-    if (headerResetBtn) headerResetBtn.addEventListener('click', resetHeaders);
-    const customHeaderAddBtn = utils.get('custom-header-add');
-    if (customHeaderAddBtn) customHeaderAddBtn.addEventListener('click', addCustomHeaderRow);
+    utils.bindClick('header-apply', applyHeaders);
+    utils.bindClick('header-reset', resetHeaders);
+    utils.bindClick('custom-header-add', addCustomHeaderRow);
 
     const initialRemoveBtn = document.querySelector('.custom-header-remove');
     if (initialRemoveBtn)
@@ -903,14 +842,10 @@
     });
 
     // Vue Analysis
-    const vueDetectBtn = utils.get('vue-detect-btn');
-    if (vueDetectBtn) vueDetectBtn.addEventListener('click', detectVue);
-    const vueExportBtn = utils.get('vue-export-routes-btn');
-    if (vueExportBtn) vueExportBtn.addEventListener('click', exportVueRoutes);
-    const vueBypassBtn = utils.get('vue-bypass-guards-btn');
-    if (vueBypassBtn) vueBypassBtn.addEventListener('click', bypassVueGuards);
-    const vueDisableAuthBtn = utils.get('vue-disable-auth-btn');
-    if (vueDisableAuthBtn) vueDisableAuthBtn.addEventListener('click', disableRouteAuth);
+    utils.bindClick('vue-detect-btn', detectVue);
+    utils.bindClick('vue-export-routes-btn', exportVueRoutes);
+    utils.bindClick('vue-bypass-guards-btn', bypassVueGuards);
+    utils.bindClick('vue-disable-auth-btn', disableRouteAuth);
     const vueCopyBtn = utils.get('vue-copy-btn');
     if (vueCopyBtn) {
       vueCopyBtn.addEventListener('click', () => {
@@ -966,25 +901,17 @@
     });
 
     // Vue Store Explorer
-    const vueStoreReadBtn = utils.get('vue-store-read-btn');
-    if (vueStoreReadBtn) vueStoreReadBtn.addEventListener('click', exploreVueStore);
-    const vueStoreCopyBtn = utils.get('vue-store-copy-btn');
-    if (vueStoreCopyBtn) vueStoreCopyBtn.addEventListener('click', copyFullStoreJson);
-    const vueStoreRefreshBtn = utils.get('vue-store-refresh-btn');
-    if (vueStoreRefreshBtn) vueStoreRefreshBtn.addEventListener('click', exploreVueStore);
+    utils.bindClick('vue-store-read-btn', exploreVueStore);
+    utils.bindClick('vue-store-copy-btn', copyFullStoreJson);
+    utils.bindClick('vue-store-refresh-btn', exploreVueStore);
     initStoreExplorerEvents();
 
     // Permission menu interception
-    const permStartBtn = utils.get('perm-start-btn');
-    if (permStartBtn) permStartBtn.addEventListener('click', startPermInterception);
-    const permStopBtn = utils.get('perm-stop-btn');
-    if (permStopBtn) permStopBtn.addEventListener('click', stopPermInterception);
-    const permRefreshBtn = utils.get('perm-refresh-btn');
-    if (permRefreshBtn) permRefreshBtn.addEventListener('click', refreshPermCaptured);
-    const permFilter = utils.get('perm-filter');
-    if (permFilter) permFilter.addEventListener('input', renderPermList);
-    const permTypeFilter = utils.get('perm-type-filter');
-    if (permTypeFilter) permTypeFilter.addEventListener('change', renderPermList);
+    utils.bindClick('perm-start-btn', startPermInterception);
+    utils.bindClick('perm-stop-btn', stopPermInterception);
+    utils.bindClick('perm-refresh-btn', refreshPermCaptured);
+    utils.on('perm-filter', 'input', renderPermList);
+    utils.on('perm-type-filter', 'change', renderPermList);
     const permDetailBack = utils.get('perm-detail-back');
     if (permDetailBack)
       permDetailBack.addEventListener('click', () => {
@@ -996,12 +923,9 @@
         const permDetail = utils.get('perm-detail');
         if (permDetail) permDetail.classList.add('hidden');
       });
-    const permOpenAllBtn = utils.get('perm-open-all');
-    if (permOpenAllBtn) permOpenAllBtn.addEventListener('click', permOpenAll);
-    const permChangeAdminBtn = utils.get('perm-change-admin');
-    if (permChangeAdminBtn) permChangeAdminBtn.addEventListener('click', permChangeAdmin);
-    const permApplyBtn = utils.get('perm-apply-btn');
-    if (permApplyBtn) permApplyBtn.addEventListener('click', applyPermOverride);
+    utils.bindClick('perm-open-all', permOpenAll);
+    utils.bindClick('perm-change-admin', permChangeAdmin);
+    utils.bindClick('perm-apply-btn', applyPermOverride);
     const permCopyJsonBtn = utils.get('perm-copy-json');
     if (permCopyJsonBtn)
       permCopyJsonBtn.addEventListener('click', () => {
@@ -1013,8 +937,7 @@
         utils.copyAndToast(val);
       });
 
-    const permExpandIdsBtn = utils.get('perm-expand-ids');
-    if (permExpandIdsBtn) permExpandIdsBtn.addEventListener('click', permExpandMenuIds);
+    utils.bindClick('perm-expand-ids', permExpandMenuIds);
 
     const compareInjectBtn = utils.get('compare-inject-btn');
     if (compareInjectBtn)
@@ -1048,8 +971,7 @@
     });
 
     // Route vs menu comparison
-    const compareBtn = utils.get('compare-btn');
-    if (compareBtn) compareBtn.addEventListener('click', compareRoutesAndMenu);
+    utils.bindClick('compare-btn', compareRoutesAndMenu);
     const compareCopyHidden = utils.get('compare-copy-hidden');
     if (compareCopyHidden)
       compareCopyHidden.addEventListener('click', () => {
@@ -1070,29 +992,21 @@
       });
 
     // Auto-traverse routes
-    const traverseStartBtn = utils.get('traverse-start-btn');
-    if (traverseStartBtn) traverseStartBtn.addEventListener('click', startTraverseRoutes);
-    const traverseStopBtn = utils.get('traverse-stop-btn');
-    if (traverseStopBtn) traverseStopBtn.addEventListener('click', stopTraverse);
+    utils.bindClick('traverse-start-btn', startTraverseRoutes);
+    utils.bindClick('traverse-stop-btn', stopTraverse);
 
     // JS Control
     document.querySelectorAll('.jsctrl-tab').forEach(btn => {
       btn.addEventListener('click', () => switchJsCtrlTab(btn.dataset.ctrl));
     });
-    const jsDisableBtn = utils.get('js-disable-btn');
-    if (jsDisableBtn) jsDisableBtn.addEventListener('click', disableJs);
-    const jsEnableBtn = utils.get('js-enable-btn');
-    if (jsEnableBtn) jsEnableBtn.addEventListener('click', enableJs);
-    const antidebugScanBtn = utils.get('antidebug-scan-btn');
-    if (antidebugScanBtn) antidebugScanBtn.addEventListener('click', scanAntiDebug);
-    const antidebugBypassBtn = utils.get('antidebug-bypass-btn');
-    if (antidebugBypassBtn) antidebugBypassBtn.addEventListener('click', bypassAntiDebug);
-    const antidebugClearBtn = utils.get('antidebug-clear-btn');
-    if (antidebugClearBtn) antidebugClearBtn.addEventListener('click', clearScriptBlock);
+    utils.bindClick('js-disable-btn', disableJs);
+    utils.bindClick('js-enable-btn', enableJs);
+    utils.bindClick('antidebug-scan-btn', scanAntiDebug);
+    utils.bindClick('antidebug-bypass-btn', bypassAntiDebug);
+    utils.bindClick('antidebug-clear-btn', clearScriptBlock);
 
     // Remove copy restrictions
-    const uncopyBtn = utils.get('uncopy-btn');
-    if (uncopyBtn) uncopyBtn.addEventListener('click', removeCopyRestrictions);
+    utils.bindClick('uncopy-btn', removeCopyRestrictions);
 
     // RuoYi sub-tabs
     document.querySelectorAll('.ruoyi-stab').forEach(btn => {
@@ -1101,67 +1015,44 @@
     });
 
     // RuoYi detection
-    const ruoyiDetectBtn = utils.get('ruoyi-detect-btn');
-    if (ruoyiDetectBtn) ruoyiDetectBtn.addEventListener('click', detectRuoYi);
+    utils.bindClick('ruoyi-detect-btn', detectRuoYi);
 
     // RuoYi route hook
-    const ruoyiHookInstallBtn = utils.get('ruoyi-hook-install-btn');
-    if (ruoyiHookInstallBtn) ruoyiHookInstallBtn.addEventListener('click', installRouteHook);
-    const ruoyiHookRemoveBtn = utils.get('ruoyi-hook-remove-btn');
-    if (ruoyiHookRemoveBtn) ruoyiHookRemoveBtn.addEventListener('click', removeRouteHook);
-    const ruoyiHookCheckBtn = utils.get('ruoyi-hook-check-btn');
-    if (ruoyiHookCheckBtn) ruoyiHookCheckBtn.addEventListener('click', checkHookStatus);
+    utils.bindClick('ruoyi-hook-install-btn', installRouteHook);
+    utils.bindClick('ruoyi-hook-remove-btn', removeRouteHook);
+    utils.bindClick('ruoyi-hook-check-btn', checkHookStatus);
     const ruoyiAugmentMode = utils.get('ruoyi-augment-mode');
     if (ruoyiAugmentMode)
       ruoyiAugmentMode.addEventListener('change', () => setAugmentMode(ruoyiAugmentMode.value));
 
     // RuoYi export buttons
-    const ruoyiCopyJsonBtn = utils.get('ruoyi-copy-json-btn');
-    if (ruoyiCopyJsonBtn) ruoyiCopyJsonBtn.addEventListener('click', copyRouteJson);
-    const ruoyiExportCurlBtn = utils.get('ruoyi-export-curl-btn');
-    if (ruoyiExportCurlBtn) ruoyiExportCurlBtn.addEventListener('click', exportCurlCommands);
-    const ruoyiExportHtmlBtn = utils.get('ruoyi-export-html-btn');
-    if (ruoyiExportHtmlBtn) ruoyiExportHtmlBtn.addEventListener('click', exportHtmlReport);
+    utils.bindClick('ruoyi-copy-json-btn', copyRouteJson);
+    utils.bindClick('ruoyi-export-curl-btn', exportCurlCommands);
+    utils.bindClick('ruoyi-export-html-btn', exportHtmlReport);
 
     // RuoYi JS analysis
-    const ruoyiAnalyzeBtn = utils.get('ruoyi-analyze-btn');
-    if (ruoyiAnalyzeBtn) ruoyiAnalyzeBtn.addEventListener('click', analyzeJsRoutes);
-    const ruoyiApplyBtn = utils.get('ruoyi-apply-btn');
-    if (ruoyiApplyBtn) ruoyiApplyBtn.addEventListener('click', applyExtraRoutes);
-    const ruoyiClearBtn = utils.get('ruoyi-clear-btn');
-    if (ruoyiClearBtn) ruoyiClearBtn.addEventListener('click', clearExtraRoutes);
-    const ruoyiSelectAllBtn = utils.get('ruoyi-selectall-btn');
-    if (ruoyiSelectAllBtn) ruoyiSelectAllBtn.addEventListener('click', toggleSelectAll);
-    const ruoyiCopyPathsBtn = utils.get('ruoyi-copy-paths-btn');
-    if (ruoyiCopyPathsBtn) ruoyiCopyPathsBtn.addEventListener('click', copyExtraPaths);
+    utils.bindClick('ruoyi-analyze-btn', analyzeJsRoutes);
+    utils.bindClick('ruoyi-apply-btn', applyExtraRoutes);
+    utils.bindClick('ruoyi-clear-btn', clearExtraRoutes);
+    utils.bindClick('ruoyi-selectall-btn', toggleSelectAll);
+    utils.bindClick('ruoyi-copy-paths-btn', copyExtraPaths);
 
     // RuoYi batch probe
-    const ruoyiProbeBtn = utils.get('ruoyi-probe-btn');
-    if (ruoyiProbeBtn) ruoyiProbeBtn.addEventListener('click', batchProbeRoutes);
-    const ruoyiProbeStopBtn = utils.get('ruoyi-probe-stop-btn');
-    if (ruoyiProbeStopBtn) ruoyiProbeStopBtn.addEventListener('click', stopProbe);
-    const ruoyiProbeExportBtn = utils.get('ruoyi-probe-export-btn');
-    if (ruoyiProbeExportBtn) ruoyiProbeExportBtn.addEventListener('click', exportProbeResults);
+    utils.bindClick('ruoyi-probe-btn', batchProbeRoutes);
+    utils.bindClick('ruoyi-probe-stop-btn', stopProbe);
+    utils.bindClick('ruoyi-probe-export-btn', exportProbeResults);
 
     // RuoYi API traffic
-    const ruoyiTrafficLoadBtn = utils.get('ruoyi-traffic-load-btn');
-    if (ruoyiTrafficLoadBtn) ruoyiTrafficLoadBtn.addEventListener('click', loadApiTraffic);
-    const ruoyiTrafficClearBtn = utils.get('ruoyi-traffic-clear-btn');
-    if (ruoyiTrafficClearBtn) ruoyiTrafficClearBtn.addEventListener('click', clearApiTraffic);
-    const ruoyiTrafficExportBtn = utils.get('ruoyi-traffic-export-btn');
-    if (ruoyiTrafficExportBtn) ruoyiTrafficExportBtn.addEventListener('click', exportApiTraffic);
-    const ruoyiTrafficFilter = utils.get('ruoyi-traffic-filter');
-    if (ruoyiTrafficFilter) ruoyiTrafficFilter.addEventListener('input', filterApiTraffic);
+    utils.bindClick('ruoyi-traffic-load-btn', loadApiTraffic);
+    utils.bindClick('ruoyi-traffic-clear-btn', clearApiTraffic);
+    utils.bindClick('ruoyi-traffic-export-btn', exportApiTraffic);
+    utils.on('ruoyi-traffic-filter', 'input', filterApiTraffic);
 
     // MaR dynamic route loading
-    const marScanBtn = utils.get('mar-scan-btn');
-    if (marScanBtn) marScanBtn.addEventListener('click', marScanDynamicRoutes);
-    const marInjectBtn = utils.get('mar-inject-btn');
-    if (marInjectBtn) marInjectBtn.addEventListener('click', marInjectToRouter);
-    const marSelectAllBtn = utils.get('mar-selectall-btn');
-    if (marSelectAllBtn) marSelectAllBtn.addEventListener('click', marToggleSelectAll);
-    const marCopyBtn = utils.get('mar-copy-btn');
-    if (marCopyBtn) marCopyBtn.addEventListener('click', marCopyHiddenPaths);
+    utils.bindClick('mar-scan-btn', marScanDynamicRoutes);
+    utils.bindClick('mar-inject-btn', marInjectToRouter);
+    utils.bindClick('mar-selectall-btn', marToggleSelectAll);
+    utils.bindClick('mar-copy-btn', marCopyHiddenPaths);
 
     // Restore perm intercept state
     chrome.storage.local.get(['permInterceptTabId'], result => {
@@ -1271,8 +1162,7 @@
     }
 
     // Reverse shell
-    const revshellGen = utils.get('revshell-gen-btn');
-    if (revshellGen) revshellGen.addEventListener('click', generateReverseShell);
+    utils.bindClick('revshell-gen-btn', generateReverseShell);
     const revshellCopy = utils.get('revshell-copy-btn');
     if (revshellCopy)
       revshellCopy.addEventListener('click', () => {
@@ -1281,29 +1171,20 @@
           utils.copyAndToast(output.value, '已复制命令', 'success', 1000);
         }
       });
-    const revshellType = utils.get('revshell-type');
-    if (revshellType) revshellType.addEventListener('change', generateReverseShell);
-    const revshellIp = utils.get('revshell-ip');
-    if (revshellIp) revshellIp.addEventListener('input', generateReverseShell);
-    const revshellPort = utils.get('revshell-port');
-    if (revshellPort) revshellPort.addEventListener('input', generateReverseShell);
+    utils.on('revshell-type', 'change', generateReverseShell);
+    utils.on('revshell-ip', 'input', generateReverseShell);
+    utils.on('revshell-port', 'input', generateReverseShell);
 
     // SQL injection regenerate
-    const sqliRegen = utils.get('sqli-regen-btn');
-    if (sqliRegen) sqliRegen.addEventListener('click', renderSqliPayloads);
-    const sqliColumns = utils.get('sqli-columns');
-    if (sqliColumns) sqliColumns.addEventListener('change', renderSqliPayloads);
-    const sqliTable = utils.get('sqli-table');
-    if (sqliTable) sqliTable.addEventListener('input', renderSqliPayloads);
+    utils.bindClick('sqli-regen-btn', renderSqliPayloads);
+    utils.on('sqli-columns', 'change', renderSqliPayloads);
+    utils.on('sqli-table', 'input', renderSqliPayloads);
 
     // XSS Scan
     initXssScanPayloadSelect();
-    var xssHarvestBtn = utils.get('xssscan-harvest-btn');
-    if (xssHarvestBtn) xssHarvestBtn.addEventListener('click', handleXssHarvest);
-    var xssStartBtn = utils.get('xssscan-start-intercept-btn');
-    if (xssStartBtn) xssStartBtn.addEventListener('click', startXssIntercept);
-    var xssStopBtn = utils.get('xssscan-stop-intercept-btn');
-    if (xssStopBtn) xssStopBtn.addEventListener('click', stopXssIntercept);
+    utils.bindClick('xssscan-harvest-btn', handleXssHarvest);
+    utils.bindClick('xssscan-start-intercept-btn', startXssIntercept);
+    utils.bindClick('xssscan-stop-intercept-btn', stopXssIntercept);
     var xssClearBtn = utils.get('xssscan-clear-btn');
     if (xssClearBtn) {
       xssClearBtn.addEventListener('click', function () {
@@ -1339,30 +1220,18 @@
         });
       });
     }
-    var xssBatchOpenBtn = utils.get('xssscan-batchopen-btn');
-    if (xssBatchOpenBtn) xssBatchOpenBtn.addEventListener('click', handleBatchOpenXss);
-    var xssCopyAllBtn = utils.get('xssscan-copyall-btn');
-    if (xssCopyAllBtn) xssCopyAllBtn.addEventListener('click', handleCopyXssUrls);
-    var xssExportBtn = utils.get('xssscan-export-btn');
-    if (xssExportBtn) {
-      xssExportBtn.addEventListener('click', xssExportData);
-    }
+    utils.bindClick('xssscan-batchopen-btn', handleBatchOpenXss);
+    utils.bindClick('xssscan-copyall-btn', handleCopyXssUrls);
+    utils.bindClick('xssscan-export-btn', xssExportData);
 
     // Webpack Module Mapping (Source Map Scan)
-    var smScanBtn = utils.get('sourcemap-scan-btn');
-    if (smScanBtn) smScanBtn.addEventListener('click', scanWebpackModules);
-    var smCopyAllBtn = utils.get('sourcemap-copy-all-btn');
-    if (smCopyAllBtn) smCopyAllBtn.addEventListener('click', copyAllSourcemapPaths);
-    var smCopyTreeBtn = utils.get('sourcemap-copy-tree-btn');
-    if (smCopyTreeBtn) smCopyTreeBtn.addEventListener('click', generateSourcemapTree);
-    var smLoadBtn = utils.get('sourcemap-load-sources-btn');
-    if (smLoadBtn) smLoadBtn.addEventListener('click', loadSourcesToDevTools);
-    var smDlAllBtn = utils.get('sourcemap-download-all-btn');
-    if (smDlAllBtn) smDlAllBtn.addEventListener('click', downloadAllSourcemapSources);
-    var smBackBtn = utils.get('sourcemap-detail-back');
-    if (smBackBtn) smBackBtn.addEventListener('click', backToSourcemapList);
-    var smCopySrcBtn = utils.get('sourcemap-copy-src-btn');
-    if (smCopySrcBtn) smCopySrcBtn.addEventListener('click', copyModuleSource);
+    utils.bindClick('sourcemap-scan-btn', scanWebpackModules);
+    utils.bindClick('sourcemap-copy-all-btn', copyAllSourcemapPaths);
+    utils.bindClick('sourcemap-copy-tree-btn', generateSourcemapTree);
+    utils.bindClick('sourcemap-load-sources-btn', loadSourcesToDevTools);
+    utils.bindClick('sourcemap-download-all-btn', downloadAllSourcemapSources);
+    utils.bindClick('sourcemap-detail-back', backToSourcemapList);
+    utils.bindClick('sourcemap-copy-src-btn', copyModuleSource);
     var smDlBtn = utils.get('sourcemap-download-btn');
     if (smDlBtn)
       smDlBtn.addEventListener('click', function () {
@@ -1379,8 +1248,7 @@
         }, 200);
       });
     }
-    var smAnalyzeBtn = utils.get('sourcemap-analyze-btn');
-    if (smAnalyzeBtn) smAnalyzeBtn.addEventListener('click', analyzeSourcemaps);
+    utils.bindClick('sourcemap-analyze-btn', analyzeSourcemaps);
     var smAnalysisClose = utils.get('sm-analysis-close');
     if (smAnalysisClose)
       smAnalysisClose.addEventListener('click', function () {
@@ -1389,18 +1257,15 @@
       });
 
     // Webpack API endpoint extraction
-    var smApiBtn = utils.get('sourcemap-api-btn');
-    if (smApiBtn) smApiBtn.addEventListener('click', showApiEndpoints);
+    utils.bindClick('sourcemap-api-btn', showApiEndpoints);
     var smApiClose = utils.get('sm-api-close');
     if (smApiClose)
       smApiClose.addEventListener('click', function () {
         var card = utils.get('sm-api-card');
         if (card) card.classList.add('hidden');
       });
-    var smExportJson = utils.get('sourcemap-export-json-btn');
-    if (smExportJson) smExportJson.addEventListener('click', exportModulesJSON);
-    var smExportCsv = utils.get('sourcemap-export-csv-btn');
-    if (smExportCsv) smExportCsv.addEventListener('click', exportModulesCSV);
+    utils.bindClick('sourcemap-export-json-btn', exportModulesJSON);
+    utils.bindClick('sourcemap-export-csv-btn', exportModulesCSV);
 
     // Status bar clock
     const statusTime = utils.get('status-time');

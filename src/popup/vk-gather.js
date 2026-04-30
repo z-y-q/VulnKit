@@ -49,7 +49,7 @@ window.VulnKitGather = (function () {
 
     var fullList = gatherData[currentGatherTab] || [];
     if (fullList.length === 0) {
-      container.innerHTML = '<div class="empty-state">点击「收集当前页面」开始</div>';
+      container.innerHTML = utils.emptyHtml('点击「收集当前页面」开始');
       statusEl.textContent = '';
       return;
     }
@@ -61,7 +61,7 @@ window.VulnKitGather = (function () {
     statusEl.textContent = statusText;
 
     if (list.length === 0) {
-      container.innerHTML = '<div class="empty-state">没有匹配的结果</div>';
+      container.innerHTML = utils.emptyHtml('没有匹配的结果');
       return;
     }
 
@@ -595,9 +595,6 @@ window.VulnKitGather = (function () {
 
   return {
     init: init,
-    renderGatherTab: renderGatherTab,
-    switchGatherTab: switchGatherTab,
-    renderSubTabs: renderSubTabs,
     gatherInfo: gatherInfo,
     restoreData: restoreData,
     applySearchFilter: applySearchFilter,
@@ -617,6 +614,5 @@ window.VulnKitGather = (function () {
     set currentGatherTab(v) {
       currentGatherTab = v;
     },
-    DOM_GROUP: DOM_GROUP,
   };
 })();

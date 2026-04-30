@@ -119,7 +119,7 @@ window.VulnKitHistory = (function () {
     const hasTs = fields.includes('timestamp');
 
     if (items.length === 0) {
-      container.innerHTML = '<div class="empty-state">未找到历史档案</div>';
+      container.innerHTML = utils.emptyHtml('未找到历史档案');
       statusEl.textContent = '无结果';
       return;
     }
@@ -195,7 +195,7 @@ window.VulnKitHistory = (function () {
         '">查看</button>';
       html += '</div>';
     });
-    if (items.length > 200) html += '<div class="empty-state">仅显示前 200 条</div>';
+    if (items.length > 200) html += utils.emptyHtml('仅显示前 200 条');
     container.innerHTML = html;
   }
 

@@ -253,8 +253,7 @@ window.VulnKitRuoYiDetect = (function () {
         if (statusEl) statusEl.textContent = '疑似 RuoYi (' + data.evidence.length + ' 个特征)';
       } else {
         updateWorkflowStep(0);
-        if (resultsEl)
-          resultsEl.innerHTML = '<div class="empty-state">当前页面未检测到 RuoYi 框架特征</div>';
+        if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('当前页面未检测到 RuoYi 框架特征');
         if (statusEl) statusEl.textContent = '未检测到 RuoYi';
       }
     } catch (e) {
@@ -351,12 +350,11 @@ window.VulnKitRuoYiDetect = (function () {
         }
       }
       if (panelEl) {
-        panelEl.innerHTML =
-          '<div class="empty-state">' +
-          (hasToken
+        panelEl.innerHTML = utils.emptyHtml(
+          hasToken
             ? '钩子已就绪，刷新页面或重新登录以触发 /getRouters 请求'
-            : '请先登录 RuoYi 系统，登录后钩子会自动捕获路由数据') +
-          '</div>';
+            : '请先登录 RuoYi 系统，登录后钩子会自动捕获路由数据'
+        );
       }
     } catch (e) {
       if (hookStatusEl) hookStatusEl.textContent = '自动捕获检查失败: ' + e.message;

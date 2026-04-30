@@ -252,7 +252,7 @@ window.VulnKitLinks = (function () {
     }
 
     if (filtered.length === 0) {
-      container.innerHTML = '<div class="empty-state">没有匹配的链接</div>';
+      container.innerHTML = utils.emptyHtml('没有匹配的链接');
       return;
     }
 
