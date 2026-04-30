@@ -92,15 +92,17 @@
       return true;
     }
     if (message.type === 'VK_RUOYI_INJECT_HOOK') {
-      // Hook is auto-injected via manifest.json document_start + world:MAIN
-      // This handler is a fallback for dynamic injection scenarios
       var hookScript = document.createElement('script');
       hookScript.src = chrome.runtime.getURL('src/inject/ruoyi-route-hook.js');
       hookScript.onload = function () {
         hookScript.remove();
+        sendResponse({ status: 'ok', hookReady: !!window.__VK_RUOYI_HOOK__ });
+      };
+      hookScript.onerror = function () {
+        hookScript.remove();
+        sendResponse({ status: 'load-failed' });
       };
       (document.head || document.documentElement).appendChild(hookScript);
-      sendResponse({ status: 'ok' });
       return true;
     }
     if (message.type === 'VK_RUOYI_STATUS') {

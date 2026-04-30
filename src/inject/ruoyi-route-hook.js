@@ -5,16 +5,9 @@
 
   if (window.__VK_RUOYI_HOOK__) return;
 
-  var defaultRouterUrls = [
-    /\/getRouters/i,
-    /\/getRoutes/i,
-    /\/system\/menu\/getRouters/i,
-  ];
+  var defaultRouterUrls = [/\/getRouters/i, /\/getRoutes/i, /\/system\/menu\/getRouters/i];
 
-  var userInfoUrls = [
-    /\/getUserInfo/i,
-    /\/getInfo/i,
-  ];
+  var userInfoUrls = [/\/getUserInfo/i, /\/getInfo/i];
 
   window.__VK_RUOYI_HOOK__ = {
     version: '1.1',
@@ -29,34 +22,82 @@
 
   function getTime() {
     var d = new Date();
-    return String(d.getHours()).padStart(2, '0') + ':' +
-      String(d.getMinutes()).padStart(2, '0') + ':' +
-      String(d.getSeconds()).padStart(2, '0');
+    return (
+      String(d.getHours()).padStart(2, '0') +
+      ':' +
+      String(d.getMinutes()).padStart(2, '0') +
+      ':' +
+      String(d.getSeconds()).padStart(2, '0')
+    );
   }
+
+  var _cachedCustomUrls = '';
+  var _cachedPatterns = null;
 
   function isRouterUrl(url) {
     var hook = window.__VK_RUOYI_HOOK__;
-    var allPatterns = defaultRouterUrls.slice();
-    if (hook.customRouterUrls) {
-      hook.customRouterUrls.forEach(function (custom) {
-        try { allPatterns.push(new RegExp(custom, 'i')); } catch (e) { /* ignore bad regex */ }
+    var customKey = (hook.customRouterUrls || []).join('|');
+    if (customKey !== _cachedCustomUrls) {
+      _cachedCustomUrls = customKey;
+      _cachedPatterns = defaultRouterUrls.slice();
+      (hook.customRouterUrls || []).forEach(function (custom) {
+        try {
+          _cachedPatterns.push(new RegExp(custom, 'i'));
+        } catch (e) {
+          /* ignore */
+        }
       });
     }
-    return allPatterns.some(function (p) { return p.test(url); });
+    return _cachedPatterns.some(function (p) {
+      return p.test(url);
+    });
   }
 
   function isUserInfoUrl(url) {
-    return userInfoUrls.some(function (p) { return p.test(url); });
+    return userInfoUrls.some(function (p) {
+      return p.test(url);
+    });
   }
 
-  function logRequest(type, url, status) {
+  function logRequest(type, url, status, method) {
     var hook = window.__VK_RUOYI_HOOK__;
     if (!hook) return;
-    var entry = { type: type, url: url, status: status || '', time: getTime() };
+    var entry = {
+      type: type,
+      url: url,
+      status: status || '',
+      method: method || '',
+      time: getTime(),
+    };
     if (!hook.requestLog) hook.requestLog = [];
     hook.requestLog.push(entry);
-    // Keep log bounded
     if (hook.requestLog.length > 100) hook.requestLog = hook.requestLog.slice(-50);
+  }
+
+  function findParentByPath(routes, parentPath) {
+    for (var i = 0; i < routes.length; i++) {
+      if (routes[i].path === parentPath) return routes[i];
+      if (routes[i].children) {
+        var found = findParentByPath(routes[i].children, parentPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  function ensureParent(routeArray, parentPath) {
+    var existing = findParentByPath(routeArray, parentPath);
+    if (existing) return existing;
+    var parent = {
+      name: parentPath.replace(/\//g, '') || 'Root',
+      path: parentPath,
+      hidden: false,
+      component: 'Layout',
+      meta: { title: parentPath, icon: 'menu' },
+      children: [],
+    };
+    routeArray.push(parent);
+    return parent;
   }
 
   function mergeExtraRoutes(raw) {
@@ -78,22 +119,39 @@
       var injected = 0;
       config.extraRoutes.forEach(function (extra) {
         if (existing[extra.path]) return;
-        routeArray.push({
-          name: extra.name || extra.path,
-          path: extra.path,
+
+        var segments = extra.path.replace(/^\/+/, '').split('/');
+        var childNode = {
+          name: extra.name || segments.join('') || extra.path,
+          path: extra.childPath || (segments.length > 1 ? segments.slice(1).join('/') : 'index'),
           hidden: false,
-          component: 'Layout',
-          meta: { title: extra.title || extra.path, icon: extra.icon || 'menu' },
-          children: [{
-            name: extra.name ? extra.name + 'Index' : extra.path + 'Index',
-            path: extra.childPath || 'index',
+          component: extra.component || '',
+          meta: {
+            title: extra.title || extra.path,
+            icon: extra.icon || 'menu',
+            activeMenu: extra.path,
+          },
+        };
+
+        if (segments.length > 1) {
+          var parentPath = '/' + segments[0];
+          var parent = ensureParent(routeArray, parentPath);
+          if (!parent.children) parent.children = [];
+          parent.children.push(childNode);
+          existing[extra.path] = true;
+          injected++;
+        } else {
+          routeArray.push({
+            name: extra.name || extra.path,
+            path: extra.path,
             hidden: false,
-            component: extra.component || '',
-            meta: { title: extra.title || extra.path, icon: extra.icon || 'menu', activeMenu: extra.path },
-          }],
-        });
-        existing[extra.path] = true;
-        injected++;
+            component: 'Layout',
+            meta: { title: extra.title || extra.path, icon: extra.icon || 'menu' },
+            children: [childNode],
+          });
+          existing[extra.path] = true;
+          injected++;
+        }
       });
 
       var modified = JSON.stringify(data);
@@ -108,45 +166,65 @@
   window.fetch = function () {
     var args = arguments;
     var url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+    var fetchOpts = args[1] && typeof args[1] === 'object' ? args[1] : {};
+    var fetchMethod = (fetchOpts.method || 'GET').toUpperCase();
     return origFetch.apply(this, args).then(function (response) {
       var config = window.__VK_RUOYI_HOOK__;
       if (!config || !config.enabled) return response;
 
-      if (isRouterUrl(url) && response.ok) {
-        logRequest('router', url, response.status);
-        return response.clone().text().then(function (body) {
-          config.capturedRouters = body;
-          if (config.augmentMode !== 'off' && config.extraRoutes.length > 0) {
-            var result = mergeExtraRoutes(body);
-            if (typeof result === 'object' && result.body) {
-              logRequest('augment', url, 'injected:' + (result.injected || 0));
-              window.postMessage({
+      if (isRouterUrl(url)) {
+        if (!response.ok) {
+          logRequest('router-error', url, response.status, fetchMethod);
+          return response;
+        }
+        logRequest('router', url, response.status, fetchMethod);
+        return response
+          .clone()
+          .text()
+          .then(function (body) {
+            config.capturedRouters = body;
+            if (config.augmentMode !== 'off' && config.extraRoutes.length > 0) {
+              var result = mergeExtraRoutes(body);
+              if (typeof result === 'object' && result.body) {
+                logRequest('augment', url, 'injected:' + (result.injected || 0), fetchMethod);
+                window.postMessage(
+                  {
+                    __vk_ruoyi_hook: true,
+                    event: 'routers_captured',
+                    augmented: true,
+                    injected: result.injected,
+                  },
+                  location.origin
+                );
+                return new Response(result.body, {
+                  status: response.status,
+                  statusText: response.statusText,
+                  headers: response.headers,
+                });
+              }
+            }
+            window.postMessage(
+              {
                 __vk_ruoyi_hook: true,
                 event: 'routers_captured',
-                augmented: true,
-                injected: result.injected,
-              }, '*');
-              return new Response(result.body, {
-                status: response.status,
-                statusText: response.statusText,
-                headers: response.headers,
-              });
-            }
-          }
-          window.postMessage({
-            __vk_ruoyi_hook: true,
-            event: 'routers_captured',
-            augmented: false,
-          }, '*');
-          return response;
-        }).catch(function () {
-          return response;
-        });
+                augmented: false,
+              },
+              location.origin
+            );
+            return response;
+          })
+          .catch(function () {
+            return response;
+          });
       }
 
-      if (isUserInfoUrl(url) && response.ok) {
-        logRequest('userinfo', url, response.status);
-        window.postMessage({ __vk_ruoyi_hook: true, event: 'userinfo_captured' }, '*');
+      if (isUserInfoUrl(url)) {
+        if (!response.ok) {
+          logRequest('userinfo-error', url, response.status, fetchMethod);
+          return response;
+        }
+        logRequest('userinfo', url, response.status, fetchMethod);
+        window.postMessage({ __vk_ruoyi_hook: true, event: 'userinfo_captured' }, location.origin);
       }
 
       return response;
@@ -166,25 +244,43 @@
     var config = window.__VK_RUOYI_HOOK__;
     if (config && config.enabled && this.__vk_ruoyi_url && isRouterUrl(this.__vk_ruoyi_url)) {
       this.addEventListener('readystatechange', function () {
-        if (self.readyState === 4 && self.status === 200) {
+        if (self.readyState === 4) {
+          if (self.status !== 200) {
+            logRequest('router-error', self.__vk_ruoyi_url, self.status, self.__vk_ruoyi_method);
+            return;
+          }
           var original = self.responseText;
-          logRequest('router', self.__vk_ruoyi_url, self.status);
+          logRequest('router', self.__vk_ruoyi_url, self.status, self.__vk_ruoyi_method);
           config.capturedRouters = original;
           if (config.augmentMode !== 'off' && config.extraRoutes.length > 0) {
             var result = mergeExtraRoutes(original);
             if (typeof result === 'object' && result.body) {
-              Object.defineProperty(self, 'responseText', { value: result.body, writable: true, configurable: true });
-              Object.defineProperty(self, 'response', { value: result.body, writable: true, configurable: true });
-              window.postMessage({
-                __vk_ruoyi_hook: true,
-                event: 'routers_captured',
-                augmented: true,
-                injected: result.injected,
-              }, '*');
+              Object.defineProperty(self, 'responseText', {
+                value: result.body,
+                writable: true,
+                configurable: true,
+              });
+              Object.defineProperty(self, 'response', {
+                value: result.body,
+                writable: true,
+                configurable: true,
+              });
+              window.postMessage(
+                {
+                  __vk_ruoyi_hook: true,
+                  event: 'routers_captured',
+                  augmented: true,
+                  injected: result.injected,
+                },
+                location.origin
+              );
               return;
             }
           }
-          window.postMessage({ __vk_ruoyi_hook: true, event: 'routers_captured', augmented: false }, '*');
+          window.postMessage(
+            { __vk_ruoyi_hook: true, event: 'routers_captured', augmented: false },
+            location.origin
+          );
         }
       });
     }

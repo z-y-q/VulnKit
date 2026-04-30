@@ -1401,6 +1401,24 @@ body {
   font-weight: 700;
 }
 
+.ruoyi-route-type {
+  background: #E8F4FD;
+  color: #1565C0;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ruoyi-route-nocache {
+  background: #FFF3E0;
+  color: #E65100;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
 .ruoyi-route-path {
   color: #4A90E2;
   font-weight: 600;
@@ -1802,6 +1820,16 @@ body {
 [data-theme='dark'] .ruoyi-route-roles {
   background: #2e1065;
   color: #c4b5fd;
+}
+
+[data-theme='dark'] .ruoyi-route-type {
+  background: #1e3a5f;
+  color: #90caf9;
+}
+
+[data-theme='dark'] .ruoyi-route-nocache {
+  background: #4e342e;
+  color: #ffb74d;
 }
 
 [data-theme='dark'] .ruoyi-log-entry {
