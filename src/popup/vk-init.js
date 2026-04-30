@@ -1346,22 +1346,29 @@
     });
 
     // Restore RuoYi hook state
+    // The hook always passively captures /getRouters, so always check status for current tab.
     chrome.storage.local.get(['ruoyiHookTabId', 'ruoyiHookEnabled'], result => {
-      if (result.ruoyiHookTabId && result.ruoyiHookEnabled) {
-        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-          if (tabs[0] && tabs[0].id === result.ruoyiHookTabId) {
-            ruoyiHookActive = true;
-            ruoyiTabId = result.ruoyiHookTabId;
-            const installBtn = utils.get('ruoyi-hook-install-btn');
-            const removeBtn = utils.get('ruoyi-hook-remove-btn');
-            if (installBtn) installBtn.disabled = true;
-            if (removeBtn) removeBtn.disabled = false;
-            checkHookStatus();
-          } else {
-            chrome.storage.local.remove(['ruoyiHookTabId', 'ruoyiHookEnabled']);
-          }
-        });
-      }
+      chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+        if (!tabs[0]) return;
+
+        if (
+          result.ruoyiHookTabId &&
+          result.ruoyiHookEnabled &&
+          tabs[0].id === result.ruoyiHookTabId
+        ) {
+          // Was explicitly enabled for this tab — restore full UI
+          ruoyiHookActive = true;
+          ruoyiTabId = result.ruoyiHookTabId;
+          const installBtn = utils.get('ruoyi-hook-install-btn');
+          const removeBtn = utils.get('ruoyi-hook-remove-btn');
+          if (installBtn) installBtn.disabled = true;
+          if (removeBtn) removeBtn.disabled = false;
+          checkHookStatus();
+        } else if (tabs[0].url && /^https?:/.test(tabs[0].url)) {
+          // Always check for passively captured data on http/https pages
+          checkHookStatus();
+        }
+      });
     });
 
     // Restore gather data for current tab

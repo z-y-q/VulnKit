@@ -1,5 +1,6 @@
 // VulnKit - RuoYi Route Hook (document_start, MAIN world)
 // Intercepts fetch/XHR to capture and augment /getRouters responses
+// Capture is ALWAYS active (passive). `enabled` controls augmentation and API logging.
 (function () {
   'use strict';
 
@@ -32,7 +33,7 @@
   }
 
   window.__VK_RUOYI_HOOK__ = {
-    version: '1.3',
+    version: '1.4',
     enabled: configEnabled,
     capturedRouters: null,
     augmentMode: configAugmentMode,
@@ -42,6 +43,7 @@
     apiLog: [],
     hookInstalledAt: Date.now(),
     restoredFromStorage: configEnabled,
+    alwaysCapture: true,
   };
 
   function getTime() {
@@ -216,7 +218,8 @@
     }
   }
 
-  // Fetch hook
+  // Fetch hook — ALWAYS captures router/userinfo data regardless of enabled flag.
+  // enabled only controls augmentation (injecting extra routes) and API traffic logging.
   var origFetch = window.fetch;
   window.fetch = function () {
     var args = arguments;
@@ -225,8 +228,8 @@
     var fetchMethod = (fetchOpts.method || 'GET').toUpperCase();
     return origFetch.apply(this, args).then(function (response) {
       var config = window.__VK_RUOYI_HOOK__;
-      if (!config || !config.enabled) return response;
 
+      // ALWAYS capture /getRouters responses (passive, no modification)
       if (isRouterUrl(url)) {
         if (!response.ok) {
           logRequest('router-error', url, response.status, fetchMethod);
@@ -237,8 +240,15 @@
           .clone()
           .text()
           .then(function (body) {
-            config.capturedRouters = body;
-            if (config.augmentMode !== 'off' && config.extraRoutes.length > 0) {
+            if (config) config.capturedRouters = body;
+
+            // Augmentation (modifying response) only when enabled
+            if (
+              config &&
+              config.enabled &&
+              config.augmentMode !== 'off' &&
+              config.extraRoutes.length > 0
+            ) {
               var result = mergeExtraRoutes(body);
               if (typeof result === 'object' && result.body) {
                 logRequest('augment', url, 'injected:' + (result.injected || 0), fetchMethod);
@@ -273,6 +283,7 @@
           });
       }
 
+      // ALWAYS capture userinfo responses
       if (isUserInfoUrl(url)) {
         if (!response.ok) {
           logRequest('userinfo-error', url, response.status, fetchMethod);
@@ -282,8 +293,8 @@
         window.postMessage({ __vk_ruoyi_hook: true, event: 'userinfo_captured' }, location.origin);
       }
 
-      // Capture all API traffic
-      if (isApiUrl(url) && !isRouterUrl(url) && !isUserInfoUrl(url)) {
+      // API traffic logging only when enabled (more expensive)
+      if (config && config.enabled && isApiUrl(url) && !isRouterUrl(url) && !isUserInfoUrl(url)) {
         response
           .clone()
           .text()
@@ -310,7 +321,10 @@
   XMLHttpRequest.prototype.send = function () {
     var self = this;
     var config = window.__VK_RUOYI_HOOK__;
-    if (config && config.enabled && this.__vk_ruoyi_url && isRouterUrl(this.__vk_ruoyi_url)) {
+    var reqUrl = this.__vk_ruoyi_url;
+
+    // ALWAYS capture router responses (passive)
+    if (reqUrl && isRouterUrl(reqUrl)) {
       this.addEventListener('readystatechange', function () {
         if (self.readyState === 4) {
           if (self.status !== 200) {
@@ -319,8 +333,15 @@
           }
           var original = self.responseText;
           logRequest('router', self.__vk_ruoyi_url, self.status, self.__vk_ruoyi_method);
-          config.capturedRouters = original;
-          if (config.augmentMode !== 'off' && config.extraRoutes.length > 0) {
+          if (config) config.capturedRouters = original;
+
+          // Augmentation only when enabled
+          if (
+            config &&
+            config.enabled &&
+            config.augmentMode !== 'off' &&
+            config.extraRoutes.length > 0
+          ) {
             var result = mergeExtraRoutes(original);
             if (typeof result === 'object' && result.body) {
               Object.defineProperty(self, 'responseText', {
@@ -363,10 +384,10 @@
     } else if (
       config &&
       config.enabled &&
-      this.__vk_ruoyi_url &&
-      isApiUrl(this.__vk_ruoyi_url) &&
-      !isRouterUrl(this.__vk_ruoyi_url) &&
-      !isUserInfoUrl(this.__vk_ruoyi_url)
+      reqUrl &&
+      isApiUrl(reqUrl) &&
+      !isRouterUrl(reqUrl) &&
+      !isUserInfoUrl(reqUrl)
     ) {
       this.addEventListener('load', function () {
         logApiRequest(

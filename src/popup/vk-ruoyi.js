@@ -324,12 +324,14 @@ window.VulnKitRuoYi = (function () {
         return;
       }
 
-      if (statusEl) statusEl.textContent = '安装钩子中...';
+      if (statusEl) statusEl.textContent = '启用钩子中...';
 
       var customUrlInput = utils.get('ruoyi-custom-url');
       var customUrl = (customUrlInput && customUrlInput.value.trim()) || '';
 
-      // Try to enable existing hook (document_start already injected)
+      // The hook is ALWAYS injected at document_start via manifest content_scripts.
+      // It passively captures /getRouters regardless of enabled state.
+      // Here we just enable augmentation mode (extra route injection + API logging).
       var hookResult = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: 'MAIN',
@@ -338,14 +340,13 @@ window.VulnKitRuoYi = (function () {
       });
 
       if (hookResult && hookResult[0] && hookResult[0].result) {
-        // document_start hook was already present and config saved to localStorage
         ruoyiHookActive = true;
         ruoyiTabId = tab.id;
         hookStatus = 'active';
         chrome.storage.local.set({ ruoyiHookTabId: tab.id, ruoyiHookEnabled: true });
         setHookUI(true);
 
-        // Check if router data was already captured (hook was auto-restored from storage)
+        // Check if router data was already passively captured
         var capCheck = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
           world: 'MAIN',
@@ -353,24 +354,22 @@ window.VulnKitRuoYi = (function () {
             var hook = window.__VK_RUOYI_HOOK__;
             return {
               captured: !!hook.capturedRouters,
-              restored: !!hook.restoredFromStorage,
+              logCount: (hook.requestLog || []).length,
             };
           },
         });
         var capData = capCheck && capCheck[0] && capCheck[0].result;
 
         if (capData && capData.captured) {
-          if (statusEl) statusEl.textContent = '钩子已启用 — 路由数据已捕获';
-          utils.showToast('路由钩子已启用，路由数据已捕获', 'success');
+          if (statusEl) statusEl.textContent = '钩子已启用 — 路由数据已被动捕获';
+          utils.showToast('路由数据已捕获', 'success');
           await checkHookStatus();
-        } else if (capData && capData.restored) {
-          if (statusEl) statusEl.textContent = '钩子已从存储恢复 — 正在监听 /getRouters...';
-          utils.showToast('钩子已恢复，等待 /getRouters 请求', 'success');
         } else {
-          // First time: refresh the page so hook captures /getRouters during page load
-          if (statusEl) statusEl.textContent = '钩子已启用，正在刷新页面...';
-          utils.showToast('钩子已启用，刷新页面以捕获 /getRouters', 'success');
-          await chrome.tabs.reload(tab.id);
+          // Hook is listening but /getRouters hasn't been called yet.
+          // No need to force page refresh — tell user to navigate/login.
+          if (statusEl)
+            statusEl.textContent = '钩子已启用，等待 /getRouters 请求（刷新页面或登录后自动捕获）';
+          utils.showToast('钩子已启用，刷新页面或登录以触发 /getRouters', 'success');
         }
         return;
       }
@@ -471,6 +470,7 @@ window.VulnKitRuoYi = (function () {
             installed: true,
             pageUrl: location.href,
             enabled: hook.enabled,
+            alwaysCapture: !!hook.alwaysCapture,
             captured: !!hook.capturedRouters,
             augmentMode: hook.augmentMode,
             extraRouteCount: (hook.extraRoutes || []).length,
@@ -490,28 +490,33 @@ window.VulnKitRuoYi = (function () {
         if (panelEl)
           panelEl.innerHTML =
             '<div class="empty-state">钩子未注入 — 请先点击「安装钩子」' + urlHint + '</div>';
+      } else if (data.captured) {
+        // Data already passively captured — show it regardless of enabled state
+        hookStatus = data.enabled ? 'captured' : 'passive-captured';
+        setHookUI(data.enabled);
+        var modeText = data.enabled ? data.augmentMode || 'auto' : '被动捕获';
+        var extras =
+          data.enabled && data.extraRouteCount > 0
+            ? '，' + data.extraRouteCount + ' 条额外路由'
+            : '';
+        if (statusEl) statusEl.textContent = '已捕获路由数据 (' + modeText + ' 模式' + extras + ')';
+        await fetchCapturedRoutes();
       } else if (!data.enabled) {
-        if (statusEl) statusEl.textContent = '钩子已安装但未启用';
+        // Hook present but not enabled, no data yet
+        if (statusEl)
+          statusEl.textContent = data.alwaysCapture
+            ? '钩子已注入（被动捕获模式），等待 /getRouters...'
+            : '钩子已安装但未启用';
         hookStatus = 'idle';
         setHookUI(false);
-      } else if (!data.captured) {
+        renderRequestLog(tab.id);
+      } else {
+        // Enabled but no data yet
         var logInfo = data.logCount > 0 ? '，已拦截 ' + data.logCount + ' 个请求' : '';
-        var restoreInfo = data.restored ? ' [已恢复]' : '';
-        if (statusEl)
-          statusEl.textContent = '监听中，等待 /getRouters 请求...' + logInfo + restoreInfo;
+        if (statusEl) statusEl.textContent = '监听中，等待 /getRouters 请求...' + logInfo;
         hookStatus = 'active';
         setHookUI(true);
         renderRequestLog(tab.id);
-      } else {
-        hookStatus = 'captured';
-        setHookUI(true);
-        var modeText = data.augmentMode || 'auto';
-        var extras = data.extraRouteCount > 0 ? '，' + data.extraRouteCount + ' 条额外路由' : '';
-        var capRestore = data.restored ? ' [已恢复]' : '';
-        if (statusEl)
-          statusEl.textContent =
-            '已捕获路由数据 (' + modeText + ' 模式' + extras + ')' + capRestore;
-        await fetchCapturedRoutes();
       }
     } catch (e) {
       if (statusEl) statusEl.textContent = '检查失败';
