@@ -1741,6 +1741,16 @@ body {
   color: #1e40af;
 }
 
+.ruoyi-cve-link {
+  font-size: 10px;
+  color: #e74c3c;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ruoyi-cve-link:hover {
+  color: #c0392b;
+}
+
 /* RuoYi — Custom URL input */
 .ruoyi-custom-url-row {
   display: flex;
@@ -1921,6 +1931,13 @@ body {
 [data-theme='dark'] .ruoyi-detect-tag.tag-version {
   background: #1e3a5f;
   color: #93c5fd;
+}
+
+[data-theme='dark'] .ruoyi-cve-link {
+  color: #f87171;
+}
+[data-theme='dark'] .ruoyi-cve-link:hover {
+  color: #fca5a5;
 }
 
 [data-theme='dark'] .ruoyi-custom-url-row {

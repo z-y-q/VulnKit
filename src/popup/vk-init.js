@@ -283,6 +283,7 @@
     exportHtmlReport,
     batchProbeRoutes,
     stopProbe,
+    exportProbeResults,
     loadApiTraffic,
     clearApiTraffic,
     exportApiTraffic,
@@ -1302,6 +1303,8 @@
     if (ruoyiProbeBtn) ruoyiProbeBtn.addEventListener('click', batchProbeRoutes);
     const ruoyiProbeStopBtn = utils.get('ruoyi-probe-stop-btn');
     if (ruoyiProbeStopBtn) ruoyiProbeStopBtn.addEventListener('click', stopProbe);
+    const ruoyiProbeExportBtn = utils.get('ruoyi-probe-export-btn');
+    if (ruoyiProbeExportBtn) ruoyiProbeExportBtn.addEventListener('click', exportProbeResults);
 
     // RuoYi API traffic
     const ruoyiTrafficLoadBtn = utils.get('ruoyi-traffic-load-btn');
