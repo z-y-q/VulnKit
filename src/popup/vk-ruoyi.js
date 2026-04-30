@@ -1443,7 +1443,7 @@ window.VulnKitRuoYi = (function () {
         return;
       }
 
-      // Collect all paths from captured routes + MaR discovered + extra routes
+      // Collect all paths from captured routes + MaR discovered + extra routes + MaR hidden
       var paths = [];
       if (capturedRouterData) {
         extractPathsFromData(capturedRouterData.data || capturedRouterData, paths);
@@ -1452,6 +1452,9 @@ window.VulnKitRuoYi = (function () {
         if (r.path && paths.indexOf(r.path) === -1) paths.push(r.path);
       });
       extraRoutes.forEach(function (r) {
+        if (r.path && paths.indexOf(r.path) === -1) paths.push(r.path);
+      });
+      marHiddenRoutes.forEach(function (r) {
         if (r.path && paths.indexOf(r.path) === -1) paths.push(r.path);
       });
 
