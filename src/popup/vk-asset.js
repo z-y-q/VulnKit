@@ -6,19 +6,9 @@ window.VulnKitAsset = (function () {
   let lastAssetResults = [];
   let customQueryMode = false;
 
-  async function getCurrentDomain() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.url) return null;
-    try {
-      return new URL(tab.url).hostname;
-    } catch {
-      return null;
-    }
-  }
-
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
+  var utils = window.VulnKitUtils.utilsProxy;
+  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
+  var getCurrentDomain = window.VulnKitUtils.getCurrentDomain.bind(window.VulnKitUtils);
 
   function bgFetch(url) {
     return new Promise(function (resolve) {
@@ -55,18 +45,18 @@ window.VulnKitAsset = (function () {
   }
 
   async function getCurrentUrl() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await getActiveTab();
     return tab?.url || null;
   }
 
   function setAssetStatus(text) {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const el = utils.get('asset-status');
     if (el) el.textContent = text;
   }
 
   function getAssetSize() {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const el = utils.get('asset-size');
     return el ? parseInt(el.value, 10) || 10 : 10;
   }
@@ -88,7 +78,7 @@ window.VulnKitAsset = (function () {
         );
       });
     }
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const container = utils.get('asset-results');
     if (!container) return;
     var actionsRow = utils.get('asset-actions-row');
@@ -139,7 +129,7 @@ window.VulnKitAsset = (function () {
   }
 
   function exportData() {
-    var utils = getUtils();
+    var utils = window.VulnKitUtils.utilsProxy;
     if (!lastAssetResults || lastAssetResults.length === 0) {
       utils.showToast('没有可导出的结果', 'warning');
       return;
@@ -196,7 +186,7 @@ window.VulnKitAsset = (function () {
   }
 
   async function scanFofa(query) {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const keys = await getApiKey('fofa');
     if (!keys?.email || !keys?.key) {
       utils.showToast('请先配置 FOFA API Key', 'warning');
@@ -249,7 +239,7 @@ window.VulnKitAsset = (function () {
   }
 
   async function scanZoomEye(query) {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const key = await getApiKey('zoomeye');
     if (!key) {
       utils.showToast('请先配置 ZoomEye API Key', 'warning');
@@ -307,7 +297,7 @@ window.VulnKitAsset = (function () {
   }
 
   async function scanShodan(query) {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const key = await getApiKey('shodan');
     if (!key) {
       utils.showToast('请先配置 Shodan API Key', 'warning');
@@ -359,7 +349,7 @@ window.VulnKitAsset = (function () {
   }
 
   function shodanHostLookup() {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     var inputEl = utils.get('shodan-host-input');
     var input = inputEl ? inputEl.value.trim() : '';
     var container = utils.get('shodan-host-info');
@@ -460,7 +450,7 @@ window.VulnKitAsset = (function () {
   }
 
   function renderShodanHostInfo(container, idbData, shodanData, queryInput, resolvedIp) {
-    var utils = getUtils();
+    var utils = window.VulnKitUtils.utilsProxy;
     var esc =
       utils && utils.escapeHtml
         ? function (s) {
@@ -610,7 +600,7 @@ window.VulnKitAsset = (function () {
   }
 
   async function handleAssetScan() {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const queryEl = utils.get('asset-query');
     let query = queryEl ? queryEl.value.trim() : '';
     if (!query) {
@@ -636,7 +626,7 @@ window.VulnKitAsset = (function () {
 
   function switchAssetSource(source) {
     currentAssetSource = source;
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     document
       .querySelectorAll('.source-btn')
       .forEach(b => b.classList.toggle('active', b.dataset.source === source));
@@ -647,7 +637,7 @@ window.VulnKitAsset = (function () {
 
   function toggleCustomQueryMode(enabled) {
     customQueryMode = enabled;
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const queryInput = utils.get('asset-query');
     const hint = utils.get('asset-query-hint');
     if (queryInput) {
@@ -661,7 +651,7 @@ window.VulnKitAsset = (function () {
   }
 
   function saveApiKeys() {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     var el = id => utils.get(id);
     const keys = {
       fofa_email: (el('key-fofa-email') || {}).value ? el('key-fofa-email').value.trim() : '',
@@ -675,7 +665,7 @@ window.VulnKitAsset = (function () {
   }
 
   function loadApiKeys() {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     chrome.storage.local.get(['pentest_keys'], result => {
       const keys = result.pentest_keys || {};
       if (utils.get('key-fofa-email')) utils.get('key-fofa-email').value = keys.fofa_email || '';
@@ -686,7 +676,7 @@ window.VulnKitAsset = (function () {
   }
 
   function clearApiKeys() {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     chrome.storage.local.remove(['pentest_keys'], () => {
       ['key-fofa-email', 'key-fofa-key', 'key-zoomeye', 'key-shodan'].forEach(id => {
         var el = utils.get(id);

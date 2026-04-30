@@ -166,11 +166,6 @@ body {
 }
 
 /* Side-by-side layout */
-.side-by-side {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
 
 /* Form Styles */
 .form-group {
@@ -523,11 +518,6 @@ body {
 
 .gather-item-copy:hover { background: #E6F0FA; color: #4A90E2; }
 
-.gather-count {
-  font-size: 12px;
-  color: #999;
-  margin-bottom: 4px;
-}
 
 .gather-actions {
   display: flex;
@@ -2596,40 +2586,7 @@ body {
 [data-theme='dark'] .empty-state { color: var(--text-secondary); }
 [data-theme='dark'] .input::placeholder { color: #555; }
 
-/* Export Dropdown */
-.export-dropdown {
-  position: fixed;
-  z-index: 9999;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  min-width: 90px;
-  overflow: hidden;
-}
-.export-dropdown-item {
-  padding: 6px 16px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #333;
-  transition: background 0.15s;
-}
-.export-dropdown-item:hover {
-  background: #f0f4ff;
-  color: #4a90e2;
-}
-[data-theme='dark'] .export-dropdown {
-  background: #1e1e2e;
-  border-color: #333;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-}
-[data-theme='dark'] .export-dropdown-item {
-  color: #ccc;
-}
-[data-theme='dark'] .export-dropdown-item:hover {
-  background: #2a2a4a;
-  color: #4a90e2;
-}
+/* ====== RuoYi Module ====== */
 
 .asset-actions-row {
   display: flex;
@@ -3305,7 +3262,6 @@ body {
 .jsctrl-panel { display: none; }
 .jsctrl-panel.active { display: block; }
 
-.js-toggle-status { margin-bottom: 8px; min-height: 18px; }
 .js-toggle-indicator {
   display: flex;
   align-items: center;
@@ -3679,11 +3635,6 @@ body {
   border-radius: 2px;
 }
 
-.jssearch-match-actions {
-  margin-top: 4px;
-  display: flex;
-  gap: 4px;
-}
 
 /* ====== Route vs Menu Comparison Panel ====== */
 .compare-actions {
@@ -4219,11 +4170,6 @@ body {
   margin-bottom: 4px;
 }
 
-.sourcemap-list {
-  max-height: 200px;
-  overflow-y: auto;
-}
-
 .sourcemap-item {
   display: flex;
   align-items: center;
@@ -4266,18 +4212,9 @@ body {
   margin-bottom: 8px;
 }
 
-.sourcemap-detail-meta {
-  font-size: 11px;
-  color: #999;
-  margin-bottom: 6px;
-}
-
-.sourcemap-results::-webkit-scrollbar,
-.sourcemap-list::-webkit-scrollbar { width: 4px; }
-.sourcemap-results::-webkit-scrollbar-track,
-.sourcemap-list::-webkit-scrollbar-track { background: transparent; }
-.sourcemap-results::-webkit-scrollbar-thumb,
-.sourcemap-list::-webkit-scrollbar-thumb { background: #D0D0D0; border-radius: 2px; }
+.sourcemap-results::-webkit-scrollbar { width: 4px; }
+.sourcemap-results::-webkit-scrollbar-track { background: transparent; }
+.sourcemap-results::-webkit-scrollbar-thumb { background: #D0D0D0; border-radius: 2px; }
 
 [data-theme='dark'] .sourcemap-status { color: var(--text-secondary); }
 [data-theme='dark'] .sourcemap-section-title { background: var(--bg-tertiary); color: var(--accent); }
@@ -4285,24 +4222,8 @@ body {
 [data-theme='dark'] .sourcemap-item:hover { background: var(--bg-tertiary); }
 [data-theme='dark'] .sourcemap-item-name { color: var(--text-primary); }
 [data-theme='dark'] .sourcemap-item-source { color: var(--text-secondary); }
-[data-theme='dark'] .sourcemap-results::-webkit-scrollbar-thumb,
-[data-theme='dark'] .sourcemap-list::-webkit-scrollbar-thumb { background: #3A3A5E; }
+[data-theme='dark'] .sourcemap-results::-webkit-scrollbar-thumb { background: #3A3A5E; }
 
-/* ====== Webpack Stats Bar ====== */
-.sourcemap-stats-bar {
-  font-size: 11px;
-  color: #888;
-  padding: 4px 8px;
-  background: #F8F9FA;
-  border-radius: 4px;
-  margin-bottom: 8px;
-  border: 1px solid #eee;
-}
-[data-theme='dark'] .sourcemap-stats-bar {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border-color: var(--border-color);
-}
 
 /* ====== Webpack Progress Bar ====== */
 .sm-progress {
@@ -4544,15 +4465,6 @@ body {
 }
 @keyframes sm-spin { to { transform: rotate(360deg); } }
 
-/* ====== Webpack Empty State ====== */
-.sm-empty {
-  text-align: center;
-  padding: 30px 10px;
-  color: #999;
-}
-.sm-empty-icon { font-size: 28px; margin-bottom: 8px; }
-.sm-empty-hint { font-size: 11px; color: #bbb; margin-top: 4px; }
-
 /* ====== Webpack Breadcrumb ====== */
 .sm-breadcrumb {
   font-size: 11px;
@@ -4589,7 +4501,6 @@ body {
   background: var(--bg-tertiary) !important;
   color: #FFB74D !important;
 }
-.sourcemap-item-numeric { opacity: 0.7; }
 .sourcemap-section-resolved {
   background: #E8F5E9 !important;
   color: #2E7D32 !important;

@@ -57,4 +57,28 @@
   };
 
   window.VulnKitUtils = utils;
+
+  utils.getActiveTab = async function () {
+    var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    return tabs[0] || null;
+  };
+
+  utils.getCurrentDomain = async function () {
+    var tab = await this.getActiveTab();
+    if (!tab || !tab.url) return '';
+    try {
+      return new URL(tab.url).hostname;
+    } catch (e) {
+      return '';
+    }
+  };
+
+  var self = utils;
+  var utilsProxy = {};
+  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
+    utilsProxy[method] = function () {
+      return self[method].apply(self, arguments);
+    };
+  });
+  utils.utilsProxy = utilsProxy;
 })();

@@ -273,7 +273,6 @@ window.VulnKitRuoYiMar = (function () {
       }
 
       // Step 5: Merge in RuoYi known routes dictionary
-      var jsRouteCount = extractedRoutes.length;
       RUOYI_KNOWN_ROUTES.forEach(function (kr) {
         if (!seenPaths[kr.path]) {
           seenPaths[kr.path] = true;
@@ -294,7 +293,7 @@ window.VulnKitRuoYiMar = (function () {
       }
 
       // Step 6: Compare with captured router data to find hidden routes
-      var capturedPaths = {};
+      var capturedPaths = [];
       var capturedRouterData = state ? state.capturedRouterData : null;
       if (capturedRouterData) {
         var extractPaths = window.VulnKitRuoYiHook
@@ -319,7 +318,7 @@ window.VulnKitRuoYiMar = (function () {
 
       if (routerInfo.currentRoutes) {
         routerInfo.currentRoutes.forEach(function (rp) {
-          capturedPaths[rp] = true;
+          if (capturedPaths.indexOf(rp) === -1) capturedPaths.push(rp);
         });
       }
 
@@ -328,7 +327,7 @@ window.VulnKitRuoYiMar = (function () {
         if (r.type === 'component-ref') return true;
         return (
           r.path &&
-          !capturedPaths[r.path] &&
+          capturedPaths.indexOf(r.path) === -1 &&
           r.path !== '/' &&
           r.path !== '/login' &&
           r.path !== '*'
@@ -628,6 +627,13 @@ window.VulnKitRuoYiMar = (function () {
                   if (r2) return r2;
                 }
               }
+            }
+            var allEls = document.querySelectorAll('*');
+            for (var ai = 0; ai < allEls.length; ai++) {
+              var ael = allEls[ai];
+              if (ael.__vue__ && ael.__vue__.$router) return ael.__vue__.$router;
+              if (ael.__vue__ && ael.__vue__.$root && ael.__vue__.$root.$router)
+                return ael.__vue__.$root.$router;
             }
             return null;
           }

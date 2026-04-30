@@ -4,19 +4,7 @@ window.VulnKitEncoding = (function () {
 
   const ENCODING_NAMES = { base64: 'Base64', url: 'URL', html: 'HTML', hex: 'Hex' };
   let currentEncodingType = 'base64';
-
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
-
-  var utils = {};
-  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
-    utils[method] = function () {
-      var u = getUtils();
-      if (!u || typeof u[method] !== 'function') return undefined;
-      return u[method].apply(u, arguments);
-    };
-  });
+  var utils = window.VulnKitUtils.utilsProxy;
 
   const encodingTools = {
     base64: {

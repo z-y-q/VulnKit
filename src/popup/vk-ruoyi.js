@@ -322,7 +322,7 @@ window.VulnKitRuoYi = (function () {
       if (resultsEl) resultsEl.innerHTML = '<div class="empty-state">已清除</div>';
       utils.showToast('已清除额外路由', 'info');
     } catch (e) {
-      // ignore
+      console.warn('[VulnKit] clearExtraRoutes:', e);
     }
   }
 
@@ -340,7 +340,7 @@ window.VulnKitRuoYi = (function () {
         args: [mode],
       });
     } catch (e) {
-      // ignore
+      console.warn('[VulnKit] setAugmentMode:', e);
     }
   }
 
@@ -609,7 +609,7 @@ window.VulnKitRuoYi = (function () {
         });
       });
     } catch (e) {
-      // ignore
+      console.warn('[VulnKit] loadApiTraffic:', e);
     }
   }
 

@@ -10,18 +10,8 @@ window.VulnKitSpoof = (function () {
     headers: { xff: '', referer: '', clientIp: '', custom: [] },
   };
 
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
-
-  var utils = {};
-  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
-    utils[method] = function () {
-      var u = getUtils();
-      if (!u || typeof u[method] !== 'function') return undefined;
-      return u[method].apply(u, arguments);
-    };
-  });
+  var utils = window.VulnKitUtils.utilsProxy;
+  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   function confirmAction(message, onConfirm) {
     var safeMsg = utils.escapeHtml(message);
@@ -213,7 +203,7 @@ window.VulnKitSpoof = (function () {
     }
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab?.url) {
         utils.showToast('无法获取当前页面', 'error');
         return;
@@ -249,7 +239,7 @@ window.VulnKitSpoof = (function () {
 
   async function resetUserAgent() {
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
 
       spoofState.ua.enabled = false;
       spoofState.ua.current = '';
@@ -279,7 +269,7 @@ window.VulnKitSpoof = (function () {
     if (!domainEl || !listEl) return;
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab?.url) {
         domainEl.textContent = '无法获取当前页面';
         return;
@@ -445,7 +435,7 @@ window.VulnKitSpoof = (function () {
   }
 
   async function saveCookieEdit(isNew) {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await getActiveTab();
     if (!tab?.url) return;
     const url = new URL(tab.url);
 
@@ -485,9 +475,9 @@ window.VulnKitSpoof = (function () {
 
   function deleteCookie(cookieName) {
     confirmAction('确定删除 Cookie「' + cookieName + '」？', function () {
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (!tabs[0]?.url) return;
-        var url = new URL(tabs[0].url);
+      getActiveTab().then(function (tab) {
+        if (!tab?.url) return;
+        var url = new URL(tab.url);
         chrome.cookies.remove({ url: url.origin, name: cookieName }, function () {
           if (chrome.runtime.lastError) {
             utils.showToast('删除失败: ' + chrome.runtime.lastError.message, 'error');
@@ -529,7 +519,7 @@ window.VulnKitSpoof = (function () {
   }
 
   async function importCookieString(cookieStr) {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await getActiveTab();
     if (!tab?.url) return;
     const url = new URL(tab.url);
     let count = 0;
@@ -561,20 +551,19 @@ window.VulnKitSpoof = (function () {
   }
 
   function clearAllCookies() {
-    confirmAction('确定清除当前域名所有 Cookie？此操作不可撤销。', function () {
-      chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
-        if (!tabs[0]?.url) return;
-        var url = new URL(tabs[0].url);
-        var domain = url.hostname;
-        var cookies = await chrome.cookies.getAll({ domain: domain });
-        var count = 0;
-        for (var i = 0; i < cookies.length; i++) {
-          await chrome.cookies.remove({ url: url.origin, name: cookies[i].name });
-          count++;
-        }
-        utils.showToast('已清除 ' + count + ' 个 Cookie', 'success');
-        loadCookies();
-      });
+    confirmAction('确定清除当前域名所有 Cookie？此操作不可撤销。', async function () {
+      var tab = await getActiveTab();
+      if (!tab?.url) return;
+      var url = new URL(tab.url);
+      var domain = url.hostname;
+      var cookies = await chrome.cookies.getAll({ domain: domain });
+      var count = 0;
+      for (var i = 0; i < cookies.length; i++) {
+        await chrome.cookies.remove({ url: url.origin, name: cookies[i].name });
+        count++;
+      }
+      utils.showToast('已清除 ' + count + ' 个 Cookie', 'success');
+      loadCookies();
     });
   }
 
@@ -592,7 +581,7 @@ window.VulnKitSpoof = (function () {
     if (refererPreset === 'none') referer = '';
     else if (refererPreset === 'same') {
       try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tab = await getActiveTab();
         referer = tab && tab.url ? new URL(tab.url).origin + new URL(tab.url).pathname : '';
       } catch {
         referer = '';
@@ -610,7 +599,7 @@ window.VulnKitSpoof = (function () {
     spoofState.headers = { xff, referer, clientIp, custom: customHeaders };
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab?.url) {
         utils.showToast('无法获取当前页面', 'error');
         return;
@@ -677,7 +666,7 @@ window.VulnKitSpoof = (function () {
     spoofState.headers = { xff: '', referer: '', clientIp: '', custom: [] };
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       chrome.runtime.sendMessage({ type: 'RESET_SPOOF_HEADERS', tabId: tab?.id }, response => {
         if (chrome.runtime.lastError || !response?.success) {
           utils.showToast(
@@ -695,7 +684,7 @@ window.VulnKitSpoof = (function () {
   }
 
   async function exportCookies() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await getActiveTab();
     if (!tab?.url) {
       utils.showToast('无法获取当前页面', 'error');
       return;
@@ -775,7 +764,7 @@ window.VulnKitSpoof = (function () {
   }
 
   async function importCookieJson(jsonStr) {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await getActiveTab();
     if (!tab?.url) return;
     const url = new URL(tab.url);
 

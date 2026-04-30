@@ -2,18 +2,7 @@
 window.VulnKitJwt = (function () {
   'use strict';
 
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
-
-  var utils = {};
-  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
-    utils[method] = function () {
-      var u = getUtils();
-      if (!u || typeof u[method] !== 'function') return undefined;
-      return u[method].apply(u, arguments);
-    };
-  });
+  var utils = window.VulnKitUtils.utilsProxy;
 
   function base64UrlDecode(str) {
     var base64 = str.replace(/-/g, '+').replace(/_/g, '/');

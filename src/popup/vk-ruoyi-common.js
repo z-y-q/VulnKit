@@ -3,23 +3,8 @@
 window.VulnKitRuoYiCommon = (function () {
   'use strict';
 
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
-
-  var utils = {};
-  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
-    utils[method] = function () {
-      var u = getUtils();
-      if (!u || typeof u[method] !== 'function') return undefined;
-      return u[method].apply(u, arguments);
-    };
-  });
-
-  async function getActiveTab() {
-    var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    return tabs[0] || null;
-  }
+  var utils = window.VulnKitUtils.utilsProxy;
+  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   function updateWorkflowStep(step) {
     var steps = document.querySelectorAll('.ruoyi-wf-step');
@@ -37,7 +22,6 @@ window.VulnKitRuoYiCommon = (function () {
   }
 
   return {
-    getUtils: getUtils,
     utils: utils,
     getActiveTab: getActiveTab,
     updateWorkflowStep: updateWorkflowStep,

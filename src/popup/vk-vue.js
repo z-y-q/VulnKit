@@ -1,19 +1,8 @@
 window.VulnKitVue = (function () {
   'use strict';
 
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
-
-  // Lazy utils proxy - always resolves at call time
-  var utils = {};
-  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
-    utils[method] = function () {
-      var u = getUtils();
-      if (!u || typeof u[method] !== 'function') return undefined;
-      return u[method].apply(u, arguments);
-    };
-  });
+  var utils = window.VulnKitUtils.utilsProxy;
+  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   // ====== Vue Analysis ======
   let lastVueResult = '';
@@ -88,7 +77,7 @@ window.VulnKitVue = (function () {
     resultsEl.innerHTML = '';
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab?.id) {
         statusEl.textContent = '无法获取当前标签页';
         return;
@@ -246,7 +235,7 @@ window.VulnKitVue = (function () {
   }
 
   async function exportVueRoutes() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await getActiveTab();
     if (!tab?.id) return;
 
     try {
@@ -309,7 +298,7 @@ window.VulnKitVue = (function () {
   }
 
   async function bypassVueGuards() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await getActiveTab();
     if (!tab?.id) return;
 
     try {
@@ -376,7 +365,7 @@ window.VulnKitVue = (function () {
   }
 
   async function disableRouteAuth() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await getActiveTab();
     if (!tab?.id) return;
 
     try {
@@ -929,7 +918,7 @@ window.VulnKitVue = (function () {
   async function startPermInterception() {
     var statusEl = utils.get('perm-status');
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab?.id) {
         if (statusEl) statusEl.textContent = '无法获取当前标签页';
         return;
@@ -977,7 +966,7 @@ window.VulnKitVue = (function () {
   async function stopPermInterception() {
     stopPermAutoRefresh();
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab?.id) return;
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -1006,7 +995,7 @@ window.VulnKitVue = (function () {
 
   async function refreshPermCaptured() {
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab?.id) return;
       var results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -1457,7 +1446,7 @@ window.VulnKitVue = (function () {
     }
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab?.id) {
         utils.showToast('无法获取当前标签页', 'error');
         return;
@@ -1621,7 +1610,7 @@ window.VulnKitVue = (function () {
     lastJsMatchContexts = [];
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab?.id) return;
 
       // 1. Search inline scripts
@@ -2103,11 +2092,11 @@ window.VulnKitVue = (function () {
     if (progressEl && !progressEl.textContent.includes('完成')) {
       progressEl.textContent += ' (已停止)';
     }
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      if (!tabs[0]?.id) return;
+    getActiveTab().then(function (tab) {
+      if (!tab?.id) return;
       chrome.scripting
         .executeScript({
-          target: { tabId: tabs[0].id },
+          target: { tabId: tab.id },
           world: 'MAIN',
           func: function () {
             window.__VULN_TRAVERSE_ACTIVE__ = false;
@@ -2137,7 +2126,7 @@ window.VulnKitVue = (function () {
     } else {
       // Fetch all routes from page
       try {
-        var [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        var tab = await getActiveTab();
         if (!tab?.id) {
           utils.showToast('无法获取当前标签页', 'error');
           return;
@@ -2223,7 +2212,7 @@ window.VulnKitVue = (function () {
     if (logEl) logEl.innerHTML = '';
     updateTraverseProgress(0, routes.length, '准备中...');
 
-    var [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    var tab = await getActiveTab();
     if (!tab?.id) {
       stopTraverse();
       utils.showToast('无法获取当前标签页', 'error');
@@ -2317,7 +2306,7 @@ window.VulnKitVue = (function () {
     if (statusEl) statusEl.textContent = '对比中...';
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab?.id) {
         if (statusEl) statusEl.textContent = '无法获取当前标签页';
         return;
@@ -2483,7 +2472,7 @@ window.VulnKitVue = (function () {
     if (statusEl) statusEl.textContent = '正在探索 Store...';
 
     try {
-      var [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      var tab = await getActiveTab();
       if (!tab || !tab.id) {
         if (statusEl) statusEl.textContent = '无法获取标签页';
         return;
@@ -2759,7 +2748,7 @@ window.VulnKitVue = (function () {
 
   async function copyFullStoreJson() {
     try {
-      var [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      var tab = await getActiveTab();
       if (!tab || !tab.id) return;
       var data = await chrome.tabs.sendMessage(tab.id, { type: 'VK_VUE_STORE_EXPLORE' });
       if (!data || data.error) {

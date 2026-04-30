@@ -1,17 +1,8 @@
 window.VulnKitSourcemap = (function () {
   'use strict';
 
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
-  var utils = {};
-  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
-    utils[method] = function () {
-      var u = getUtils();
-      if (!u || typeof u[method] !== 'function') return undefined;
-      return u[method].apply(u, arguments);
-    };
-  });
+  var utils = window.VulnKitUtils.utilsProxy;
+  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   // --- State ---
   let sourcemapModules = [];
@@ -147,8 +138,7 @@ window.VulnKitSourcemap = (function () {
     smUpdateProgress(0, 1);
 
     try {
-      var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      var tab = tabs[0];
+      var tab = await getActiveTab();
       if (!tab || !tab.id || !tab.url || tab.url.startsWith('chrome')) {
         statusEl.textContent = '无法扫描此页面';
         if (scanBtn) {
@@ -1991,8 +1981,7 @@ window.VulnKitSourcemap = (function () {
       return;
     }
     try {
-      var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      var tab = tabs[0];
+      var tab = await getActiveTab();
       if (!tab || !tab.id) {
         utils.showToast('无法获取当前标签页', 'warning');
         return;

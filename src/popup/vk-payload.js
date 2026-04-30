@@ -2,9 +2,7 @@
 window.VulnKitPayload = (function () {
   'use strict';
 
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
+  var utils = window.VulnKitUtils.utilsProxy;
 
   const XSS_DATA = {
     'Cookie 窃取': [
@@ -348,7 +346,7 @@ window.VulnKitPayload = (function () {
   };
 
   function renderPayloadCategories(containerId, data, collapsed, filterText) {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const container = utils.get(containerId);
     if (!container) return;
     container.innerHTML = '';
@@ -407,12 +405,12 @@ window.VulnKitPayload = (function () {
       .querySelectorAll('.payload-tab')
       .forEach(b => b.classList.toggle('active', b.dataset.ptab === tab));
     document.querySelectorAll('.payload-panel').forEach(p => p.classList.remove('active'));
-    const target = getUtils().get('ptab-' + tab);
+    const target = window.VulnKitUtils.utilsProxy.get('ptab-' + tab);
     if (target) target.classList.add('active');
   }
 
   function generateReverseShell() {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const ip = (utils.get('revshell-ip') || {}).value || '';
     const port = (utils.get('revshell-port') || {}).value || '4444';
     const type = (utils.get('revshell-type') || {}).value || 'bash';
@@ -427,7 +425,7 @@ window.VulnKitPayload = (function () {
   }
 
   function renderAllReverseShells() {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const container = utils.get('revshell-all');
     if (!container) return;
     container.innerHTML = '<div class="revshell-section-title">全部 Shell 类型一览</div>';
@@ -456,7 +454,7 @@ window.VulnKitPayload = (function () {
   }
 
   function renderSqliPayloads(filterText) {
-    const utils = getUtils();
+    const utils = window.VulnKitUtils.utilsProxy;
     const n = parseInt((utils.get('sqli-columns') || {}).value) || 3;
     const table = (utils.get('sqli-table') || {}).value || 'users';
     renderPayloadCategories('sqli-categories', buildSqliPayloads(n, table), false, filterText);

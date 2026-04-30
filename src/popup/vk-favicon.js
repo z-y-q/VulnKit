@@ -2,10 +2,6 @@
 window.VulnKitFavicon = (function () {
   'use strict';
 
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
-
   function mm3hash32(str) {
     const seed = 0;
     const c1 = 0xcc9e2d51;
@@ -53,8 +49,8 @@ window.VulnKitFavicon = (function () {
 
   async function extractFavicon() {
     try {
-      const utils = getUtils();
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const utils = window.VulnKitUtils;
+      const tab = await utils.getActiveTab();
       if (!tab?.url) {
         utils.showToast('无法获取当前页面', 'error');
         return;
@@ -156,12 +152,12 @@ window.VulnKitFavicon = (function () {
 
       utils.showToast('图标提取成功', 'success');
     } catch (e) {
-      getUtils().showToast('提取失败: ' + e.message, 'error');
+      window.VulnKitUtils.showToast('提取失败: ' + e.message, 'error');
     }
   }
 
   function copyFaviconUrl() {
-    var utils = getUtils();
+    var utils = window.VulnKitUtils;
     var urlEl = utils.get('favicon-url');
     if (!urlEl || urlEl.textContent === '-') {
       utils.showToast('请先提取图标', 'warning');

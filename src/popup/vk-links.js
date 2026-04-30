@@ -3,27 +3,15 @@ window.VulnKitLinks = (function () {
   'use strict';
 
   let allLinks = [];
-
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
-
-  // Lazy utils proxy
-  var utils = {};
-  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
-    utils[method] = function () {
-      var u = getUtils();
-      if (!u || typeof u[method] !== 'function') return undefined;
-      return u[method].apply(u, arguments);
-    };
-  });
+  var utils = window.VulnKitUtils.utilsProxy;
+  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   async function extractLinks() {
     var statusEl = utils.get('links-count');
     if (statusEl) statusEl.textContent = '正在提取...';
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab || !tab.url) {
         if (statusEl) statusEl.textContent = '无法获取当前页面';
         return;

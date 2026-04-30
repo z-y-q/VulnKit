@@ -7,19 +7,8 @@
 window.VulnKitJsCtrl = (function () {
   'use strict';
 
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
-
-  // Lazy utils proxy
-  var utils = {};
-  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
-    utils[method] = function () {
-      var u = getUtils();
-      if (!u || typeof u[method] !== 'function') return undefined;
-      return u[method].apply(u, arguments);
-    };
-  });
+  var utils = window.VulnKitUtils.utilsProxy;
+  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   // ====== JS Control ======
   var currentJsCtrlTab = 'jstoggle';
@@ -88,7 +77,7 @@ window.VulnKitJsCtrl = (function () {
 
     var tab;
     try {
-      tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+      tab = await getActiveTab();
     } catch (e) {}
     if (!tab || !tab.id) {
       updateJsToggleStatus();
@@ -133,7 +122,7 @@ window.VulnKitJsCtrl = (function () {
 
     var tab;
     try {
-      tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+      tab = await getActiveTab();
     } catch (e) {}
     if (!tab || !tab.id) {
       updateJsToggleStatus();
@@ -177,8 +166,7 @@ window.VulnKitJsCtrl = (function () {
     updateAntidebugIndicator('warn', '正在扫描...');
 
     try {
-      var queryResult = await chrome.tabs.query({ active: true, currentWindow: true });
-      var tab = queryResult[0];
+      var tab = await getActiveTab();
       if (!tab || !tab.id) return;
 
       // Phase 1: inline script scan (MAIN world)
@@ -367,8 +355,7 @@ window.VulnKitJsCtrl = (function () {
   }
 
   async function bypassAntiDebug() {
-    var queryResult = await chrome.tabs.query({ active: true, currentWindow: true });
-    var tab = queryResult[0];
+    var tab = await getActiveTab();
     if (!tab || !tab.id) return;
 
     try {
@@ -461,8 +448,7 @@ window.VulnKitJsCtrl = (function () {
   }
 
   async function clearScriptBlock() {
-    var queryResult = await chrome.tabs.query({ active: true, currentWindow: true });
-    var tab = queryResult[0];
+    var tab = await getActiveTab();
     if (!tab || !tab.id) return;
 
     try {
@@ -512,7 +498,7 @@ window.VulnKitJsCtrl = (function () {
 
     var tab;
     try {
-      tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+      tab = await getActiveTab();
     } catch (e) {}
     if (!tab || !tab.id) {
       updateUncopyIndicator('off', '无法获取当前标签页');

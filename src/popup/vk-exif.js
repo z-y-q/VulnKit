@@ -4,18 +4,8 @@ window.VulnKitExif = (function () {
 
   let lastExifData = null;
 
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
-
-  var utils = {};
-  ['get', 'escapeHtml', 'copyText', 'showToast'].forEach(function (method) {
-    utils[method] = function () {
-      var u = getUtils();
-      if (!u || typeof u[method] !== 'function') return undefined;
-      return u[method].apply(u, arguments);
-    };
-  });
+  var utils = window.VulnKitUtils.utilsProxy;
+  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   const EXIF_SECTIONS = [
     {
@@ -308,7 +298,7 @@ window.VulnKitExif = (function () {
     container.innerHTML = '<div class="empty-state">正在扫描...</div>';
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
       if (!tab?.url) {
         container.innerHTML = '<div class="empty-state">无法获取当前页面</div>';
         return;

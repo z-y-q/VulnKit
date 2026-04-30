@@ -12,9 +12,8 @@ window.VulnKitGather = (function () {
   var loadedRules = [];
   var searchFilter = '';
 
-  function getUtils() {
-    return window.VulnKitUtils || null;
-  }
+  var utils = window.VulnKitUtils.utilsProxy;
+  var getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   function getHaeRules() {
     return window.VulnKitHaeRules || null;
@@ -33,7 +32,7 @@ window.VulnKitGather = (function () {
   }
 
   function updateSearchVisibility() {
-    var utils = getUtils();
+    var utils = window.VulnKitUtils.utilsProxy;
     var searchInput = utils ? utils.get('gather-search') : null;
     if (!searchInput) return;
     var hasData = Object.keys(gatherData).some(function (k) {
@@ -43,7 +42,7 @@ window.VulnKitGather = (function () {
   }
 
   function renderGatherTab() {
-    var utils = getUtils();
+    var utils = window.VulnKitUtils.utilsProxy;
     var list = getFilteredList();
     var container = utils.get('gather-results');
     var statusEl = utils.get('gather-status');
@@ -97,7 +96,7 @@ window.VulnKitGather = (function () {
   function switchGatherTab(tab) {
     currentGatherTab = tab;
     searchFilter = '';
-    var utils = getUtils();
+    var utils = window.VulnKitUtils.utilsProxy;
     var searchInput = utils ? utils.get('gather-search') : null;
     if (searchInput) searchInput.value = '';
     document.querySelectorAll('.gather-tab').forEach(function (b) {
@@ -112,7 +111,7 @@ window.VulnKitGather = (function () {
   }
 
   function renderSubTabs() {
-    var utils = getUtils();
+    var utils = window.VulnKitUtils.utilsProxy;
     var container = utils ? utils.get('gather-sub-tabs') : null;
     if (!container) return;
 
@@ -271,13 +270,12 @@ window.VulnKitGather = (function () {
   }
 
   async function gatherInfo() {
-    var utils = getUtils();
+    var utils = window.VulnKitUtils.utilsProxy;
     var statusEl = utils.get('gather-status');
     if (statusEl) statusEl.textContent = '正在收集...';
 
     try {
-      var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      var tab = tabs[0];
+      var tab = await getActiveTab();
       if (!tab || !tab.url) {
         if (statusEl) statusEl.textContent = '无法获取当前页面';
         return;
@@ -537,7 +535,7 @@ window.VulnKitGather = (function () {
         currentGatherTab = firstGroup;
         renderGatherTab();
 
-        var utils = getUtils();
+        var utils = window.VulnKitUtils.utilsProxy;
         var statusEl = utils.get('gather-status');
         var total = Object.values(gatherData).reduce(function (s, a) {
           return s + (Array.isArray(a) ? a.length : 0);
@@ -548,7 +546,7 @@ window.VulnKitGather = (function () {
   }
 
   function exportAllData() {
-    var utils = getUtils();
+    var utils = window.VulnKitUtils.utilsProxy;
     var total = Object.values(gatherData).reduce(function (s, a) {
       return s + (Array.isArray(a) ? a.length : 0);
     }, 0);
@@ -597,7 +595,7 @@ window.VulnKitGather = (function () {
   }
 
   function copyAllData() {
-    var utils = getUtils();
+    var utils = window.VulnKitUtils.utilsProxy;
     var list = gatherData[currentGatherTab] || [];
     if (list.length === 0) {
       utils.showToast('当前分组没有数据', 'warning');

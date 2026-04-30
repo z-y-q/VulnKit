@@ -72,15 +72,8 @@
       configurable: true,
     },
   });
-  async function getCurrentDomain() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.url) return null;
-    try {
-      return new URL(tab.url).hostname;
-    } catch {
-      return null;
-    }
-  }
+  const getCurrentDomain = window.VulnKitUtils.getCurrentDomain.bind(window.VulnKitUtils);
+  const getActiveTab = window.VulnKitUtils.getActiveTab.bind(window.VulnKitUtils);
 
   // ====== URL Multi-Open (loaded from vk-multiurl.js) ======
   const { parseUrls, updateMultiurlInfo, handleMultiurlOpen, handleMultiurlDedup, copyAllUrls } =
@@ -1329,8 +1322,8 @@
     // Restore perm intercept state
     chrome.storage.local.get(['permInterceptTabId'], result => {
       if (result.permInterceptTabId) {
-        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-          if (tabs[0] && tabs[0].id === result.permInterceptTabId) {
+        getActiveTab().then(tab => {
+          if (tab && tab.id === result.permInterceptTabId) {
             permInterceptActive = true;
             const startBtn = utils.get('perm-start-btn');
             const stopBtn = utils.get('perm-stop-btn');
@@ -1351,8 +1344,8 @@
     // Restore JS toggle state
     chrome.storage.local.get(['js_blocked_tabId'], result => {
       if (result.js_blocked_tabId) {
-        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-          if (tabs[0] && tabs[0].id === result.js_blocked_tabId) {
+        getActiveTab().then(tab => {
+          if (tab && tab.id === result.js_blocked_tabId) {
             jsBlocked = true;
             updateJsToggleStatus();
           } else {
@@ -1365,14 +1358,10 @@
     // Restore RuoYi hook state
     // The hook always passively captures /getRouters, so always check status for current tab.
     chrome.storage.local.get(['ruoyiHookTabId', 'ruoyiHookEnabled'], result => {
-      chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-        if (!tabs[0]) return;
+      getActiveTab().then(tab => {
+        if (!tab) return;
 
-        if (
-          result.ruoyiHookTabId &&
-          result.ruoyiHookEnabled &&
-          tabs[0].id === result.ruoyiHookTabId
-        ) {
+        if (result.ruoyiHookTabId && result.ruoyiHookEnabled && tab.id === result.ruoyiHookTabId) {
           // Was explicitly enabled for this tab — restore full UI
           ruoyiHookActive = true;
           ruoyiTabId = result.ruoyiHookTabId;
@@ -1381,7 +1370,7 @@
           if (installBtn) installBtn.disabled = true;
           if (removeBtn) removeBtn.disabled = false;
           checkHookStatus();
-        } else if (tabs[0].url && /^https?:/.test(tabs[0].url)) {
+        } else if (tab.url && /^https?:/.test(tab.url)) {
           // Always check for passively captured data on http/https pages
           checkHookStatus();
         }
@@ -1389,8 +1378,8 @@
     });
 
     // Restore gather data for current tab
-    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-      const currentUrl = tabs[0]?.url || '';
+    getActiveTab().then(tab => {
+      const currentUrl = tab?.url || '';
       gather.restoreData(currentUrl);
       chrome.storage.local.get(['allLinks', 'allLinksUrl'], result => {
         if (result.allLinks && result.allLinksUrl === currentUrl) {
