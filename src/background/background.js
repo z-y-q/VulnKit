@@ -412,19 +412,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           signal: controller.signal,
           headers: message.headers || {},
         })
-          .then(resp => {
+          .then(async resp => {
             clearTimeout(timer);
             const hdrs = {};
             resp.headers.forEach((v, k) => {
               hdrs[k] = v;
             });
-            sendResponse({
+            const result = {
               status: resp.status,
               statusText: resp.statusText,
               headers: hdrs,
               redirected: resp.redirected,
               url: resp.url,
-            });
+            };
+            if (message.includeBody && resp.status >= 200 && resp.status < 300) {
+              try {
+                result.body = await resp.text();
+              } catch {
+                result.body = '';
+              }
+            }
+            sendResponse(result);
           })
           .catch(e => {
             clearTimeout(timer);

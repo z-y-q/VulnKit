@@ -237,6 +237,11 @@ window.VulnKitRuoYi = (function () {
         if (statusEl)
           statusEl.textContent = '检测到 RuoYi 框架 (' + data.evidence.length + ' 个特征)';
         utils.showToast('检测到 RuoYi 框架', 'success');
+
+        // Auto-check hook status and try to capture routes after detection
+        setTimeout(function () {
+          autoCaptureRoutes(tab.id, data.cookieToken);
+        }, 300);
       } else if (data.evidence.length > 0) {
         if (resultsEl)
           resultsEl.innerHTML = buildDetectHtml(
@@ -253,6 +258,113 @@ window.VulnKitRuoYi = (function () {
     } catch (e) {
       if (statusEl) statusEl.textContent = '检测出错';
       utils.showToast('检测失败: ' + e.message, 'error');
+    }
+  }
+
+  // ====== Auto Capture (called after RuoYi detection) ======
+
+  async function autoCaptureRoutes(tabId, hasToken) {
+    var hookStatusEl = utils.get('ruoyi-hook-status');
+    var panelEl = utils.get('ruoyi-captured-panel');
+    try {
+      // Step 1: Check if hook already captured data
+      var checkResult = await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        world: 'MAIN',
+        func: function () {
+          var hook = window.__VK_RUOYI_HOOK__;
+          return {
+            installed: !!hook,
+            captured: hook ? !!hook.capturedRouters : false,
+          };
+        },
+      });
+      var status = checkResult && checkResult[0] && checkResult[0].result;
+
+      if (status && status.captured) {
+        // Already have data — show it
+        if (hookStatusEl) hookStatusEl.textContent = '已捕获路由数据 (被动捕获模式)';
+        await fetchCapturedRoutes();
+        return;
+      }
+
+      // Step 2: Try to actively fetch /getRouters via background (bypasses CORS)
+      if (hasToken) {
+        // Get cookies from the page for authentication
+        var cookieResult = await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          world: 'MAIN',
+          func: function () {
+            return document.cookie || '';
+          },
+        });
+        var cookies = (cookieResult && cookieResult[0] && cookieResult[0].result) || '';
+        var cookieHeader = cookies ? { Cookie: cookies } : {};
+
+        // Try common RuoYi router URLs
+        var routerPaths = [
+          '/getRouters',
+          '/system/menu/getRouters',
+          '/prod-api/getRouters',
+          '/api/getRouters',
+        ];
+        var tab = await getActiveTab();
+        var origin = tab.url ? new URL(tab.url).origin : '';
+
+        for (var i = 0; i < routerPaths.length; i++) {
+          var probeUrl = origin + routerPaths[i];
+          var resp = await chrome.runtime
+            .sendMessage({
+              type: 'FETCH_PROBE',
+              url: probeUrl,
+              method: 'GET',
+              timeout: 8000,
+              followRedirect: false,
+              includeBody: true,
+              headers: cookieHeader,
+            })
+            .catch(function () {
+              return null;
+            });
+
+          if (resp && resp.status === 200 && resp.body) {
+            // Inject captured data into hook
+            await chrome.scripting.executeScript({
+              target: { tabId: tabId },
+              world: 'MAIN',
+              func: function (body) {
+                if (window.__VK_RUOYI_HOOK__) {
+                  window.__VK_RUOYI_HOOK__.capturedRouters = body;
+                }
+              },
+              args: [resp.body],
+            });
+            if (hookStatusEl) hookStatusEl.textContent = '已主动获取路由数据';
+            await fetchCapturedRoutes();
+            return;
+          }
+        }
+      }
+
+      // Step 3: No data captured yet — show guidance
+      if (hookStatusEl) {
+        if (hasToken) {
+          hookStatusEl.textContent = '钩子已注入，正在监听 /getRouters...';
+        } else {
+          hookStatusEl.textContent = '请先登录 RuoYi 系统，钩子将自动捕获路由';
+        }
+      }
+      if (panelEl) {
+        panelEl.innerHTML =
+          '<div class="empty-state">' +
+          (hasToken
+            ? '钩子已就绪，刷新页面或重新登录以触发 /getRouters 请求'
+            : '请先登录 RuoYi 系统，登录后钩子会自动捕获路由数据') +
+          '</div>';
+      }
+    } catch (e) {
+      // Non-critical — just log
+      if (hookStatusEl) hookStatusEl.textContent = '自动捕获检查失败: ' + e.message;
     }
   }
 

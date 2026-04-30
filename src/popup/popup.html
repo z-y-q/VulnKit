@@ -1168,7 +1168,7 @@
 
         <!-- 路由钩子 -->
         <div id="rstab-hook" class="ruoyi-subpanel">
-          <div class="ruoyi-hook-desc">在页面加载前注入 fetch/XHR 钩子，自动拦截 /getRouters 响应并合并额外路由。启用后需刷新页面。</div>
+          <div class="ruoyi-hook-desc">钩子已自动注入，会被动拦截 /getRouters 响应。点击「检测」后自动尝试获取路由。如未捕获，请登录后刷新页面。</div>
           <div class="panel-actions">
             <button class="btn btn-primary" id="ruoyi-hook-install-btn">安装钩子</button>
             <button class="btn btn-sm btn-secondary" id="ruoyi-hook-remove-btn" disabled>移除钩子</button>
@@ -1188,7 +1188,7 @@
           </div>
           <div class="ruoyi-status" id="ruoyi-hook-status">未安装</div>
           <div class="ruoyi-captured-panel" id="ruoyi-captured-panel">
-            <div class="empty-state">安装钩子并刷新页面后，此处显示捕获的路由数据</div>
+            <div class="empty-state">点击上方「检测」识别 RuoYi 框架后，自动尝试获取路由数据</div>
           </div>
           <div class="panel-actions">
             <button class="btn btn-sm btn-outline" id="ruoyi-export-curl-btn">导出 curl</button>
