@@ -9,16 +9,39 @@
 
   var userInfoUrls = [/\/getUserInfo/i, /\/getInfo/i];
 
+  // Read persisted config from localStorage (survives page refresh)
+  var savedConfig = null;
+  try {
+    var raw = localStorage.getItem('__vk_ruoyi_hook_config');
+    if (raw) savedConfig = JSON.parse(raw);
+  } catch (e) {
+    savedConfig = null;
+  }
+
+  // Only restore if saved for this origin (security check)
+  var configEnabled = false;
+  var configAugmentMode = 'auto';
+  var configExtraRoutes = [];
+  var configCustomUrls = [];
+
+  if (savedConfig && savedConfig.origin === location.origin) {
+    configEnabled = true;
+    configAugmentMode = savedConfig.augmentMode || 'auto';
+    configExtraRoutes = savedConfig.extraRoutes || [];
+    configCustomUrls = savedConfig.customRouterUrls || [];
+  }
+
   window.__VK_RUOYI_HOOK__ = {
-    version: '1.2',
-    enabled: false,
+    version: '1.3',
+    enabled: configEnabled,
     capturedRouters: null,
-    augmentMode: 'auto',
-    extraRoutes: [],
-    customRouterUrls: [],
+    augmentMode: configAugmentMode,
+    extraRoutes: configExtraRoutes,
+    customRouterUrls: configCustomUrls,
     requestLog: [],
     apiLog: [],
     hookInstalledAt: Date.now(),
+    restoredFromStorage: configEnabled,
   };
 
   function getTime() {
@@ -412,4 +435,47 @@
 
     return { discovered: discovered, extUrls: extUrls };
   };
+
+  // Persist/restore hook config via localStorage (survives page refresh)
+  window.__VK_RUOYI_HOOK__.saveConfig = function () {
+    try {
+      localStorage.setItem(
+        '__vk_ruoyi_hook_config',
+        JSON.stringify({
+          origin: location.origin,
+          enabled: window.__VK_RUOYI_HOOK__.enabled,
+          augmentMode: window.__VK_RUOYI_HOOK__.augmentMode,
+          extraRoutes: window.__VK_RUOYI_HOOK__.extraRoutes || [],
+          customRouterUrls: window.__VK_RUOYI_HOOK__.customRouterUrls || [],
+        })
+      );
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  window.__VK_RUOYI_HOOK__.clearConfig = function () {
+    try {
+      localStorage.removeItem('__vk_ruoyi_hook_config');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // Notify popup if hook was auto-restored from storage
+  if (configEnabled) {
+    setTimeout(function () {
+      window.postMessage(
+        {
+          __vk_ruoyi_hook: true,
+          event: 'hook_restored',
+          augmented: false,
+          injected: 0,
+        },
+        location.origin
+      );
+    }, 500);
+  }
 })();

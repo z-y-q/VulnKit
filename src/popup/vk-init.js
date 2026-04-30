@@ -1346,8 +1346,8 @@
     });
 
     // Restore RuoYi hook state
-    chrome.storage.local.get(['ruoyiHookTabId'], result => {
-      if (result.ruoyiHookTabId) {
+    chrome.storage.local.get(['ruoyiHookTabId', 'ruoyiHookEnabled'], result => {
+      if (result.ruoyiHookTabId && result.ruoyiHookEnabled) {
         chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
           if (tabs[0] && tabs[0].id === result.ruoyiHookTabId) {
             ruoyiHookActive = true;
@@ -1358,7 +1358,7 @@
             if (removeBtn) removeBtn.disabled = false;
             checkHookStatus();
           } else {
-            chrome.storage.local.remove('ruoyiHookTabId');
+            chrome.storage.local.remove(['ruoyiHookTabId', 'ruoyiHookEnabled']);
           }
         });
       }

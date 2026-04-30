@@ -306,6 +306,10 @@ window.VulnKitRuoYi = (function () {
       if (opts.customUrl) {
         window.__VK_RUOYI_HOOK__.customRouterUrls = [opts.customUrl];
       }
+      // Persist config to localStorage so it survives page refresh
+      if (typeof window.__VK_RUOYI_HOOK__.saveConfig === 'function') {
+        window.__VK_RUOYI_HOOK__.saveConfig();
+      }
       return true;
     }
     return false;
@@ -334,14 +338,40 @@ window.VulnKitRuoYi = (function () {
       });
 
       if (hookResult && hookResult[0] && hookResult[0].result) {
-        // document_start hook was already present
+        // document_start hook was already present and config saved to localStorage
         ruoyiHookActive = true;
         ruoyiTabId = tab.id;
         hookStatus = 'active';
-        chrome.storage.local.set({ ruoyiHookTabId: tab.id });
+        chrome.storage.local.set({ ruoyiHookTabId: tab.id, ruoyiHookEnabled: true });
         setHookUI(true);
-        if (statusEl) statusEl.textContent = '钩子已启用 (document_start)';
-        utils.showToast('路由钩子已启用', 'success');
+
+        // Check if router data was already captured (hook was auto-restored from storage)
+        var capCheck = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: function () {
+            var hook = window.__VK_RUOYI_HOOK__;
+            return {
+              captured: !!hook.capturedRouters,
+              restored: !!hook.restoredFromStorage,
+            };
+          },
+        });
+        var capData = capCheck && capCheck[0] && capCheck[0].result;
+
+        if (capData && capData.captured) {
+          if (statusEl) statusEl.textContent = '钩子已启用 — 路由数据已捕获';
+          utils.showToast('路由钩子已启用，路由数据已捕获', 'success');
+          await checkHookStatus();
+        } else if (capData && capData.restored) {
+          if (statusEl) statusEl.textContent = '钩子已从存储恢复 — 正在监听 /getRouters...';
+          utils.showToast('钩子已恢复，等待 /getRouters 请求', 'success');
+        } else {
+          // First time: refresh the page so hook captures /getRouters during page load
+          if (statusEl) statusEl.textContent = '钩子已启用，正在刷新页面...';
+          utils.showToast('钩子已启用，刷新页面以捕获 /getRouters', 'success');
+          await chrome.tabs.reload(tab.id);
+        }
         return;
       }
 
@@ -375,10 +405,11 @@ window.VulnKitRuoYi = (function () {
       ruoyiHookActive = true;
       ruoyiTabId = tab.id;
       hookStatus = 'active';
-      chrome.storage.local.set({ ruoyiHookTabId: tab.id });
+      chrome.storage.local.set({ ruoyiHookTabId: tab.id, ruoyiHookEnabled: true });
       setHookUI(true);
-      if (statusEl) statusEl.textContent = '钩子已启用 (动态注入: ' + method + ')';
-      utils.showToast('路由钩子已启用，请刷新页面捕获 /getRouters', 'success');
+      if (statusEl) statusEl.textContent = '钩子已启用，正在刷新页面...';
+      utils.showToast('钩子已启用，刷新页面以捕获 /getRouters', 'success');
+      await chrome.tabs.reload(tab.id);
     } catch (e) {
       hookStatus = 'idle';
       if (statusEl) statusEl.textContent = '安装失败';
@@ -402,6 +433,10 @@ window.VulnKitRuoYi = (function () {
             window.__VK_RUOYI_HOOK__.capturedRouters = null;
             window.__VK_RUOYI_HOOK__.requestLog = [];
             window.__VK_RUOYI_HOOK__.customRouterUrls = [];
+            // Clear persisted config from localStorage
+            if (typeof window.__VK_RUOYI_HOOK__.clearConfig === 'function') {
+              window.__VK_RUOYI_HOOK__.clearConfig();
+            }
           }
         },
       });
@@ -409,7 +444,7 @@ window.VulnKitRuoYi = (function () {
       ruoyiHookActive = false;
       ruoyiTabId = null;
       hookStatus = 'idle';
-      chrome.storage.local.remove('ruoyiHookTabId');
+      chrome.storage.local.remove(['ruoyiHookTabId', 'ruoyiHookEnabled']);
 
       setHookUI(false);
       if (statusEl) statusEl.textContent = '钩子已禁用';
@@ -441,6 +476,7 @@ window.VulnKitRuoYi = (function () {
             extraRouteCount: (hook.extraRoutes || []).length,
             logCount: (hook.requestLog || []).length,
             customUrls: hook.customRouterUrls || [],
+            restored: !!hook.restoredFromStorage,
           };
         },
       });
@@ -457,16 +493,24 @@ window.VulnKitRuoYi = (function () {
       } else if (!data.enabled) {
         if (statusEl) statusEl.textContent = '钩子已安装但未启用';
         hookStatus = 'idle';
+        setHookUI(false);
       } else if (!data.captured) {
         var logInfo = data.logCount > 0 ? '，已拦截 ' + data.logCount + ' 个请求' : '';
-        if (statusEl) statusEl.textContent = '监听中，等待 /getRouters 请求...' + logInfo;
+        var restoreInfo = data.restored ? ' [已恢复]' : '';
+        if (statusEl)
+          statusEl.textContent = '监听中，等待 /getRouters 请求...' + logInfo + restoreInfo;
         hookStatus = 'active';
+        setHookUI(true);
         renderRequestLog(tab.id);
       } else {
         hookStatus = 'captured';
+        setHookUI(true);
         var modeText = data.augmentMode || 'auto';
         var extras = data.extraRouteCount > 0 ? '，' + data.extraRouteCount + ' 条额外路由' : '';
-        if (statusEl) statusEl.textContent = '已捕获路由数据 (' + modeText + ' 模式' + extras + ')';
+        var capRestore = data.restored ? ' [已恢复]' : '';
+        if (statusEl)
+          statusEl.textContent =
+            '已捕获路由数据 (' + modeText + ' 模式' + extras + ')' + capRestore;
         await fetchCapturedRoutes();
       }
     } catch (e) {
