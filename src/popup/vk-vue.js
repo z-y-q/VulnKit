@@ -443,31 +443,32 @@ window.VulnKitVue = (function () {
   }
 
   // ====== Store Reader (injected into page to read Pinia/Vuex/localStorage) ======
-  var permStoreReaderFunc = function () {
+  var MENU_KEYWORDS = [
+    'menu',
+    'menulist',
+    'menuList',
+    'menuData',
+    'permission',
+    'permissions',
+    'permList',
+    'menuIds',
+    'menu_ids',
+    'menuId',
+    'isAdmin',
+    'isadmin',
+    'role',
+    'roles',
+    'getMenu',
+    'getMenus',
+    'getPermission',
+    'getUserInfo',
+    'navList',
+    'sideMenu',
+    'sidebar',
+  ];
+
+  var permStoreReaderFunc = function (MENU_KEYWORDS) {
     if (!window.__PERM_INTERCEPTOR__) return;
-    var MENU_KEYWORDS = [
-      'menu',
-      'menulist',
-      'menuList',
-      'menuData',
-      'permission',
-      'permissions',
-      'permList',
-      'menuIds',
-      'menu_ids',
-      'menuId',
-      'isAdmin',
-      'isadmin',
-      'role',
-      'roles',
-      'getMenu',
-      'getMenus',
-      'getPermission',
-      'getUserInfo',
-      'navList',
-      'sideMenu',
-      'sidebar',
-    ];
     function classifyStr(str, url) {
       var urlLower = (url || '').toLowerCase();
       if (/permission/i.test(urlLower)) return 'permission';
@@ -624,35 +625,11 @@ window.VulnKitVue = (function () {
   };
 
   // ====== Permission Menu Interceptor ======
-  var permInterceptorFunc = function () {
+  var permInterceptorFunc = function (MENU_KEYWORDS) {
     if (window.__PERM_INTERCEPTOR__) {
       window.__PERM_INTERCEPTOR__.active = true;
       return 'already_injected';
     }
-
-    var MENU_KEYWORDS = [
-      'menu',
-      'menulist',
-      'menuList',
-      'menuData',
-      'permission',
-      'permissions',
-      'permList',
-      'menuIds',
-      'menu_ids',
-      'menuId',
-      'isAdmin',
-      'isadmin',
-      'role',
-      'roles',
-      'getMenu',
-      'getMenus',
-      'getPermission',
-      'getUserInfo',
-      'navList',
-      'sideMenu',
-      'sidebar',
-    ];
 
     var URL_MENU_PATTERNS = [
       /\/api\/.*menu/i,
@@ -713,6 +690,18 @@ window.VulnKitVue = (function () {
     }
 
     var captured = [];
+    function pushCap(url, type, subtype, data, rawText, method) {
+      captured.push({
+        url: url,
+        type: type,
+        subtype: subtype,
+        data: data,
+        rawText: rawText,
+        size: rawText.length,
+        timestamp: Date.now(),
+        method: method,
+      });
+    }
 
     var originalFetch = window.fetch;
     window.fetch = function () {
@@ -732,16 +721,7 @@ window.VulnKitVue = (function () {
                 try {
                   var info = classifyResponse(override, url);
                   if (info.type !== 'other') {
-                    captured.push({
-                      url: url,
-                      type: info.type,
-                      subtype: info.subtype,
-                      data: override,
-                      rawText: overrideBody,
-                      size: overrideBody.length,
-                      timestamp: Date.now(),
-                      method: 'fetch-override',
-                    });
+                    pushCap(url, info.type, info.subtype, override, overrideBody, 'fetch-override');
                   }
                 } catch (e) {}
                 return new Response(overrideBody, {
@@ -758,16 +738,7 @@ window.VulnKitVue = (function () {
                       var parsed = parseBody(text);
                       var info = classifyResponse(parsed, url);
                       if (info.type !== 'other') {
-                        captured.push({
-                          url: url,
-                          type: info.type,
-                          subtype: info.subtype,
-                          data: parsed,
-                          rawText: text,
-                          size: text.length,
-                          timestamp: Date.now(),
-                          method: 'fetch',
-                        });
+                        pushCap(url, info.type, info.subtype, parsed, text, 'fetch');
                       }
                     } catch (e) {}
                   })
@@ -824,16 +795,14 @@ window.VulnKitVue = (function () {
                 var parsed = parseBody(text);
                 var info = classifyResponse(parsed, url);
                 if (info.type !== 'other') {
-                  captured.push({
-                    url: url,
-                    type: info.type,
-                    subtype: info.subtype,
-                    data: parsed,
-                    rawText: text,
-                    size: text.length,
-                    timestamp: Date.now(),
-                    method: override != null ? 'xhr-override' : 'xhr',
-                  });
+                  pushCap(
+                    url,
+                    info.type,
+                    info.subtype,
+                    parsed,
+                    text,
+                    override != null ? 'xhr-override' : 'xhr'
+                  );
                 }
               } catch (e) {}
             }
@@ -877,7 +846,9 @@ window.VulnKitVue = (function () {
         if (statusEl) statusEl.textContent = '无法获取当前标签页';
         return;
       }
-      var status = await utils.execInTabData(tab.id, permInterceptorFunc);
+      var status = await utils.execInTabData(tab.id, permInterceptorFunc, {
+        args: [MENU_KEYWORDS],
+      });
       if (status === 'already_injected') {
         await utils.execInTab(tab.id, function () {
           if (window.__PERM_INTERCEPTOR__) window.__PERM_INTERCEPTOR__.start();
@@ -890,7 +861,7 @@ window.VulnKitVue = (function () {
       utils.showToast('拦截已启动，请操作页面或刷新页面', 'success');
       // Try to read already-loaded data from Vue/Pinia/Vuex stores
       try {
-        await utils.execInTab(tab.id, permStoreReaderFunc);
+        await utils.execInTab(tab.id, permStoreReaderFunc, { args: [MENU_KEYWORDS] });
       } catch (e) {
         // Non-critical: store reading is best-effort
       }

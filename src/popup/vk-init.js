@@ -917,36 +917,33 @@
     utils.bindClick('mar-selectall-btn', marToggleSelectAll);
     utils.bindClick('mar-copy-btn', marCopyHiddenPaths);
 
+    function restoreTabState(storageKey, onMatch) {
+      chrome.storage.local.get([storageKey], function (result) {
+        if (result[storageKey]) {
+          getActiveTab().then(function (tab) {
+            if (tab && tab.id === result[storageKey]) {
+              onMatch();
+            } else {
+              chrome.storage.local.remove(storageKey);
+            }
+          });
+        }
+      });
+    }
+
     // Restore perm intercept state
-    chrome.storage.local.get(['permInterceptTabId'], result => {
-      if (result.permInterceptTabId) {
-        getActiveTab().then(tab => {
-          if (tab && tab.id === result.permInterceptTabId) {
-            permInterceptActive = true;
-            utils.toggleBtnPair('perm-start-btn', 'perm-stop-btn', true);
-            utils.setStatus('perm-status', '拦截中... 页面刷新后会自动重新注入');
-            // Fetch captured data and start auto-refresh
-            refreshPermCaptured();
-            startPermAutoRefresh();
-          } else {
-            chrome.storage.local.remove('permInterceptTabId');
-          }
-        });
-      }
+    restoreTabState('permInterceptTabId', function () {
+      permInterceptActive = true;
+      utils.toggleBtnPair('perm-start-btn', 'perm-stop-btn', true);
+      utils.setStatus('perm-status', '拦截中... 页面刷新后会自动重新注入');
+      refreshPermCaptured();
+      startPermAutoRefresh();
     });
 
     // Restore JS toggle state
-    chrome.storage.local.get(['js_blocked_tabId'], result => {
-      if (result.js_blocked_tabId) {
-        getActiveTab().then(tab => {
-          if (tab && tab.id === result.js_blocked_tabId) {
-            jsBlocked = true;
-            updateJsToggleStatus();
-          } else {
-            chrome.storage.local.remove('js_blocked_tabId');
-          }
-        });
-      }
+    restoreTabState('js_blocked_tabId', function () {
+      jsBlocked = true;
+      updateJsToggleStatus();
     });
 
     // Restore RuoYi hook state

@@ -36,6 +36,22 @@ window.VulnKitLinks = (function () {
         const pageDomain = location.hostname;
         const links = [];
 
+        function makeLink(href, text, tag) {
+          var domain = '';
+          try {
+            domain = new URL(href, pageUrl).hostname;
+          } catch {}
+          return {
+            href: href,
+            text: text,
+            tag: tag,
+            domain: domain,
+            isExternal: domain !== pageDomain,
+            isJS: false,
+            isMailto: false,
+          };
+        }
+
         document.querySelectorAll('a[href]').forEach(el => {
           const href = el.href;
           if (!href || href === '#' || href.startsWith('javascript:')) return;
@@ -55,71 +71,19 @@ window.VulnKitLinks = (function () {
         });
 
         document.querySelectorAll('img[src]').forEach(el => {
-          var entry = {
-            href: el.src,
-            text: el.alt || '',
-            tag: 'img',
-            domain: '',
-            isExternal: false,
-            isJS: false,
-            isMailto: false,
-          };
-          try {
-            entry.domain = new URL(el.src, pageUrl).hostname;
-            entry.isExternal = entry.domain !== pageDomain;
-          } catch {}
-          links.push(entry);
+          links.push(makeLink(el.src, el.alt || '', 'img'));
         });
 
         document.querySelectorAll('script[src]').forEach(el => {
-          const src = el.src;
-          let domain = '';
-          try {
-            domain = new URL(src, pageUrl).hostname;
-          } catch {}
-          links.push({
-            href: src,
-            text: '',
-            tag: 'script',
-            domain,
-            isExternal: domain !== pageDomain,
-            isJS: false,
-            isMailto: false,
-          });
+          links.push(makeLink(el.src, '', 'script'));
         });
 
         document.querySelectorAll('link[href]').forEach(el => {
-          const href = el.href;
-          let domain = '';
-          try {
-            domain = new URL(href, pageUrl).hostname;
-          } catch {}
-          links.push({
-            href,
-            text: el.rel || '',
-            tag: 'link',
-            domain,
-            isExternal: domain !== pageDomain,
-            isJS: false,
-            isMailto: false,
-          });
+          links.push(makeLink(el.href, el.rel || '', 'link'));
         });
 
         document.querySelectorAll('iframe[src],frame[src]').forEach(el => {
-          const src = el.src;
-          let domain = '';
-          try {
-            domain = new URL(src, pageUrl).hostname;
-          } catch {}
-          links.push({
-            href: src,
-            text: '',
-            tag: 'iframe',
-            domain,
-            isExternal: domain !== pageDomain,
-            isJS: false,
-            isMailto: false,
-          });
+          links.push(makeLink(el.src, '', 'iframe'));
         });
 
         // Extract forms

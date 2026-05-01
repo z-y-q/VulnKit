@@ -292,9 +292,16 @@ window.VulnKitSourcemap = (function () {
     });
   }
 
+  function setScanState(scanning) {
+    var btn = utils.get('sourcemap-scan-btn');
+    if (!btn) return;
+    btn.disabled = scanning;
+    btn.textContent = scanning ? '扫描中...' : '扫描[v2]';
+    btn.classList.toggle('scanning', scanning);
+  }
+
   async function scanWebpackModules() {
     var statusEl = utils.get('sourcemap-status');
-    var scanBtn = utils.get('sourcemap-scan-btn');
     var resultsEl = utils.get('sourcemap-results');
     if (!statusEl) return;
 
@@ -302,11 +309,7 @@ window.VulnKitSourcemap = (function () {
     sourcemapSourceCache = {};
     sourcemapMapCache = {};
     sourcemapTabId = null;
-    if (scanBtn) {
-      scanBtn.disabled = true;
-      scanBtn.textContent = '扫描中...';
-      scanBtn.classList.add('scanning');
-    }
+    setScanState(true);
     if (resultsEl) resultsEl.innerHTML = '';
 
     // Show progress bar and phase indicator
@@ -324,11 +327,7 @@ window.VulnKitSourcemap = (function () {
       var tab = await utils.requireTabId();
       if (!tab || !tab.url || tab.url.startsWith('chrome')) {
         statusEl.textContent = '无法扫描此页面';
-        if (scanBtn) {
-          scanBtn.disabled = false;
-          scanBtn.textContent = '扫描[v2]';
-          scanBtn.classList.remove('scanning');
-        }
+        setScanState(false);
         sourcemapTabId = null;
         return;
       }
@@ -348,6 +347,12 @@ window.VulnKitSourcemap = (function () {
           var modules = [];
           var hasWebpack = false;
           var capturedWpRequire = null;
+          function modExists(id) {
+            for (var i = 0; i < modules.length; i++) {
+              if (modules[i].id === id) return true;
+            }
+            return false;
+          }
 
           // Strategy 0: Intercept webpackChunk* to capture webpack require
           // Works even when __webpack_require__ is NOT on window (webpack 5 default)
@@ -432,14 +437,7 @@ window.VulnKitSourcemap = (function () {
             hasWebpack = true;
             for (var mid in __webpack_modules__) {
               if (!__webpack_modules__.hasOwnProperty(mid)) continue;
-              var found = false;
-              for (var k = 0; k < modules.length; k++) {
-                if (modules[k].id === mid) {
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) modules.push({ id: mid, path: '', deps: [], source: 'runtime' });
+              if (!modExists(mid)) modules.push({ id: mid, path: '', deps: [], source: 'runtime' });
             }
           }
 
@@ -455,14 +453,8 @@ window.VulnKitSourcemap = (function () {
                 if (typeof modObj !== 'object' || modObj === null) continue;
                 for (var mId in modObj) {
                   if (!modObj.hasOwnProperty(mId)) continue;
-                  var exists = false;
-                  for (var e = 0; e < modules.length; e++) {
-                    if (modules[e].id === mId) {
-                      exists = true;
-                      break;
-                    }
-                  }
-                  if (!exists) modules.push({ id: mId, path: mId, deps: [], source: 'runtime' });
+                  if (!modExists(mId))
+                    modules.push({ id: mId, path: mId, deps: [], source: 'runtime' });
                 }
               }
             }
@@ -1342,11 +1334,7 @@ window.VulnKitSourcemap = (function () {
     } catch (err) {
       statusEl.textContent = '扫描失败: ' + (err.message || '未知错误');
     } finally {
-      if (scanBtn) {
-        scanBtn.disabled = false;
-        scanBtn.textContent = '扫描[v2]';
-        scanBtn.classList.remove('scanning');
-      }
+      setScanState(false);
       // Hide progress bar after a brief delay
       setTimeout(function () {
         var progressEl = utils.get('sm-progress');
@@ -1382,16 +1370,18 @@ window.VulnKitSourcemap = (function () {
     }
 
     // Enhanced stats bar
-    var allGroups = { runtime: [], sourcemap: [], chunk: [] };
-    for (var ai = 0; ai < sourcemapModules.length; ai++) {
-      var ag = allGroups[sourcemapModules[ai].source] || allGroups.chunk;
-      ag.push(sourcemapModules[ai]);
+    function countBySource(src) {
+      var c = 0;
+      for (var i = 0; i < sourcemapModules.length; i++) {
+        if (sourcemapModules[i].source === src) c++;
+      }
+      return c;
     }
     var stats = {
       total: sourcemapModules.length,
-      runtime: allGroups.runtime.length,
-      sourcemap: allGroups.sourcemap.length,
-      chunk: allGroups.chunk.length,
+      runtime: countBySource('runtime'),
+      sourcemap: countBySource('sourcemap'),
+      chunk: countBySource('chunk'),
       resolved: sourcemapModules.filter(function (m) {
         return m.resolved;
       }).length,

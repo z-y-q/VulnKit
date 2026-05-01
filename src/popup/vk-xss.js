@@ -147,6 +147,34 @@ window.VulnKitXss = (function () {
       const origSend = window.__XSS_ORIGINAL__.xhrSend;
       const origFetch = window.__XSS_ORIGINAL__.fetch;
 
+      function collectQueryParams(rawUrl, method) {
+        try {
+          const u = new URL(rawUrl, location.href);
+          u.searchParams.forEach((_, k) => {
+            window.__XSS_INTERCEPT__.push({
+              url: u.origin + u.pathname + u.search,
+              param: k,
+              method: method,
+            });
+          });
+        } catch {}
+      }
+      function collectBodyParams(body, rawUrl, method) {
+        try {
+          const params = new URLSearchParams(body);
+          params.forEach((_, k) => {
+            try {
+              const u = new URL(rawUrl, location.href);
+              window.__XSS_INTERCEPT__.push({
+                url: u.origin + u.pathname,
+                param: k,
+                method: method,
+              });
+            } catch {}
+          });
+        } catch {}
+      }
+
       XMLHttpRequest.prototype.open = function (method, url) {
         this.__xss_method = method;
         this.__xss_url = url;
@@ -154,32 +182,10 @@ window.VulnKitXss = (function () {
       };
       XMLHttpRequest.prototype.send = function (body) {
         if (this.__xss_url) {
-          try {
-            const u = new URL(this.__xss_url, location.href);
-            u.searchParams.forEach((_, k) => {
-              window.__XSS_INTERCEPT__.push({
-                url: u.origin + u.pathname + u.search,
-                param: k,
-                method: this.__xss_method || 'GET',
-              });
-            });
-          } catch {}
+          collectQueryParams(this.__xss_url, this.__xss_method || 'GET');
         }
         if (typeof body === 'string' && body) {
-          try {
-            const params = new URLSearchParams(body);
-            params.forEach((_, k) => {
-              const fallbackUrl = this.__xss_url || location.href;
-              try {
-                const u = new URL(fallbackUrl, location.href);
-                window.__XSS_INTERCEPT__.push({
-                  url: u.origin + u.pathname,
-                  param: k,
-                  method: this.__xss_method || 'POST',
-                });
-              } catch {}
-            });
-          } catch {}
+          collectBodyParams(body, this.__xss_url || location.href, this.__xss_method || 'POST');
           try {
             const fallbackUrl2 = this.__xss_url || location.href;
             let parsedUrl2;
@@ -201,30 +207,9 @@ window.VulnKitXss = (function () {
       window.fetch = function (input, init) {
         const url =
           typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-        try {
-          const u = new URL(url, location.href);
-          u.searchParams.forEach((_, k) => {
-            window.__XSS_INTERCEPT__.push({
-              url: u.origin + u.pathname + u.search,
-              param: k,
-              method: (init?.method || 'GET').toUpperCase(),
-            });
-          });
-        } catch {}
+        collectQueryParams(url, (init?.method || 'GET').toUpperCase());
         if (init?.body && typeof init.body === 'string') {
-          try {
-            const params = new URLSearchParams(init.body);
-            params.forEach((_, k) => {
-              try {
-                const u = new URL(url, location.href);
-                window.__XSS_INTERCEPT__.push({
-                  url: u.origin + u.pathname,
-                  param: k,
-                  method: (init?.method || 'POST').toUpperCase(),
-                });
-              } catch {}
-            });
-          } catch {}
+          collectBodyParams(init.body, url, (init?.method || 'POST').toUpperCase());
           try {
             let parsedUrl;
             try {
