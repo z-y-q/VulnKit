@@ -118,6 +118,30 @@ window.VulnKitXss = (function () {
         xhrSend: XMLHttpRequest.prototype.send,
         fetch: window.fetch,
       };
+      function extractJsonParams(body, urlBase, method) {
+        try {
+          var obj = JSON.parse(body);
+          if (typeof obj !== 'object' || obj === null) return;
+          Object.keys(obj).forEach(function (k) {
+            if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
+              Object.keys(obj[k]).forEach(function (nk) {
+                window.__XSS_INTERCEPT__.push({
+                  url: urlBase,
+                  param: k + '.' + nk,
+                  method: method,
+                });
+              });
+            } else {
+              window.__XSS_INTERCEPT__.push({
+                url: urlBase,
+                param: k,
+                method: method,
+              });
+            }
+          });
+        } catch (e) {}
+      }
+
       const origOpen = window.__XSS_ORIGINAL__.xhrOpen;
       const origSend = window.__XSS_ORIGINAL__.xhrSend;
       const origFetch = window.__XSS_ORIGINAL__.fetch;
@@ -156,38 +180,18 @@ window.VulnKitXss = (function () {
             });
           } catch {}
           try {
-            const jsonBody = JSON.parse(body);
-            if (typeof jsonBody === 'object' && jsonBody !== null) {
-              const fallbackUrl2 = this.__xss_url || location.href;
-              let parsedUrl2;
-              try {
-                parsedUrl2 = new URL(fallbackUrl2, location.href);
-              } catch {
-                return;
-              }
-              var xssSelf = this;
-              Object.keys(jsonBody).forEach(function (k) {
-                if (
-                  typeof jsonBody[k] === 'object' &&
-                  jsonBody[k] !== null &&
-                  !Array.isArray(jsonBody[k])
-                ) {
-                  Object.keys(jsonBody[k]).forEach(function (nk) {
-                    window.__XSS_INTERCEPT__.push({
-                      url: parsedUrl2.origin + parsedUrl2.pathname,
-                      param: k + '.' + nk,
-                      method: xssSelf.__xss_method || 'POST',
-                    });
-                  });
-                } else {
-                  window.__XSS_INTERCEPT__.push({
-                    url: parsedUrl2.origin + parsedUrl2.pathname,
-                    param: k,
-                    method: xssSelf.__xss_method || 'POST',
-                  });
-                }
-              });
+            const fallbackUrl2 = this.__xss_url || location.href;
+            let parsedUrl2;
+            try {
+              parsedUrl2 = new URL(fallbackUrl2, location.href);
+            } catch {
+              return;
             }
+            extractJsonParams(
+              body,
+              parsedUrl2.origin + parsedUrl2.pathname,
+              this.__xss_method || 'POST'
+            );
           } catch {}
         }
         return origSend.apply(this, arguments);
@@ -221,37 +225,17 @@ window.VulnKitXss = (function () {
             });
           } catch {}
           try {
-            const jsonBody = JSON.parse(init.body);
-            if (typeof jsonBody === 'object' && jsonBody !== null) {
-              let parsedUrl;
-              try {
-                parsedUrl = new URL(url, location.href);
-              } catch {
-                return origFetch.apply(this, arguments);
-              }
-              const fetchMethod = (init?.method || 'POST').toUpperCase();
-              Object.keys(jsonBody).forEach(function (k) {
-                if (
-                  typeof jsonBody[k] === 'object' &&
-                  jsonBody[k] !== null &&
-                  !Array.isArray(jsonBody[k])
-                ) {
-                  Object.keys(jsonBody[k]).forEach(function (nk) {
-                    window.__XSS_INTERCEPT__.push({
-                      url: parsedUrl.origin + parsedUrl.pathname,
-                      param: k + '.' + nk,
-                      method: fetchMethod,
-                    });
-                  });
-                } else {
-                  window.__XSS_INTERCEPT__.push({
-                    url: parsedUrl.origin + parsedUrl.pathname,
-                    param: k,
-                    method: fetchMethod,
-                  });
-                }
-              });
+            let parsedUrl;
+            try {
+              parsedUrl = new URL(url, location.href);
+            } catch {
+              return origFetch.apply(this, arguments);
             }
+            extractJsonParams(
+              init.body,
+              parsedUrl.origin + parsedUrl.pathname,
+              (init?.method || 'POST').toUpperCase()
+            );
           } catch {}
         }
         return origFetch.apply(this, arguments);
@@ -642,20 +626,14 @@ window.VulnKitXss = (function () {
       utils.showToast('没有可导出的注入点', 'warning');
       return;
     }
-    var lines = ['Source,URL,Param,Method'];
-    xssPoints.forEach(function (p) {
-      lines.push(
-        utils.csvField(p.source) +
-          ',' +
-          utils.csvField(p.url) +
-          ',' +
-          utils.csvField(p.param) +
-          ',' +
-          utils.csvField(p.method)
-      );
+    var rows = xssPoints.map(function (p) {
+      return [p.source, p.url, p.param, p.method];
     });
-    var csv = lines.join('\n');
-    utils.downloadCsv(csv, 'vulnkit-xss-' + Date.now() + '.csv');
+    utils.buildCsv(
+      ['Source', 'URL', 'Param', 'Method'],
+      rows,
+      'vulnkit-xss-' + Date.now() + '.csv'
+    );
   }
 
   return {

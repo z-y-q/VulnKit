@@ -2153,10 +2153,10 @@ window.VulnKitSourcemap = (function () {
     sourcemapModules.forEach(function (m) {
       lines.push(
         utils.csvField(m.path) +
-          '","' +
-          (m.source || '') +
-          '",' +
-          (m.size || 0) +
+          ',' +
+          utils.csvField(m.source || '') +
+          ',' +
+          utils.csvField(String(m.size || 0)) +
           ',' +
           (m.deps ? m.deps.length : 0)
       );

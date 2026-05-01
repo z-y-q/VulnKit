@@ -522,27 +522,19 @@ window.VulnKitGather = (function () {
   }
 
   function exportAllData() {
-    var total = Object.values(gatherData).reduce(function (s, a) {
-      return s + (Array.isArray(a) ? a.length : 0);
-    }, 0);
-    if (total === 0) {
-      utils.showToast('没有数据可导出', 'warning');
-      return;
-    }
-
-    var lines = ['Group,Type,Value'];
+    var rows = [];
     Object.keys(gatherData).forEach(function (group) {
       var items = gatherData[group];
       if (!Array.isArray(items)) return;
       items.forEach(function (item) {
-        lines.push(
-          utils.csvField(group) + ',' + utils.csvField(item.name) + ',' + utils.csvField(item.value)
-        );
+        rows.push([group, item.name, item.value]);
       });
     });
-
-    var csv = lines.join('\n');
-    utils.downloadCsv(csv, 'vulnkit-gather-' + Date.now() + '.csv');
+    if (rows.length === 0) {
+      utils.showToast('没有数据可导出', 'warning');
+      return;
+    }
+    utils.buildCsv(['Group', 'Type', 'Value'], rows, 'vulnkit-gather-' + Date.now() + '.csv');
   }
 
   function copyAllData() {

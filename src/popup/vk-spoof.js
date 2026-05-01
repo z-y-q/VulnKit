@@ -190,11 +190,9 @@ window.VulnKitSpoof = (function () {
   async function applyUserAgent() {
     const input = utils.get('ua-custom-input');
     if (!input) return;
-    const ua = input.value.trim();
-    if (!ua) {
-      utils.showToast('请选择或输入 User-Agent', 'warning');
-      return;
-    }
+    let ua = input.value.trim();
+    ua = utils.requireInput(ua, '请选择或输入 User-Agent');
+    if (!ua) return;
 
     try {
       const tab = await utils.getActiveTab();
@@ -442,10 +440,8 @@ window.VulnKitSpoof = (function () {
     const secure =
       document.querySelector('.cookie-edit-secure').checked || url.protocol === 'https:';
 
-    if (!name) {
-      utils.showToast('Cookie 名称不能为空', 'warning');
-      return;
-    }
+    name = utils.requireInput(name, 'Cookie 名称不能为空');
+    if (!name) return;
 
     try {
       await chrome.cookies.set({
@@ -502,11 +498,9 @@ window.VulnKitSpoof = (function () {
 
     listEl.querySelector('.cookie-cancel-btn').addEventListener('click', () => loadCookies());
     listEl.querySelector('#cookie-import-do').addEventListener('click', async () => {
-      const text = document.querySelector('.cookie-import-textarea').value.trim();
-      if (!text) {
-        utils.showToast('请输入 Cookie 字符串', 'warning');
-        return;
-      }
+      let text = document.querySelector('.cookie-import-textarea').value.trim();
+      text = utils.requireInput(text, '请输入 Cookie 字符串');
+      if (!text) return;
       await importCookieString(text);
     });
   }

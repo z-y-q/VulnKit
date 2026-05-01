@@ -55,10 +55,8 @@ window.VulnKitCrypto = (function () {
 
   function doCryptoEncrypt() {
     var input = (utils.get('crypto-input') || {}).value || '';
-    if (!input) {
-      utils.showToast('请输入内容', 'warning');
-      return;
-    }
+    input = utils.requireInput(input, '请输入内容');
+    if (!input) return;
     var output = utils.get('crypto-output');
     if (!output) return;
     try {
@@ -109,10 +107,8 @@ window.VulnKitCrypto = (function () {
 
   function doCryptoDecrypt() {
     var input = (utils.get('crypto-input') || {}).value || '';
-    if (!input) {
-      utils.showToast('请输入密文', 'warning');
-      return;
-    }
+    input = utils.requireInput(input, '请输入密文');
+    if (!input) return;
     var output = utils.get('crypto-output');
     if (!output) return;
     try {

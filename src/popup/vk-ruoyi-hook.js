@@ -149,32 +149,31 @@ window.VulnKitRuoYiHook = (function () {
 
   async function removeRouteHook() {
     try {
-      var tab = await utils.requireTabId();
-      if (!tab) return;
-
-      await utils.execInTab(tab.id, function () {
-        if (window.__VK_RUOYI_HOOK__) {
-          window.__VK_RUOYI_HOOK__.enabled = false;
-          window.__VK_RUOYI_HOOK__.extraRoutes = [];
-          window.__VK_RUOYI_HOOK__.capturedRouters = null;
-          window.__VK_RUOYI_HOOK__.requestLog = [];
-          window.__VK_RUOYI_HOOK__.customRouterUrls = [];
-          if (typeof window.__VK_RUOYI_HOOK__.clearConfig === 'function') {
-            window.__VK_RUOYI_HOOK__.clearConfig();
+      return utils.withTab(async function (tab) {
+        await utils.execInTab(tab.id, function () {
+          if (window.__VK_RUOYI_HOOK__) {
+            window.__VK_RUOYI_HOOK__.enabled = false;
+            window.__VK_RUOYI_HOOK__.extraRoutes = [];
+            window.__VK_RUOYI_HOOK__.capturedRouters = null;
+            window.__VK_RUOYI_HOOK__.requestLog = [];
+            window.__VK_RUOYI_HOOK__.customRouterUrls = [];
+            if (typeof window.__VK_RUOYI_HOOK__.clearConfig === 'function') {
+              window.__VK_RUOYI_HOOK__.clearConfig();
+            }
           }
+        });
+
+        if (state) {
+          state.ruoyiHookActive = false;
+          state.ruoyiTabId = null;
+          state.hookStatus = 'idle';
         }
+        chrome.storage.local.remove(['ruoyiHookTabId', 'ruoyiHookEnabled']);
+
+        setHookUI(false);
+        utils.setStatus('ruoyi-hook-status', '钩子已禁用');
+        utils.showToast('路由钩子已禁用', 'info');
       });
-
-      if (state) {
-        state.ruoyiHookActive = false;
-        state.ruoyiTabId = null;
-        state.hookStatus = 'idle';
-      }
-      chrome.storage.local.remove(['ruoyiHookTabId', 'ruoyiHookEnabled']);
-
-      setHookUI(false);
-      utils.setStatus('ruoyi-hook-status', '钩子已禁用');
-      utils.showToast('路由钩子已禁用', 'info');
     } catch (e) {
       utils.showToast('移除失败: ' + e.message, 'error');
     }
@@ -183,71 +182,70 @@ window.VulnKitRuoYiHook = (function () {
   async function checkHookStatus() {
     var panelEl = utils.get('ruoyi-captured-panel');
     try {
-      var tab = await utils.requireTabId();
-      if (!tab) return;
+      return utils.withTab(async function (tab) {
+        var results = await utils.execInTab(tab.id, function () {
+          var hook = window.__VK_RUOYI_HOOK__;
+          if (!hook) return { installed: false, pageUrl: location.href };
+          return {
+            installed: true,
+            pageUrl: location.href,
+            enabled: hook.enabled,
+            alwaysCapture: !!hook.alwaysCapture,
+            captured: !!hook.capturedRouters,
+            augmentMode: hook.augmentMode,
+            extraRouteCount: (hook.extraRoutes || []).length,
+            logCount: (hook.requestLog || []).length,
+            customUrls: hook.customRouterUrls || [],
+            restored: !!hook.restoredFromStorage,
+          };
+        });
 
-      var results = await utils.execInTab(tab.id, function () {
-        var hook = window.__VK_RUOYI_HOOK__;
-        if (!hook) return { installed: false, pageUrl: location.href };
-        return {
-          installed: true,
-          pageUrl: location.href,
-          enabled: hook.enabled,
-          alwaysCapture: !!hook.alwaysCapture,
-          captured: !!hook.capturedRouters,
-          augmentMode: hook.augmentMode,
-          extraRouteCount: (hook.extraRoutes || []).length,
-          logCount: (hook.requestLog || []).length,
-          customUrls: hook.customRouterUrls || [],
-          restored: !!hook.restoredFromStorage,
-        };
-      });
+        var data = utils.execResult(results) || { installed: false };
 
-      var data = utils.execResult(results) || { installed: false };
-
-      if (!data.installed) {
-        var urlHint = data.pageUrl ? ' [' + utils.escapeHtml(data.pageUrl) + ']' : '';
-        utils.setStatus('ruoyi-hook-status', '钩子未安装，页面: ' + (data.pageUrl || '未知'));
-        if (state) state.hookStatus = 'idle';
-        if (panelEl)
-          panelEl.innerHTML = utils.emptyHtml('钩子未注入 — 请先点击「安装钩子」' + urlHint);
-      } else if (data.captured) {
-        if (state) state.hookStatus = data.enabled ? 'captured' : 'passive-captured';
-        updateWorkflowStep(2);
-        setHookUI(data.enabled);
-        var modeText = data.enabled ? data.augmentMode || 'auto' : '被动捕获';
-        var extras =
-          data.enabled && data.extraRouteCount > 0
-            ? '，' + data.extraRouteCount + ' 条额外路由'
-            : '';
-        utils.setStatus(
-          'ruoyi-hook-status',
-          '已捕获路由数据 (' + modeText + ' 模式' + extras + ')'
-        );
-        // Delegate to detect module for data fetching
-        if (
-          window.VulnKitRuoYiDetect &&
-          typeof window.VulnKitRuoYiDetect.fetchCapturedRoutes === 'function'
-        ) {
-          await window.VulnKitRuoYiDetect.fetchCapturedRoutes();
+        if (!data.installed) {
+          var urlHint = data.pageUrl ? ' [' + utils.escapeHtml(data.pageUrl) + ']' : '';
+          utils.setStatus('ruoyi-hook-status', '钩子未安装，页面: ' + (data.pageUrl || '未知'));
+          if (state) state.hookStatus = 'idle';
+          if (panelEl)
+            panelEl.innerHTML = utils.emptyHtml('钩子未注入 — 请先点击「安装钩子」' + urlHint);
+        } else if (data.captured) {
+          if (state) state.hookStatus = data.enabled ? 'captured' : 'passive-captured';
+          updateWorkflowStep(2);
+          setHookUI(data.enabled);
+          var modeText = data.enabled ? data.augmentMode || 'auto' : '被动捕获';
+          var extras =
+            data.enabled && data.extraRouteCount > 0
+              ? '，' + data.extraRouteCount + ' 条额外路由'
+              : '';
+          utils.setStatus(
+            'ruoyi-hook-status',
+            '已捕获路由数据 (' + modeText + ' 模式' + extras + ')'
+          );
+          // Delegate to detect module for data fetching
+          if (
+            window.VulnKitRuoYiDetect &&
+            typeof window.VulnKitRuoYiDetect.fetchCapturedRoutes === 'function'
+          ) {
+            await window.VulnKitRuoYiDetect.fetchCapturedRoutes();
+          }
+        } else if (!data.enabled) {
+          utils.setStatus(
+            'ruoyi-hook-status',
+            data.alwaysCapture
+              ? '钩子已注入（被动捕获模式），等待 /getRouters...'
+              : '钩子已安装但未启用'
+          );
+          if (state) state.hookStatus = 'idle';
+          setHookUI(false);
+          renderRequestLog(tab.id);
+        } else {
+          var logInfo = data.logCount > 0 ? '，已拦截 ' + data.logCount + ' 个请求' : '';
+          utils.setStatus('ruoyi-hook-status', '监听中，等待 /getRouters 请求...' + logInfo);
+          if (state) state.hookStatus = 'active';
+          setHookUI(true);
+          renderRequestLog(tab.id);
         }
-      } else if (!data.enabled) {
-        utils.setStatus(
-          'ruoyi-hook-status',
-          data.alwaysCapture
-            ? '钩子已注入（被动捕获模式），等待 /getRouters...'
-            : '钩子已安装但未启用'
-        );
-        if (state) state.hookStatus = 'idle';
-        setHookUI(false);
-        renderRequestLog(tab.id);
-      } else {
-        var logInfo = data.logCount > 0 ? '，已拦截 ' + data.logCount + ' 个请求' : '';
-        utils.setStatus('ruoyi-hook-status', '监听中，等待 /getRouters 请求...' + logInfo);
-        if (state) state.hookStatus = 'active';
-        setHookUI(true);
-        renderRequestLog(tab.id);
-      }
+      });
     } catch (e) {
       utils.setStatus('ruoyi-hook-status', '检查失败');
     }

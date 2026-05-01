@@ -374,10 +374,8 @@ window.VulnKitExif = (function () {
   }
 
   function copyExifData() {
-    if (!lastExifData) {
-      utils.showToast('请先解析 EXIF 数据', 'warning');
-      return;
-    }
+    lastExifData = utils.requireInput(lastExifData, '请先解析 EXIF 数据');
+    if (!lastExifData) return;
     utils.copyAndToast(JSON.stringify(lastExifData, null, 2), '已复制 EXIF JSON');
   }
 

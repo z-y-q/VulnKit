@@ -342,10 +342,8 @@ window.VulnKitRuoYiDetect = (function () {
   // ====== CVE Lookup ======
 
   function lookupCve(version) {
-    if (!version) {
-      utils.showToast('未检测到版本信息', 'warning');
-      return;
-    }
+    version = utils.requireInput(version, '未检测到版本信息');
+    if (!version) return;
     var query = 'RuoYi ' + version;
     var url =
       'https://nvd.nist.gov/vuln/search/results?query=' +
@@ -359,28 +357,27 @@ window.VulnKitRuoYiDetect = (function () {
   async function fetchCapturedRoutes() {
     var panelEl = utils.get('ruoyi-captured-panel');
     try {
-      var tab = await utils.requireTabId();
-      if (!tab) return;
+      return utils.withTab(async function (tab) {
+        var results = await utils.execInTab(tab.id, function () {
+          if (!window.__VK_RUOYI_HOOK__ || !window.__VK_RUOYI_HOOK__.capturedRouters) return null;
+          try {
+            return JSON.parse(window.__VK_RUOYI_HOOK__.capturedRouters);
+          } catch (e) {
+            return { _raw: window.__VK_RUOYI_HOOK__.capturedRouters, _parseError: true };
+          }
+        });
 
-      var results = await utils.execInTab(tab.id, function () {
-        if (!window.__VK_RUOYI_HOOK__ || !window.__VK_RUOYI_HOOK__.capturedRouters) return null;
-        try {
-          return JSON.parse(window.__VK_RUOYI_HOOK__.capturedRouters);
-        } catch (e) {
-          return { _raw: window.__VK_RUOYI_HOOK__.capturedRouters, _parseError: true };
+        var data = utils.execResult(results);
+        if (!data) return;
+        if (state) state.capturedRouterData = data;
+        // Delegate rendering to hook module if available
+        if (
+          window.VulnKitRuoYiHook &&
+          typeof window.VulnKitRuoYiHook.renderRouterData === 'function'
+        ) {
+          window.VulnKitRuoYiHook.renderRouterData(data, panelEl);
         }
       });
-
-      var data = utils.execResult(results);
-      if (!data) return;
-      if (state) state.capturedRouterData = data;
-      // Delegate rendering to hook module if available
-      if (
-        window.VulnKitRuoYiHook &&
-        typeof window.VulnKitRuoYiHook.renderRouterData === 'function'
-      ) {
-        window.VulnKitRuoYiHook.renderRouterData(data, panelEl);
-      }
     } catch (e) {
       utils.showToast('获取捕获数据失败: ' + e.message, 'error');
     }

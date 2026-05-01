@@ -252,13 +252,9 @@ window.VulnKitVue = (function () {
           }
           return router.options ? safeSerialize(router.options.routes) || null : null;
         }
-        const appEl =
-          document.querySelector('#app') ||
-          document.querySelector('[data-v-app]') ||
-          document.querySelector('[id^="app"]') ||
-          document.querySelector('#root') ||
-          document.querySelector('#application') ||
-          document.querySelector('#main');
+        const appEl = document.querySelector(
+          '#app,[data-v-app],[id^="app"],#root,#application,#main'
+        );
         if (appEl && appEl.__vue_app__) {
           var r = getRoutes(appEl.__vue_app__.config.globalProperties.$router);
           if (r) return r;
@@ -296,13 +292,9 @@ window.VulnKitVue = (function () {
     try {
       const bypassResults = await utils.execInTab(tab.id, () => {
         // Vue 3
-        const appEl =
-          document.querySelector('#app') ||
-          document.querySelector('[data-v-app]') ||
-          document.querySelector('[id^="app"]') ||
-          document.querySelector('#root') ||
-          document.querySelector('#application') ||
-          document.querySelector('#main');
+        const appEl = document.querySelector(
+          '#app,[data-v-app],[id^="app"],#root,#application,#main'
+        );
         if (appEl && appEl.__vue_app__) {
           const router = appEl.__vue_app__.config.globalProperties.$router;
           if (router) {
@@ -385,13 +377,9 @@ window.VulnKitVue = (function () {
         }
 
         // Vue 3
-        var appEl =
-          document.querySelector('#app') ||
-          document.querySelector('[data-v-app]') ||
-          document.querySelector('[id^="app"]') ||
-          document.querySelector('#root') ||
-          document.querySelector('#application') ||
-          document.querySelector('#main');
+        var appEl = document.querySelector(
+          '#app,[data-v-app],[id^="app"],#root,#application,#main'
+        );
         if (appEl && appEl.__vue_app__) {
           var router = appEl.__vue_app__.config.globalProperties.$router;
           if (router) {
@@ -586,13 +574,7 @@ window.VulnKitVue = (function () {
       }
     }
     // Check Vue 3 Pinia stores
-    var appEl =
-      document.querySelector('#app') ||
-      document.querySelector('[data-v-app]') ||
-      document.querySelector('[id^="app"]') ||
-      document.querySelector('#root') ||
-      document.querySelector('#application') ||
-      document.querySelector('#main');
+    var appEl = document.querySelector('#app,[data-v-app],[id^="app"],#root,#application,#main');
     if (appEl && appEl.__vue_app__) {
       var pinia = appEl.__vue_app__.config.globalProperties.$pinia;
       if (pinia && pinia._s) {
@@ -1435,13 +1417,9 @@ window.VulnKitVue = (function () {
           }
 
           // Vue 3 + Pinia
-          var appEl =
-            document.querySelector('#app') ||
-            document.querySelector('[data-v-app]') ||
-            document.querySelector('[id^="app"]') ||
-            document.querySelector('#root') ||
-            document.querySelector('#application') ||
-            document.querySelector('#main');
+          var appEl = document.querySelector(
+            '#app,[data-v-app],[id^="app"],#root,#application,#main'
+          );
           if (appEl && appEl.__vue_app__) {
             var pinia = appEl.__vue_app__.config.globalProperties.$pinia;
             if (pinia && pinia._s) {
@@ -1608,38 +1586,23 @@ window.VulnKitVue = (function () {
       var matchList = inlineData.matches || [];
       var extUrls = inlineData.extUrls || [];
 
-      // 2. Search external scripts via background fetch proxy (parallel batches)
-      var CONCURRENCY = 5;
-      for (
-        var batchStart = 0;
-        batchStart < extUrls.length && matchList.length < 50;
-        batchStart += CONCURRENCY
-      ) {
-        var batch = extUrls.slice(batchStart, batchStart + CONCURRENCY);
-        var batchResults = await Promise.all(
-          batch.map(function (url) {
-            return chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url }).catch(function () {
-              return null;
-            });
-          })
-        );
-        for (var b = 0; b < batchResults.length && matchList.length < 50; b++) {
-          var resp = batchResults[b];
-          if (!resp || resp.error || !resp.data) continue;
-          var text = resp.data;
-          if (text && text.indexOf(keyword) !== -1) {
-            var shortUrl = batch[b];
-            if (shortUrl.length > 60) shortUrl = '...' + shortUrl.substring(shortUrl.length - 57);
-            var lines = text.split('\n');
-            for (var j = 0; j < lines.length && matchList.length < 50; j++) {
-              var idx = lines[j].indexOf(keyword);
-              while (idx !== -1 && matchList.length < 50) {
-                var start = Math.max(0, idx - 40);
-                var end = Math.min(lines[j].length, idx + keyword.length + 60);
-                var context = lines[j].substring(start, end).replace(/^\S*\s*/, '');
-                matchList.push({ source: shortUrl, line: j + 1, context: context });
-                idx = lines[j].indexOf(keyword, idx + 1);
-              }
+      // 2. Search external scripts via background fetch proxy
+      var allContent = await utils.batchFetch(extUrls, { concurrency: 5 });
+      for (var b = 0; b < allContent.length && matchList.length < 50; b++) {
+        var text = allContent[b];
+        if (!text) continue;
+        if (text.indexOf(keyword) !== -1) {
+          var shortUrl = extUrls[b];
+          if (shortUrl.length > 60) shortUrl = '...' + shortUrl.substring(shortUrl.length - 57);
+          var lines = text.split('\n');
+          for (var j = 0; j < lines.length && matchList.length < 50; j++) {
+            var idx = lines[j].indexOf(keyword);
+            while (idx !== -1 && matchList.length < 50) {
+              var start = Math.max(0, idx - 40);
+              var end = Math.min(lines[j].length, idx + keyword.length + 60);
+              var context = lines[j].substring(start, end).replace(/^\S*\s*/, '');
+              matchList.push({ source: shortUrl, line: j + 1, context: context });
+              idx = lines[j].indexOf(keyword, idx + 1);
             }
           }
         }
@@ -2087,11 +2050,9 @@ window.VulnKitVue = (function () {
               if (r.children) extract(r.children, path === '/' ? '/' : path);
             });
           }
-          var appEl =
-            document.querySelector('#app') ||
-            document.querySelector('[data-v-app]') ||
-            document.querySelector('#root') ||
-            document.querySelector('#main');
+          var appEl = document.querySelector(
+            '#app,[data-v-app],[id^="app"],#root,#application,#main'
+          );
           if (appEl && appEl.__vue_app__) {
             var router = appEl.__vue_app__.config.globalProperties.$router;
             if (router && typeof router.getRoutes === 'function') {
@@ -2176,11 +2137,9 @@ window.VulnKitVue = (function () {
           tabId,
           function (p) {
             var router = null;
-            var appEl =
-              document.querySelector('#app') ||
-              document.querySelector('[data-v-app]') ||
-              document.querySelector('#root') ||
-              document.querySelector('#main');
+            var appEl = document.querySelector(
+              '#app,[data-v-app],[id^="app"],#root,#application,#main'
+            );
             if (appEl && appEl.__vue_app__) {
               router = appEl.__vue_app__.config.globalProperties.$router;
             } else {
@@ -2278,13 +2237,9 @@ window.VulnKitVue = (function () {
             extract(router.options.routes, '');
           }
         }
-        var appEl =
-          document.querySelector('#app') ||
-          document.querySelector('[data-v-app]') ||
-          document.querySelector('[id^="app"]') ||
-          document.querySelector('#root') ||
-          document.querySelector('#application') ||
-          document.querySelector('#main');
+        var appEl = document.querySelector(
+          '#app,[data-v-app],[id^="app"],#root,#application,#main'
+        );
         if (appEl && appEl.__vue_app__) {
           getAndExtract(appEl.__vue_app__.config.globalProperties.$router);
         } else {
@@ -2668,16 +2623,16 @@ window.VulnKitVue = (function () {
 
   async function copyFullStoreJson() {
     try {
-      var tab = await utils.requireTabId();
-      if (!tab) return;
-      var data = await chrome.tabs.sendMessage(tab.id, { type: 'VK_VUE_STORE_EXPLORE' });
-      if (!data || data.error) {
-        utils.showToast('获取 Store 失败', 'error');
-        return;
-      }
-      var json = JSON.stringify(data.store ? data.store.stores : {}, null, 2);
-      await utils.copyText(json);
-      utils.showToast('Store JSON 已复制 (' + json.length + ' 字符)');
+      return utils.withTab(async function (tab) {
+        var data = await chrome.tabs.sendMessage(tab.id, { type: 'VK_VUE_STORE_EXPLORE' });
+        if (!data || data.error) {
+          utils.showToast('获取 Store 失败', 'error');
+          return;
+        }
+        var json = JSON.stringify(data.store ? data.store.stores : {}, null, 2);
+        await utils.copyText(json);
+        utils.showToast('Store JSON 已复制 (' + json.length + ' 字符)');
+      });
     } catch (e) {
       utils.showToast('复制失败: ' + e.message, 'error');
     }

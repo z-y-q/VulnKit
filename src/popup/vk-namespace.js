@@ -128,6 +128,20 @@
     }
   };
 
+  utils.requireInput = function (val, msg) {
+    if (!val) {
+      this.showToast(msg || '请输入内容', 'warning');
+      return null;
+    }
+    return val;
+  };
+
+  utils.withTab = async function (handler) {
+    var tab = await this.requireTabId();
+    if (!tab) return undefined;
+    return handler(tab);
+  };
+
   utils.setStatus = function (id, text) {
     var el = document.getElementById(id);
     if (el) el.textContent = text;
@@ -136,6 +150,23 @@
   utils.setEmpty = function (id, msg) {
     var el = document.getElementById(id);
     if (el) el.innerHTML = this.emptyHtml(msg);
+  };
+
+  utils.updateIndicator = function (dotId, labelId, state, text, buttons) {
+    var dot = utils.get(dotId),
+      label = utils.get(labelId);
+    if (dot && label) {
+      var cls = 'js-toggle-dot js-toggle-dot-';
+      dot.className =
+        cls + (state === 'on' ? 'on' : state === 'warn' || state === 'danger' ? 'warn' : 'off');
+      label.textContent = text;
+    }
+    if (buttons) {
+      buttons.forEach(function (b) {
+        var el = utils.get(b.id);
+        if (el) el.disabled = b.disabled;
+      });
+    }
   };
 
   utils.switchSubTabs = function (btnClass, dataAttr, panelPrefix, tab) {
@@ -166,6 +197,24 @@
     utils.downloadBlob('﻿' + csv, filename, 'text/csv;charset=utf-8', '导出成功');
   };
 
+  utils.buildCsv = function (headers, rows, filename) {
+    if (!rows || rows.length === 0) {
+      this.showToast('没有可导出的数据', 'warning');
+      return;
+    }
+    var lines = [headers.join(',')];
+    rows.forEach(function (row) {
+      lines.push(
+        row
+          .map(function (cell) {
+            return utils.csvField(String(cell == null ? '' : cell));
+          })
+          .join(',')
+      );
+    });
+    utils.downloadCsv(lines.join('\n'), filename);
+  };
+
   utils.toggleBtnPair = function (startId, stopId, running) {
     var s = utils.get(startId),
       e = utils.get(stopId);
@@ -179,6 +228,18 @@
         b.addEventListener('click', function () {
           handler(b.dataset[dataAttr]);
         });
+    });
+  };
+
+  utils.fetchUrlJson = function (options) {
+    return utils.fetchUrl(options).then(function (result) {
+      if (!result) return null;
+      if (!result.success) return { success: false, error: result.error };
+      try {
+        return { success: true, data: JSON.parse(result.data) };
+      } catch (e) {
+        return { success: false, error: 'JSON 解析失败' };
+      }
     });
   };
 
@@ -213,6 +274,36 @@
     });
   };
 
+  utils.batchFetch = async function (urls, options) {
+    var opts = options || {};
+    var concurrency = opts.concurrency || 5;
+    var results = [];
+    for (var i = 0; i < urls.length; i += concurrency) {
+      var batch = urls.slice(i, i + concurrency);
+      var batchResults = await Promise.all(
+        batch.map(function (url) {
+          var msg = { type: 'FETCH_URL', url: url };
+          if (opts.tailOnly) msg.tailOnly = true;
+          return chrome.runtime
+            .sendMessage(msg)
+            .then(function (r) {
+              return r && !r.error ? r.data : null;
+            })
+            .catch(function () {
+              return null;
+            });
+        })
+      );
+      results = results.concat(batchResults);
+      if (
+        opts.onProgress &&
+        opts.onProgress(results, Math.min(i + concurrency, urls.length), urls.length) === false
+      )
+        break;
+    }
+    return results;
+  };
+
   var utilsProxy = {};
   [
     'get',
@@ -222,6 +313,7 @@
     'copyAndToast',
     'downloadCsv',
     'downloadBlob',
+    'buildCsv',
     'bindClick',
     'on',
     'emptyHtml',
@@ -232,11 +324,16 @@
     'execResult',
     'csvField',
     'requireTabId',
+    'requireInput',
+    'withTab',
     'getActiveTab',
     'getCurrentDomain',
     'toggleBtnPair',
     'bindTabSwitch',
     'fetchUrl',
+    'fetchUrlJson',
+    'batchFetch',
+    'updateIndicator',
   ].forEach(function (method) {
     utilsProxy[method] = function () {
       return utils[method].apply(utils, arguments);

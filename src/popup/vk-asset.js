@@ -37,6 +37,21 @@ window.VulnKitAsset = (function () {
 
   var currentSearchFilter = '';
 
+  async function fetchScanResults(engineName, url, fetchOpts) {
+    setAssetStatus('正在查询 ' + engineName + '...');
+    var result = await utils.fetchUrlJson(fetchOpts || { url: url });
+    if (!result || !result.success) {
+      setAssetStatus('查询失败: ' + (result ? result.error : '超时'));
+      return null;
+    }
+    var json = result.data;
+    if (json.error) {
+      setAssetStatus('API 错误: ' + (json.message || json.error));
+      return null;
+    }
+    return json;
+  }
+
   function renderAssetResults(data) {
     var filtered = data || lastAssetResults || [];
     if (currentSearchFilter && filtered.length > 0) {
@@ -121,20 +136,14 @@ window.VulnKitAsset = (function () {
         );
       });
     }
-    var lines = ['IP/域名,端口,协议,标题'];
-    data.forEach(function (item) {
-      lines.push(
-        utils.csvField(item.host) +
-          ',' +
-          utils.csvField(String(item.port || '')) +
-          ',' +
-          utils.csvField(item.protocol) +
-          ',' +
-          utils.csvField(item.title)
-      );
+    var rows = data.map(function (item) {
+      return [item.host, String(item.port || ''), item.protocol, item.title];
     });
-    var csv = lines.join('\n');
-    utils.downloadCsv(csv, 'vulnkit-asset-' + currentAssetSource + '-' + Date.now() + '.csv');
+    utils.buildCsv(
+      ['IP/域名', '端口', '协议', '标题'],
+      rows,
+      'vulnkit-asset-' + currentAssetSource + '-' + Date.now() + '.csv'
+    );
   }
 
   async function scanFofa(query) {
@@ -143,7 +152,6 @@ window.VulnKitAsset = (function () {
       utils.showToast('请先配置 FOFA API Key', 'warning');
       return;
     }
-    setAssetStatus('正在查询 FOFA...');
     const fofaQuery = customQueryMode ? query : 'domain="' + query + '"';
     const qbase64 = btoa(unescape(encodeURIComponent(fofaQuery)));
     const url =
@@ -156,38 +164,19 @@ window.VulnKitAsset = (function () {
       '&fields=host,port,protocol,title&size=' +
       getAssetSize();
 
-    var result = await utils.fetchUrl({ url: url });
-    if (!result) {
-      setAssetStatus('查询失败: 超时');
-      return;
-    }
-    if (!result.success) {
-      setAssetStatus('查询失败: ' + result.error);
-      return;
-    }
-    try {
-      var json = JSON.parse(result.data);
-      if (json.error) {
-        setAssetStatus('API 错误: ' + json.error);
-        return;
-      }
-      var results = (json.results || []).map(function (r) {
-        return { host: r[0], port: r[1], protocol: r[2], title: r[3] };
-      });
-      setAssetStatus('FOFA: 查询完成 (共 ' + (json.size || results.length) + ' 条)');
-      renderAssetResults(results);
-    } catch {
-      setAssetStatus('解析结果失败');
-    }
+    var json = await fetchScanResults('FOFA', url);
+    if (!json) return;
+    var results = (json.results || []).map(function (r) {
+      return { host: r[0], port: r[1], protocol: r[2], title: r[3] };
+    });
+    setAssetStatus('FOFA: 查询完成 (共 ' + (json.size || results.length) + ' 条)');
+    renderAssetResults(results);
   }
 
   async function scanZoomEye(query) {
-    const key = await getApiKey('zoomeye');
-    if (!key) {
-      utils.showToast('请先配置 ZoomEye API Key', 'warning');
-      return;
-    }
-    setAssetStatus('正在查询 ZoomEye...');
+    let key = await getApiKey('zoomeye');
+    key = utils.requireInput(key, '请先配置 ZoomEye API Key');
+    if (!key) return;
     var zoomQuery = customQueryMode ? query : 'hostname:' + query.replace(/^www\./, '');
     const url =
       'https://api.zoomeye.org/host/search?query=' +
@@ -195,55 +184,36 @@ window.VulnKitAsset = (function () {
       '&page=1&size=' +
       getAssetSize();
 
-    var result = await utils.fetchUrl({
+    var json = await fetchScanResults('ZoomEye', url, {
       type: 'FETCH_URL_AUTH',
       url: url,
       key: key,
       provider: 'zoomeye',
     });
-    if (!result) {
-      setAssetStatus('查询失败: 超时');
+    if (!json) return;
+    var list = json.matches || json.data || [];
+    var total = json.total || list.length;
+    if (list.length === 0) {
+      setAssetStatus('ZoomEye: 未找到资产 (total=0)');
+      renderAssetResults([]);
       return;
     }
-    if (!result.success) {
-      setAssetStatus('查询失败: ' + result.error);
-      return;
-    }
-    try {
-      var json = JSON.parse(result.data);
-      if (json.error) {
-        setAssetStatus('API 错误: ' + (json.message || json.error));
-        return;
-      }
-      var list = json.matches || json.data || [];
-      var total = json.total || list.length;
-      if (list.length === 0) {
-        setAssetStatus('ZoomEye: 未找到资产 (total=0)');
-        renderAssetResults([]);
-        return;
-      }
-      var results = list.map(function (r) {
-        return {
-          host: r.ip || '-',
-          port: r.portinfo && r.portinfo.port ? r.portinfo.port : '-',
-          protocol: (r.portinfo && (r.portinfo.service || r.portinfo.type)) || '-',
-          title: (r.webinfo && r.webinfo.title) || (r.portinfo && r.portinfo.product) || '-',
-        };
-      });
-      setAssetStatus('ZoomEye: 查询完成 (共 ' + total + ' 条)');
-      renderAssetResults(results);
-    } catch {
-      setAssetStatus('解析结果失败');
-    }
+    var results = list.map(function (r) {
+      return {
+        host: r.ip || '-',
+        port: r.portinfo && r.portinfo.port ? r.portinfo.port : '-',
+        protocol: (r.portinfo && (r.portinfo.service || r.portinfo.type)) || '-',
+        title: (r.webinfo && r.webinfo.title) || (r.portinfo && r.portinfo.product) || '-',
+      };
+    });
+    setAssetStatus('ZoomEye: 查询完成 (共 ' + total + ' 条)');
+    renderAssetResults(results);
   }
 
   async function scanShodan(query) {
-    const key = await getApiKey('shodan');
-    if (!key) {
-      utils.showToast('请先配置 Shodan API Key', 'warning');
-      return;
-    }
-    setAssetStatus('正在查询 Shodan...');
+    let key = await getApiKey('shodan');
+    key = utils.requireInput(key, '请先配置 Shodan API Key');
+    if (!key) return;
     var searchQuery = customQueryMode
       ? query
       : /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(query)
@@ -255,34 +225,18 @@ window.VulnKitAsset = (function () {
       '&query=' +
       encodeURIComponent(searchQuery);
 
-    var result = await utils.fetchUrl({ url: url });
-    if (!result) {
-      setAssetStatus('查询失败: 超时');
-      return;
-    }
-    if (!result.success) {
-      setAssetStatus('查询失败: ' + result.error);
-      return;
-    }
-    try {
-      var json = JSON.parse(result.data);
-      if (json.error) {
-        setAssetStatus('API 错误: ' + json.error);
-        return;
-      }
-      var results = (json.matches || []).slice(0, getAssetSize()).map(function (m) {
-        return {
-          host: m.ip_str || '-',
-          port: m.port || '-',
-          protocol: (m._shodan && m._shodan.module) || '-',
-          title: (m.http && m.http.title) || '-',
-        };
-      });
-      setAssetStatus('Shodan: 查询完成 (共 ' + (json.total || results.length) + ' 条)');
-      renderAssetResults(results);
-    } catch {
-      setAssetStatus('解析结果失败');
-    }
+    var json = await fetchScanResults('Shodan', url);
+    if (!json) return;
+    var results = (json.matches || []).slice(0, getAssetSize()).map(function (m) {
+      return {
+        host: m.ip_str || '-',
+        port: m.port || '-',
+        protocol: (m._shodan && m._shodan.module) || '-',
+        title: (m.http && m.http.title) || '-',
+      };
+    });
+    setAssetStatus('Shodan: 查询完成 (共 ' + (json.total || results.length) + ' 条)');
+    renderAssetResults(results);
   }
 
   function shodanHostLookup() {
@@ -313,16 +267,14 @@ window.VulnKitAsset = (function () {
 
     // Step 1: resolve domain to IP
     if (!isIp) {
-      var dnsResult = await utils.fetchUrl({
+      var dnsResult = await utils.fetchUrlJson({
         url: 'https://geonet.shodan.io/api/dns/' + encodeURIComponent(input),
       });
       if (dnsResult && dnsResult.success && dnsResult.data) {
-        try {
-          var dnsJson = JSON.parse(dnsResult.data);
-          if (dnsJson && dnsJson.answers) {
-            resolvedIp = dnsJson.answers[0].value;
-          }
-        } catch {}
+        var dnsJson = dnsResult.data;
+        if (dnsJson && dnsJson.answers) {
+          resolvedIp = dnsJson.answers[0].value;
+        }
       }
     } else {
       resolvedIp = input;
@@ -337,20 +289,14 @@ window.VulnKitAsset = (function () {
         ' 为 IP 地址，请直接输入 IP</div>';
       return;
     }
-    var idbResult = await utils.fetchUrl({
+    var idbResult = await utils.fetchUrlJson({
       url: 'https://internetdb.shodan.io/' + encodeURIComponent(targetIp),
     });
-    if (!idbResult || !idbResult.success || !idbResult.data) {
+    if (!idbResult || !idbResult.success) {
       container.innerHTML = '<div style="color:#ff6b6b;padding:8px;">未找到该主机的信息</div>';
       return;
     }
-    var idbData;
-    try {
-      idbData = JSON.parse(idbResult.data);
-    } catch {
-      container.innerHTML = '<div style="color:#ff6b6b;padding:8px;">未找到该主机的信息</div>';
-      return;
-    }
+    var idbData = idbResult.data;
     if (idbData && idbData.error) {
       container.innerHTML = '<div style="color:#ff6b6b;padding:8px;">未找到该主机的信息</div>';
       return;
@@ -360,17 +306,15 @@ window.VulnKitAsset = (function () {
     var shodanKey = await getApiKey('shodan');
     var shodanData = null;
     if (shodanKey && resolvedIp) {
-      var hostResult = await utils.fetchUrl({
+      var hostResult = await utils.fetchUrlJson({
         url:
           'https://api.shodan.io/shodan/host/' +
           encodeURIComponent(resolvedIp) +
           '?key=' +
           encodeURIComponent(shodanKey),
       });
-      if (hostResult && hostResult.success && hostResult.data) {
-        try {
-          shodanData = JSON.parse(hostResult.data);
-        } catch {}
+      if (hostResult && hostResult.success) {
+        shodanData = hostResult.data;
       }
     }
     renderShodanHostInfo(container, idbData, shodanData, input, targetIp);

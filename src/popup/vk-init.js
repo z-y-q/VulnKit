@@ -345,10 +345,8 @@
     if (jwtDecodeBtn)
       jwtDecodeBtn.addEventListener('click', function () {
         var input = (utils.get('jwt-input') || {}).value;
-        if (!input) {
-          utils.showToast('请输入 JWT Token', 'warning');
-          return;
-        }
+        input = utils.requireInput(input, '请输入 JWT Token');
+        if (!input) return;
         decodeJwt(input);
       });
     var jwtClearBtn = utils.bindClick('jwt-clear-btn', clearJwt);
@@ -680,10 +678,8 @@
 
     var exifFetchHandler = function () {
       const url = utils.get('exif-url-input').value.trim();
-      if (!url) {
-        utils.showToast('请输入图片URL', 'warning');
-        return;
-      }
+      url = utils.requireInput(url, '请输入图片URL');
+      if (!url) return;
       fetchExifFromUrl(url);
     };
     utils.bindClick('exif-fetch-btn', exifFetchHandler);
@@ -694,10 +690,8 @@
     utils.bindClick('exif-scan-page-btn', scanPageImages);
 
     utils.bindClick('exif-copy-all-btn', () => {
-      if (!lastExifData) {
-        utils.showToast('没有元数据', 'warning');
-        return;
-      }
+      lastExifData = utils.requireInput(lastExifData, '没有元数据');
+      if (!lastExifData) return;
       const text = Object.entries(lastExifData)
         .map(([k, v]) => k + ': ' + v)
         .join('\n');
@@ -761,10 +755,8 @@
     utils.bindClick('vue-bypass-guards-btn', bypassVueGuards);
     utils.bindClick('vue-disable-auth-btn', disableRouteAuth);
     utils.bindClick('vue-copy-btn', () => {
-      if (!lastVueResult) {
-        utils.showToast('没有可复制的内容', 'warning');
-        return;
-      }
+      lastVueResult = utils.requireInput(lastVueResult, '没有可复制的内容');
+      if (!lastVueResult) return;
       utils.copyAndToast(lastVueResult);
     });
 
@@ -778,10 +770,8 @@
         e.target.classList.contains('vue-copy-hist-btn') ||
         e.target.classList.contains('vue-copy-hash-btn')
       ) {
-        if (!lastVueResult) {
-          utils.showToast('请先检测 Vue', 'warning');
-          return;
-        }
+        lastVueResult = utils.requireInput(lastVueResult, '请先检测 Vue');
+        if (!lastVueResult) return;
         try {
           var data = JSON.parse(lastVueResult);
           if (!data.routes || !data.routes.length) {
@@ -830,10 +820,8 @@
     utils.bindClick('perm-apply-btn', applyPermOverride);
     utils.bindClick('perm-copy-json', () => {
       const val = utils.get('perm-json-editor').value;
-      if (!val) {
-        utils.showToast('没有数据', 'warning');
-        return;
-      }
+      val = utils.requireInput(val, '没有数据');
+      if (!val) return;
       utils.copyAndToast(val);
     });
 

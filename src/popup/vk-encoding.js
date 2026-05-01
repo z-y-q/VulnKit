@@ -57,10 +57,8 @@ window.VulnKitEncoding = (function () {
     var inputEl = utils.get('encoding-input');
     if (!inputEl) return;
     var input = inputEl.value;
-    if (!input) {
-      utils.showToast('请输入文本', 'warning');
-      return;
-    }
+    input = utils.requireInput(input, '请输入文本');
+    if (!input) return;
     var result =
       encodingTools[currentEncodingType] && encodingTools[currentEncodingType].encode(input);
     if (result === undefined) {
@@ -76,10 +74,8 @@ window.VulnKitEncoding = (function () {
     var inputEl = utils.get('encoding-input');
     if (!inputEl) return;
     var input = inputEl.value;
-    if (!input) {
-      utils.showToast('请输入文本', 'warning');
-      return;
-    }
+    input = utils.requireInput(input, '请输入文本');
+    if (!input) return;
     var result =
       encodingTools[currentEncodingType] && encodingTools[currentEncodingType].decode(input);
     if (result === undefined) {

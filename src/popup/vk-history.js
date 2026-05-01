@@ -227,15 +227,17 @@ window.VulnKitHistory = (function () {
     utils.get('history-summary').classList.add('hidden');
 
     var cdxUrl = buildCdxUrl(domain);
-    var result = await utils.fetchUrl({ url: cdxUrl });
+    var outputType = utils.get('history-output-type').value;
+    var isJson = outputType === 'json';
+    var result = isJson
+      ? await utils.fetchUrlJson({ url: cdxUrl })
+      : await utils.fetchUrl({ url: cdxUrl });
     if (!result || !result.success) {
       utils.setStatus('history-status', '查询失败: ' + (result ? result.error : '超时'));
       return;
     }
     try {
-      var outputType = utils.get('history-output-type').value;
-      var items =
-        outputType === 'json' ? parseCdxJson(JSON.parse(result.data)) : parseCdxText(result.data);
+      var items = isJson ? parseCdxJson(result.data) : parseCdxText(result.data);
       renderHistoryResults(items);
       utils.showToast('查询完成', 'success');
 
@@ -258,20 +260,14 @@ window.VulnKitHistory = (function () {
       utils.showToast('没有可导出的结果', 'warning');
       return;
     }
-    var lines = ['时间戳,URL,状态码,MIME类型'];
-    lastHistoryResults.forEach(function (item) {
-      lines.push(
-        utils.csvField(item.timestamp) +
-          ',' +
-          utils.csvField(item.url) +
-          ',' +
-          utils.csvField(item.statuscode) +
-          ',' +
-          utils.csvField(item.mimetype)
-      );
+    var rows = lastHistoryResults.map(function (item) {
+      return [item.timestamp, item.url, item.statuscode, item.mimetype];
     });
-    var csv = lines.join('\n');
-    utils.downloadCsv(csv, 'vulnkit-history-' + Date.now() + '.csv');
+    utils.buildCsv(
+      ['时间戳', 'URL', '状态码', 'MIME类型'],
+      rows,
+      'vulnkit-history-' + Date.now() + '.csv'
+    );
   }
 
   return {

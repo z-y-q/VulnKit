@@ -39,56 +39,55 @@ window.VulnKitRuoYi = (function () {
     if (resultsEl) resultsEl.innerHTML = '';
 
     try {
-      var tab = await utils.requireTabId();
-      if (!tab) return;
+      return utils.withTab(async function (tab) {
+        var discoverResults = await utils.execInTab(tab.id, function () {
+          if (
+            window.__VK_RUOYI_HOOK__ &&
+            typeof window.__VK_RUOYI_HOOK__.discoverRoutesFromJs === 'function'
+          ) {
+            return window.__VK_RUOYI_HOOK__.discoverRoutesFromJs();
+          }
+          return null;
+        });
 
-      var discoverResults = await utils.execInTab(tab.id, function () {
-        if (
-          window.__VK_RUOYI_HOOK__ &&
-          typeof window.__VK_RUOYI_HOOK__.discoverRoutesFromJs === 'function'
-        ) {
-          return window.__VK_RUOYI_HOOK__.discoverRoutesFromJs();
-        }
-        return null;
-      });
+        var result = utils.execResult(discoverResults) || {
+          discovered: [],
+          extUrls: [],
+        };
+        state.discoveredRoutes = result.discovered || [];
+        var extUrls = result.extUrls || [];
 
-      var result = utils.execResult(discoverResults) || {
-        discovered: [],
-        extUrls: [],
-      };
-      state.discoveredRoutes = result.discovered || [];
-      var extUrls = result.extUrls || [];
-
-      utils.setStatus(
-        'ruoyi-analyze-status',
-        '发现 ' +
-          state.discoveredRoutes.length +
-          ' 条路径，正在扫描外部JS (' +
-          extUrls.length +
-          ' 个文件)...'
-      );
-
-      var CONCURRENCY = 5;
-      var routePattern = /path\s*:\s*['"`](\/[a-zA-Z0-9_\-\/]+)['"`]/g;
-      var compPattern = /component\s*:\s*['"`]([^'"`]+?)['"`]/g;
-      var skipRe = /\/api\/|\.js$|\.css$|\.(png|jpg|svg|ico|woff|ttf)|\/login$|\/index$/i;
-
-      var completedBatches = 0;
-      var totalBatches = Math.ceil(extUrls.length / CONCURRENCY);
-
-      for (var batchStart = 0; batchStart < extUrls.length; batchStart += CONCURRENCY) {
-        var batch = extUrls.slice(batchStart, batchStart + CONCURRENCY);
-        var batchResults = await Promise.all(
-          batch.map(function (url) {
-            return chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url }).catch(function () {
-              return null;
-            });
-          })
+        utils.setStatus(
+          'ruoyi-analyze-status',
+          '发现 ' +
+            state.discoveredRoutes.length +
+            ' 条路径，正在扫描外部JS (' +
+            extUrls.length +
+            ' 个文件)...'
         );
-        for (var b = 0; b < batchResults.length; b++) {
-          var resp = batchResults[b];
-          if (!resp || resp.error || !resp.data) continue;
-          var text = resp.data;
+
+        var CONCURRENCY = 5;
+        var routePattern = /path\s*:\s*['"`](\/[a-zA-Z0-9_\-\/]+)['"`]/g;
+        var compPattern = /component\s*:\s*['"`]([^'"`]+?)['"`]/g;
+        var skipRe = /\/api\/|\.js$|\.css$|\.(png|jpg|svg|ico|woff|ttf)|\/login$|\/index$/i;
+
+        var totalBatches = Math.ceil(extUrls.length / CONCURRENCY);
+        var allContent = await utils.batchFetch(extUrls, {
+          concurrency: CONCURRENCY,
+          onProgress: function (results, current, total) {
+            if (totalBatches > 1) {
+              var pct = Math.round((current / total) * 100);
+              utils.setStatus(
+                'ruoyi-analyze-status',
+                '扫描外部JS中... ' + pct + '% (' + current + '/' + total + ')'
+              );
+            }
+          },
+        });
+
+        for (var b = 0; b < allContent.length; b++) {
+          var text = allContent[b];
+          if (!text) continue;
 
           routePattern.lastIndex = 0;
           var m;
@@ -99,7 +98,7 @@ window.VulnKitRuoYi = (function () {
               return r.path === p;
             });
             if (!alreadyExists) {
-              var shortUrl = batch[b];
+              var shortUrl = extUrls[b];
               if (shortUrl.length > 50) shortUrl = '...' + shortUrl.substring(shortUrl.length - 47);
               state.discoveredRoutes.push({ path: p, source: shortUrl, type: 'route-def' });
             }
@@ -124,103 +123,94 @@ window.VulnKitRuoYi = (function () {
           }
         }
 
-        completedBatches++;
-        if (totalBatches > 1) {
-          var pct = Math.round((completedBatches / totalBatches) * 100);
-          utils.setStatus(
-            'ruoyi-analyze-status',
-            '扫描外部JS中... ' + pct + '% (' + completedBatches + '/' + totalBatches + ')'
+        // Filter against captured router data
+        var capturedPaths = {};
+        var capturedComponents = {};
+        if (state.capturedRouterData) {
+          extractPaths(
+            state.capturedRouterData.data || state.capturedRouterData,
+            capturedPaths,
+            capturedComponents
           );
         }
-      }
 
-      // Filter against captured router data
-      var capturedPaths = {};
-      var capturedComponents = {};
-      if (state.capturedRouterData) {
-        extractPaths(
-          state.capturedRouterData.data || state.capturedRouterData,
-          capturedPaths,
-          capturedComponents
-        );
-      }
-
-      state.extraRoutes = state.discoveredRoutes.filter(function (r) {
-        if (r.type === 'component-ref') {
-          return r.component && !capturedComponents[r.component];
-        }
-        return r.path && !capturedPaths[r.path];
-      });
-
-      var seen = {};
-      state.extraRoutes = state.extraRoutes.filter(function (r) {
-        var key = r.path || r.component;
-        if (seen[key]) return false;
-        seen[key] = true;
-        return true;
-      });
-
-      state.extraRoutes.sort(function (a, b) {
-        var pa = a.path || '';
-        var pb = b.path || '';
-        return pa.localeCompare(pb);
-      });
-
-      utils.setStatus(
-        'ruoyi-analyze-status',
-        '分析完成，发现 ' + state.extraRoutes.length + ' 条额外路由'
-      );
-      updateWorkflowStep(3);
-
-      if (state.extraRoutes.length > 0) {
-        var html =
-          '<div class="ruoyi-discovery-summary">发现 ' +
-          state.discoveredRoutes.length +
-          ' 条路径，' +
-          state.extraRoutes.length +
-          ' 条不在当前路由中</div>';
-
-        var routeCount = state.extraRoutes.filter(function (r) {
-          return r.type === 'route-def';
-        }).length;
-        var compCount = state.extraRoutes.filter(function (r) {
-          return r.type === 'component-ref';
-        }).length;
-        if (compCount > 0) {
-          html += '<div class="ruoyi-discovery-stats">';
-          html += '<span class="ruoyi-stat-item">路由定义: ' + routeCount + '</span>';
-          html += '<span class="ruoyi-stat-item">组件引用: ' + compCount + '</span>';
-          html += '</div>';
-        }
-
-        html += '<div class="ruoyi-extra-routes">';
-        state.extraRoutes.forEach(function (r, i) {
-          html += '<div class="ruoyi-extra-route-item">';
-          html +=
-            '<label><input type="checkbox" class="ruoyi-route-check" data-idx="' +
-            i +
-            '" checked> ';
-          var displayPath = r.path || r.component;
-          var typeLabel = r.type === 'component-ref' ? '[组件] ' : '';
-          html +=
-            '<span class="ruoyi-route-path">' +
-            utils.escapeHtml(typeLabel + displayPath) +
-            '</span></label>';
-          if (r.source)
-            html += '<span class="ruoyi-route-source">' + utils.escapeHtml(r.source) + '</span>';
-          html += '</div>';
+        state.extraRoutes = state.discoveredRoutes.filter(function (r) {
+          if (r.type === 'component-ref') {
+            return r.component && !capturedComponents[r.component];
+          }
+          return r.path && !capturedPaths[r.path];
         });
-        html += '</div>';
 
-        if (resultsEl) resultsEl.innerHTML = html;
-        utils.showToast('发现 ' + state.extraRoutes.length + ' 条额外路由', 'success');
-      } else {
+        var seen = {};
+        state.extraRoutes = state.extraRoutes.filter(function (r) {
+          var key = r.path || r.component;
+          if (seen[key]) return false;
+          seen[key] = true;
+          return true;
+        });
+
+        state.extraRoutes.sort(function (a, b) {
+          var pa = a.path || '';
+          var pb = b.path || '';
+          return pa.localeCompare(pb);
+        });
+
+        utils.setStatus(
+          'ruoyi-analyze-status',
+          '分析完成，发现 ' + state.extraRoutes.length + ' 条额外路由'
+        );
         updateWorkflowStep(3);
-        if (resultsEl)
-          resultsEl.innerHTML = utils.emptyHtml(
-            state.discoveredRoutes.length > 0 ? '所有发现的路径均已注册' : '未发现路由定义'
-          );
-      }
+
+        if (state.extraRoutes.length > 0) {
+          var html =
+            '<div class="ruoyi-discovery-summary">发现 ' +
+            state.discoveredRoutes.length +
+            ' 条路径，' +
+            state.extraRoutes.length +
+            ' 条不在当前路由中</div>';
+
+          var routeCount = state.extraRoutes.filter(function (r) {
+            return r.type === 'route-def';
+          }).length;
+          var compCount = state.extraRoutes.filter(function (r) {
+            return r.type === 'component-ref';
+          }).length;
+          if (compCount > 0) {
+            html += '<div class="ruoyi-discovery-stats">';
+            html += '<span class="ruoyi-stat-item">路由定义: ' + routeCount + '</span>';
+            html += '<span class="ruoyi-stat-item">组件引用: ' + compCount + '</span>';
+            html += '</div>';
+          }
+
+          html += '<div class="ruoyi-extra-routes">';
+          state.extraRoutes.forEach(function (r, i) {
+            html += '<div class="ruoyi-extra-route-item">';
+            html +=
+              '<label><input type="checkbox" class="ruoyi-route-check" data-idx="' +
+              i +
+              '" checked> ';
+            var displayPath = r.path || r.component;
+            var typeLabel = r.type === 'component-ref' ? '[组件] ' : '';
+            html +=
+              '<span class="ruoyi-route-path">' +
+              utils.escapeHtml(typeLabel + displayPath) +
+              '</span></label>';
+            if (r.source)
+              html += '<span class="ruoyi-route-source">' + utils.escapeHtml(r.source) + '</span>';
+            html += '</div>';
+          });
+          html += '</div>';
+
+          if (resultsEl) resultsEl.innerHTML = html;
+          utils.showToast('发现 ' + state.extraRoutes.length + ' 条额外路由', 'success');
+        } else {
+          updateWorkflowStep(3);
+          if (resultsEl)
+            resultsEl.innerHTML = utils.emptyHtml(
+              state.discoveredRoutes.length > 0 ? '所有发现的路径均已注册' : '未发现路由定义'
+            );
+        }
+      });
     } catch (e) {
       utils.setStatus('ruoyi-analyze-status', '分析出错');
       utils.showToast('分析失败: ' + e.message, 'error');
@@ -242,55 +232,54 @@ window.VulnKitRuoYi = (function () {
 
   async function applyExtraRoutes() {
     try {
-      var tab = await utils.requireTabId();
-      if (!tab) return;
+      return utils.withTab(async function (tab) {
+        var selected = [];
+        document.querySelectorAll('.ruoyi-route-check:checked').forEach(function (cb) {
+          var idx = parseInt(cb.dataset.idx, 10);
+          if (state.extraRoutes[idx]) selected.push(state.extraRoutes[idx]);
+        });
 
-      var selected = [];
-      document.querySelectorAll('.ruoyi-route-check:checked').forEach(function (cb) {
-        var idx = parseInt(cb.dataset.idx, 10);
-        if (state.extraRoutes[idx]) selected.push(state.extraRoutes[idx]);
-      });
-
-      if (selected.length === 0) {
-        utils.showToast('请至少选择一条路由', 'warning');
-        return;
-      }
-
-      var routesToApply = selected.map(function (r) {
-        if (r.type === 'component-ref') {
-          var compPath = r.component || '';
-          var segs = compPath
-            .replace(/^(views|pages|src)\//i, '')
-            .replace(/\.\w+$/, '')
-            .split('/');
-          var routePath = '/' + segs.join('/');
-          return {
-            path: routePath,
-            component: compPath,
-            name: segs[segs.length - 1] || routePath,
-            title: segs[segs.length - 1] || routePath,
-          };
+        if (selected.length === 0) {
+          utils.showToast('请至少选择一条路由', 'warning');
+          return;
         }
-        return r;
-      });
 
-      await utils.execInTab(
-        tab.id,
-        function (routes) {
-          if (window.__VK_RUOYI_HOOK__) {
-            window.__VK_RUOYI_HOOK__.extraRoutes = routes;
-            window.__VK_RUOYI_HOOK__.augmentMode = 'auto';
+        var routesToApply = selected.map(function (r) {
+          if (r.type === 'component-ref') {
+            var compPath = r.component || '';
+            var segs = compPath
+              .replace(/^(views|pages|src)\//i, '')
+              .replace(/\.\w+$/, '')
+              .split('/');
+            var routePath = '/' + segs.join('/');
+            return {
+              path: routePath,
+              component: compPath,
+              name: segs[segs.length - 1] || routePath,
+              title: segs[segs.length - 1] || routePath,
+            };
           }
-        },
-        { args: [routesToApply] }
-      );
+          return r;
+        });
 
-      state.extraRoutes = routesToApply;
-      utils.setStatus(
-        'ruoyi-analyze-status',
-        '已设置 ' + selected.length + ' 条额外路由，刷新页面生效'
-      );
-      utils.showToast('已设置 ' + selected.length + ' 条路由，刷新页面即可生效', 'success');
+        await utils.execInTab(
+          tab.id,
+          function (routes) {
+            if (window.__VK_RUOYI_HOOK__) {
+              window.__VK_RUOYI_HOOK__.extraRoutes = routes;
+              window.__VK_RUOYI_HOOK__.augmentMode = 'auto';
+            }
+          },
+          { args: [routesToApply] }
+        );
+
+        state.extraRoutes = routesToApply;
+        utils.setStatus(
+          'ruoyi-analyze-status',
+          '已设置 ' + selected.length + ' 条额外路由，刷新页面生效'
+        );
+        utils.showToast('已设置 ' + selected.length + ' 条路由，刷新页面即可生效', 'success');
+      });
     } catch (e) {
       utils.showToast('应用失败: ' + e.message, 'error');
     }
@@ -321,15 +310,15 @@ window.VulnKitRuoYi = (function () {
   async function setAugmentMode(mode) {
     state.augmentMode = mode;
     try {
-      var tab = await utils.requireTabId();
-      if (!tab) return;
-      await utils.execInTab(
-        tab.id,
-        function (m) {
-          if (window.__VK_RUOYI_HOOK__) window.__VK_RUOYI_HOOK__.augmentMode = m;
-        },
-        { args: [mode] }
-      );
+      return utils.withTab(async function (tab) {
+        await utils.execInTab(
+          tab.id,
+          function (m) {
+            if (window.__VK_RUOYI_HOOK__) window.__VK_RUOYI_HOOK__.augmentMode = m;
+          },
+          { args: [mode] }
+        );
+      });
     } catch (e) {
       console.warn('[VulnKit] setAugmentMode:', e);
     }
@@ -540,55 +529,54 @@ window.VulnKitRuoYi = (function () {
     var countEl = utils.get('ruoyi-traffic-count');
     var listEl = utils.get('ruoyi-traffic-list');
     try {
-      var tab = await utils.requireTabId();
-      if (!tab) return;
+      return utils.withTab(async function (tab) {
+        var results = await utils.execInTab(tab.id, function () {
+          var hook = window.__VK_RUOYI_HOOK__;
+          if (!hook || !hook.apiLog) return [];
+          return hook.apiLog.slice(-200);
+        });
 
-      var results = await utils.execInTab(tab.id, function () {
-        var hook = window.__VK_RUOYI_HOOK__;
-        if (!hook || !hook.apiLog) return [];
-        return hook.apiLog.slice(-200);
-      });
+        var log = utils.execResult(results) || [];
+        if (countEl) countEl.textContent = '已捕获 ' + log.length + ' 个API请求';
 
-      var log = utils.execResult(results) || [];
-      if (countEl) countEl.textContent = '已捕获 ' + log.length + ' 个API请求';
+        if (log.length === 0) {
+          if (listEl)
+            listEl.innerHTML = utils.emptyHtml('安装路由钩子并浏览页面后，此处显示捕获的API请求');
+          return;
+        }
 
-      if (log.length === 0) {
-        if (listEl)
-          listEl.innerHTML = utils.emptyHtml('安装路由钩子并浏览页面后，此处显示捕获的API请求');
-        return;
-      }
+        var html = '<div class="ruoyi-traffic-list-inner">';
+        log.forEach(function (entry, i) {
+          var statusCls = '';
+          if (entry.status >= 200 && entry.status < 300) statusCls = 'traffic-ok';
+          else if (entry.status >= 400) statusCls = 'traffic-err';
+          else if (entry.status === 0) statusCls = 'traffic-err';
 
-      var html = '<div class="ruoyi-traffic-list-inner">';
-      log.forEach(function (entry, i) {
-        var statusCls = '';
-        if (entry.status >= 200 && entry.status < 300) statusCls = 'traffic-ok';
-        else if (entry.status >= 400) statusCls = 'traffic-err';
-        else if (entry.status === 0) statusCls = 'traffic-err';
-
-        html += '<div class="ruoyi-traffic-item" data-idx="' + i + '">';
-        html +=
-          '<span class="traffic-method">' + utils.escapeHtml(entry.method || 'GET') + '</span>';
-        html +=
-          '<span class="traffic-status ' + statusCls + '">' + (entry.status || '-') + '</span>';
-        html += '<span class="traffic-url">' + utils.escapeHtml(entry.url || '') + '</span>';
-        html += '<span class="traffic-time">' + utils.escapeHtml(entry.time || '') + '</span>';
+          html += '<div class="ruoyi-traffic-item" data-idx="' + i + '">';
+          html +=
+            '<span class="traffic-method">' + utils.escapeHtml(entry.method || 'GET') + '</span>';
+          html +=
+            '<span class="traffic-status ' + statusCls + '">' + (entry.status || '-') + '</span>';
+          html += '<span class="traffic-url">' + utils.escapeHtml(entry.url || '') + '</span>';
+          html += '<span class="traffic-time">' + utils.escapeHtml(entry.time || '') + '</span>';
+          html += '</div>';
+        });
         html += '</div>';
-      });
-      html += '</div>';
-      if (listEl) listEl.innerHTML = html;
+        if (listEl) listEl.innerHTML = html;
 
-      listEl.querySelectorAll('.ruoyi-traffic-item').forEach(function (el) {
-        el.addEventListener('click', function () {
-          var idx = parseInt(el.dataset.idx, 10);
-          var entry = log[idx];
-          if (!entry || !entry.body) return;
-          var preview = entry.body.substring(0, 500);
-          var existing = listEl.querySelector('.traffic-preview');
-          if (existing) existing.remove();
-          var pre = document.createElement('div');
-          pre.className = 'traffic-preview';
-          pre.textContent = preview;
-          el.after(pre);
+        listEl.querySelectorAll('.ruoyi-traffic-item').forEach(function (el) {
+          el.addEventListener('click', function () {
+            var idx = parseInt(el.dataset.idx, 10);
+            var entry = log[idx];
+            if (!entry || !entry.body) return;
+            var preview = entry.body.substring(0, 500);
+            var existing = listEl.querySelector('.traffic-preview');
+            if (existing) existing.remove();
+            var pre = document.createElement('div');
+            pre.className = 'traffic-preview';
+            pre.textContent = preview;
+            el.after(pre);
+          });
         });
       });
     } catch (e) {

@@ -310,22 +310,14 @@ window.VulnKitLinks = (function () {
       utils.showToast('没有可导出的链接', 'warning');
       return;
     }
-    var lines = ['URL,Tag,Domain,Text,External'];
-    filtered.forEach(function (l) {
-      lines.push(
-        utils.csvField(l.href) +
-          ',' +
-          l.tag +
-          ',' +
-          utils.csvField(l.domain) +
-          ',' +
-          utils.csvField(l.text) +
-          ',' +
-          (l.isExternal ? 'Yes' : 'No')
-      );
+    var rows = filtered.map(function (l) {
+      return [l.href, l.tag, l.domain, l.text, l.isExternal ? 'Yes' : 'No'];
     });
-    var csv = lines.join('\n');
-    utils.downloadCsv(csv, 'vulnkit-links-' + Date.now() + '.csv');
+    utils.buildCsv(
+      ['URL', 'Tag', 'Domain', 'Text', 'External'],
+      rows,
+      'vulnkit-links-' + Date.now() + '.csv'
+    );
   }
 
   function sendToMultiUrl() {
