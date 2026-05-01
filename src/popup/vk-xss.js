@@ -45,59 +45,60 @@ window.VulnKitXss = (function () {
   async function harvestXssParamsFromDom() {
     const tab = await utils.requireTabId();
     if (!tab) return [];
-    const results = await utils.execInTab(
-      tab.id,
-      () => {
-        const pageUrl = location.href;
-        const collected = [];
-        const seen = new Set();
+    return (
+      (await utils.execInTabData(
+        tab.id,
+        () => {
+          const pageUrl = location.href;
+          const collected = [];
+          const seen = new Set();
 
-        function addPoint(source, url, param, method) {
-          if (!url || !param) return;
-          let fullUrl;
-          try {
-            fullUrl = new URL(url, pageUrl).href;
-          } catch {
-            return;
+          function addPoint(source, url, param, method) {
+            if (!url || !param) return;
+            let fullUrl;
+            try {
+              fullUrl = new URL(url, pageUrl).href;
+            } catch {
+              return;
+            }
+            const key = fullUrl + '|' + param + '|' + method;
+            if (seen.has(key)) return;
+            seen.add(key);
+            collected.push({ source, url: fullUrl, param, method });
           }
-          const key = fullUrl + '|' + param + '|' + method;
-          if (seen.has(key)) return;
-          seen.add(key);
-          collected.push({ source, url: fullUrl, param, method });
-        }
 
-        document.querySelectorAll('a[href]').forEach(a => {
+          document.querySelectorAll('a[href]').forEach(a => {
+            try {
+              const href = new URL(a.href, pageUrl);
+              if (href.origin !== location.origin) return;
+              href.searchParams.forEach((_, key) => {
+                addPoint('link', href.pathname + href.search, key, 'GET');
+              });
+            } catch {}
+          });
+
+          document.querySelectorAll('form').forEach(form => {
+            const action = form.getAttribute('action') || pageUrl;
+            const method = (form.getAttribute('method') || 'GET').toUpperCase();
+            form.querySelectorAll('input[name], select[name], textarea[name]').forEach(el => {
+              const name = el.getAttribute('name');
+              if (!name) return;
+              addPoint('form', action, name, method);
+            });
+          });
+
           try {
-            const href = new URL(a.href, pageUrl);
-            if (href.origin !== location.origin) return;
-            href.searchParams.forEach((_, key) => {
-              addPoint('link', href.pathname + href.search, key, 'GET');
+            const currentUrl = new URL(pageUrl);
+            currentUrl.searchParams.forEach((_, key) => {
+              addPoint('url', currentUrl.pathname + currentUrl.search, key, 'GET');
             });
           } catch {}
-        });
 
-        document.querySelectorAll('form').forEach(form => {
-          const action = form.getAttribute('action') || pageUrl;
-          const method = (form.getAttribute('method') || 'GET').toUpperCase();
-          form.querySelectorAll('input[name], select[name], textarea[name]').forEach(el => {
-            const name = el.getAttribute('name');
-            if (!name) return;
-            addPoint('form', action, name, method);
-          });
-        });
-
-        try {
-          const currentUrl = new URL(pageUrl);
-          currentUrl.searchParams.forEach((_, key) => {
-            addPoint('url', currentUrl.pathname + currentUrl.search, key, 'GET');
-          });
-        } catch {}
-
-        return collected;
-      },
-      { world: 'ISOLATED' }
+          return collected;
+        },
+        { world: 'ISOLATED' }
+      )) || []
     );
-    return utils.execResult(results) || [];
   }
 
   async function startXssIntercept() {
@@ -251,12 +252,12 @@ window.VulnKitXss = (function () {
         return;
       }
       try {
-        const results = await utils.execInTab(tabId, () => {
-          const data = window.__XSS_INTERCEPT__ || [];
-          window.__XSS_INTERCEPT__ = [];
-          return data;
-        });
-        const captured = utils.execResult(results) || [];
+        const captured =
+          (await utils.execInTabData(tabId, () => {
+            const data = window.__XSS_INTERCEPT__ || [];
+            window.__XSS_INTERCEPT__ = [];
+            return data;
+          })) || [];
         if (captured.length > 0) {
           const existing = new Set(xssPoints.map(p => p.url + '|' + p.param + '|' + p.method));
           const newPoints = captured

@@ -50,7 +50,7 @@ window.VulnKitRuoYiDetect = (function () {
         return;
       }
 
-      var results = await utils.execInTab(tab.id, function () {
+      var data = await utils.execInTabData(tab.id, function () {
         var evidence = [];
         var variant = null;
         var version = null;
@@ -187,7 +187,7 @@ window.VulnKitRuoYiDetect = (function () {
         };
       });
 
-      var data = utils.execResult(results) || {
+      data = data || {
         detected: false,
         evidence: [],
         variant: null,
@@ -259,14 +259,13 @@ window.VulnKitRuoYiDetect = (function () {
   async function autoCaptureRoutes(tabId, hasToken) {
     var panelEl = utils.get('ruoyi-captured-panel');
     try {
-      var checkResult = await utils.execInTab(tabId, function () {
+      var status = await utils.execInTabData(tabId, function () {
         var hook = window.__VK_RUOYI_HOOK__;
         return {
           installed: !!hook,
           captured: hook ? !!hook.capturedRouters : false,
         };
       });
-      var status = utils.execResult(checkResult);
 
       if (status && status.captured) {
         utils.setStatus('ruoyi-hook-status', '已捕获路由数据 (被动捕获模式)');
@@ -275,10 +274,10 @@ window.VulnKitRuoYiDetect = (function () {
       }
 
       if (hasToken) {
-        var cookieResult = await utils.execInTab(tabId, function () {
-          return document.cookie || '';
-        });
-        var cookies = utils.execResult(cookieResult) || '';
+        var cookies =
+          (await utils.execInTabData(tabId, function () {
+            return document.cookie || '';
+          })) || '';
         var cookieHeader = cookies ? { Cookie: cookies } : {};
 
         var routerPaths = [
@@ -358,7 +357,7 @@ window.VulnKitRuoYiDetect = (function () {
     var panelEl = utils.get('ruoyi-captured-panel');
     try {
       return utils.withTab(async function (tab) {
-        var results = await utils.execInTab(tab.id, function () {
+        var data = await utils.execInTabData(tab.id, function () {
           if (!window.__VK_RUOYI_HOOK__ || !window.__VK_RUOYI_HOOK__.capturedRouters) return null;
           try {
             return JSON.parse(window.__VK_RUOYI_HOOK__.capturedRouters);
@@ -366,8 +365,6 @@ window.VulnKitRuoYiDetect = (function () {
             return { _raw: window.__VK_RUOYI_HOOK__.capturedRouters, _parseError: true };
           }
         });
-
-        var data = utils.execResult(results);
         if (!data) return;
         if (state) state.capturedRouterData = data;
         // Delegate rendering to hook module if available

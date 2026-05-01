@@ -235,7 +235,7 @@ window.VulnKitVue = (function () {
     if (!tab) return;
 
     try {
-      const results = await utils.execInTab(tab.id, () => {
+      const routes = await utils.execInTabData(tab.id, () => {
         function safeSerialize(obj) {
           try {
             return JSON.parse(JSON.stringify(obj));
@@ -269,8 +269,6 @@ window.VulnKitVue = (function () {
         }
         return null;
       });
-
-      const routes = utils.execResult(results);
       if (!routes) {
         utils.showToast('未找到 Vue Router', 'warning');
         return;
@@ -290,7 +288,7 @@ window.VulnKitVue = (function () {
     if (!tab) return;
 
     try {
-      const bypassResults = await utils.execInTab(tab.id, () => {
+      const result = await utils.execInTabData(tab.id, () => {
         // Vue 3
         const appEl = document.querySelector(
           '#app,[data-v-app],[id^="app"],#root,#application,#main'
@@ -332,8 +330,6 @@ window.VulnKitVue = (function () {
         }
         return null;
       });
-
-      const result = utils.execResult(bypassResults);
       if (!result) {
         utils.showToast('未找到 Vue Router', 'warning');
         return;
@@ -349,7 +345,7 @@ window.VulnKitVue = (function () {
     if (!tab) return;
 
     try {
-      const results = await utils.execInTab(tab.id, () => {
+      const result = await utils.execInTabData(tab.id, () => {
         var authKeys = [
           'auth',
           'requireAuth',
@@ -418,8 +414,6 @@ window.VulnKitVue = (function () {
 
         return null;
       });
-
-      const result = utils.execResult(results);
       if (!result) {
         utils.showToast('未找到 Vue Router', 'warning');
         return;
@@ -882,8 +876,7 @@ window.VulnKitVue = (function () {
         if (statusEl) statusEl.textContent = '无法获取当前标签页';
         return;
       }
-      var results = await utils.execInTab(tab.id, permInterceptorFunc);
-      var status = utils.execResult(results);
+      var status = await utils.execInTabData(tab.id, permInterceptorFunc);
       if (status === 'already_injected') {
         await utils.execInTab(tab.id, function () {
           if (window.__PERM_INTERCEPTOR__) window.__PERM_INTERCEPTOR__.start();
@@ -932,12 +925,11 @@ window.VulnKitVue = (function () {
     try {
       const tab = await utils.requireTabId();
       if (!tab) return;
-      var results = await utils.execInTab(tab.id, function () {
+      var result = (await utils.execInTabData(tab.id, function () {
         if (!window.__PERM_INTERCEPTOR__) return { items: [], length: 0 };
         var captured = window.__PERM_INTERCEPTOR__.getCaptured();
         return { items: captured, length: captured.length };
-      });
-      var result = utils.execResult(results) || { items: [], length: 0 };
+      })) || { items: [], length: 0 };
       if (result.length === permCapturedLength) return;
       permCapturedLength = result.length;
       permCapturedData = result.items || [];
@@ -1382,7 +1374,7 @@ window.VulnKitVue = (function () {
         utils.showToast('无法获取当前标签页', 'error');
         return;
       }
-      var results = await utils.execInTab(
+      var overrideResult = await utils.execInTabData(
         tab.id,
         function (overrideData) {
           if (!window.__PERM_INTERCEPTOR__) return false;
@@ -1508,7 +1500,6 @@ window.VulnKitVue = (function () {
         },
         { args: [modifiedData] }
       );
-      var overrideResult = utils.execResult(results);
       if (!overrideResult || !overrideResult.success) {
         utils.showToast('拦截器未注入，请先启动权限拦截', 'error');
         return;
@@ -1540,49 +1531,48 @@ window.VulnKitVue = (function () {
       if (!tab) return;
 
       // 1. Search inline scripts
-      var inlineResults = await utils.execInTab(
-        tab.id,
-        function (kw) {
-          var matches = [];
-          var seen = {};
-          var scripts = document.querySelectorAll('script:not([src])');
-          for (var i = 0; i < scripts.length; i++) {
-            var text = scripts[i].textContent || '';
-            if (text.indexOf(kw) === -1) continue;
-            var lines = text.split('\n');
-            for (var j = 0; j < lines.length; j++) {
-              var idx = lines[j].indexOf(kw);
-              while (idx !== -1) {
-                var start = Math.max(0, idx - 40);
-                var end = Math.min(lines[j].length, idx + kw.length + 60);
-                var context = lines[j].substring(start, end).replace(/^\S*\s*/, '');
-                var key = i + ':' + idx;
-                if (!seen[key]) {
-                  seen[key] = true;
-                  matches.push({
-                    source: '(inline script #' + (i + 1) + ')',
-                    line: j + 1,
-                    context: context,
-                  });
+      var inlineData =
+        (await utils.execInTabData(
+          tab.id,
+          function (kw) {
+            var matches = [];
+            var seen = {};
+            var scripts = document.querySelectorAll('script:not([src])');
+            for (var i = 0; i < scripts.length; i++) {
+              var text = scripts[i].textContent || '';
+              if (text.indexOf(kw) === -1) continue;
+              var lines = text.split('\n');
+              for (var j = 0; j < lines.length; j++) {
+                var idx = lines[j].indexOf(kw);
+                while (idx !== -1) {
+                  var start = Math.max(0, idx - 40);
+                  var end = Math.min(lines[j].length, idx + kw.length + 60);
+                  var context = lines[j].substring(start, end).replace(/^\S*\s*/, '');
+                  var key = i + ':' + idx;
+                  if (!seen[key]) {
+                    seen[key] = true;
+                    matches.push({
+                      source: '(inline script #' + (i + 1) + ')',
+                      line: j + 1,
+                      context: context,
+                    });
+                  }
+                  if (matches.length >= 50) break;
+                  idx = lines[j].indexOf(kw, idx + 1);
                 }
                 if (matches.length >= 50) break;
-                idx = lines[j].indexOf(kw, idx + 1);
               }
               if (matches.length >= 50) break;
             }
-            if (matches.length >= 50) break;
-          }
-          // Also return external script URLs for further fetching
-          var extUrls = [];
-          document.querySelectorAll('script[src]').forEach(function (s) {
-            extUrls.push(s.src);
-          });
-          return { matches: matches, extUrls: extUrls };
-        },
-        { args: [keyword], world: 'ISOLATED' }
-      );
-
-      var inlineData = utils.execResult(inlineResults) || {};
+            // Also return external script URLs for further fetching
+            var extUrls = [];
+            document.querySelectorAll('script[src]').forEach(function (s) {
+              extUrls.push(s.src);
+            });
+            return { matches: matches, extUrls: extUrls };
+          },
+          { args: [keyword], world: 'ISOLATED' }
+        )) || {};
       var matchList = inlineData.matches || [];
       var extUrls = inlineData.extUrls || [];
 
@@ -2033,62 +2023,62 @@ window.VulnKitVue = (function () {
           utils.showToast('无法获取当前标签页', 'error');
           return;
         }
-        var routeResults = await utils.execInTab(tab.id, function () {
-          var routes = [];
-          var seen = {};
-          function extract(rts, prefix) {
-            rts.forEach(function (r) {
-              var childPath = r.path || '/';
-              var path;
-              if (childPath.charAt(0) === '/') path = childPath;
-              else if (prefix === '' || prefix === '/') path = '/' + childPath;
-              else path = prefix + '/' + childPath;
-              if (r.path && r.path !== '*' && !seen[path]) {
-                seen[path] = true;
-                routes.push(path);
-              }
-              if (r.children) extract(r.children, path === '/' ? '/' : path);
-            });
-          }
-          var appEl = document.querySelector(
-            '#app,[data-v-app],[id^="app"],#root,#application,#main'
-          );
-          if (appEl && appEl.__vue_app__) {
-            var router = appEl.__vue_app__.config.globalProperties.$router;
-            if (router && typeof router.getRoutes === 'function') {
-              router.getRoutes().forEach(function (r) {
-                if (r.path && r.path !== '*' && !seen[r.path]) {
-                  seen[r.path] = true;
-                  routes.push(r.path);
+        routes =
+          (await utils.execInTabData(tab.id, function () {
+            var routes = [];
+            var seen = {};
+            function extract(rts, prefix) {
+              rts.forEach(function (r) {
+                var childPath = r.path || '/';
+                var path;
+                if (childPath.charAt(0) === '/') path = childPath;
+                else if (prefix === '' || prefix === '/') path = '/' + childPath;
+                else path = prefix + '/' + childPath;
+                if (r.path && r.path !== '*' && !seen[path]) {
+                  seen[path] = true;
+                  routes.push(path);
                 }
+                if (r.children) extract(r.children, path === '/' ? '/' : path);
               });
-            } else if (router && router.options && router.options.routes) {
-              extract(router.options.routes, '');
             }
-          } else {
-            var els = document.querySelectorAll('*');
-            for (var i = 0; i < els.length; i++) {
-              if (els[i].__vue__) {
-                var vm = els[i].__vue__.$root || els[i].__vue__;
-                if (vm.$router) {
-                  if (typeof vm.$router.getRoutes === 'function') {
-                    vm.$router.getRoutes().forEach(function (r) {
-                      if (r.path && r.path !== '*' && !seen[r.path]) {
-                        seen[r.path] = true;
-                        routes.push(r.path);
-                      }
-                    });
-                  } else if (vm.$router.options && vm.$router.options.routes) {
-                    extract(vm.$router.options.routes, '');
+            var appEl = document.querySelector(
+              '#app,[data-v-app],[id^="app"],#root,#application,#main'
+            );
+            if (appEl && appEl.__vue_app__) {
+              var router = appEl.__vue_app__.config.globalProperties.$router;
+              if (router && typeof router.getRoutes === 'function') {
+                router.getRoutes().forEach(function (r) {
+                  if (r.path && r.path !== '*' && !seen[r.path]) {
+                    seen[r.path] = true;
+                    routes.push(r.path);
                   }
+                });
+              } else if (router && router.options && router.options.routes) {
+                extract(router.options.routes, '');
+              }
+            } else {
+              var els = document.querySelectorAll('*');
+              for (var i = 0; i < els.length; i++) {
+                if (els[i].__vue__) {
+                  var vm = els[i].__vue__.$root || els[i].__vue__;
+                  if (vm.$router) {
+                    if (typeof vm.$router.getRoutes === 'function') {
+                      vm.$router.getRoutes().forEach(function (r) {
+                        if (r.path && r.path !== '*' && !seen[r.path]) {
+                          seen[r.path] = true;
+                          routes.push(r.path);
+                        }
+                      });
+                    } else if (vm.$router.options && vm.$router.options.routes) {
+                      extract(vm.$router.options.routes, '');
+                    }
+                  }
+                  if (routes.length > 0) break;
                 }
-                if (routes.length > 0) break;
               }
             }
-          }
-          return routes;
-        });
-        routes = utils.execResult(routeResults) || [];
+            return routes;
+          })) || [];
       } catch (e) {
         utils.showToast('获取路由失败: ' + e.message, 'error');
         return;
@@ -2133,7 +2123,7 @@ window.VulnKitVue = (function () {
       updateTraverseProgress(currentIdx + 1, total, path);
 
       utils
-        .execInTab(
+        .execInTabData(
           tabId,
           function (p) {
             var router = null;
@@ -2166,8 +2156,7 @@ window.VulnKitVue = (function () {
           },
           { args: [path] }
         )
-        .then(function (results) {
-          var res = utils.execResult(results);
+        .then(function (res) {
           if (res && res.ok) {
             addTraverseLog(currentIdx + 1, path, 'ok');
           } else {
@@ -2201,66 +2190,65 @@ window.VulnKitVue = (function () {
         if (statusEl) statusEl.textContent = '无法获取当前标签页';
         return;
       }
-      var routeResults = await utils.execInTab(tab.id, function () {
-        var routes = [];
-        var seen = {};
-        function extract(rts, prefix) {
-          rts.forEach(function (r) {
-            var childPath = r.path || '/';
-            var path;
-            if (childPath.charAt(0) === '/') {
-              path = childPath;
-            } else if (prefix === '' || prefix === '/') {
-              path = '/' + childPath;
-            } else {
-              path = prefix + '/' + childPath;
+      var routeList =
+        (await utils.execInTabData(tab.id, function () {
+          var routes = [];
+          var seen = {};
+          function extract(rts, prefix) {
+            rts.forEach(function (r) {
+              var childPath = r.path || '/';
+              var path;
+              if (childPath.charAt(0) === '/') {
+                path = childPath;
+              } else if (prefix === '' || prefix === '/') {
+                path = '/' + childPath;
+              } else {
+                path = prefix + '/' + childPath;
+              }
+              if (r.path && r.path !== '*' && !seen[path]) {
+                seen[path] = true;
+                routes.push({ path: path, name: r.name || '' });
+              }
+              if (r.children) extract(r.children, path === '/' ? '/' : path);
+            });
+          }
+          function getAndExtract(router) {
+            if (!router) return;
+            if (typeof router.getRoutes === 'function') {
+              var flat = router.getRoutes();
+              for (var i = 0; i < flat.length; i++) {
+                var p = flat[i].path;
+                if (p && p !== '*' && !seen[p]) {
+                  seen[p] = true;
+                  routes.push({ path: p, name: flat[i].name || '' });
+                }
+              }
+            } else if (router.options && router.options.routes) {
+              extract(router.options.routes, '');
             }
-            if (r.path && r.path !== '*' && !seen[path]) {
-              seen[path] = true;
-              routes.push({ path: path, name: r.name || '' });
-            }
-            if (r.children) extract(r.children, path === '/' ? '/' : path);
-          });
-        }
-        function getAndExtract(router) {
-          if (!router) return;
-          if (typeof router.getRoutes === 'function') {
-            var flat = router.getRoutes();
-            for (var i = 0; i < flat.length; i++) {
-              var p = flat[i].path;
-              if (p && p !== '*' && !seen[p]) {
-                seen[p] = true;
-                routes.push({ path: p, name: flat[i].name || '' });
+          }
+          var appEl = document.querySelector(
+            '#app,[data-v-app],[id^="app"],#root,#application,#main'
+          );
+          if (appEl && appEl.__vue_app__) {
+            getAndExtract(appEl.__vue_app__.config.globalProperties.$router);
+          } else {
+            var els = document.querySelectorAll('*');
+            for (var i = 0; i < els.length; i++) {
+              if (els[i].__vue__) {
+                var vm = els[i].__vue__.$root || els[i].__vue__;
+                getAndExtract(vm.$router);
+                if (routes.length > 0) break;
               }
             }
-          } else if (router.options && router.options.routes) {
-            extract(router.options.routes, '');
           }
-        }
-        var appEl = document.querySelector(
-          '#app,[data-v-app],[id^="app"],#root,#application,#main'
-        );
-        if (appEl && appEl.__vue_app__) {
-          getAndExtract(appEl.__vue_app__.config.globalProperties.$router);
-        } else {
-          var els = document.querySelectorAll('*');
-          for (var i = 0; i < els.length; i++) {
-            if (els[i].__vue__) {
-              var vm = els[i].__vue__.$root || els[i].__vue__;
-              getAndExtract(vm.$router);
-              if (routes.length > 0) break;
-            }
-          }
-        }
-        return routes;
-      });
+          return routes;
+        })) || [];
 
-      var routeList = utils.execResult(routeResults) || [];
-
-      var menuResults = await utils.execInTab(tab.id, function () {
-        return window.__PERM_INTERCEPTOR__ ? window.__PERM_INTERCEPTOR__.getCaptured() : [];
-      });
-      var captured = utils.execResult(menuResults) || [];
+      var captured =
+        (await utils.execInTabData(tab.id, function () {
+          return window.__PERM_INTERCEPTOR__ ? window.__PERM_INTERCEPTOR__.getCaptured() : [];
+        })) || [];
 
       var menuPaths = new Set();
       for (var i = 0; i < captured.length; i++) extractMenuPaths(captured[i].data, menuPaths);

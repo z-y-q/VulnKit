@@ -28,10 +28,10 @@ window.VulnKitRuoYiHook = (function () {
           await new Promise(function (r) {
             setTimeout(r, 100);
           });
-          var check = await utils.execInTab(tabId, function () {
+          var check = await utils.execInTabData(tabId, function () {
             return !!window.__VK_RUOYI_HOOK__;
           });
-          if (utils.execResult(check)) return 'content-script';
+          if (check) return 'content-script';
         }
         return null;
       } catch (e2) {
@@ -70,11 +70,11 @@ window.VulnKitRuoYiHook = (function () {
       var customUrlInput = utils.get('ruoyi-custom-url');
       var customUrl = (customUrlInput && customUrlInput.value.trim()) || '';
 
-      var hookResult = await utils.execInTab(tab.id, enableHookFunc, {
+      var hookResult = await utils.execInTabData(tab.id, enableHookFunc, {
         args: [{ mode: augmentMode, customUrl: customUrl }],
       });
 
-      if (utils.execResult(hookResult)) {
+      if (hookResult) {
         if (state) {
           state.ruoyiHookActive = true;
           state.ruoyiTabId = tab.id;
@@ -83,14 +83,13 @@ window.VulnKitRuoYiHook = (function () {
         chrome.storage.local.set({ ruoyiHookTabId: tab.id, ruoyiHookEnabled: true });
         setHookUI(true);
 
-        var capCheck = await utils.execInTab(tab.id, function () {
+        var capData = await utils.execInTabData(tab.id, function () {
           var hook = window.__VK_RUOYI_HOOK__;
           return {
             captured: !!hook.capturedRouters,
             logCount: (hook.requestLog || []).length,
           };
         });
-        var capData = utils.execResult(capCheck);
 
         if (capData && capData.captured) {
           utils.setStatus('ruoyi-hook-status', '钩子已启用 — 路由数据已被动捕获');
@@ -119,11 +118,11 @@ window.VulnKitRuoYiHook = (function () {
         setTimeout(r, 400);
       });
 
-      var retryResult = await utils.execInTab(tab.id, enableHookFunc, {
+      var retryResult = await utils.execInTabData(tab.id, enableHookFunc, {
         args: [{ mode: augmentMode, customUrl: customUrl }],
       });
 
-      if (!utils.execResult(retryResult)) {
+      if (!retryResult) {
         utils.setStatus('ruoyi-hook-status', '注入后未检测到钩子');
         utils.showToast('钩子注入失败 [' + method + ']，请刷新页面后重试', 'warning');
         return;
@@ -183,7 +182,7 @@ window.VulnKitRuoYiHook = (function () {
     var panelEl = utils.get('ruoyi-captured-panel');
     try {
       return utils.withTab(async function (tab) {
-        var results = await utils.execInTab(tab.id, function () {
+        var data = (await utils.execInTabData(tab.id, function () {
           var hook = window.__VK_RUOYI_HOOK__;
           if (!hook) return { installed: false, pageUrl: location.href };
           return {
@@ -198,9 +197,7 @@ window.VulnKitRuoYiHook = (function () {
             customUrls: hook.customRouterUrls || [],
             restored: !!hook.restoredFromStorage,
           };
-        });
-
-        var data = utils.execResult(results) || { installed: false };
+        })) || { installed: false };
 
         if (!data.installed) {
           var urlHint = data.pageUrl ? ' [' + utils.escapeHtml(data.pageUrl) + ']' : '';
@@ -255,13 +252,12 @@ window.VulnKitRuoYiHook = (function () {
 
   async function renderRequestLog(tabId) {
     try {
-      var results = await utils.execInTab(tabId, function () {
-        var hook = window.__VK_RUOYI_HOOK__;
-        if (!hook || !hook.requestLog) return [];
-        return hook.requestLog.slice(-20);
-      });
-
-      var log = utils.execResult(results) || [];
+      var log =
+        (await utils.execInTabData(tabId, function () {
+          var hook = window.__VK_RUOYI_HOOK__;
+          if (!hook || !hook.requestLog) return [];
+          return hook.requestLog.slice(-20);
+        })) || [];
       if (log.length === 0) return;
 
       var panelEl = utils.get('ruoyi-captured-panel');
@@ -522,12 +518,11 @@ window.VulnKitRuoYiHook = (function () {
 
       var cookieHeader = '';
       try {
-        var cookieResult = await utils.execInTab(tab.id, function () {
+        var token = await utils.execInTabData(tab.id, function () {
           var cookies = document.cookie || '';
           var match = cookies.match(/Admin-Token=[^;]*/i);
           return match ? match[0] : '';
         });
-        var token = utils.execResult(cookieResult);
         if (token) {
           var safeToken = token.replace(/'/g, "'\\''");
           cookieHeader = " -H 'Cookie: " + safeToken + "'";

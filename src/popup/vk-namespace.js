@@ -114,6 +114,12 @@
     return results && results[0] && results[0].result;
   };
 
+  utils.execInTabData = async function (tabId, fn, opts, defaultVal) {
+    var results = await utils.execInTab(tabId, fn, opts);
+    var data = utils.execResult(results);
+    return data !== undefined ? data : defaultVal !== undefined ? defaultVal : null;
+  };
+
   utils.csvField = function (val) {
     return '"' + (val || '').replace(/"/g, '""') + '"';
   };
@@ -321,6 +327,7 @@
     'setEmpty',
     'switchSubTabs',
     'execInTab',
+    'execInTabData',
     'execResult',
     'csvField',
     'requireTabId',

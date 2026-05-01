@@ -303,34 +303,33 @@ window.VulnKitExif = (function () {
         return;
       }
 
-      const results = await utils.execInTab(
-        tab.id,
-        () => {
-          const imgs = [];
-          document.querySelectorAll('img[src]').forEach(img => {
-            if (img.src && img.naturalWidth > 50 && img.naturalHeight > 50) {
-              if (/^(blob:|data:)/i.test(img.src)) return;
-              imgs.push({
-                src: img.src,
-                alt: img.alt || '',
-                w: img.naturalWidth,
-                h: img.naturalHeight,
-              });
-            }
-          });
-          document.querySelectorAll('[style*="background"]').forEach(el => {
-            const m = el.style.backgroundImage.match(/url\(["']?(.*?)["']?\)/);
-            if (m && m[1] && !/^(blob:|data:)/i.test(m[1])) {
-              imgs.push({ src: m[1], alt: '', w: 0, h: 0 });
-            }
-          });
-          const unique = [...new Map(imgs.map(i => [i.src, i])).values()];
-          return unique.slice(0, 50);
-        },
-        { world: 'ISOLATED' }
-      );
-
-      const images = utils.execResult(results) || [];
+      const images =
+        (await utils.execInTabData(
+          tab.id,
+          () => {
+            const imgs = [];
+            document.querySelectorAll('img[src]').forEach(img => {
+              if (img.src && img.naturalWidth > 50 && img.naturalHeight > 50) {
+                if (/^(blob:|data:)/i.test(img.src)) return;
+                imgs.push({
+                  src: img.src,
+                  alt: img.alt || '',
+                  w: img.naturalWidth,
+                  h: img.naturalHeight,
+                });
+              }
+            });
+            document.querySelectorAll('[style*="background"]').forEach(el => {
+              const m = el.style.backgroundImage.match(/url\(["']?(.*?)["']?\)/);
+              if (m && m[1] && !/^(blob:|data:)/i.test(m[1])) {
+                imgs.push({ src: m[1], alt: '', w: 0, h: 0 });
+              }
+            });
+            const unique = [...new Map(imgs.map(i => [i.src, i])).values()];
+            return unique.slice(0, 50);
+          },
+          { world: 'ISOLATED' }
+        )) || [];
       if (images.length === 0) {
         utils.setEmpty('exif-page-images', '未找到图片');
         return;

@@ -89,19 +89,19 @@ window.VulnKitRuoYiMar = (function () {
       }
 
       // Step 1: Get external script URLs + inline scripts
-      var scriptResult = await utils.execInTab(tab.id, function () {
-        var urls = [];
-        document.querySelectorAll('script[src]').forEach(function (s) {
-          urls.push(s.src);
-        });
-        var inlineTexts = [];
-        document.querySelectorAll('script:not([src])').forEach(function (s) {
-          var t = s.textContent || '';
-          if (t.length > 10 && t.length < 500000) inlineTexts.push(t);
-        });
-        return { urls: urls, inlineTexts: inlineTexts };
-      });
-      var scriptData = utils.execResult(scriptResult) || {};
+      var scriptData =
+        (await utils.execInTabData(tab.id, function () {
+          var urls = [];
+          document.querySelectorAll('script[src]').forEach(function (s) {
+            urls.push(s.src);
+          });
+          var inlineTexts = [];
+          document.querySelectorAll('script:not([src])').forEach(function (s) {
+            var t = s.textContent || '';
+            if (t.length > 10 && t.length < 500000) inlineTexts.push(t);
+          });
+          return { urls: urls, inlineTexts: inlineTexts };
+        })) || {};
       var scriptUrls = scriptData.urls || [];
       var inlineTexts = scriptData.inlineTexts || [];
 
@@ -121,28 +121,27 @@ window.VulnKitRuoYiMar = (function () {
       for (var bi = 0; bi < scriptUrls.length; bi += CONCURRENCY) {
         var batch = scriptUrls.slice(bi, bi + CONCURRENCY);
 
-        var batchFetchResult = await utils.execInTab(
-          tab.id,
-          function (urls) {
-            return Promise.all(
-              urls.map(function (url) {
-                return fetch(url)
-                  .then(function (r) {
-                    return r.text();
-                  })
-                  .then(function (t) {
-                    return { url: url, data: t };
-                  })
-                  .catch(function () {
-                    return { url: url, error: true };
-                  });
-              })
-            );
-          },
-          { args: [batch] }
-        );
-
-        var batchResults = utils.execResult(batchFetchResult) || [];
+        var batchResults =
+          (await utils.execInTabData(
+            tab.id,
+            function (urls) {
+              return Promise.all(
+                urls.map(function (url) {
+                  return fetch(url)
+                    .then(function (r) {
+                      return r.text();
+                    })
+                    .then(function (t) {
+                      return { url: url, data: t };
+                    })
+                    .catch(function () {
+                      return { url: url, error: true };
+                    });
+                })
+              );
+            },
+            { args: [batch] }
+          )) || [];
         batchResults.forEach(function (r) {
           if (r && r.data) allJsContents.push(r);
         });
@@ -321,14 +320,14 @@ window.VulnKitRuoYiMar = (function () {
           extractPaths(capturedRouterData.data || capturedRouterData, capturedPaths);
       }
 
-      var routerResult = await utils.execInTab(tab.id, function () {
-        var hook = window.__VK_RUOYI_HOOK__;
-        if (hook && typeof hook.getRouterInfo === 'function') {
-          return hook.getRouterInfo();
-        }
-        return { found: false, routes: [], currentRoutes: [] };
-      });
-      var routerInfo = utils.execResult(routerResult) || {};
+      var routerInfo =
+        (await utils.execInTabData(tab.id, function () {
+          var hook = window.__VK_RUOYI_HOOK__;
+          if (hook && typeof hook.getRouterInfo === 'function') {
+            return hook.getRouterInfo();
+          }
+          return { found: false, routes: [], currentRoutes: [] };
+        })) || {};
 
       if (routerInfo.currentRoutes) {
         routerInfo.currentRoutes.forEach(function (rp) {
@@ -518,18 +517,17 @@ window.VulnKitRuoYiMar = (function () {
       });
 
       // Step 1: Check if Vue Router exists
-      var routerCheck = await utils.execInTab(tab.id, function () {
-        var findRouter = new Function(FIND_ROUTER_BODY);
-        var router = findRouter();
-        return {
-          hasVue: !!window.Vue || !!window.__vue_app__,
-          hasRouter: !!router,
-          routerMode: router ? router.mode || 'unknown' : null,
-          currentPath: location.pathname + location.hash,
-        };
-      });
-
-      var pageState = utils.execResult(routerCheck) || {};
+      var pageState =
+        (await utils.execInTabData(tab.id, function () {
+          var findRouter = new Function(FIND_ROUTER_BODY);
+          var router = findRouter();
+          return {
+            hasVue: !!window.Vue || !!window.__vue_app__,
+            hasRouter: !!router,
+            routerMode: router ? router.mode || 'unknown' : null,
+            currentPath: location.pathname + location.hash,
+          };
+        })) || {};
 
       if (!pageState.hasRouter) {
         var origin;
@@ -565,101 +563,106 @@ window.VulnKitRuoYiMar = (function () {
       }
 
       // Step 2: Vue Router found — inject routes
-      var injectResult = await utils.execInTab(
-        tab.id,
-        function (routes) {
-          var result = { injected: 0, skipped: 0, errors: [], routerFound: false, routerMode: '' };
+      var result =
+        (await utils.execInTabData(
+          tab.id,
+          function (routes) {
+            var result = {
+              injected: 0,
+              skipped: 0,
+              errors: [],
+              routerFound: false,
+              routerMode: '',
+            };
 
-          var findRouter = new Function(FIND_ROUTER_BODY);
-          var router = findRouter();
-          if (!router) {
-            result.errors.push('Vue Router 消失了');
-            return result;
-          }
+            var findRouter = new Function(FIND_ROUTER_BODY);
+            var router = findRouter();
+            if (!router) {
+              result.errors.push('Vue Router 消失了');
+              return result;
+            }
 
-          result.routerFound = true;
-          result.routerMode = router.mode || 'unknown';
+            result.routerFound = true;
+            result.routerMode = router.mode || 'unknown';
 
-          var loadView = null;
-          if (typeof window.loadView === 'function') loadView = window.loadView;
-          if (!loadView && typeof window.loadComponent === 'function')
-            loadView = window.loadComponent;
+            var loadView = null;
+            if (typeof window.loadView === 'function') loadView = window.loadView;
+            if (!loadView && typeof window.loadComponent === 'function')
+              loadView = window.loadComponent;
 
-          var existingPaths = {};
-          try {
-            var currentRoutes = router.getRoutes ? router.getRoutes() : [];
-            currentRoutes.forEach(function (r) {
-              if (r.path) existingPaths[r.path] = true;
-            });
-          } catch (e) {}
-
-          routes.forEach(function (route) {
+            var existingPaths = {};
             try {
-              var path = route.path;
-              if (!path || existingPaths[path]) {
-                result.skipped++;
-                return;
-              }
+              var currentRoutes = router.getRoutes ? router.getRoutes() : [];
+              currentRoutes.forEach(function (r) {
+                if (r.path) existingPaths[r.path] = true;
+              });
+            } catch (e) {}
 
-              var routeObj = {
-                path: path,
-                name: route.name || path.replace(/^\/+/, '').replace(/\//g, '-'),
-                meta: route.meta || {},
-              };
+            routes.forEach(function (route) {
+              try {
+                var path = route.path;
+                if (!path || existingPaths[path]) {
+                  result.skipped++;
+                  return;
+                }
 
-              if (route.component && typeof route.component === 'string') {
-                if (loadView) {
-                  try {
-                    routeObj.component = loadView(route.component);
-                  } catch (e) {
-                    routeObj.component = {
-                      template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
-                    };
+                var routeObj = {
+                  path: path,
+                  name: route.name || path.replace(/^\/+/, '').replace(/\//g, '-'),
+                  meta: route.meta || {},
+                };
+
+                if (route.component && typeof route.component === 'string') {
+                  if (loadView) {
+                    try {
+                      routeObj.component = loadView(route.component);
+                    } catch (e) {
+                      routeObj.component = {
+                        template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
+                      };
+                    }
+                  } else {
+                    try {
+                      var viewPath = route.component;
+                      if (!/^views\//i.test(viewPath)) viewPath = 'views/' + viewPath;
+                      routeObj.component = function () {
+                        return import('@/' + viewPath + '.vue').catch(function () {
+                          return {
+                            template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
+                          };
+                        });
+                      };
+                    } catch (e) {
+                      routeObj.component = {
+                        template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
+                      };
+                    }
                   }
                 } else {
-                  try {
-                    var viewPath = route.component;
-                    if (!/^views\//i.test(viewPath)) viewPath = 'views/' + viewPath;
-                    routeObj.component = function () {
-                      return import('@/' + viewPath + '.vue').catch(function () {
-                        return {
-                          template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
-                        };
-                      });
-                    };
-                  } catch (e) {
-                    routeObj.component = {
-                      template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
-                    };
-                  }
+                  routeObj.component = {
+                    template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
+                  };
                 }
-              } else {
-                routeObj.component = {
-                  template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
-                };
+
+                if (typeof router.addRoute === 'function') {
+                  router.addRoute(routeObj);
+                } else if (typeof router.addRoutes === 'function') {
+                  router.addRoutes([routeObj]);
+                } else {
+                  result.errors.push('No addRoute/addRoutes method');
+                  return;
+                }
+                result.injected++;
+                existingPaths[path] = true;
+              } catch (e) {
+                result.errors.push((route.path || '?') + ': ' + e.message);
               }
+            });
 
-              if (typeof router.addRoute === 'function') {
-                router.addRoute(routeObj);
-              } else if (typeof router.addRoutes === 'function') {
-                router.addRoutes([routeObj]);
-              } else {
-                result.errors.push('No addRoute/addRoutes method');
-                return;
-              }
-              result.injected++;
-              existingPaths[path] = true;
-            } catch (e) {
-              result.errors.push((route.path || '?') + ': ' + e.message);
-            }
-          });
-
-          return result;
-        },
-        { args: [routesToInject] }
-      );
-
-      var result = utils.execResult(injectResult) || {};
+            return result;
+          },
+          { args: [routesToInject] }
+        )) || {};
 
       if (!result.routerFound) {
         utils.setStatus('mar-scan-status', '注入失败: Vue Router 未找到');

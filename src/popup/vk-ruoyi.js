@@ -40,7 +40,7 @@ window.VulnKitRuoYi = (function () {
 
     try {
       return utils.withTab(async function (tab) {
-        var discoverResults = await utils.execInTab(tab.id, function () {
+        var result = (await utils.execInTabData(tab.id, function () {
           if (
             window.__VK_RUOYI_HOOK__ &&
             typeof window.__VK_RUOYI_HOOK__.discoverRoutesFromJs === 'function'
@@ -48,9 +48,7 @@ window.VulnKitRuoYi = (function () {
             return window.__VK_RUOYI_HOOK__.discoverRoutesFromJs();
           }
           return null;
-        });
-
-        var result = utils.execResult(discoverResults) || {
+        })) || {
           discovered: [],
           extUrls: [],
         };
@@ -530,13 +528,12 @@ window.VulnKitRuoYi = (function () {
     var listEl = utils.get('ruoyi-traffic-list');
     try {
       return utils.withTab(async function (tab) {
-        var results = await utils.execInTab(tab.id, function () {
-          var hook = window.__VK_RUOYI_HOOK__;
-          if (!hook || !hook.apiLog) return [];
-          return hook.apiLog.slice(-200);
-        });
-
-        var log = utils.execResult(results) || [];
+        var log =
+          (await utils.execInTabData(tab.id, function () {
+            var hook = window.__VK_RUOYI_HOOK__;
+            if (!hook || !hook.apiLog) return [];
+            return hook.apiLog.slice(-200);
+          })) || [];
         if (countEl) countEl.textContent = '已捕获 ' + log.length + ' 个API请求';
 
         if (log.length === 0) {
@@ -603,12 +600,11 @@ window.VulnKitRuoYi = (function () {
       .requireTabId()
       .then(function (tab) {
         if (!tab) return;
-        return utils.execInTab(tab.id, function () {
+        return utils.execInTabData(tab.id, function () {
           return (window.__VK_RUOYI_HOOK__ && window.__VK_RUOYI_HOOK__.apiLog) || [];
         });
       })
-      .then(function (results) {
-        var log = utils.execResult(results) || [];
+      .then(function (log) {
         if (log.length === 0) {
           utils.showToast('没有API流量数据', 'warning');
           return;

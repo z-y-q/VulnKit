@@ -105,7 +105,7 @@ window.VulnKitJsCtrl = (function () {
     try {
       return utils.withTab(async function (tab) {
         // Phase 1: inline script scan (MAIN world)
-        var inlineResults = await utils.execInTab(tab.id, function () {
+        var inline = (await utils.execInTabData(tab.id, function () {
           var detections = [];
           var isNative = function (fn) {
             return /\[native code\]/.test(Function.prototype.toString.call(fn));
@@ -167,9 +167,7 @@ window.VulnKitJsCtrl = (function () {
             if (scripts[k].src) externalUrls.push(scripts[k].src);
           }
           return { detections: detections, externalUrls: externalUrls };
-        });
-
-        var inline = utils.execResult(inlineResults) || {
+        })) || {
           detections: [],
           externalUrls: [],
         };
@@ -423,7 +421,7 @@ window.VulnKitJsCtrl = (function () {
         ].join('\n'),
       });
 
-      var results = await utils.execInTab(tab.id, function () {
+      var log = await utils.execInTabData(tab.id, function () {
         var log = {};
 
         // 1. Count elements with user-select: none (now overridden by injected CSS)
@@ -517,8 +515,6 @@ window.VulnKitJsCtrl = (function () {
 
         return log;
       });
-
-      var log = utils.execResult(results) || null;
       if (!log) {
         updateUncopyIndicator('off', '注入失败');
         if (btn) btn.disabled = false;

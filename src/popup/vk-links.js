@@ -31,7 +31,7 @@ window.VulnKitLinks = (function () {
         return;
       }
 
-      const results = await utils.execInTab(tab.id, () => {
+      var extractedLinks = await utils.execInTabData(tab.id, () => {
         const pageUrl = location.href;
         const pageDomain = location.hostname;
         const links = [];
@@ -155,7 +155,6 @@ window.VulnKitLinks = (function () {
         });
       });
 
-      var extractedLinks = utils.execResult(results);
       if (extractedLinks) {
         allLinks = extractedLinks;
         renderLinks();

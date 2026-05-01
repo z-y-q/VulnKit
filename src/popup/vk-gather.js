@@ -268,7 +268,7 @@ window.VulnKitGather = (function () {
         );
       });
 
-      var results = await utils.execInTab(
+      var extracted = await utils.execInTabData(
         tab.id,
         function (haeRules, domGroup) {
           var pageUrl = location.href;
@@ -442,7 +442,6 @@ window.VulnKitGather = (function () {
         { args: [rulesForInjection, DOM_GROUP], world: 'ISOLATED' }
       );
 
-      var extracted = utils.execResult(results);
       if (extracted) {
         gatherData = extracted;
         var meta = gatherData._meta;

@@ -46,7 +46,7 @@ window.VulnKitSourcemap = (function () {
 
   async function smBatchFetchInPage(urls, tailOnly, tabId) {
     try {
-      var fetchResults = await utils.execInTab(
+      var fetched = await utils.execInTabData(
         tabId,
         function (fetchParams) {
           var promises = fetchParams.map(function (p) {
@@ -70,7 +70,6 @@ window.VulnKitSourcemap = (function () {
           ],
         }
       );
-      var fetched = utils.execResult(fetchResults);
       if (fetched) {
         return fetched;
       }
@@ -163,7 +162,7 @@ window.VulnKitSourcemap = (function () {
       statusEl.textContent = 'Phase 1: 检测 Webpack 运行时...';
       smUpdateProgress(10, 1);
       try {
-        var wpResults = await utils.execInTab(tab.id, function () {
+        var wpData = await utils.execInTabData(tab.id, function () {
           var modules = [];
           var hasWebpack = false;
           var capturedWpRequire = null;
@@ -628,7 +627,6 @@ window.VulnKitSourcemap = (function () {
             wpPublicPath: wpPublicPath,
           };
         });
-        var wpData = utils.execResult(wpResults);
         if (wpData) {
           if (wpData.modules && wpData.modules.length > 0) {
             allModules = allModules.concat(wpData.modules);
@@ -657,7 +655,7 @@ window.VulnKitSourcemap = (function () {
       statusEl.textContent = 'Phase 2: 收集脚本和 Source Map...';
       smUpdateProgress(30, 2);
       try {
-        var domResults = await utils.execInTab(
+        var domData = await utils.execInTabData(
           tab.id,
           function () {
             var extUrls = [];
@@ -694,7 +692,6 @@ window.VulnKitSourcemap = (function () {
           },
           { world: 'ISOLATED' }
         );
-        var domData = utils.execResult(domResults);
         if (domData) {
           scriptUrls = domData.extUrls || [];
 
@@ -1203,10 +1200,11 @@ window.VulnKitSourcemap = (function () {
 
       // Check if network hooks are active and show hint
       try {
-        var hookResults = await utils.execInTab(tab.id, function () {
-          return !!window.__vulnkitHookActive;
-        });
-        if (utils.execResult(hookResults)) {
+        if (
+          await utils.execInTabData(tab.id, function () {
+            return !!window.__vulnkitHookActive;
+          })
+        ) {
           var hookHint = document.createElement('div');
           hookHint.className = 'sm-hook-hint';
           hookHint.textContent =
@@ -1972,27 +1970,27 @@ window.VulnKitSourcemap = (function () {
         utils.showToast('无法获取当前标签页', 'warning');
         return;
       }
-      var results = await utils.execInTab(
-        tab.id,
-        function (urls) {
-          var existing = new Set();
-          document.querySelectorAll('script[src]').forEach(function (s) {
-            existing.add(s.src.split('?')[0]);
-          });
-          var injected = 0;
-          urls.forEach(function (url) {
-            if (existing.has(url)) return;
-            var script = document.createElement('script');
-            script.src = url;
-            script.async = true;
-            document.head.appendChild(script);
-            injected++;
-          });
-          return injected;
-        },
-        { args: [jsUrls] }
-      );
-      var count = utils.execResult(results) || 0;
+      var count =
+        (await utils.execInTabData(
+          tab.id,
+          function (urls) {
+            var existing = new Set();
+            document.querySelectorAll('script[src]').forEach(function (s) {
+              existing.add(s.src.split('?')[0]);
+            });
+            var injected = 0;
+            urls.forEach(function (url) {
+              if (existing.has(url)) return;
+              var script = document.createElement('script');
+              script.src = url;
+              script.async = true;
+              document.head.appendChild(script);
+              injected++;
+            });
+            return injected;
+          },
+          { args: [jsUrls] }
+        )) || 0;
       if (count === 0) {
         utils.showToast('所有 JS 文件已在页面中加载', 'info');
       } else {
