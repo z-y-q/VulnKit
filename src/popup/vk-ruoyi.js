@@ -448,19 +448,7 @@ window.VulnKitRuoYi = (function () {
   }
 
   function exportProbeResults() {
-    if (!lastProbeResults || lastProbeResults.length === 0) {
-      utils.showToast('没有可导出的探测结果', 'warning');
-      return;
-    }
-    var json = JSON.stringify(lastProbeResults, null, 2);
-    var blob = new Blob([json], { type: 'application/json' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'ruoyi-probe-results.json';
-    a.click();
-    URL.revokeObjectURL(url);
-    utils.showToast('已导出 ' + lastProbeResults.length + ' 条探测结果', 'success');
+    exportJson(lastProbeResults, 'ruoyi-probe-results.json');
   }
 
   function renderProbeResults(results, containerEl) {
@@ -472,12 +460,7 @@ window.VulnKitRuoYi = (function () {
 
     var stats = { ok: 0, redirect: 0, auth: 0, notfound: 0, error: 0, other: 0 };
     results.forEach(function (r) {
-      if (r.status >= 200 && r.status < 300) stats.ok++;
-      else if (r.status >= 300 && r.status < 400) stats.redirect++;
-      else if (r.status === 401 || r.status === 403) stats.auth++;
-      else if (r.status === 404) stats.notfound++;
-      else if (r.status === 0) stats.error++;
-      else stats.other++;
+      stats[classifyStatus(r.status)]++;
     });
 
     var html =
@@ -504,13 +487,7 @@ window.VulnKitRuoYi = (function () {
 
     html += '<div class="ruoyi-probe-list">';
     results.forEach(function (r) {
-      var cls = 'probe-status-other';
-      if (r.status >= 200 && r.status < 300) cls = 'probe-status-ok';
-      else if (r.status >= 300 && r.status < 400) cls = 'probe-status-redirect';
-      else if (r.status === 401 || r.status === 403) cls = 'probe-status-auth';
-      else if (r.status === 404) cls = 'probe-status-notfound';
-      else if (r.status === 0) cls = 'probe-status-error';
-      else if (r.status >= 500) cls = 'probe-status-error';
+      var cls = 'probe-status-' + classifyStatus(r.status);
 
       html += '<div class="ruoyi-probe-item">';
       html += '<span class="probe-code ' + cls + '">' + (r.status || 'ERR') + '</span>';
@@ -635,6 +612,31 @@ window.VulnKitRuoYi = (function () {
 
   function switchRuoYiSubTab(tab) {
     utils.switchSubTabs('ruoyi-stab', 'rstab', 'rstab', tab);
+  }
+
+  function classifyStatus(code) {
+    if (code >= 200 && code < 300) return 'ok';
+    if (code >= 300 && code < 400) return 'redirect';
+    if (code === 401 || code === 403) return 'auth';
+    if (code === 404) return 'notfound';
+    if (code === 0 || code >= 500) return 'error';
+    return 'other';
+  }
+
+  function exportJson(data, filename) {
+    if (!data || data.length === 0) {
+      utils.showToast('没有可导出的数据', 'warning');
+      return;
+    }
+    var json = JSON.stringify(data, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    utils.showToast('已导出 ' + data.length + ' 条数据', 'success');
   }
 
   // ====== Utility Functions ======

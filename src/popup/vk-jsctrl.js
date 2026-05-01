@@ -111,60 +111,49 @@ window.VulnKitJsCtrl = (function () {
             return /\[native code\]/.test(Function.prototype.toString.call(fn));
           };
 
-          // Check for debugger statement in inline scripts
-          var scripts = document.querySelectorAll('script');
-          for (var i = 0; i < scripts.length; i++) {
-            if (scripts[i].textContent && scripts[i].textContent.indexOf('debugger') !== -1) {
-              detections.push({
-                type: 'debugger语句',
-                desc: '检测到 inline script 中的 debugger 语句',
-              });
-              break;
-            }
-          }
-
-          // Check for Function constructor abuse
-          if (!isNative(Function.prototype.constructor)) {
+          if (!isNative(Function.prototype.constructor))
             detections.push({
               type: 'Function劫持',
               desc: 'Function.prototype.constructor 已被重写',
             });
-          }
-
-          // Check for setInterval/setTimeout debugger loops
-          if (!isNative(setInterval)) {
+          if (!isNative(setInterval))
             detections.push({ type: '定时器劫持', desc: 'setInterval 已被重写，可能用于反调试' });
-          }
-          if (!isNative(setTimeout)) {
+          if (!isNative(setTimeout))
             detections.push({ type: '定时器劫持', desc: 'setTimeout 已被重写，可能用于反调试' });
-          }
-
-          // Check for console overrides
-          if (!isNative(console.log)) {
+          if (!isNative(console.log))
             detections.push({ type: 'Console劫持', desc: 'console.log 已被重写' });
-          }
 
-          // Check for devtools detection in inline scripts
-          for (var j = 0; j < scripts.length; j++) {
-            var text = scripts[j].textContent || '';
-            if (/outerWidth\s*-\s*innerWidth\s*>\s*\d+/.test(text)) {
-              detections.push({ type: 'DevTools检测', desc: '通过窗口尺寸差检测开发者工具' });
-              break;
-            }
-            if (/Firebug|firebug|chrome\.devtools/.test(text)) {
-              detections.push({ type: 'DevTools检测', desc: '检测到 Firebug/DevTools 探测代码' });
-              break;
-            }
-            if (/new\s+Image.*onerror.*devtools/i.test(text)) {
-              detections.push({ type: 'DevTools检测', desc: '通过 Image.onerror 检测开发者工具' });
-              break;
-            }
-          }
-
-          // Collect external JS URLs for phase 2
+          var inlinePats = [
+            [/debugger/, 'debugger语句', '检测到 inline script 中的 debugger 语句'],
+            [
+              /outerWidth\s*-\s*innerWidth\s*>\s*\d+/,
+              'DevTools检测',
+              '通过窗口尺寸差检测开发者工具',
+            ],
+            [
+              /Firebug|firebug|chrome\.devtools/,
+              'DevTools检测',
+              '检测到 Firebug/DevTools 探测代码',
+            ],
+            [
+              /new\s+Image.*onerror.*devtools/i,
+              'DevTools检测',
+              '通过 Image.onerror 检测开发者工具',
+            ],
+          ];
+          var foundPat = {};
+          var scripts = document.querySelectorAll('script');
           var externalUrls = [];
-          for (var k = 0; k < scripts.length; k++) {
-            if (scripts[k].src) externalUrls.push(scripts[k].src);
+          for (var i = 0; i < scripts.length; i++) {
+            if (scripts[i].src) externalUrls.push(scripts[i].src);
+            var text = scripts[i].textContent || '';
+            if (!text) continue;
+            for (var p = 0; p < inlinePats.length; p++) {
+              if (!foundPat[p] && inlinePats[p][0].test(text)) {
+                detections.push({ type: inlinePats[p][1], desc: inlinePats[p][2] });
+                foundPat[p] = true;
+              }
+            }
           }
           return { detections: detections, externalUrls: externalUrls };
         })) || {

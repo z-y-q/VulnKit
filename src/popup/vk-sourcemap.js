@@ -280,6 +280,39 @@ window.VulnKitSourcemap = (function () {
     return m ? m[1] : null;
   }
 
+  function smMergeHashMaps(hashArray, pairRe) {
+    var map = {};
+    if (!hashArray) return map;
+    hashArray.forEach(function (obj) {
+      var parsed = smParseHashPairs(obj, pairRe);
+      Object.keys(parsed).forEach(function (k) {
+        map[k] = parsed[k];
+      });
+    });
+    return map;
+  }
+
+  function smResolveWebpackBase(rc, rcBase, tabUrl) {
+    var pp = smExtractWebpackPublicPath(rc);
+    var prefixMatch = rc.match(/return\s+["']([^"']*\/)["']/);
+    var urlPrefix = prefixMatch ? prefixMatch[1] : '';
+    var base = pp ? smResolveUrl(pp, tabUrl) : urlPrefix ? smResolveUrl(urlPrefix, rcBase) : rcBase;
+    return { base: base, urlPrefix: urlPrefix, hasPublicPath: !!pp };
+  }
+
+  function smRegisterChunkUrls(chunkMap, baseInfo, target) {
+    Object.keys(chunkMap).forEach(function (cid) {
+      var hash = chunkMap[cid];
+      var url =
+        (baseInfo.hasPublicPath ? baseInfo.base + baseInfo.urlPrefix : baseInfo.base) +
+        cid +
+        '.' +
+        hash +
+        '.js';
+      smAddDiscoveredChunk(url, cid, target, scriptUrls);
+    });
+  }
+
   function smUpdateProgress(percent, activePhase) {
     var bar = utils.get('sm-progress-bar');
     var phases = document.querySelectorAll('#sm-phases .sm-phase');
@@ -982,29 +1015,17 @@ window.VulnKitSourcemap = (function () {
         statusEl.textContent = 'Phase 2.5: 深度解析 Bundle 源码发现 Chunk...';
         smUpdateProgress(40, 2);
 
-        var runtimeUrl = null;
-        for (var rb = 0; rb < scriptUrls.length; rb++) {
-          if (/runtime/i.test(scriptUrls[rb]) && /\.js(\?|$)/.test(scriptUrls[rb])) {
-            runtimeUrl = scriptUrls[rb];
-            break;
-          }
-        }
-        if (!runtimeUrl) {
-          for (var mb = 0; mb < scriptUrls.length; mb++) {
-            if (/main|app|index/i.test(scriptUrls[mb]) && /\.js(\?|$)/.test(scriptUrls[mb])) {
-              runtimeUrl = scriptUrls[mb];
-              break;
-            }
-          }
-        }
-        if (!runtimeUrl) {
-          for (var fb = 0; fb < scriptUrls.length; fb++) {
-            if (/bundle\//.test(scriptUrls[fb]) || /static\/js/.test(scriptUrls[fb])) {
-              runtimeUrl = scriptUrls[fb];
-              break;
-            }
-          }
-        }
+        var runtimeUrl =
+          scriptUrls.find(function (u) {
+            return /runtime/i.test(u) && /\.js(\?|$)/.test(u);
+          }) ||
+          scriptUrls.find(function (u) {
+            return /main|app|index/i.test(u) && /\.js(\?|$)/.test(u);
+          }) ||
+          scriptUrls.find(function (u) {
+            return /bundle\//.test(u) || /static\/js/.test(u);
+          }) ||
+          null;
 
         if (runtimeUrl) {
           var runtimeContent = await smBatchFetch([runtimeUrl], false, tab.id);
@@ -1025,33 +1046,9 @@ window.VulnKitSourcemap = (function () {
               try {
                 var mappingObj = uFuncMatch[1].match(/\{[^{}]+\}/g);
                 if (mappingObj) {
-                  var chunkIdToHash = {};
-                  var _hashPairRe = /(\d+)\s*:\s*"([a-f0-9]{4,})"/g;
-                  mappingObj.forEach(function (obj) {
-                    var parsed = smParseHashPairs(obj, _hashPairRe);
-                    Object.keys(parsed).forEach(function (k) {
-                      chunkIdToHash[k] = parsed[k];
-                    });
-                  });
-                  var returnMatch = uFuncMatch[1].match(/return\s+["']([^"']*\/)["']/);
-                  var urlPrefix = returnMatch ? returnMatch[1] : '';
-                  var ppMatch1 = smExtractWebpackPublicPath(rc);
-                  var finalBase = ppMatch1
-                    ? smResolveUrl(ppMatch1, tab.url)
-                    : urlPrefix
-                      ? smResolveUrl(urlPrefix, rcBase)
-                      : rcBase;
-                  var hasPublicPath = !!ppMatch1;
-                  Object.keys(chunkIdToHash).forEach(function (cid) {
-                    var hash = chunkIdToHash[cid];
-                    var chunkUrl =
-                      (hasPublicPath ? finalBase + urlPrefix : finalBase) +
-                      cid +
-                      '.' +
-                      hash +
-                      '.js';
-                    smAddDiscoveredChunk(chunkUrl, cid, discoveredChunkUrls, scriptUrls);
-                  });
+                  var chunkIdToHash = smMergeHashMaps(mappingObj, /(\d+)\s*:\s*"([a-f0-9]{4,})"/g);
+                  var baseInfo1 = smResolveWebpackBase(rc, rcBase, tab.url);
+                  smRegisterChunkUrls(chunkIdToHash, baseInfo1, discoveredChunkUrls);
                 }
               } catch (e) {}
             }
@@ -1060,30 +1057,10 @@ window.VulnKitSourcemap = (function () {
             if (discoveredChunkUrls.length === 0) {
               var hashMaps = rc.match(/\{[^\{\}]{10,}?"?\d+"?\s*:\s*"[a-f0-9]{4,}"[^\{\}]*?\}/g);
               if (hashMaps) {
-                var tempChunkMap = {};
-                var _broadPairRe = /"?(\d+)"?\s*:\s*"([a-f0-9]{4,})"/g;
-                hashMaps.forEach(function (hm) {
-                  var parsed = smParseHashPairs(hm, _broadPairRe);
-                  Object.keys(parsed).forEach(function (k) {
-                    tempChunkMap[k] = parsed[k];
-                  });
-                });
+                var tempChunkMap = smMergeHashMaps(hashMaps, /"?(\d+)"?\s*:\s*"([a-f0-9]{4,})"/g);
                 if (Object.keys(tempChunkMap).length > 2) {
-                  var ppMatch2 = smExtractWebpackPublicPath(rc);
-                  var prefixMatch2 = rc.match(/return\s+["']([^"']*\/)["']/);
-                  var urlPrefix2 = prefixMatch2 ? prefixMatch2[1] : '';
-                  var hasPublicPath2 = !!ppMatch2;
-                  var base2 = ppMatch2
-                    ? smResolveUrl(ppMatch2[1], tab.url)
-                    : urlPrefix2
-                      ? smResolveUrl(urlPrefix2, rcBase)
-                      : rcBase;
-                  Object.keys(tempChunkMap).forEach(function (cid) {
-                    var hash = tempChunkMap[cid];
-                    var chunkUrl =
-                      (hasPublicPath2 ? base2 + urlPrefix2 : base2) + cid + '.' + hash + '.js';
-                    smAddDiscoveredChunk(chunkUrl, cid, discoveredChunkUrls, scriptUrls);
-                  });
+                  var baseInfo2 = smResolveWebpackBase(rc, rcBase, tab.url);
+                  smRegisterChunkUrls(tempChunkMap, baseInfo2, discoveredChunkUrls);
                 }
               }
             }

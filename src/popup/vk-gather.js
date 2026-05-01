@@ -99,6 +99,19 @@ window.VulnKitGather = (function () {
     renderGatherTab();
   }
 
+  function countAll() {
+    return Object.values(gatherData).reduce(function (s, a) {
+      return s + (Array.isArray(a) ? a.length : 0);
+    }, 0);
+  }
+
+  function buildGroups() {
+    return [DOM_GROUP].concat(
+      gatherData['JS API'] ? ['JS API'] : [],
+      getHaeRules() ? getHaeRules().getGroups(loadedRules) : []
+    );
+  }
+
   function applySearchFilter(text) {
     searchFilter = text;
     renderGatherTab();
@@ -108,9 +121,7 @@ window.VulnKitGather = (function () {
     var container = utils ? utils.get('gather-sub-tabs') : null;
     if (!container) return;
 
-    var groups = [DOM_GROUP];
-    if (gatherData['JS API'] && gatherData['JS API'].length > 0) groups.push('JS API');
-    groups = groups.concat(getHaeRules() ? getHaeRules().getGroups(loadedRules) : []);
+    var groups = buildGroups();
     var html = '';
     groups.forEach(function (group, i) {
       var active = i === 0 ? ' active' : '';
@@ -289,11 +300,8 @@ window.VulnKitGather = (function () {
           }
 
           // DOM Analysis
-          var domSeen = {};
           var scriptSrcs = [];
           function addDom(type, value) {
-            if (!value || domSeen[type + '::' + value]) return;
-            domSeen[type + '::' + value] = true;
             add(domGroup, type, value, type);
           }
 
@@ -461,10 +469,7 @@ window.VulnKitGather = (function () {
         renderSubTabs();
         renderGatherTab();
 
-        var total = Object.values(gatherData).reduce(function (s, a) {
-          return s + (Array.isArray(a) ? a.length : 0);
-        }, 0);
-        var statusText = '收集完成，共 ' + total + ' 条';
+        var statusText = '收集完成，共 ' + countAll() + ' 条';
         if (meta && meta.truncated) {
           statusText += '（HTML 已截断至 500KB/' + (meta.totalSize / 1024).toFixed(0) + 'KB）';
         }
@@ -474,10 +479,7 @@ window.VulnKitGather = (function () {
           meta && meta.truncated ? 'warning' : 'success'
         );
 
-        var groups = [DOM_GROUP].concat(
-          gatherData['JS API'] ? ['JS API'] : [],
-          getHaeRules() ? getHaeRules().getGroups(loadedRules) : []
-        );
+        var groups = buildGroups();
         chrome.storage.local.set({
           gatherData: gatherData,
           gatherDataUrl: tab.url,
@@ -503,9 +505,6 @@ window.VulnKitGather = (function () {
               : getHaeRules()
                 ? getHaeRules().getDefaultRules()
                 : [];
-          var allGroups = [DOM_GROUP].concat(
-            getHaeRules() ? getHaeRules().getGroups(loadedRules) : []
-          );
           renderSubTabs();
         }
         var firstGroup = Object.keys(gatherData)[0] || DOM_GROUP;
@@ -515,7 +514,7 @@ window.VulnKitGather = (function () {
         var total = Object.values(gatherData).reduce(function (s, a) {
           return s + (Array.isArray(a) ? a.length : 0);
         }, 0);
-        utils.setStatus('gather-status', '已恢复，共 ' + total + ' 条');
+        utils.setStatus('gather-status', '已恢复，共 ' + countAll() + ' 条');
       }
     });
   }
