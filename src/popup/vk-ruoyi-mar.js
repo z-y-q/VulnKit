@@ -7,6 +7,37 @@ window.VulnKitRuoYiMar = (function () {
   var common = window.VulnKitRuoYiCommon;
   var utils = common ? common.utils : {};
 
+  // Shared findRouter() body — used inside execInTab callbacks (runs in page context)
+  var FIND_ROUTER_BODY = [
+    'if (window.__vue_app__) {',
+    '  try {',
+    '    var cfg = window.__vue_app__.config;',
+    '    if (cfg && cfg.globalProperties && cfg.globalProperties.$router) return cfg.globalProperties.$router;',
+    '  } catch (e) {}',
+    '}',
+    "var selectors = ['#app', '[data-v-app]', '.app-wrapper', '#app-main'];",
+    'for (var si = 0; si < selectors.length; si++) {',
+    '  var els = document.querySelectorAll(selectors[si]);',
+    '  for (var ei = 0; ei < els.length; ei++) {',
+    '    var el = els[ei];',
+    '    if (el.__vue_app__) {',
+    '      try { var r = el.__vue_app__.config.globalProperties.$router; if (r) return r; } catch (e) {}',
+    '    }',
+    '    if (el.__vue__) {',
+    '      var r2 = el.__vue__.$router || (el.__vue__.$root && el.__vue__.$root.$router);',
+    '      if (r2) return r2;',
+    '    }',
+    '  }',
+    '}',
+    "var allEls = document.querySelectorAll('*');",
+    'for (var ai = 0; ai < allEls.length; ai++) {',
+    '  var ael = allEls[ai];',
+    '  if (ael.__vue__ && ael.__vue__.$router) return ael.__vue__.$router;',
+    '  if (ael.__vue__ && ael.__vue__.$root && ael.__vue__.$root.$router) return ael.__vue__.$root.$router;',
+    '}',
+    'return null;',
+  ].join('\n');
+
   // RuoYi standard route dictionary
   var RUOYI_KNOWN_ROUTES = [
     { path: '/system/user', title: '用户管理', component: 'system/user/index' },
@@ -488,40 +519,7 @@ window.VulnKitRuoYiMar = (function () {
 
       // Step 1: Check if Vue Router exists
       var routerCheck = await utils.execInTab(tab.id, function () {
-        function findRouter() {
-          if (window.__vue_app__) {
-            try {
-              var cfg = window.__vue_app__.config;
-              if (cfg && cfg.globalProperties && cfg.globalProperties.$router)
-                return cfg.globalProperties.$router;
-            } catch (e) {}
-          }
-          var selectors = ['#app', '[data-v-app]', '.app-wrapper', '#app-main'];
-          for (var si = 0; si < selectors.length; si++) {
-            var els = document.querySelectorAll(selectors[si]);
-            for (var ei = 0; ei < els.length; ei++) {
-              var el = els[ei];
-              if (el.__vue_app__) {
-                try {
-                  var r = el.__vue_app__.config.globalProperties.$router;
-                  if (r) return r;
-                } catch (e) {}
-              }
-              if (el.__vue__) {
-                var r2 = el.__vue__.$router || (el.__vue__.$root && el.__vue__.$root.$router);
-                if (r2) return r2;
-              }
-            }
-          }
-          var allEls = document.querySelectorAll('*');
-          for (var ai = 0; ai < allEls.length; ai++) {
-            var ael = allEls[ai];
-            if (ael.__vue__ && ael.__vue__.$router) return ael.__vue__.$router;
-            if (ael.__vue__ && ael.__vue__.$root && ael.__vue__.$root.$router)
-              return ael.__vue__.$root.$router;
-          }
-          return null;
-        }
+        var findRouter = new Function(FIND_ROUTER_BODY);
         var router = findRouter();
         return {
           hasVue: !!window.Vue || !!window.__vue_app__,
@@ -572,41 +570,7 @@ window.VulnKitRuoYiMar = (function () {
         function (routes) {
           var result = { injected: 0, skipped: 0, errors: [], routerFound: false, routerMode: '' };
 
-          function findRouter() {
-            if (window.__vue_app__) {
-              try {
-                var cfg = window.__vue_app__.config;
-                if (cfg && cfg.globalProperties && cfg.globalProperties.$router)
-                  return cfg.globalProperties.$router;
-              } catch (e) {}
-            }
-            var selectors = ['#app', '[data-v-app]', '.app-wrapper', '#app-main'];
-            for (var si = 0; si < selectors.length; si++) {
-              var els = document.querySelectorAll(selectors[si]);
-              for (var ei = 0; ei < els.length; ei++) {
-                var el = els[ei];
-                if (el.__vue_app__) {
-                  try {
-                    var r = el.__vue_app__.config.globalProperties.$router;
-                    if (r) return r;
-                  } catch (e) {}
-                }
-                if (el.__vue__) {
-                  var r2 = el.__vue__.$router || (el.__vue__.$root && el.__vue__.$root.$router);
-                  if (r2) return r2;
-                }
-              }
-            }
-            var allEls = document.querySelectorAll('*');
-            for (var ai = 0; ai < allEls.length; ai++) {
-              var ael = allEls[ai];
-              if (ael.__vue__ && ael.__vue__.$router) return ael.__vue__.$router;
-              if (ael.__vue__ && ael.__vue__.$root && ael.__vue__.$root.$router)
-                return ael.__vue__.$root.$router;
-            }
-            return null;
-          }
-
+          var findRouter = new Function(FIND_ROUTER_BODY);
           var router = findRouter();
           if (!router) {
             result.errors.push('Vue Router 消失了');
