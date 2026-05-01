@@ -42,15 +42,14 @@ window.VulnKitGather = (function () {
   function renderGatherTab() {
     var list = getFilteredList();
     var container = utils.get('gather-results');
-    var statusEl = utils.get('gather-status');
-    if (!container || !statusEl) return;
+    if (!container || !utils.get('gather-status')) return;
 
     updateSearchVisibility();
 
     var fullList = gatherData[currentGatherTab] || [];
     if (fullList.length === 0) {
-      container.innerHTML = utils.emptyHtml('点击「收集当前页面」开始');
-      statusEl.textContent = '';
+      utils.setEmpty('gather-results', '点击「收集当前页面」开始');
+      utils.setStatus('gather-status', '');
       return;
     }
 
@@ -58,10 +57,10 @@ window.VulnKitGather = (function () {
     if (searchFilter && list.length !== fullList.length) {
       statusText += '（筛选: ' + list.length + '）';
     }
-    statusEl.textContent = statusText;
+    utils.setStatus('gather-status', statusText);
 
     if (list.length === 0) {
-      container.innerHTML = utils.emptyHtml('没有匹配的结果');
+      utils.setEmpty('gather-results', '没有匹配的结果');
       return;
     }
 
@@ -183,23 +182,6 @@ window.VulnKitGather = (function () {
     return true;
   }
 
-  function fetchJsFile(url) {
-    return new Promise(function (resolve) {
-      var timer = setTimeout(function () {
-        resolve(null);
-      }, 12000);
-      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url, tailOnly: false }, function (resp) {
-        clearTimeout(timer);
-        if (chrome.runtime.lastError) {
-          resolve(null);
-          return;
-        }
-        if (resp && resp.data) resolve(resp.data);
-        else resolve(null);
-      });
-    });
-  }
-
   async function extractApiFromJsFiles(scriptSrcs, pageUrl) {
     var seen = {};
     var endpoints = [];
@@ -219,9 +201,13 @@ window.VulnKitGather = (function () {
     filesToFetch = filesToFetch.slice(0, 15);
 
     var fetchPromises = filesToFetch.map(function (src) {
-      return fetchJsFile(src);
+      return utils.fetchUrl({ url: src, tailOnly: false, timeout: 12000 });
     });
-    var jsContents = await Promise.all(fetchPromises);
+    var fetchResults = await Promise.all(fetchPromises);
+
+    var jsContents = fetchResults.map(function (r) {
+      return r && r.success ? r.data : null;
+    });
 
     jsContents.forEach(function (content, idx) {
       if (!content) return;
@@ -264,13 +250,12 @@ window.VulnKitGather = (function () {
   }
 
   async function gatherInfo() {
-    var statusEl = utils.get('gather-status');
-    if (statusEl) statusEl.textContent = '正在收集...';
+    utils.setStatus('gather-status', '正在收集...');
 
     try {
       var tab = await utils.getActiveTab();
       if (!tab || !tab.url) {
-        if (statusEl) statusEl.textContent = '无法获取当前页面';
+        utils.setStatus('gather-status', '无法获取当前页面');
         return;
       }
 
@@ -467,8 +452,7 @@ window.VulnKitGather = (function () {
 
         // Fetch external JS files and extract API endpoints
         if (scriptSrcs.length > 0) {
-          if (statusEl)
-            statusEl.textContent = '正在分析 JS 文件（' + scriptSrcs.length + ' 个）...';
+          utils.setStatus('gather-status', '正在分析 JS 文件（' + scriptSrcs.length + ' 个）...');
           var apiEndpoints = await extractApiFromJsFiles(scriptSrcs, tab.url);
           if (apiEndpoints.length > 0) {
             gatherData['JS API'] = apiEndpoints;
@@ -485,7 +469,7 @@ window.VulnKitGather = (function () {
         if (meta && meta.truncated) {
           statusText += '（HTML 已截断至 500KB/' + (meta.totalSize / 1024).toFixed(0) + 'KB）';
         }
-        if (statusEl) statusEl.textContent = statusText;
+        utils.setStatus('gather-status', statusText);
         utils.showToast(
           meta && meta.truncated ? '收集完成（页面过大，部分内容被截断）' : '收集完成',
           meta && meta.truncated ? 'warning' : 'success'
@@ -501,10 +485,10 @@ window.VulnKitGather = (function () {
           gatherDataTabs: groups,
         });
       } else {
-        if (statusEl) statusEl.textContent = '收集失败';
+        utils.setStatus('gather-status', '收集失败');
       }
     } catch (e) {
-      if (statusEl) statusEl.textContent = '收集失败: ' + e.message;
+      utils.setStatus('gather-status', '收集失败: ' + e.message);
       utils.showToast('收集失败', 'error');
     }
   }
@@ -529,11 +513,10 @@ window.VulnKitGather = (function () {
         currentGatherTab = firstGroup;
         renderGatherTab();
 
-        var statusEl = utils.get('gather-status');
         var total = Object.values(gatherData).reduce(function (s, a) {
           return s + (Array.isArray(a) ? a.length : 0);
         }, 0);
-        if (statusEl) statusEl.textContent = '已恢复，共 ' + total + ' 条';
+        utils.setStatus('gather-status', '已恢复，共 ' + total + ' 条');
       }
     });
   }
@@ -553,15 +536,7 @@ window.VulnKitGather = (function () {
       if (!Array.isArray(items)) return;
       items.forEach(function (item) {
         lines.push(
-          '"' +
-            group.replace(/"/g, '""') +
-            '",' +
-            '"' +
-            (item.name || '').replace(/"/g, '""') +
-            '",' +
-            '"' +
-            (item.value || '').replace(/"/g, '""') +
-            '"'
+          utils.csvField(group) + ',' + utils.csvField(item.name) + ',' + utils.csvField(item.value)
         );
       });
     });

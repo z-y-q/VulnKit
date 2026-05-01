@@ -328,9 +328,7 @@
     });
 
     // Encoding sub-tabs
-    document.querySelectorAll('.sub-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => switchEncodingTab(btn.dataset.type));
-    });
+    utils.bindTabSwitch('sub-tab-btn', 'type', switchEncodingTab);
 
     // Encoding buttons
     const encodingBindings = [
@@ -358,12 +356,7 @@
     var jwtCopyPayloadBtn = utils.bindClick('jwt-copy-payload-btn', copyJwtPayload);
 
     // Crypto algo tabs
-    document.querySelectorAll('.crypto-algo-btn').forEach(function (btn) {
-      if (btn.dataset.algo)
-        btn.addEventListener('click', function () {
-          switchCryptoAlgo(btn.dataset.algo);
-        });
-    });
+    utils.bindTabSwitch('crypto-algo-btn', 'algo', switchCryptoAlgo);
 
     // Crypto action buttons
     var cryptoEncBtn = utils.bindClick('crypto-enc-btn', doCryptoEncrypt);
@@ -428,9 +421,7 @@
     });
 
     // Asset mapping
-    document.querySelectorAll('.source-btn').forEach(btn => {
-      btn.addEventListener('click', () => switchAssetSource(btn.dataset.source));
-    });
+    utils.bindTabSwitch('source-btn', 'source', switchAssetSource);
 
     utils.bindClick('asset-scan-btn', handleAssetScan);
     utils.on('asset-query', 'keydown', function (e) {
@@ -685,9 +676,7 @@
     initExifDragDrop();
     checkExifPending();
 
-    document.querySelectorAll('.exif-mode-btn').forEach(btn => {
-      btn.addEventListener('click', () => switchExifMode(btn.dataset.mode));
-    });
+    utils.bindTabSwitch('exif-mode-btn', 'mode', switchExifMode);
 
     var exifFetchHandler = function () {
       const url = utils.get('exif-url-input').value.trim();
@@ -718,9 +707,7 @@
     utils.bindClick('exif-clear-btn', clearExif);
 
     // Request Spoofing
-    document.querySelectorAll('.spoof-tab').forEach(btn => {
-      btn.addEventListener('click', () => switchSpoofTab(btn.dataset.spoof));
-    });
+    utils.bindTabSwitch('spoof-tab', 'spoof', switchSpoofTab);
 
     utils.on('ua-category', 'change', function () {
       renderUaList(this.value);
@@ -815,9 +802,7 @@
         }
       }
     });
-    document.querySelectorAll('.vue-stab').forEach(btn => {
-      btn.addEventListener('click', () => switchVueSubTab(btn.dataset.vstab));
-    });
+    utils.bindTabSwitch('vue-stab', 'vstab', switchVueSubTab);
 
     // Vue Store Explorer
     utils.bindClick('vue-store-read-btn', exploreVueStore);
@@ -873,11 +858,10 @@
     utils.on('jssearch-keyword', 'keydown', function (e) {
       if (e.key === 'Enter') doJsSearch();
     });
-    document.querySelectorAll('.jssearch-preset').forEach(btn => {
-      btn.addEventListener('click', () => {
-        utils.get('jssearch-keyword').value = btn.dataset.kw;
-        searchJsKeywords(btn.dataset.kw);
-      });
+    utils.bindTabSwitch('jssearch-preset', 'kw', function (kw) {
+      var input = utils.get('jssearch-keyword');
+      if (input) input.value = kw;
+      searchJsKeywords(kw);
     });
 
     // Route vs menu comparison
@@ -904,9 +888,7 @@
     utils.bindClick('traverse-stop-btn', stopTraverse);
 
     // JS Control
-    document.querySelectorAll('.jsctrl-tab').forEach(btn => {
-      btn.addEventListener('click', () => switchJsCtrlTab(btn.dataset.ctrl));
-    });
+    utils.bindTabSwitch('jsctrl-tab', 'ctrl', switchJsCtrlTab);
     utils.bindClick('js-disable-btn', disableJs);
     utils.bindClick('js-enable-btn', enableJs);
     utils.bindClick('antidebug-scan-btn', scanAntiDebug);
@@ -917,10 +899,7 @@
     utils.bindClick('uncopy-btn', removeCopyRestrictions);
 
     // RuoYi sub-tabs
-    document.querySelectorAll('.ruoyi-stab').forEach(btn => {
-      if (btn.dataset.rstab)
-        btn.addEventListener('click', () => switchRuoYiSubTab(btn.dataset.rstab));
-    });
+    utils.bindTabSwitch('ruoyi-stab', 'rstab', switchRuoYiSubTab);
 
     // RuoYi detection
     utils.bindClick('ruoyi-detect-btn', detectRuoYi);
@@ -968,12 +947,8 @@
         getActiveTab().then(tab => {
           if (tab && tab.id === result.permInterceptTabId) {
             permInterceptActive = true;
-            const startBtn = utils.get('perm-start-btn');
-            const stopBtn = utils.get('perm-stop-btn');
-            if (startBtn) startBtn.disabled = true;
-            if (stopBtn) stopBtn.disabled = false;
-            const statusEl = utils.get('perm-status');
-            if (statusEl) statusEl.textContent = '拦截中... 页面刷新后会自动重新注入';
+            utils.toggleBtnPair('perm-start-btn', 'perm-stop-btn', true);
+            utils.setStatus('perm-status', '拦截中... 页面刷新后会自动重新注入');
             // Fetch captured data and start auto-refresh
             refreshPermCaptured();
             startPermAutoRefresh();
@@ -1008,10 +983,7 @@
           // Was explicitly enabled for this tab — restore full UI
           ruoyiHookActive = true;
           ruoyiTabId = result.ruoyiHookTabId;
-          const installBtn = utils.get('ruoyi-hook-install-btn');
-          const removeBtn = utils.get('ruoyi-hook-remove-btn');
-          if (installBtn) installBtn.disabled = true;
-          if (removeBtn) removeBtn.disabled = false;
+          utils.toggleBtnPair('ruoyi-hook-install-btn', 'ruoyi-hook-remove-btn', true);
           checkHookStatus();
         } else if (tab.url && /^https?:/.test(tab.url)) {
           // Always check for passively captured data on http/https pages
@@ -1028,8 +1000,7 @@
         if (result.allLinks && result.allLinksUrl === currentUrl) {
           allLinks = result.allLinks;
           renderLinks();
-          const statusEl = utils.get('links-count');
-          if (statusEl) statusEl.textContent = '已恢复，共 ' + allLinks.length + ' 个链接';
+          utils.setStatus('links-count', '已恢复，共 ' + allLinks.length + ' 个链接');
         }
       });
     });
@@ -1046,9 +1017,7 @@
     });
 
     // Payload tab switching
-    document.querySelectorAll('.payload-tab').forEach(btn => {
-      if (btn.dataset.ptab) btn.addEventListener('click', () => switchPayloadTab(btn.dataset.ptab));
-    });
+    utils.bindTabSwitch('payload-tab', 'ptab', switchPayloadTab);
 
     // Payload data rendering
     renderPayloadCategories('xss-categories', XSS_DATA, false);

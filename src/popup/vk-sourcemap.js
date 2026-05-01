@@ -140,8 +140,8 @@ window.VulnKitSourcemap = (function () {
     smUpdateProgress(0, 1);
 
     try {
-      var tab = await utils.getActiveTab();
-      if (!tab || !tab.id || !tab.url || tab.url.startsWith('chrome')) {
+      var tab = await utils.requireTabId();
+      if (!tab || !tab.url || tab.url.startsWith('chrome')) {
         statusEl.textContent = '无法扫描此页面';
         if (scanBtn) {
           scanBtn.disabled = false;
@@ -1967,8 +1967,8 @@ window.VulnKitSourcemap = (function () {
       return;
     }
     try {
-      var tab = await utils.getActiveTab();
-      if (!tab || !tab.id) {
+      var tab = await utils.requireTabId();
+      if (!tab) {
         utils.showToast('无法获取当前标签页', 'warning');
         return;
       }
@@ -2021,17 +2021,8 @@ window.VulnKitSourcemap = (function () {
       content += '='.repeat(60) + '\n';
       content += src + '\n\n';
     });
-    var blob = new Blob([content], { type: 'text/plain' });
-    var url = URL.createObjectURL(blob);
     var filename = 'webpack-sources-' + Date.now() + '.txt';
-    chrome.downloads.download({ url: url, filename: filename, saveAs: true }, function () {
-      URL.revokeObjectURL(url);
-      if (chrome.runtime.lastError) {
-        utils.showToast('下载失败: ' + chrome.runtime.lastError.message, 'error');
-        return;
-      }
-      utils.showToast('已下载 ' + resolved.length + ' 个源文件', 'success');
-    });
+    utils.downloadBlob(content, filename, 'text/plain', '已下载 ' + resolved.length + ' 个源文件');
   }
 
   function downloadSingleModule(index) {
@@ -2043,16 +2034,7 @@ window.VulnKitSourcemap = (function () {
       return;
     }
     var fileName = mod.path.split('/').pop() || 'module.js';
-    var blob = new Blob([source], { type: 'text/javascript' });
-    var url = URL.createObjectURL(blob);
-    chrome.downloads.download({ url: url, filename: fileName, saveAs: true }, function () {
-      URL.revokeObjectURL(url);
-      if (chrome.runtime.lastError) {
-        utils.showToast('下载失败: ' + chrome.runtime.lastError.message, 'error');
-        return;
-      }
-      utils.showToast('已下载 ' + fileName, 'success');
-    });
+    utils.downloadBlob(source, fileName, 'text/javascript', '已下载 ' + fileName);
   }
 
   function copyModuleSource() {
@@ -2170,8 +2152,7 @@ window.VulnKitSourcemap = (function () {
     var lines = ['Path,Source,Size,Deps'];
     sourcemapModules.forEach(function (m) {
       lines.push(
-        '"' +
-          (m.path || '').replace(/"/g, '""') +
+        utils.csvField(m.path) +
           '","' +
           (m.source || '') +
           '",' +

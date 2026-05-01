@@ -57,21 +57,19 @@ window.VulnKitJsCtrl = (function () {
     if (clearBtn) clearBtn.disabled = !antiDebugBypassActive;
   }
 
-  async function disableJs() {
-    var disableBtn = utils.get('js-disable-btn');
-    if (disableBtn) disableBtn.disabled = true;
+  async function toggleJs(enable) {
+    var btnId = enable ? 'js-enable-btn' : 'js-disable-btn';
+    var btn = utils.get(btnId);
+    if (btn) btn.disabled = true;
     var dot = utils.get('js-toggle-dot');
     var label = utils.get('js-toggle-label');
     if (dot && label) {
       dot.className = 'js-toggle-dot js-toggle-dot-warn';
-      label.textContent = '正在禁用...';
+      label.textContent = enable ? '正在启用...' : '正在禁用...';
     }
 
-    var tab;
-    try {
-      tab = await utils.getActiveTab();
-    } catch (e) {}
-    if (!tab || !tab.id) {
+    var tab = await utils.requireTabId();
+    if (!tab) {
       updateJsToggleStatus();
       utils.showToast('无法获取当前标签页', 'error');
       return;
@@ -82,68 +80,26 @@ window.VulnKitJsCtrl = (function () {
         type: 'TOGGLE_JS',
         tabId: tab.id,
         url: tab.url,
-        enable: false,
+        enable: enable,
       });
       if (response && response.success) {
-        jsBlocked = true;
-        chrome.storage.local.set({ js_blocked_tabId: tab.id });
+        jsBlocked = !enable;
+        if (enable) chrome.storage.local.remove('js_blocked_tabId');
+        else chrome.storage.local.set({ js_blocked_tabId: tab.id });
         updateJsToggleStatus();
-        utils.showToast('已禁用 JavaScript，请刷新页面', 'success');
+        utils.showToast((enable ? '已启用' : '已禁用') + ' JavaScript，请刷新页面', 'success');
       } else {
         updateJsToggleStatus();
         utils.showToast(
-          '禁用失败: ' + (response && response.error ? response.error : '未知错误'),
+          (enable ? '启用' : '禁用') +
+            '失败: ' +
+            (response && response.error ? response.error : '未知错误'),
           'error'
         );
       }
     } catch (e) {
       updateJsToggleStatus();
-      utils.showToast('禁用失败: ' + e.message, 'error');
-    }
-  }
-
-  async function enableJs() {
-    var enableBtn = utils.get('js-enable-btn');
-    if (enableBtn) enableBtn.disabled = true;
-    var dot = utils.get('js-toggle-dot');
-    var label = utils.get('js-toggle-label');
-    if (dot && label) {
-      dot.className = 'js-toggle-dot js-toggle-dot-warn';
-      label.textContent = '正在启用...';
-    }
-
-    var tab;
-    try {
-      tab = await utils.getActiveTab();
-    } catch (e) {}
-    if (!tab || !tab.id) {
-      updateJsToggleStatus();
-      utils.showToast('无法获取当前标签页', 'error');
-      return;
-    }
-
-    try {
-      var response = await chrome.runtime.sendMessage({
-        type: 'TOGGLE_JS',
-        tabId: tab.id,
-        url: tab.url,
-        enable: true,
-      });
-      if (response && response.success) {
-        jsBlocked = false;
-        chrome.storage.local.remove('js_blocked_tabId');
-        updateJsToggleStatus();
-        utils.showToast('已启用 JavaScript，请刷新页面', 'success');
-      } else {
-        updateJsToggleStatus();
-        utils.showToast(
-          '启用失败: ' + (response && response.error ? response.error : '未知错误'),
-          'error'
-        );
-      }
-    } catch (e) {
-      updateJsToggleStatus();
-      utils.showToast('启用失败: ' + e.message, 'error');
+      utils.showToast((enable ? '启用' : '禁用') + '失败: ' + e.message, 'error');
     }
   }
 
@@ -158,8 +114,8 @@ window.VulnKitJsCtrl = (function () {
     updateAntidebugIndicator('warn', '正在扫描...');
 
     try {
-      var tab = await utils.getActiveTab();
-      if (!tab || !tab.id) return;
+      var tab = await utils.requireTabId();
+      if (!tab) return;
 
       // Phase 1: inline script scan (MAIN world)
       var inlineResults = await utils.execInTab(tab.id, function () {
@@ -270,23 +226,13 @@ window.VulnKitJsCtrl = (function () {
 
       for (var u = 0; u < externalUrls.length && scannedCount < maxScan; u++) {
         try {
-          var fetchResult = await new Promise(function (resolve) {
-            var timer = setTimeout(function () {
-              resolve(null);
-            }, 12000);
-            chrome.runtime.sendMessage(
-              { type: 'FETCH_URL', url: externalUrls[u] },
-              function (resp) {
-                clearTimeout(timer);
-                if (chrome.runtime.lastError) {
-                  resolve(null);
-                  return;
-                }
-                resolve(resp);
-              }
-            );
-          });
-          if (fetchResult && fetchResult.data && fetchResult.data.length > 0) {
+          var fetchResult = await utils.fetchUrl({ url: externalUrls[u], timeout: 12000 });
+          if (
+            fetchResult &&
+            fetchResult.success &&
+            fetchResult.data &&
+            fetchResult.data.length > 0
+          ) {
             scannedCount++;
             var code = fetchResult.data;
             for (var p = 0; p < antiDebugPatterns.length; p++) {
@@ -342,8 +288,8 @@ window.VulnKitJsCtrl = (function () {
   }
 
   async function bypassAntiDebug() {
-    var tab = await utils.getActiveTab();
-    if (!tab || !tab.id) return;
+    var tab = await utils.requireTabId();
+    if (!tab) return;
 
     try {
       await utils.execInTab(tab.id, function () {
@@ -431,8 +377,8 @@ window.VulnKitJsCtrl = (function () {
   }
 
   async function clearScriptBlock() {
-    var tab = await utils.getActiveTab();
-    if (!tab || !tab.id) return;
+    var tab = await utils.requireTabId();
+    if (!tab) return;
 
     try {
       await chrome.runtime.sendMessage({
@@ -447,8 +393,7 @@ window.VulnKitJsCtrl = (function () {
       chrome.storage.local.remove('js_blocked_tabId');
       updateJsToggleStatus();
       updateAntidebugIndicator('on', '未检测 / 未绕过');
-      var statusEl = utils.get('antidebug-status');
-      if (statusEl) statusEl.textContent = '';
+      utils.setStatus('antidebug-status', '');
       var resultsEl = utils.get('antidebug-results');
       if (resultsEl) {
         resultsEl.innerHTML = utils.emptyHtml('点击「扫描反调试」检测页面中的反调试手段');
@@ -478,11 +423,8 @@ window.VulnKitJsCtrl = (function () {
     if (btn) btn.disabled = true;
     updateUncopyIndicator('warn', '正在解除...');
 
-    var tab;
-    try {
-      tab = await utils.getActiveTab();
-    } catch (e) {}
-    if (!tab || !tab.id) {
+    var tab = await utils.requireTabId();
+    if (!tab) {
       updateUncopyIndicator('off', '无法获取当前标签页');
       if (btn) btn.disabled = false;
       return;
@@ -656,8 +598,8 @@ window.VulnKitJsCtrl = (function () {
     switchJsCtrlTab: switchJsCtrlTab,
     updateJsToggleStatus: updateJsToggleStatus,
     updateAntidebugIndicator: updateAntidebugIndicator,
-    disableJs: disableJs,
-    enableJs: enableJs,
+    disableJs: toggleJs.bind(null, false),
+    enableJs: toggleJs.bind(null, true),
     scanAntiDebug: scanAntiDebug,
     bypassAntiDebug: bypassAntiDebug,
     clearScriptBlock: clearScriptBlock,

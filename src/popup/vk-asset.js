@@ -8,28 +8,6 @@ window.VulnKitAsset = (function () {
 
   var utils = window.VulnKitUtils.utilsProxy;
 
-  function bgFetch(url) {
-    return new Promise(function (resolve) {
-      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url }, function (resp) {
-        if (chrome.runtime.lastError) {
-          resolve({ success: false, error: chrome.runtime.lastError.message });
-          return;
-        }
-        if (resp && resp.error) {
-          resolve({ success: false, error: resp.error });
-        } else if (resp && resp.data) {
-          try {
-            resolve({ success: true, data: JSON.parse(resp.data) });
-          } catch (e) {
-            resolve({ success: true, data: resp.data });
-          }
-        } else {
-          resolve({ success: false, error: '未知响应' });
-        }
-      });
-    });
-  }
-
   async function getApiKey(source) {
     return new Promise(resolve => {
       chrome.storage.local.get(['pentest_keys'], result => {
@@ -84,11 +62,11 @@ window.VulnKitAsset = (function () {
     var searchInput = utils.get('asset-search');
     if (searchInput) searchInput.style.display = hasResults ? '' : 'none';
     if (filtered.length === 0 && !hasResults) {
-      container.innerHTML = utils.emptyHtml('未找到结果');
+      utils.setEmpty('asset-results', '未找到结果');
       return;
     }
     if (filtered.length === 0) {
-      container.innerHTML = utils.emptyHtml('无匹配结果');
+      utils.setEmpty('asset-results', '无匹配结果');
       return;
     }
     var countLabel = currentSearchFilter
@@ -146,18 +124,13 @@ window.VulnKitAsset = (function () {
     var lines = ['IP/域名,端口,协议,标题'];
     data.forEach(function (item) {
       lines.push(
-        '"' +
-          (item.host || '').replace(/"/g, '""') +
-          '",' +
-          '"' +
-          String(item.port || '').replace(/"/g, '""') +
-          '",' +
-          '"' +
-          (item.protocol || '').replace(/"/g, '""') +
-          '",' +
-          '"' +
-          (item.title || '').replace(/"/g, '""') +
-          '"'
+        utils.csvField(item.host) +
+          ',' +
+          utils.csvField(String(item.port || '')) +
+          ',' +
+          utils.csvField(item.protocol) +
+          ',' +
+          utils.csvField(item.title)
       );
     });
     var csv = lines.join('\n');
@@ -183,37 +156,29 @@ window.VulnKitAsset = (function () {
       '&fields=host,port,protocol,title&size=' +
       getAssetSize();
 
-    chrome.runtime.sendMessage({ type: 'FETCH_URL', url }, response => {
-      if (chrome.runtime.lastError) {
-        setAssetStatus('查询失败: ' + chrome.runtime.lastError.message);
+    var result = await utils.fetchUrl({ url: url });
+    if (!result) {
+      setAssetStatus('查询失败: 超时');
+      return;
+    }
+    if (!result.success) {
+      setAssetStatus('查询失败: ' + result.error);
+      return;
+    }
+    try {
+      var json = JSON.parse(result.data);
+      if (json.error) {
+        setAssetStatus('API 错误: ' + json.error);
         return;
       }
-      if (!response) {
-        setAssetStatus('查询失败: 无响应');
-        return;
-      }
-      if (response.error) {
-        setAssetStatus('查询失败: ' + response.error);
-        return;
-      }
-      try {
-        const json = JSON.parse(response.data);
-        if (json.error) {
-          setAssetStatus('API 错误: ' + json.error);
-          return;
-        }
-        const results = (json.results || []).map(r => ({
-          host: r[0],
-          port: r[1],
-          protocol: r[2],
-          title: r[3],
-        }));
-        setAssetStatus('FOFA: 查询完成 (共 ' + (json.size || results.length) + ' 条)');
-        renderAssetResults(results);
-      } catch {
-        setAssetStatus('解析结果失败');
-      }
-    });
+      var results = (json.results || []).map(function (r) {
+        return { host: r[0], port: r[1], protocol: r[2], title: r[3] };
+      });
+      setAssetStatus('FOFA: 查询完成 (共 ' + (json.size || results.length) + ' 条)');
+      renderAssetResults(results);
+    } catch {
+      setAssetStatus('解析结果失败');
+    }
   }
 
   async function scanZoomEye(query) {
@@ -230,47 +195,46 @@ window.VulnKitAsset = (function () {
       '&page=1&size=' +
       getAssetSize();
 
-    chrome.runtime.sendMessage(
-      { type: 'FETCH_URL_AUTH', url, key, provider: 'zoomeye' },
-      response => {
-        if (chrome.runtime.lastError) {
-          setAssetStatus('查询失败: ' + chrome.runtime.lastError.message);
-          return;
-        }
-        if (!response) {
-          setAssetStatus('查询失败: 无响应');
-          return;
-        }
-        if (response.error) {
-          setAssetStatus('查询失败: ' + response.error);
-          return;
-        }
-        try {
-          const json = JSON.parse(response.data);
-          if (json.error) {
-            setAssetStatus('API 错误: ' + (json.message || json.error));
-            return;
-          }
-          const list = json.matches || json.data || [];
-          const total = json.total || list.length;
-          if (list.length === 0) {
-            setAssetStatus('ZoomEye: 未找到资产 (total=0)');
-            renderAssetResults([]);
-            return;
-          }
-          const results = list.map(r => ({
-            host: r.ip || '-',
-            port: r.portinfo?.port || '-',
-            protocol: r.portinfo?.service || r.portinfo?.type || '-',
-            title: r.webinfo?.title || r.portinfo?.product || '-',
-          }));
-          setAssetStatus('ZoomEye: 查询完成 (共 ' + total + ' 条)');
-          renderAssetResults(results);
-        } catch {
-          setAssetStatus('解析结果失败');
-        }
+    var result = await utils.fetchUrl({
+      type: 'FETCH_URL_AUTH',
+      url: url,
+      key: key,
+      provider: 'zoomeye',
+    });
+    if (!result) {
+      setAssetStatus('查询失败: 超时');
+      return;
+    }
+    if (!result.success) {
+      setAssetStatus('查询失败: ' + result.error);
+      return;
+    }
+    try {
+      var json = JSON.parse(result.data);
+      if (json.error) {
+        setAssetStatus('API 错误: ' + (json.message || json.error));
+        return;
       }
-    );
+      var list = json.matches || json.data || [];
+      var total = json.total || list.length;
+      if (list.length === 0) {
+        setAssetStatus('ZoomEye: 未找到资产 (total=0)');
+        renderAssetResults([]);
+        return;
+      }
+      var results = list.map(function (r) {
+        return {
+          host: r.ip || '-',
+          port: r.portinfo && r.portinfo.port ? r.portinfo.port : '-',
+          protocol: (r.portinfo && (r.portinfo.service || r.portinfo.type)) || '-',
+          title: (r.webinfo && r.webinfo.title) || (r.portinfo && r.portinfo.product) || '-',
+        };
+      });
+      setAssetStatus('ZoomEye: 查询完成 (共 ' + total + ' 条)');
+      renderAssetResults(results);
+    } catch {
+      setAssetStatus('解析结果失败');
+    }
   }
 
   async function scanShodan(query) {
@@ -291,37 +255,34 @@ window.VulnKitAsset = (function () {
       '&query=' +
       encodeURIComponent(searchQuery);
 
-    chrome.runtime.sendMessage({ type: 'FETCH_URL', url }, response => {
-      if (chrome.runtime.lastError) {
-        setAssetStatus('查询失败: ' + chrome.runtime.lastError.message);
+    var result = await utils.fetchUrl({ url: url });
+    if (!result) {
+      setAssetStatus('查询失败: 超时');
+      return;
+    }
+    if (!result.success) {
+      setAssetStatus('查询失败: ' + result.error);
+      return;
+    }
+    try {
+      var json = JSON.parse(result.data);
+      if (json.error) {
+        setAssetStatus('API 错误: ' + json.error);
         return;
       }
-      if (!response) {
-        setAssetStatus('查询失败: 无响应');
-        return;
-      }
-      if (response.error) {
-        setAssetStatus('查询失败: ' + response.error);
-        return;
-      }
-      try {
-        const json = JSON.parse(response.data);
-        if (json.error) {
-          setAssetStatus('API 错误: ' + json.error);
-          return;
-        }
-        const results = (json.matches || []).slice(0, getAssetSize()).map(m => ({
+      var results = (json.matches || []).slice(0, getAssetSize()).map(function (m) {
+        return {
           host: m.ip_str || '-',
           port: m.port || '-',
-          protocol: m._shodan?.module || '-',
-          title: m.http?.title || '-',
-        }));
-        setAssetStatus('Shodan: 查询完成 (共 ' + (json.total || results.length) + ' 条)');
-        renderAssetResults(results);
-      } catch {
-        setAssetStatus('解析结果失败');
-      }
-    });
+          protocol: (m._shodan && m._shodan.module) || '-',
+          title: (m.http && m.http.title) || '-',
+        };
+      });
+      setAssetStatus('Shodan: 查询完成 (共 ' + (json.total || results.length) + ' 条)');
+      renderAssetResults(results);
+    } catch {
+      setAssetStatus('解析结果失败');
+    }
   }
 
   function shodanHostLookup() {
@@ -344,84 +305,75 @@ window.VulnKitAsset = (function () {
     doShodanLookup(input, container);
   }
 
-  function doShodanLookup(input, container) {
+  async function doShodanLookup(input, container) {
     container.innerHTML =
       '<div style="text-align:center;padding:8px;color:#66B2FF;">正在查询...</div>';
     var resolvedIp = null;
     var isIp = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(input);
 
-    function step1() {
-      if (isIp) {
-        resolvedIp = input;
-        step2();
-        return;
-      }
-      bgFetch('https://geonet.shodan.io/api/dns/' + encodeURIComponent(input))
-        .then(function (result) {
-          if (result.success && result.data && result.data.answers) {
-            resolvedIp = result.data.answers[0].value;
-          }
-        })
-        .catch(function () {})
-        .finally(function () {
-          step2();
-        });
-    }
-
-    function step2() {
-      var targetIp = resolvedIp;
-      if (!targetIp || !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(targetIp)) {
-        container.innerHTML =
-          '<div style="color:#ff6b6b;padding:8px;">无法解析域名 ' +
-          utils.escapeHtml(input) +
-          ' 为 IP 地址，请直接输入 IP</div>';
-        return;
-      }
-      bgFetch('https://internetdb.shodan.io/' + encodeURIComponent(targetIp))
-        .then(function (result) {
-          if (!result.success || !result.data || result.data.error) {
-            container.innerHTML =
-              '<div style="color:#ff6b6b;padding:8px;">未找到该主机的信息</div>';
-            return;
-          }
-          step3(result.data, targetIp);
-        })
-        .catch(function (err) {
-          container.innerHTML =
-            '<div style="color:#ff6b6b;padding:8px;">查询失败: ' +
-            utils.escapeHtml(String(err.message || err)) +
-            '</div>';
-        });
-    }
-
-    function step3(idbData, targetIp) {
-      getApiKey('shodan').then(function (shodanKey) {
-        if (!shodanKey || !resolvedIp) {
-          renderShodanHostInfo(container, idbData, null, input, targetIp);
-          return;
-        }
-        bgFetch(
-          'https://api.shodan.io/shodan/host/' +
-            encodeURIComponent(resolvedIp) +
-            '?key=' +
-            encodeURIComponent(shodanKey)
-        )
-          .then(function (result) {
-            renderShodanHostInfo(
-              container,
-              idbData,
-              result.success ? result.data : null,
-              input,
-              targetIp
-            );
-          })
-          .catch(function () {
-            renderShodanHostInfo(container, idbData, null, input, targetIp);
-          });
+    // Step 1: resolve domain to IP
+    if (!isIp) {
+      var dnsResult = await utils.fetchUrl({
+        url: 'https://geonet.shodan.io/api/dns/' + encodeURIComponent(input),
       });
+      if (dnsResult && dnsResult.success && dnsResult.data) {
+        try {
+          var dnsJson = JSON.parse(dnsResult.data);
+          if (dnsJson && dnsJson.answers) {
+            resolvedIp = dnsJson.answers[0].value;
+          }
+        } catch {}
+      }
+    } else {
+      resolvedIp = input;
     }
 
-    step1();
+    // Step 2: query InternetDB
+    var targetIp = resolvedIp;
+    if (!targetIp || !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(targetIp)) {
+      container.innerHTML =
+        '<div style="color:#ff6b6b;padding:8px;">无法解析域名 ' +
+        utils.escapeHtml(input) +
+        ' 为 IP 地址，请直接输入 IP</div>';
+      return;
+    }
+    var idbResult = await utils.fetchUrl({
+      url: 'https://internetdb.shodan.io/' + encodeURIComponent(targetIp),
+    });
+    if (!idbResult || !idbResult.success || !idbResult.data) {
+      container.innerHTML = '<div style="color:#ff6b6b;padding:8px;">未找到该主机的信息</div>';
+      return;
+    }
+    var idbData;
+    try {
+      idbData = JSON.parse(idbResult.data);
+    } catch {
+      container.innerHTML = '<div style="color:#ff6b6b;padding:8px;">未找到该主机的信息</div>';
+      return;
+    }
+    if (idbData && idbData.error) {
+      container.innerHTML = '<div style="color:#ff6b6b;padding:8px;">未找到该主机的信息</div>';
+      return;
+    }
+
+    // Step 3: query Shodan API for extra detail
+    var shodanKey = await getApiKey('shodan');
+    var shodanData = null;
+    if (shodanKey && resolvedIp) {
+      var hostResult = await utils.fetchUrl({
+        url:
+          'https://api.shodan.io/shodan/host/' +
+          encodeURIComponent(resolvedIp) +
+          '?key=' +
+          encodeURIComponent(shodanKey),
+      });
+      if (hostResult && hostResult.success && hostResult.data) {
+        try {
+          shodanData = JSON.parse(hostResult.data);
+        } catch {}
+      }
+    }
+    renderShodanHostInfo(container, idbData, shodanData, input, targetIp);
   }
 
   function renderShodanHostInfo(container, idbData, shodanData, queryInput, resolvedIp) {

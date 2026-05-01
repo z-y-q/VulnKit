@@ -73,8 +73,8 @@ window.VulnKitVue = (function () {
     resultsEl.innerHTML = '';
 
     try {
-      const tab = await utils.getActiveTab();
-      if (!tab?.id) {
+      const tab = await utils.requireTabId();
+      if (!tab) {
         statusEl.textContent = '无法获取当前标签页';
         return;
       }
@@ -231,8 +231,8 @@ window.VulnKitVue = (function () {
   }
 
   async function exportVueRoutes() {
-    const tab = await utils.getActiveTab();
-    if (!tab?.id) return;
+    const tab = await utils.requireTabId();
+    if (!tab) return;
 
     try {
       const results = await utils.execInTab(tab.id, () => {
@@ -290,8 +290,8 @@ window.VulnKitVue = (function () {
   }
 
   async function bypassVueGuards() {
-    const tab = await utils.getActiveTab();
-    if (!tab?.id) return;
+    const tab = await utils.requireTabId();
+    if (!tab) return;
 
     try {
       const bypassResults = await utils.execInTab(tab.id, () => {
@@ -353,8 +353,8 @@ window.VulnKitVue = (function () {
   }
 
   async function disableRouteAuth() {
-    const tab = await utils.getActiveTab();
-    if (!tab?.id) return;
+    const tab = await utils.requireTabId();
+    if (!tab) return;
 
     try {
       const results = await utils.execInTab(tab.id, () => {
@@ -895,8 +895,8 @@ window.VulnKitVue = (function () {
   async function startPermInterception() {
     var statusEl = utils.get('perm-status');
     try {
-      const tab = await utils.getActiveTab();
-      if (!tab?.id) {
+      const tab = await utils.requireTabId();
+      if (!tab) {
         if (statusEl) statusEl.textContent = '无法获取当前标签页';
         return;
       }
@@ -909,10 +909,7 @@ window.VulnKitVue = (function () {
       }
       permInterceptActive = true;
       chrome.storage.local.set({ permInterceptTabId: tab.id });
-      var permStartBtn = utils.get('perm-start-btn');
-      var permStopBtn = utils.get('perm-stop-btn');
-      if (permStartBtn) permStartBtn.disabled = true;
-      if (permStopBtn) permStopBtn.disabled = false;
+      utils.toggleBtnPair('perm-start-btn', 'perm-stop-btn', true);
       if (statusEl) statusEl.textContent = '拦截中... 请操作页面触发菜单API请求，或刷新页面';
       utils.showToast('拦截已启动，请操作页面或刷新页面', 'success');
       // Try to read already-loaded data from Vue/Pinia/Vuex stores
@@ -931,33 +928,28 @@ window.VulnKitVue = (function () {
   async function stopPermInterception() {
     stopPermAutoRefresh();
     try {
-      const tab = await utils.getActiveTab();
-      if (!tab?.id) return;
+      const tab = await utils.requireTabId();
+      if (!tab) return;
       await utils.execInTab(tab.id, function () {
         if (window.__PERM_INTERCEPTOR__) window.__PERM_INTERCEPTOR__.stop();
       });
       permInterceptActive = false;
       chrome.storage.local.remove('permInterceptTabId');
-      var permStartBtn = utils.get('perm-start-btn');
-      var permStopBtn = utils.get('perm-stop-btn');
-      if (permStartBtn) permStartBtn.disabled = false;
-      if (permStopBtn) permStopBtn.disabled = true;
-      var statusEl = utils.get('perm-status');
-      if (statusEl) statusEl.textContent = '拦截已停止';
+      utils.toggleBtnPair('perm-start-btn', 'perm-stop-btn', false);
+      utils.setStatus('perm-status', '拦截已停止');
       utils.showToast('拦截已停止', 'info');
     } catch (e) {
       permInterceptActive = false;
       chrome.storage.local.remove('permInterceptTabId');
-      var statusEl = utils.get('perm-status');
-      if (statusEl) statusEl.textContent = '停止失败: ' + (e.message || '未知错误');
+      utils.setStatus('perm-status', '停止失败: ' + (e.message || '未知错误'));
       utils.showToast('停止拦截失败', 'error');
     }
   }
 
   async function refreshPermCaptured() {
     try {
-      const tab = await utils.getActiveTab();
-      if (!tab?.id) return;
+      const tab = await utils.requireTabId();
+      if (!tab) return;
       var results = await utils.execInTab(tab.id, function () {
         if (!window.__PERM_INTERCEPTOR__) return { items: [], length: 0 };
         var captured = window.__PERM_INTERCEPTOR__.getCaptured();
@@ -987,7 +979,7 @@ window.VulnKitVue = (function () {
     });
 
     if (filtered.length === 0) {
-      container.innerHTML = utils.emptyHtml('暂无捕获数据，请先操作页面触发菜单请求');
+      utils.setEmpty('perm-captured-list', '暂无捕获数据，请先操作页面触发菜单请求');
       if (countEl)
         countEl.textContent =
           permCapturedData.length > 0 ? '共 ' + permCapturedData.length + ' 条 (筛选后 0)' : '';
@@ -1403,8 +1395,8 @@ window.VulnKitVue = (function () {
     }
 
     try {
-      const tab = await utils.getActiveTab();
-      if (!tab?.id) {
+      const tab = await utils.requireTabId();
+      if (!tab) {
         utils.showToast('无法获取当前标签页', 'error');
         return;
       }
@@ -1566,8 +1558,8 @@ window.VulnKitVue = (function () {
     lastJsMatchContexts = [];
 
     try {
-      const tab = await utils.getActiveTab();
-      if (!tab?.id) return;
+      const tab = await utils.requireTabId();
+      if (!tab) return;
 
       // 1. Search inline scripts
       var inlineResults = await utils.execInTab(
@@ -2038,16 +2030,13 @@ window.VulnKitVue = (function () {
 
   function stopTraverse() {
     traverseActive = false;
-    var startBtn = utils.get('traverse-start-btn');
-    var stopBtn = utils.get('traverse-stop-btn');
-    if (startBtn) startBtn.disabled = false;
-    if (stopBtn) stopBtn.disabled = true;
+    utils.toggleBtnPair('traverse-start-btn', 'traverse-stop-btn', false);
     var progressEl = utils.get('traverse-progress');
     if (progressEl && !progressEl.textContent.includes('完成')) {
       progressEl.textContent += ' (已停止)';
     }
-    utils.getActiveTab().then(function (tab) {
-      if (!tab?.id) return;
+    utils.requireTabId().then(function (tab) {
+      if (!tab) return;
       utils
         .execInTab(tab.id, function () {
           window.__VULN_TRAVERSE_ACTIVE__ = false;
@@ -2076,8 +2065,8 @@ window.VulnKitVue = (function () {
     } else {
       // Fetch all routes from page
       try {
-        var tab = await utils.getActiveTab();
-        if (!tab?.id) {
+        var tab = await utils.requireTabId();
+        if (!tab) {
           utils.showToast('无法获取当前标签页', 'error');
           return;
         }
@@ -2150,16 +2139,13 @@ window.VulnKitVue = (function () {
     }
 
     traverseActive = true;
-    var startBtn = utils.get('traverse-start-btn');
-    var stopBtn = utils.get('traverse-stop-btn');
     var logEl = utils.get('traverse-log');
-    if (startBtn) startBtn.disabled = true;
-    if (stopBtn) stopBtn.disabled = false;
+    utils.toggleBtnPair('traverse-start-btn', 'traverse-stop-btn', true);
     if (logEl) logEl.innerHTML = '';
     updateTraverseProgress(0, routes.length, '准备中...');
 
-    var tab = await utils.getActiveTab();
-    if (!tab?.id) {
+    var tab = await utils.requireTabId();
+    if (!tab) {
       stopTraverse();
       utils.showToast('无法获取当前标签页', 'error');
       return;
@@ -2251,8 +2237,8 @@ window.VulnKitVue = (function () {
     if (statusEl) statusEl.textContent = '对比中...';
 
     try {
-      const tab = await utils.getActiveTab();
-      if (!tab?.id) {
+      const tab = await utils.requireTabId();
+      if (!tab) {
         if (statusEl) statusEl.textContent = '无法获取当前标签页';
         return;
       }
@@ -2409,8 +2395,8 @@ window.VulnKitVue = (function () {
     if (statusEl) statusEl.textContent = '正在探索 Store...';
 
     try {
-      var tab = await utils.getActiveTab();
-      if (!tab || !tab.id) {
+      var tab = await utils.requireTabId();
+      if (!tab) {
         if (statusEl) statusEl.textContent = '无法获取标签页';
         return;
       }
@@ -2682,8 +2668,8 @@ window.VulnKitVue = (function () {
 
   async function copyFullStoreJson() {
     try {
-      var tab = await utils.getActiveTab();
-      if (!tab || !tab.id) return;
+      var tab = await utils.requireTabId();
+      if (!tab) return;
       var data = await chrome.tabs.sendMessage(tab.id, { type: 'VK_VUE_STORE_EXPLORE' });
       if (!data || data.error) {
         utils.showToast('获取 Store 失败', 'error');

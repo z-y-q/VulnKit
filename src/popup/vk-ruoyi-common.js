@@ -23,6 +23,7 @@ window.VulnKitRuoYiCommon = (function () {
   return {
     utils: utils,
     getActiveTab: utils.getActiveTab,
+    requireTabId: utils.requireTabId,
     updateWorkflowStep: updateWorkflowStep,
   };
 })();

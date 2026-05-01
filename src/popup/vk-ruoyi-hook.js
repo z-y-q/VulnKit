@@ -6,7 +6,6 @@ window.VulnKitRuoYiHook = (function () {
   var state = null;
   var common = window.VulnKitRuoYiCommon;
   var utils = common ? common.utils : {};
-  var getActiveTab = common ? common.getActiveTab : null;
   var updateWorkflowStep = common ? common.updateWorkflowStep : null;
 
   // ====== Route Hook ======
@@ -58,16 +57,15 @@ window.VulnKitRuoYiHook = (function () {
   }
 
   async function installRouteHook() {
-    var statusEl = utils.get('ruoyi-hook-status');
     var augmentMode = state ? state.augmentMode : 'auto';
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) {
-        if (statusEl) statusEl.textContent = '无法获取当前标签页';
+      var tab = await utils.requireTabId();
+      if (!tab) {
+        utils.setStatus('ruoyi-hook-status', '无法获取当前标签页');
         return;
       }
 
-      if (statusEl) statusEl.textContent = '启用钩子中...';
+      utils.setStatus('ruoyi-hook-status', '启用钩子中...');
 
       var customUrlInput = utils.get('ruoyi-custom-url');
       var customUrl = (customUrlInput && customUrlInput.value.trim()) || '';
@@ -95,22 +93,24 @@ window.VulnKitRuoYiHook = (function () {
         var capData = utils.execResult(capCheck);
 
         if (capData && capData.captured) {
-          if (statusEl) statusEl.textContent = '钩子已启用 — 路由数据已被动捕获';
+          utils.setStatus('ruoyi-hook-status', '钩子已启用 — 路由数据已被动捕获');
           utils.showToast('路由数据已捕获', 'success');
           await checkHookStatus();
         } else {
-          if (statusEl)
-            statusEl.textContent = '钩子已启用，等待 /getRouters 请求（刷新页面或登录后自动捕获）';
+          utils.setStatus(
+            'ruoyi-hook-status',
+            '钩子已启用，等待 /getRouters 请求（刷新页面或登录后自动捕获）'
+          );
           utils.showToast('钩子已启用，刷新页面或登录以触发 /getRouters', 'success');
         }
         return;
       }
 
-      if (statusEl) statusEl.textContent = '动态注入钩子中...';
+      utils.setStatus('ruoyi-hook-status', '动态注入钩子中...');
       var method = await injectHookCode(tab.id);
 
       if (!method) {
-        if (statusEl) statusEl.textContent = '所有注入方式均失败';
+        utils.setStatus('ruoyi-hook-status', '所有注入方式均失败');
         utils.showToast('注入失败 — 请刷新目标页面后重试', 'error');
         return;
       }
@@ -124,7 +124,7 @@ window.VulnKitRuoYiHook = (function () {
       });
 
       if (!utils.execResult(retryResult)) {
-        if (statusEl) statusEl.textContent = '注入后未检测到钩子';
+        utils.setStatus('ruoyi-hook-status', '注入后未检测到钩子');
         utils.showToast('钩子注入失败 [' + method + ']，请刷新页面后重试', 'warning');
         return;
       }
@@ -137,21 +137,20 @@ window.VulnKitRuoYiHook = (function () {
       chrome.storage.local.set({ ruoyiHookTabId: tab.id, ruoyiHookEnabled: true });
       setHookUI(true);
       updateWorkflowStep(2);
-      if (statusEl) statusEl.textContent = '钩子已启用，正在刷新页面...';
+      utils.setStatus('ruoyi-hook-status', '钩子已启用，正在刷新页面...');
       utils.showToast('钩子已启用，刷新页面以捕获 /getRouters', 'success');
       await chrome.tabs.reload(tab.id);
     } catch (e) {
       if (state) state.hookStatus = 'idle';
-      if (statusEl) statusEl.textContent = '安装失败';
+      utils.setStatus('ruoyi-hook-status', '安装失败');
       utils.showToast('安装失败: ' + e.message, 'error');
     }
   }
 
   async function removeRouteHook() {
-    var statusEl = utils.get('ruoyi-hook-status');
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) return;
+      var tab = await utils.requireTabId();
+      if (!tab) return;
 
       await utils.execInTab(tab.id, function () {
         if (window.__VK_RUOYI_HOOK__) {
@@ -174,7 +173,7 @@ window.VulnKitRuoYiHook = (function () {
       chrome.storage.local.remove(['ruoyiHookTabId', 'ruoyiHookEnabled']);
 
       setHookUI(false);
-      if (statusEl) statusEl.textContent = '钩子已禁用';
+      utils.setStatus('ruoyi-hook-status', '钩子已禁用');
       utils.showToast('路由钩子已禁用', 'info');
     } catch (e) {
       utils.showToast('移除失败: ' + e.message, 'error');
@@ -182,11 +181,10 @@ window.VulnKitRuoYiHook = (function () {
   }
 
   async function checkHookStatus() {
-    var statusEl = utils.get('ruoyi-hook-status');
     var panelEl = utils.get('ruoyi-captured-panel');
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) return;
+      var tab = await utils.requireTabId();
+      if (!tab) return;
 
       var results = await utils.execInTab(tab.id, function () {
         var hook = window.__VK_RUOYI_HOOK__;
@@ -209,7 +207,7 @@ window.VulnKitRuoYiHook = (function () {
 
       if (!data.installed) {
         var urlHint = data.pageUrl ? ' [' + utils.escapeHtml(data.pageUrl) + ']' : '';
-        if (statusEl) statusEl.textContent = '钩子未安装，页面: ' + (data.pageUrl || '未知');
+        utils.setStatus('ruoyi-hook-status', '钩子未安装，页面: ' + (data.pageUrl || '未知'));
         if (state) state.hookStatus = 'idle';
         if (panelEl)
           panelEl.innerHTML = utils.emptyHtml('钩子未注入 — 请先点击「安装钩子」' + urlHint);
@@ -222,7 +220,10 @@ window.VulnKitRuoYiHook = (function () {
           data.enabled && data.extraRouteCount > 0
             ? '，' + data.extraRouteCount + ' 条额外路由'
             : '';
-        if (statusEl) statusEl.textContent = '已捕获路由数据 (' + modeText + ' 模式' + extras + ')';
+        utils.setStatus(
+          'ruoyi-hook-status',
+          '已捕获路由数据 (' + modeText + ' 模式' + extras + ')'
+        );
         // Delegate to detect module for data fetching
         if (
           window.VulnKitRuoYiDetect &&
@@ -231,22 +232,24 @@ window.VulnKitRuoYiHook = (function () {
           await window.VulnKitRuoYiDetect.fetchCapturedRoutes();
         }
       } else if (!data.enabled) {
-        if (statusEl)
-          statusEl.textContent = data.alwaysCapture
+        utils.setStatus(
+          'ruoyi-hook-status',
+          data.alwaysCapture
             ? '钩子已注入（被动捕获模式），等待 /getRouters...'
-            : '钩子已安装但未启用';
+            : '钩子已安装但未启用'
+        );
         if (state) state.hookStatus = 'idle';
         setHookUI(false);
         renderRequestLog(tab.id);
       } else {
         var logInfo = data.logCount > 0 ? '，已拦截 ' + data.logCount + ' 个请求' : '';
-        if (statusEl) statusEl.textContent = '监听中，等待 /getRouters 请求...' + logInfo;
+        utils.setStatus('ruoyi-hook-status', '监听中，等待 /getRouters 请求...' + logInfo);
         if (state) state.hookStatus = 'active';
         setHookUI(true);
         renderRequestLog(tab.id);
       }
     } catch (e) {
-      if (statusEl) statusEl.textContent = '检查失败';
+      utils.setStatus('ruoyi-hook-status', '检查失败');
     }
   }
 
@@ -510,8 +513,8 @@ window.VulnKitRuoYiHook = (function () {
     }
 
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) {
+      var tab = await utils.requireTabId();
+      if (!tab) {
         utils.showToast('无法获取当前标签页', 'warning');
         return;
       }

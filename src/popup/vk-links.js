@@ -4,15 +4,30 @@ window.VulnKitLinks = (function () {
 
   let allLinks = [];
   var utils = window.VulnKitUtils.utilsProxy;
+  var TAG_LABELS = {
+    a: '链接',
+    img: '图片',
+    script: '脚本',
+    link: '资源',
+    iframe: '框架',
+    form: '表单',
+  };
+  var TAG_COLORS = {
+    a: '#4A90E2',
+    img: '#27ae60',
+    script: '#e67e22',
+    link: '#9b59b6',
+    iframe: '#e74c3c',
+    form: '#f39c12',
+  };
 
   async function extractLinks() {
-    var statusEl = utils.get('links-count');
-    if (statusEl) statusEl.textContent = '正在提取...';
+    utils.setStatus('links-count', '正在提取...');
 
     try {
       const tab = await utils.getActiveTab();
       if (!tab || !tab.url) {
-        if (statusEl) statusEl.textContent = '无法获取当前页面';
+        utils.setStatus('links-count', '无法获取当前页面');
         return;
       }
 
@@ -145,12 +160,12 @@ window.VulnKitLinks = (function () {
         allLinks = extractedLinks;
         renderLinks();
         renderStats();
-        if (statusEl) statusEl.textContent = '提取完成，共 ' + allLinks.length + ' 个链接';
+        utils.setStatus('links-count', '提取完成，共 ' + allLinks.length + ' 个链接');
         utils.showToast('提取完成', 'success');
         chrome.storage.local.set({ allLinks: allLinks, allLinksUrl: tab.url });
       }
     } catch (e) {
-      if (statusEl) statusEl.textContent = '提取失败: ' + e.message;
+      utils.setStatus('links-count', '提取失败: ' + e.message);
       utils.showToast('提取失败', 'error');
     }
   }
@@ -198,25 +213,9 @@ window.VulnKitLinks = (function () {
     var html = '<div class="links-stats-bar">';
     html += '<span class="links-stat">总计: ' + allLinks.length + '</span>';
 
-    var tagLabels = {
-      a: '链接',
-      img: '图片',
-      script: '脚本',
-      link: '资源',
-      iframe: '框架',
-      form: '表单',
-    };
-    var tagColors = {
-      a: '#4A90E2',
-      img: '#27ae60',
-      script: '#e67e22',
-      link: '#9b59b6',
-      iframe: '#e74c3c',
-      form: '#f39c12',
-    };
     Object.keys(counts).forEach(function (tag) {
-      html += '<span class="links-stat" style="color:' + (tagColors[tag] || '#888') + '">';
-      html += (tagLabels[tag] || tag) + ': ' + counts[tag];
+      html += '<span class="links-stat" style="color:' + (TAG_COLORS[tag] || '#888') + '">';
+      html += (TAG_LABELS[tag] || tag) + ': ' + counts[tag];
       html += '</span>';
     });
 
@@ -245,18 +244,9 @@ window.VulnKitLinks = (function () {
     }
 
     if (filtered.length === 0) {
-      container.innerHTML = utils.emptyHtml('没有匹配的链接');
+      utils.setEmpty('links-results', '没有匹配的链接');
       return;
     }
-
-    var tagColors = {
-      a: '#4A90E2',
-      img: '#27ae60',
-      script: '#e67e22',
-      link: '#9b59b6',
-      iframe: '#e74c3c',
-      form: '#f39c12',
-    };
 
     var html = '';
     filtered.forEach(function (link) {
@@ -266,7 +256,7 @@ window.VulnKitLinks = (function () {
         '<span class="link-item-tag ' +
         tagClass +
         '" style="background:' +
-        (tagColors[link.tag] || '#888') +
+        (TAG_COLORS[link.tag] || '#888') +
         '">' +
         link.tag +
         '</span>';
@@ -323,17 +313,14 @@ window.VulnKitLinks = (function () {
     var lines = ['URL,Tag,Domain,Text,External'];
     filtered.forEach(function (l) {
       lines.push(
-        '"' +
-          l.href.replace(/"/g, '""') +
-          '",' +
+        utils.csvField(l.href) +
+          ',' +
           l.tag +
           ',' +
-          '"' +
-          (l.domain || '').replace(/"/g, '""') +
-          '",' +
-          '"' +
-          (l.text || '').replace(/"/g, '""') +
-          '",' +
+          utils.csvField(l.domain) +
+          ',' +
+          utils.csvField(l.text) +
+          ',' +
           (l.isExternal ? 'Yes' : 'No')
       );
     });

@@ -43,8 +43,8 @@ window.VulnKitXss = (function () {
   ];
 
   async function harvestXssParamsFromDom() {
-    const tab = await utils.getActiveTab();
-    if (!tab?.id) return [];
+    const tab = await utils.requireTabId();
+    if (!tab) return [];
     const results = await utils.execInTab(
       tab.id,
       () => {
@@ -103,12 +103,11 @@ window.VulnKitXss = (function () {
   async function startXssIntercept() {
     xssInterceptActive = true;
     xssInterceptCountdown = 30;
-    utils.get('xssscan-start-intercept-btn').disabled = true;
-    utils.get('xssscan-stop-intercept-btn').disabled = false;
+    utils.toggleBtnPair('xssscan-start-intercept-btn', 'xssscan-stop-intercept-btn', true);
     updateXssInterceptStatus();
 
-    var tab = await utils.getActiveTab();
-    if (!tab?.id) return;
+    var tab = await utils.requireTabId();
+    if (!tab) return;
     const tabId = tab.id;
 
     await utils.execInTab(tabId, () => {
@@ -294,12 +293,11 @@ window.VulnKitXss = (function () {
       xssInterceptTimer = null;
     }
     xssInterceptActive = false;
-    utils.get('xssscan-start-intercept-btn').disabled = false;
-    utils.get('xssscan-stop-intercept-btn').disabled = true;
+    utils.toggleBtnPair('xssscan-start-intercept-btn', 'xssscan-stop-intercept-btn', false);
     updateXssInterceptStatus();
 
-    var tab = await utils.getActiveTab();
-    if (!tab?.id) return;
+    var tab = await utils.requireTabId();
+    if (!tab) return;
     utils
       .execInTab(tab.id, () => {
         if (!window.__XSS_ORIGINAL__) return;
@@ -372,7 +370,7 @@ window.VulnKitXss = (function () {
         (hasFilter ? '（显示: ' + filtered.length + '）' : '');
     }
     if (filtered.length === 0) {
-      container.innerHTML = utils.emptyHtml('暂无注入点');
+      utils.setEmpty('xssscan-results', '暂无注入点');
       return;
     }
     const sourceLabels = { link: '链接', form: '表单', url: 'URL', ajax: 'AJAX' };
@@ -521,8 +519,8 @@ window.VulnKitXss = (function () {
     }
 
     if (postPoints.length > 0) {
-      const tab = await utils.getActiveTab();
-      if (!tab?.id) {
+      const tab = await utils.requireTabId();
+      if (!tab) {
         utils.showToast('无法获取当前标签页', 'error');
         return;
       }
@@ -647,18 +645,13 @@ window.VulnKitXss = (function () {
     var lines = ['Source,URL,Param,Method'];
     xssPoints.forEach(function (p) {
       lines.push(
-        '"' +
-          (p.source || '').replace(/"/g, '""') +
-          '",' +
-          '"' +
-          (p.url || '').replace(/"/g, '""') +
-          '",' +
-          '"' +
-          (p.param || '').replace(/"/g, '""') +
-          '",' +
-          '"' +
-          (p.method || '').replace(/"/g, '""') +
-          '"'
+        utils.csvField(p.source) +
+          ',' +
+          utils.csvField(p.url) +
+          ',' +
+          utils.csvField(p.param) +
+          ',' +
+          utils.csvField(p.method)
       );
     });
     var csv = lines.join('\n');

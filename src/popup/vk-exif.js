@@ -95,7 +95,7 @@ window.VulnKitExif = (function () {
     if (!resultEl || !emptyEl || !sectionsEl) return;
     resultEl.classList.add('hidden');
     emptyEl.classList.add('hidden');
-    sectionsEl.innerHTML = utils.emptyHtml('正在解析...');
+    utils.setEmpty('exif-sections', '正在解析...');
 
     const objectUrl = URL.createObjectURL(file);
     if (previewImg) {
@@ -250,7 +250,7 @@ window.VulnKitExif = (function () {
     if (!resultEl || !emptyEl || !sectionsEl) return;
     resultEl.classList.add('hidden');
     emptyEl.classList.add('hidden');
-    sectionsEl.innerHTML = utils.emptyHtml('正在获取图片...');
+    utils.setEmpty('exif-sections', '正在获取图片...');
 
     if (previewImg) previewImg.src = url;
     if (fileNameEl) fileNameEl.textContent = url.split('/').pop() || url;
@@ -294,12 +294,12 @@ window.VulnKitExif = (function () {
   async function scanPageImages() {
     const container = utils.get('exif-page-images');
     if (!container) return;
-    container.innerHTML = utils.emptyHtml('正在扫描...');
+    utils.setEmpty('exif-page-images', '正在扫描...');
 
     try {
       const tab = await utils.getActiveTab();
       if (!tab?.url) {
-        container.innerHTML = utils.emptyHtml('无法获取当前页面');
+        utils.setEmpty('exif-page-images', '无法获取当前页面');
         return;
       }
 
@@ -332,7 +332,7 @@ window.VulnKitExif = (function () {
 
       const images = utils.execResult(results) || [];
       if (images.length === 0) {
-        container.innerHTML = utils.emptyHtml('未找到图片');
+        utils.setEmpty('exif-page-images', '未找到图片');
         return;
       }
 
@@ -357,7 +357,7 @@ window.VulnKitExif = (function () {
         });
       });
     } catch (e) {
-      container.innerHTML = utils.emptyHtml('扫描失败: ' + e.message);
+      utils.setEmpty('exif-page-images', '扫描失败: ' + e.message);
     }
   }
 

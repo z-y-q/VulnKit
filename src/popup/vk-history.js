@@ -113,18 +113,17 @@ window.VulnKitHistory = (function () {
     lastHistoryResults = items;
     if (!isFilter) allHistoryResults = items;
     const container = utils.get('history-timeline');
-    const statusEl = utils.get('history-status');
     const fieldsEl = utils.get('history-fields');
     const fields = fieldsEl ? fieldsEl.value : '';
     const hasTs = fields.includes('timestamp');
 
     if (items.length === 0) {
-      container.innerHTML = utils.emptyHtml('未找到历史档案');
-      statusEl.textContent = '无结果';
+      utils.setEmpty('history-timeline', '未找到历史档案');
+      utils.setStatus('history-status', '无结果');
       return;
     }
 
-    statusEl.textContent = '共 ' + items.length + ' 条记录';
+    utils.setStatus('history-status', '共 ' + items.length + ' 条记录');
     var totalEl = utils.get('history-total');
     if (totalEl) totalEl.textContent = items.length;
 
@@ -223,42 +222,35 @@ window.VulnKitHistory = (function () {
     utils.get('history-domain').value = domain;
 
     showHistoryQuickLinks(domain);
-    utils.get('history-status').textContent = '正在查询...';
+    utils.setStatus('history-status', '正在查询...');
     utils.get('history-timeline').innerHTML = '';
     utils.get('history-summary').classList.add('hidden');
 
-    const cdxUrl = buildCdxUrl(domain);
-    chrome.runtime.sendMessage({ type: 'FETCH_URL', url: cdxUrl }, response => {
-      if (chrome.runtime.lastError) {
-        utils.get('history-status').textContent = '查询失败: ' + chrome.runtime.lastError.message;
-        return;
-      }
-      if (response?.error) {
-        utils.get('history-status').textContent = '查询失败: ' + response.error;
-        return;
-      }
-      try {
-        const outputType = utils.get('history-output-type').value;
-        const items =
-          outputType === 'json'
-            ? parseCdxJson(JSON.parse(response.data))
-            : parseCdxText(response.data);
-        renderHistoryResults(items);
-        utils.showToast('查询完成', 'success');
+    var cdxUrl = buildCdxUrl(domain);
+    var result = await utils.fetchUrl({ url: cdxUrl });
+    if (!result || !result.success) {
+      utils.setStatus('history-status', '查询失败: ' + (result ? result.error : '超时'));
+      return;
+    }
+    try {
+      var outputType = utils.get('history-output-type').value;
+      var items =
+        outputType === 'json' ? parseCdxJson(JSON.parse(result.data)) : parseCdxText(result.data);
+      renderHistoryResults(items);
+      utils.showToast('查询完成', 'success');
 
-        const latest = items[items.length - 1];
-        if (latest && latest.timestamp) {
-          const latestBtn = utils.get('history-latest-btn');
-          if (latestBtn) {
-            latestBtn.dataset.url =
-              'https://web.archive.org/web/' + latest.timestamp + '/' + latest.url;
-            latestBtn.classList.remove('hidden');
-          }
+      var latest = items[items.length - 1];
+      if (latest && latest.timestamp) {
+        var latestBtn = utils.get('history-latest-btn');
+        if (latestBtn) {
+          latestBtn.dataset.url =
+            'https://web.archive.org/web/' + latest.timestamp + '/' + latest.url;
+          latestBtn.classList.remove('hidden');
         }
-      } catch {
-        utils.get('history-status').textContent = '解析结果失败';
       }
-    });
+    } catch {
+      utils.setStatus('history-status', '解析结果失败');
+    }
   }
 
   function exportData() {
@@ -269,18 +261,13 @@ window.VulnKitHistory = (function () {
     var lines = ['时间戳,URL,状态码,MIME类型'];
     lastHistoryResults.forEach(function (item) {
       lines.push(
-        '"' +
-          (item.timestamp || '').replace(/"/g, '""') +
-          '",' +
-          '"' +
-          (item.url || '').replace(/"/g, '""') +
-          '",' +
-          '"' +
-          (item.statuscode || '').replace(/"/g, '""') +
-          '",' +
-          '"' +
-          (item.mimetype || '').replace(/"/g, '""') +
-          '"'
+        utils.csvField(item.timestamp) +
+          ',' +
+          utils.csvField(item.url) +
+          ',' +
+          utils.csvField(item.statuscode) +
+          ',' +
+          utils.csvField(item.mimetype)
       );
     });
     var csv = lines.join('\n');

@@ -143,7 +143,7 @@ window.VulnKitSpoof = (function () {
 
     const presets = UA_PRESETS[category] || [];
     if (presets.length === 0) {
-      container.innerHTML = utils.emptyHtml('无预设项');
+      utils.setEmpty('ua-list', '无预设项');
       return;
     }
 
@@ -705,16 +705,13 @@ window.VulnKitSpoof = (function () {
     });
 
     var json = JSON.stringify(exportData, null, 2);
-    var blobUrl = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
     var filename = domain.replace(/\./g, '_') + '_cookies.json';
-    chrome.downloads.download({ url: blobUrl, filename: filename, saveAs: true }, function () {
-      URL.revokeObjectURL(blobUrl);
-      if (chrome.runtime.lastError) {
-        utils.showToast('导出失败: ' + chrome.runtime.lastError.message, 'error');
-        return;
-      }
-      utils.showToast('已导出 ' + exportData.length + ' 个 Cookie', 'success');
-    });
+    utils.downloadBlob(
+      json,
+      filename,
+      'application/json',
+      '已导出 ' + exportData.length + ' 个 Cookie'
+    );
   }
 
   function showCookieFileImportDialog() {

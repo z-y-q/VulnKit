@@ -6,7 +6,6 @@ window.VulnKitRuoYiMar = (function () {
   var state = null;
   var common = window.VulnKitRuoYiCommon;
   var utils = common ? common.utils : {};
-  var getActiveTab = common ? common.getActiveTab : null;
 
   // RuoYi standard route dictionary
   var RUOYI_KNOWN_ROUTES = [
@@ -47,15 +46,14 @@ window.VulnKitRuoYiMar = (function () {
   // ====== MaR Dynamic Route Scan ======
 
   async function marScanDynamicRoutes() {
-    var statusEl = utils.get('mar-scan-status');
     var resultsEl = utils.get('mar-scan-results');
-    if (statusEl) statusEl.textContent = '扫描动态路由中...';
+    utils.setStatus('mar-scan-status', '扫描动态路由中...');
     if (resultsEl) resultsEl.innerHTML = '';
 
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) {
-        if (statusEl) statusEl.textContent = '无法获取当前标签页';
+      var tab = await utils.requireTabId();
+      if (!tab) {
+        utils.setStatus('mar-scan-status', '无法获取当前标签页');
         return;
       }
 
@@ -76,9 +74,10 @@ window.VulnKitRuoYiMar = (function () {
       var scriptUrls = scriptData.urls || [];
       var inlineTexts = scriptData.inlineTexts || [];
 
-      if (statusEl)
-        statusEl.textContent =
-          '扫描 ' + scriptUrls.length + ' 个外部JS + ' + inlineTexts.length + ' 个内联脚本...';
+      utils.setStatus(
+        'mar-scan-status',
+        '扫描 ' + scriptUrls.length + ' 个外部JS + ' + inlineTexts.length + ' 个内联脚本...'
+      );
 
       // Step 2: Fetch all external JS content
       var CONCURRENCY = 5;
@@ -117,10 +116,8 @@ window.VulnKitRuoYiMar = (function () {
           if (r && r.data) allJsContents.push(r);
         });
 
-        if (statusEl) {
-          var fetched = Math.min(bi + CONCURRENCY, scriptUrls.length);
-          statusEl.textContent = '获取JS中... ' + fetched + '/' + scriptUrls.length;
-        }
+        var fetched = Math.min(bi + CONCURRENCY, scriptUrls.length);
+        utils.setStatus('mar-scan-status', '获取JS中... ' + fetched + '/' + scriptUrls.length);
       }
 
       var totalJs = allJsContents.length;
@@ -130,18 +127,15 @@ window.VulnKitRuoYiMar = (function () {
       });
 
       if (totalJs === 0) {
-        if (statusEl) statusEl.textContent = '未找到任何 JS 文件';
+        utils.setStatus('mar-scan-status', '未找到任何 JS 文件');
         if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('当前页面未加载任何 JS 脚本。');
         return;
       }
 
-      if (statusEl)
-        statusEl.textContent =
-          '已获取 ' +
-          totalJs +
-          ' 个JS (' +
-          Math.round(totalBytes / 1024) +
-          'KB)，正在扫描路由定义...';
+      utils.setStatus(
+        'mar-scan-status',
+        '已获取 ' + totalJs + ' 个JS (' + Math.round(totalBytes / 1024) + 'KB)，正在扫描路由定义...'
+      );
 
       // Step 3: Scan ALL JS for route patterns
       var ruoyiRouteJs = null;
@@ -280,7 +274,7 @@ window.VulnKitRuoYiMar = (function () {
       });
 
       if (extractedRoutes.length === 0) {
-        if (statusEl) statusEl.textContent = '未发现任何路由';
+        utils.setStatus('mar-scan-status', '未发现任何路由');
         if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('未发现路由定义');
         return;
       }
@@ -338,7 +332,6 @@ window.VulnKitRuoYiMar = (function () {
       }
 
       marRenderScanResults(
-        statusEl,
         resultsEl,
         extractedRoutes,
         marHiddenRoutes,
@@ -347,20 +340,12 @@ window.VulnKitRuoYiMar = (function () {
         routerInfo
       );
     } catch (e) {
-      if (statusEl) statusEl.textContent = '扫描失败: ' + e.message;
+      utils.setStatus('mar-scan-status', '扫描失败: ' + e.message);
       utils.showToast('MaR扫描失败: ' + e.message, 'error');
     }
   }
 
-  function marRenderScanResults(
-    statusEl,
-    resultsEl,
-    allRoutes,
-    hiddenRoutes,
-    varName,
-    jsUrl,
-    routerInfo
-  ) {
+  function marRenderScanResults(resultsEl, allRoutes, hiddenRoutes, varName, jsUrl, routerInfo) {
     if (!resultsEl) return;
 
     var html = '';
@@ -414,7 +399,7 @@ window.VulnKitRuoYiMar = (function () {
 
     if (hiddenRoutes.length === 0) {
       html += utils.emptyHtml('所有路由均已注册，无需额外加载');
-      if (statusEl) statusEl.textContent = '扫描完成 — 未发现隐藏路由';
+      utils.setStatus('mar-scan-status', '扫描完成 — 未发现隐藏路由');
       resultsEl.innerHTML = html;
       return;
     }
@@ -445,19 +430,19 @@ window.VulnKitRuoYiMar = (function () {
     html += '</div>';
 
     resultsEl.innerHTML = html;
-    if (statusEl)
-      statusEl.textContent =
-        '扫描完成 — ' + allRoutes.length + ' 条路由，' + hiddenRoutes.length + ' 条未注册';
+    utils.setStatus(
+      'mar-scan-status',
+      '扫描完成 — ' + allRoutes.length + ' 条路由，' + hiddenRoutes.length + ' 条未注册'
+    );
   }
 
   // ====== Inject to Vue Router ======
 
   async function marInjectToRouter() {
-    var statusEl = utils.get('mar-scan-status');
     var marHiddenRoutes = state ? state.marHiddenRoutes : [];
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) {
+      var tab = await utils.requireTabId();
+      if (!tab) {
         utils.showToast('无法获取当前标签页', 'warning');
         return;
       }
@@ -566,7 +551,7 @@ window.VulnKitRuoYiMar = (function () {
           ? '当前为非 Vue 应用 (Thymeleaf/jQuery)，直接访问 URL 测试权限绕过'
           : 'Vue 应用未加载，请先登录后重试，或直接访问 URL';
 
-        if (statusEl) statusEl.textContent = hint;
+        utils.setStatus('mar-scan-status', hint);
 
         var urls = paths.map(function (p) {
           return origin + p;
@@ -713,7 +698,7 @@ window.VulnKitRuoYiMar = (function () {
       var result = utils.execResult(injectResult) || {};
 
       if (!result.routerFound) {
-        if (statusEl) statusEl.textContent = '注入失败: Vue Router 未找到';
+        utils.setStatus('mar-scan-status', '注入失败: Vue Router 未找到');
         utils.showToast('Vue Router 未找到', 'error');
         return;
       }
@@ -722,10 +707,10 @@ window.VulnKitRuoYiMar = (function () {
       if (result.skipped > 0) msg += '，跳过 ' + result.skipped + ' 条已存在';
       if (result.errors.length > 0) msg += '，' + result.errors.length + ' 个错误';
 
-      if (statusEl) statusEl.textContent = msg;
+      utils.setStatus('mar-scan-status', msg);
       utils.showToast(msg, result.injected > 0 ? 'success' : 'warning');
     } catch (e) {
-      if (statusEl) statusEl.textContent = '注入失败: ' + e.message;
+      utils.setStatus('mar-scan-status', '注入失败: ' + e.message);
       utils.showToast('注入失败: ' + e.message, 'error');
     }
   }

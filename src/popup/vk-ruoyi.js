@@ -19,7 +19,6 @@ window.VulnKitRuoYi = (function () {
 
   var common = window.VulnKitRuoYiCommon;
   var utils = common ? common.utils : {};
-  var getActiveTab = common ? common.getActiveTab : null;
   var updateWorkflowStep = common ? common.updateWorkflowStep : null;
 
   // ====== Initialize Sub-modules ======
@@ -35,14 +34,13 @@ window.VulnKitRuoYi = (function () {
   // ====== JS Route Analysis ======
 
   async function analyzeJsRoutes() {
-    var statusEl = utils.get('ruoyi-analyze-status');
     var resultsEl = utils.get('ruoyi-analyze-results');
-    if (statusEl) statusEl.textContent = '分析JS路由中...';
+    utils.setStatus('ruoyi-analyze-status', '分析JS路由中...');
     if (resultsEl) resultsEl.innerHTML = '';
 
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) return;
+      var tab = await utils.requireTabId();
+      if (!tab) return;
 
       var discoverResults = await utils.execInTab(tab.id, function () {
         if (
@@ -61,13 +59,14 @@ window.VulnKitRuoYi = (function () {
       state.discoveredRoutes = result.discovered || [];
       var extUrls = result.extUrls || [];
 
-      if (statusEl)
-        statusEl.textContent =
-          '发现 ' +
+      utils.setStatus(
+        'ruoyi-analyze-status',
+        '发现 ' +
           state.discoveredRoutes.length +
           ' 条路径，正在扫描外部JS (' +
           extUrls.length +
-          ' 个文件)...';
+          ' 个文件)...'
+      );
 
       var CONCURRENCY = 5;
       var routePattern = /path\s*:\s*['"`](\/[a-zA-Z0-9_\-\/]+)['"`]/g;
@@ -128,9 +127,10 @@ window.VulnKitRuoYi = (function () {
         completedBatches++;
         if (totalBatches > 1) {
           var pct = Math.round((completedBatches / totalBatches) * 100);
-          if (statusEl)
-            statusEl.textContent =
-              '扫描外部JS中... ' + pct + '% (' + completedBatches + '/' + totalBatches + ')';
+          utils.setStatus(
+            'ruoyi-analyze-status',
+            '扫描外部JS中... ' + pct + '% (' + completedBatches + '/' + totalBatches + ')'
+          );
         }
       }
 
@@ -166,8 +166,10 @@ window.VulnKitRuoYi = (function () {
         return pa.localeCompare(pb);
       });
 
-      if (statusEl)
-        statusEl.textContent = '分析完成，发现 ' + state.extraRoutes.length + ' 条额外路由';
+      utils.setStatus(
+        'ruoyi-analyze-status',
+        '分析完成，发现 ' + state.extraRoutes.length + ' 条额外路由'
+      );
       updateWorkflowStep(3);
 
       if (state.extraRoutes.length > 0) {
@@ -220,7 +222,7 @@ window.VulnKitRuoYi = (function () {
           );
       }
     } catch (e) {
-      if (statusEl) statusEl.textContent = '分析出错';
+      utils.setStatus('ruoyi-analyze-status', '分析出错');
       utils.showToast('分析失败: ' + e.message, 'error');
     }
   }
@@ -239,10 +241,9 @@ window.VulnKitRuoYi = (function () {
   // ====== Apply Extra Routes ======
 
   async function applyExtraRoutes() {
-    var statusEl = utils.get('ruoyi-analyze-status');
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) return;
+      var tab = await utils.requireTabId();
+      if (!tab) return;
 
       var selected = [];
       document.querySelectorAll('.ruoyi-route-check:checked').forEach(function (cb) {
@@ -285,8 +286,10 @@ window.VulnKitRuoYi = (function () {
       );
 
       state.extraRoutes = routesToApply;
-      if (statusEl)
-        statusEl.textContent = '已设置 ' + selected.length + ' 条额外路由，刷新页面生效';
+      utils.setStatus(
+        'ruoyi-analyze-status',
+        '已设置 ' + selected.length + ' 条额外路由，刷新页面生效'
+      );
       utils.showToast('已设置 ' + selected.length + ' 条路由，刷新页面即可生效', 'success');
     } catch (e) {
       utils.showToast('应用失败: ' + e.message, 'error');
@@ -295,8 +298,8 @@ window.VulnKitRuoYi = (function () {
 
   async function clearExtraRoutes() {
     try {
-      var tab = await getActiveTab();
-      if (tab && tab.id) {
+      var tab = await utils.requireTabId();
+      if (tab) {
         await utils.execInTab(tab.id, function () {
           if (window.__VK_RUOYI_HOOK__) {
             window.__VK_RUOYI_HOOK__.extraRoutes = [];
@@ -306,9 +309,8 @@ window.VulnKitRuoYi = (function () {
       }
       state.extraRoutes = [];
       state.augmentMode = 'off';
-      var statusEl = utils.get('ruoyi-analyze-status');
       var resultsEl = utils.get('ruoyi-analyze-results');
-      if (statusEl) statusEl.textContent = '';
+      utils.setStatus('ruoyi-analyze-status', '');
       if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('已清除');
       utils.showToast('已清除额外路由', 'info');
     } catch (e) {
@@ -319,8 +321,8 @@ window.VulnKitRuoYi = (function () {
   async function setAugmentMode(mode) {
     state.augmentMode = mode;
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) return;
+      var tab = await utils.requireTabId();
+      if (!tab) return;
       await utils.execInTab(
         tab.id,
         function (m) {
@@ -358,14 +360,11 @@ window.VulnKitRuoYi = (function () {
   var lastProbeResults = [];
 
   async function batchProbeRoutes() {
-    var statusEl = utils.get('ruoyi-probe-progress');
     var resultsEl = utils.get('ruoyi-probe-results');
-    var probeBtn = utils.get('ruoyi-probe-btn');
-    var stopBtn = utils.get('ruoyi-probe-stop-btn');
 
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) {
+      var tab = await utils.requireTabId();
+      if (!tab) {
         utils.showToast('无法获取当前标签页', 'warning');
         return;
       }
@@ -390,8 +389,7 @@ window.VulnKitRuoYi = (function () {
       var timeout = parseInt((utils.get('ruoyi-probe-timeout') || {}).value || '5000', 10);
       var followRedirect = (utils.get('ruoyi-probe-follow-redirect') || {}).checked !== false;
 
-      if (probeBtn) probeBtn.disabled = true;
-      if (stopBtn) stopBtn.disabled = false;
+      utils.toggleBtnPair('ruoyi-probe-btn', 'ruoyi-probe-stop-btn', true);
       probeAbortFlag = false;
 
       var results = [];
@@ -427,30 +425,31 @@ window.VulnKitRuoYi = (function () {
             redirected: (val && val.redirected) || false,
           });
           completed++;
-          if (statusEl)
-            statusEl.textContent =
-              '探测中... ' +
+          utils.setStatus(
+            'ruoyi-probe-progress',
+            '探测中... ' +
               completed +
               '/' +
               paths.length +
               ' (' +
               Math.round((completed / paths.length) * 100) +
-              '%)';
+              '%)'
+          );
         }
       }
 
-      if (probeBtn) probeBtn.disabled = false;
-      if (stopBtn) stopBtn.disabled = true;
-      if (statusEl)
-        statusEl.textContent = probeAbortFlag
+      utils.toggleBtnPair('ruoyi-probe-btn', 'ruoyi-probe-stop-btn', false);
+      utils.setStatus(
+        'ruoyi-probe-progress',
+        probeAbortFlag
           ? '已停止 (' + completed + '/' + paths.length + ')'
-          : '完成 (' + completed + '/' + paths.length + ')';
+          : '完成 (' + completed + '/' + paths.length + ')'
+      );
 
       lastProbeResults = results.slice();
       renderProbeResults(results, resultsEl);
     } catch (e) {
-      if (probeBtn) probeBtn.disabled = false;
-      if (stopBtn) stopBtn.disabled = true;
+      utils.toggleBtnPair('ruoyi-probe-btn', 'ruoyi-probe-stop-btn', false);
       utils.showToast('探测失败: ' + e.message, 'error');
     }
   }
@@ -541,8 +540,8 @@ window.VulnKitRuoYi = (function () {
     var countEl = utils.get('ruoyi-traffic-count');
     var listEl = utils.get('ruoyi-traffic-list');
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) return;
+      var tab = await utils.requireTabId();
+      if (!tab) return;
 
       var results = await utils.execInTab(tab.id, function () {
         var hook = window.__VK_RUOYI_HOOK__;
@@ -603,8 +602,8 @@ window.VulnKitRuoYi = (function () {
     if (listEl)
       listEl.innerHTML = utils.emptyHtml('安装路由钩子并浏览页面后，此处显示捕获的API请求');
     if (countEl) countEl.textContent = '';
-    getActiveTab().then(function (tab) {
-      if (!tab || !tab.id) return;
+    utils.requireTabId().then(function (tab) {
+      if (!tab) return;
       utils.execInTab(tab.id, function () {
         if (window.__VK_RUOYI_HOOK__) window.__VK_RUOYI_HOOK__.apiLog = [];
       });
@@ -612,9 +611,10 @@ window.VulnKitRuoYi = (function () {
   }
 
   function exportApiTraffic() {
-    getActiveTab()
+    utils
+      .requireTabId()
       .then(function (tab) {
-        if (!tab || !tab.id) return;
+        if (!tab) return;
         return utils.execInTab(tab.id, function () {
           return (window.__VK_RUOYI_HOOK__ && window.__VK_RUOYI_HOOK__.apiLog) || [];
         });

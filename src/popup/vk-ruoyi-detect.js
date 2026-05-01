@@ -39,15 +39,14 @@ window.VulnKitRuoYiDetect = (function () {
   // ====== Framework Detection ======
 
   async function detectRuoYi() {
-    var statusEl = utils.get('ruoyi-status');
     var resultsEl = utils.get('ruoyi-results');
-    if (statusEl) statusEl.textContent = '检测中...';
+    utils.setStatus('ruoyi-status', '检测中...');
     if (resultsEl) resultsEl.innerHTML = '';
 
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) {
-        if (statusEl) statusEl.textContent = '无法获取当前标签页';
+      var tab = await utils.requireTabId();
+      if (!tab) {
+        utils.setStatus('ruoyi-status', '无法获取当前标签页');
         return;
       }
 
@@ -228,8 +227,7 @@ window.VulnKitRuoYiDetect = (function () {
         }
 
         if (resultsEl) resultsEl.innerHTML = html;
-        if (statusEl)
-          statusEl.textContent = '检测到 RuoYi 框架 (' + data.evidence.length + ' 个特征)';
+        utils.setStatus('ruoyi-status', '检测到 RuoYi 框架 (' + data.evidence.length + ' 个特征)');
         utils.showToast('检测到 RuoYi 框架', 'success');
 
         setTimeout(function () {
@@ -243,15 +241,15 @@ window.VulnKitRuoYiDetect = (function () {
             '疑似 RuoYi (' + data.evidence.length + ' 个特征)',
             data.evidence
           );
-        if (statusEl) statusEl.textContent = '疑似 RuoYi (' + data.evidence.length + ' 个特征)';
+        utils.setStatus('ruoyi-status', '疑似 RuoYi (' + data.evidence.length + ' 个特征)');
       } else {
         updateWorkflowStep(0);
         if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('当前页面未检测到 RuoYi 框架特征');
-        if (statusEl) statusEl.textContent = '未检测到 RuoYi';
+        utils.setStatus('ruoyi-status', '未检测到 RuoYi');
       }
     } catch (e) {
       updateWorkflowStep(0);
-      if (statusEl) statusEl.textContent = '检测出错';
+      utils.setStatus('ruoyi-status', '检测出错');
       utils.showToast('检测失败: ' + e.message, 'error');
     }
   }
@@ -259,7 +257,6 @@ window.VulnKitRuoYiDetect = (function () {
   // ====== Auto Capture ======
 
   async function autoCaptureRoutes(tabId, hasToken) {
-    var hookStatusEl = utils.get('ruoyi-hook-status');
     var panelEl = utils.get('ruoyi-captured-panel');
     try {
       var checkResult = await utils.execInTab(tabId, function () {
@@ -272,7 +269,7 @@ window.VulnKitRuoYiDetect = (function () {
       var status = utils.execResult(checkResult);
 
       if (status && status.captured) {
-        if (hookStatusEl) hookStatusEl.textContent = '已捕获路由数据 (被动捕获模式)';
+        utils.setStatus('ruoyi-hook-status', '已捕获路由数据 (被动捕获模式)');
         await fetchCapturedRoutes();
         return;
       }
@@ -319,20 +316,17 @@ window.VulnKitRuoYiDetect = (function () {
               },
               { args: [resp.body] }
             );
-            if (hookStatusEl) hookStatusEl.textContent = '已主动获取路由数据';
+            utils.setStatus('ruoyi-hook-status', '已主动获取路由数据');
             await fetchCapturedRoutes();
             return;
           }
         }
       }
 
-      if (hookStatusEl) {
-        if (hasToken) {
-          hookStatusEl.textContent = '钩子已注入，正在监听 /getRouters...';
-        } else {
-          hookStatusEl.textContent = '请先登录 RuoYi 系统，钩子将自动捕获路由';
-        }
-      }
+      utils.setStatus(
+        'ruoyi-hook-status',
+        hasToken ? '钩子已注入，正在监听 /getRouters...' : '请先登录 RuoYi 系统，钩子将自动捕获路由'
+      );
       if (panelEl) {
         panelEl.innerHTML = utils.emptyHtml(
           hasToken
@@ -341,7 +335,7 @@ window.VulnKitRuoYiDetect = (function () {
         );
       }
     } catch (e) {
-      if (hookStatusEl) hookStatusEl.textContent = '自动捕获检查失败: ' + e.message;
+      utils.setStatus('ruoyi-hook-status', '自动捕获检查失败: ' + e.message);
     }
   }
 
@@ -365,8 +359,8 @@ window.VulnKitRuoYiDetect = (function () {
   async function fetchCapturedRoutes() {
     var panelEl = utils.get('ruoyi-captured-panel');
     try {
-      var tab = await getActiveTab();
-      if (!tab || !tab.id) return;
+      var tab = await utils.requireTabId();
+      if (!tab) return;
 
       var results = await utils.execInTab(tab.id, function () {
         if (!window.__VK_RUOYI_HOOK__ || !window.__VK_RUOYI_HOOK__.capturedRouters) return null;
