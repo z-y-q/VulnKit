@@ -52,20 +52,12 @@ window.VulnKitAsset = (function () {
     return json;
   }
 
+  var ASSET_FILTER_FIELDS = ['host', 'port', 'protocol', 'title'];
+
   function renderAssetResults(data) {
     var filtered = data || lastAssetResults || [];
     if (currentSearchFilter && filtered.length > 0) {
-      var lower = currentSearchFilter.toLowerCase();
-      filtered = filtered.filter(function (item) {
-        return (
-          (item.host || '').toLowerCase().indexOf(lower) !== -1 ||
-          String(item.port || '')
-            .toLowerCase()
-            .indexOf(lower) !== -1 ||
-          (item.protocol || '').toLowerCase().indexOf(lower) !== -1 ||
-          (item.title || '').toLowerCase().indexOf(lower) !== -1
-        );
-      });
+      filtered = utils.filterByQuery(filtered, currentSearchFilter, ASSET_FILTER_FIELDS);
     }
 
     const container = utils.get('asset-results');
@@ -124,17 +116,7 @@ window.VulnKitAsset = (function () {
     }
     var data = lastAssetResults;
     if (currentSearchFilter) {
-      var lower = currentSearchFilter.toLowerCase();
-      data = data.filter(function (item) {
-        return (
-          (item.host || '').toLowerCase().indexOf(lower) !== -1 ||
-          String(item.port || '')
-            .toLowerCase()
-            .indexOf(lower) !== -1 ||
-          (item.protocol || '').toLowerCase().indexOf(lower) !== -1 ||
-          (item.title || '').toLowerCase().indexOf(lower) !== -1
-        );
-      });
+      data = utils.filterByQuery(data, currentSearchFilter, ASSET_FILTER_FIELDS);
     }
     var rows = data.map(function (item) {
       return [item.host, String(item.port || ''), item.protocol, item.title];

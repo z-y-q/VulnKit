@@ -6,37 +6,8 @@ window.VulnKitRuoYiMar = (function () {
   var state = null;
   var common = window.VulnKitRuoYiCommon;
   var utils = common ? common.utils : {};
-
-  // Shared findRouter() body — used inside execInTab callbacks (runs in page context)
-  var FIND_ROUTER_BODY = [
-    'if (window.__vue_app__) {',
-    '  try {',
-    '    var cfg = window.__vue_app__.config;',
-    '    if (cfg && cfg.globalProperties && cfg.globalProperties.$router) return cfg.globalProperties.$router;',
-    '  } catch (e) {}',
-    '}',
-    "var selectors = ['#app', '[data-v-app]', '.app-wrapper', '#app-main'];",
-    'for (var si = 0; si < selectors.length; si++) {',
-    '  var els = document.querySelectorAll(selectors[si]);',
-    '  for (var ei = 0; ei < els.length; ei++) {',
-    '    var el = els[ei];',
-    '    if (el.__vue_app__) {',
-    '      try { var r = el.__vue_app__.config.globalProperties.$router; if (r) return r; } catch (e) {}',
-    '    }',
-    '    if (el.__vue__) {',
-    '      var r2 = el.__vue__.$router || (el.__vue__.$root && el.__vue__.$root.$router);',
-    '      if (r2) return r2;',
-    '    }',
-    '  }',
-    '}',
-    "var allEls = document.querySelectorAll('*');",
-    'for (var ai = 0; ai < allEls.length; ai++) {',
-    '  var ael = allEls[ai];',
-    '  if (ael.__vue__ && ael.__vue__.$router) return ael.__vue__.$router;',
-    '  if (ael.__vue__ && ael.__vue__.$root && ael.__vue__.$root.$router) return ael.__vue__.$root.$router;',
-    '}',
-    'return null;',
-  ].join('\n');
+  var commonToggleAll = common ? common.toggleSelectAll : null;
+  var commonCopyPaths = common ? common.copyRoutePaths : null;
 
   // RuoYi standard route dictionary
   var RUOYI_KNOWN_ROUTES = [
@@ -519,8 +490,9 @@ window.VulnKitRuoYiMar = (function () {
       // Step 1: Check if Vue Router exists
       var pageState =
         (await utils.execInTabData(tab.id, function () {
-          var findRouter = new Function(FIND_ROUTER_BODY);
-          var router = findRouter();
+          var hook = window.__VK_RUOYI_HOOK__;
+          var router =
+            hook && typeof hook.findVueRouter === 'function' ? hook.findVueRouter() : null;
           return {
             hasVue: !!window.Vue || !!window.__vue_app__,
             hasRouter: !!router,
@@ -562,104 +534,16 @@ window.VulnKitRuoYiMar = (function () {
         return;
       }
 
-      // Step 2: Vue Router found — inject routes
+      // Step 2: Vue Router found — inject routes via hook
       var result =
         (await utils.execInTabData(
           tab.id,
           function (routes) {
-            var result = {
-              injected: 0,
-              skipped: 0,
-              errors: [],
-              routerFound: false,
-              routerMode: '',
-            };
-
-            var findRouter = new Function(FIND_ROUTER_BODY);
-            var router = findRouter();
-            if (!router) {
-              result.errors.push('Vue Router 消失了');
-              return result;
+            var hook = window.__VK_RUOYI_HOOK__;
+            if (hook && typeof hook.injectRoutesToVueRouter === 'function') {
+              return hook.injectRoutesToVueRouter(routes);
             }
-
-            result.routerFound = true;
-            result.routerMode = router.mode || 'unknown';
-
-            var loadView = null;
-            if (typeof window.loadView === 'function') loadView = window.loadView;
-            if (!loadView && typeof window.loadComponent === 'function')
-              loadView = window.loadComponent;
-
-            var existingPaths = {};
-            try {
-              var currentRoutes = router.getRoutes ? router.getRoutes() : [];
-              currentRoutes.forEach(function (r) {
-                if (r.path) existingPaths[r.path] = true;
-              });
-            } catch (e) {}
-
-            routes.forEach(function (route) {
-              try {
-                var path = route.path;
-                if (!path || existingPaths[path]) {
-                  result.skipped++;
-                  return;
-                }
-
-                var routeObj = {
-                  path: path,
-                  name: route.name || path.replace(/^\/+/, '').replace(/\//g, '-'),
-                  meta: route.meta || {},
-                };
-
-                if (route.component && typeof route.component === 'string') {
-                  if (loadView) {
-                    try {
-                      routeObj.component = loadView(route.component);
-                    } catch (e) {
-                      routeObj.component = {
-                        template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
-                      };
-                    }
-                  } else {
-                    try {
-                      var viewPath = route.component;
-                      if (!/^views\//i.test(viewPath)) viewPath = 'views/' + viewPath;
-                      routeObj.component = function () {
-                        return import('@/' + viewPath + '.vue').catch(function () {
-                          return {
-                            template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
-                          };
-                        });
-                      };
-                    } catch (e) {
-                      routeObj.component = {
-                        template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
-                      };
-                    }
-                  }
-                } else {
-                  routeObj.component = {
-                    template: '<div style="padding:20px"><h3>' + path + '</h3></div>',
-                  };
-                }
-
-                if (typeof router.addRoute === 'function') {
-                  router.addRoute(routeObj);
-                } else if (typeof router.addRoutes === 'function') {
-                  router.addRoutes([routeObj]);
-                } else {
-                  result.errors.push('No addRoute/addRoutes method');
-                  return;
-                }
-                result.injected++;
-                existingPaths[path] = true;
-              } catch (e) {
-                result.errors.push((route.path || '?') + ': ' + e.message);
-              }
-            });
-
-            return result;
+            return { injected: 0, skipped: 0, errors: ['Hook not available'], routerFound: false };
           },
           { args: [routesToInject] }
         )) || {};
@@ -683,29 +567,11 @@ window.VulnKitRuoYiMar = (function () {
   }
 
   function marToggleSelectAll() {
-    var checks = document.querySelectorAll('.mar-route-check');
-    var allChecked =
-      checks.length > 0 &&
-      Array.from(checks).every(function (cb) {
-        return cb.checked;
-      });
-    checks.forEach(function (cb) {
-      cb.checked = !allChecked;
-    });
+    commonToggleAll('.mar-route-check');
   }
 
   function marCopyHiddenPaths() {
-    var marHiddenRoutes = state ? state.marHiddenRoutes : [];
-    if (marHiddenRoutes.length === 0) {
-      utils.showToast('没有隐藏路由', 'warning');
-      return;
-    }
-    var paths = marHiddenRoutes
-      .map(function (r) {
-        return r.path || r.component;
-      })
-      .join('\n');
-    utils.copyAndToast(paths, '已复制 ' + marHiddenRoutes.length + ' 条路径');
+    commonCopyPaths(state ? state.marHiddenRoutes : [], '没有隐藏路由');
   }
 
   // ====== Init ======

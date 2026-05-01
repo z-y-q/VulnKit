@@ -11,11 +11,145 @@ window.VulnKitSourcemap = (function () {
   let sourcemapTabId = null;
   let sourcemapMapCache = {};
 
+  var SM_SECURITY_RULES = [
+    ['AWS Access Key', /AKIA[0-9A-Z]{16}/g, 'critical'],
+    [
+      'AWS Secret Key',
+      /(?:aws[_-]?secret[_-]?access[_-]?key|AWS_SECRET_ACCESS_KEY)\s*[:=]\s*['"]([A-Za-z0-9/+=]{40})['"]/gi,
+      'critical',
+    ],
+    ['GitHub Token', /gh[pousr]_[A-Za-z0-9_]{36,255}/g, 'critical'],
+    ['Stripe Secret Key', /sk_live_[0-9a-zA-Z]{24,}/g, 'critical'],
+    ['Stripe Publishable Key', /pk_live_[0-9a-zA-Z]{24,}/g, 'high'],
+    ['Slack Token', /xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,}/g, 'critical'],
+    [
+      'Slack Webhook',
+      /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[a-zA-Z0-9]+/g,
+      'high',
+    ],
+    ['Google API Key', /AIza[0-9A-Za-z\-_]{35}/g, 'high'],
+    ['Google OAuth Token', /ya29\.[0-9A-Za-z\-_]+/g, 'high'],
+    ['SendGrid API Key', /SG\.[A-Za-z0-9\-_]{22}\.[A-Za-z0-9\-_]{43}/g, 'critical'],
+    ['Twilio API Key', /SK[0-9a-fA-F]{32}/g, 'critical'],
+    [
+      '数据库连接串',
+      /(?:mongodb|mysql|postgres|postgresql|redis|ftp|smtp|ssh|amqp):\/\/[^\s'"]+/gi,
+      'critical',
+    ],
+    ['MongoDB URI', /mongodb(?:\+srv)?:\/\/[^\s'"]+/gi, 'critical'],
+    ['私钥 (RSA/EC/DSA)', /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/g, 'critical'],
+    [
+      'API 密钥泄露',
+      /(?:api[_-]?key|apikey|secret[_-]?key|app[_-]?key|app[_-]?secret)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
+      'high',
+    ],
+    ['硬编码密码', /(?:password|passwd|pwd|pass[_-]?word)\s*[:=]\s*['"]([^'"]{4,})['"]/gi, 'high'],
+    [
+      'JWT Secret',
+      /(?:jwt[_-]?secret|token[_-]?secret|jwt[_-]?key)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
+      'high',
+    ],
+    [
+      'Authorization Header',
+      /(?:Authorization|Bearer)\s*[:=]\s*['"](?:Bearer\s+)?([A-Za-z0-9\-_.~+/]+=*)['"]/gi,
+      'high',
+    ],
+    [
+      'OAuth Client Secret',
+      /(?:client[_-]?secret|oauth[_-]?secret)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
+      'high',
+    ],
+    [
+      'Heroku API Key',
+      /(?:heroku|HEROKU)\s*[:=]\s*['"]([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})['"]/gi,
+      'high',
+    ],
+    ['Firebase URL', /https:\/\/[a-z0-9-]+\.firebaseio\.com/gi, 'high'],
+    ['Shopify Token', /shpat_[a-fA-F0-9]{32}/g, 'high'],
+    ['PayPal Braintree Token', /access_token\$production\$[0-9a-z]{16}\$[0-9a-f]{32}/g, 'high'],
+    [
+      '内部IP地址',
+      /(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})/g,
+      'medium',
+    ],
+    [
+      'Internal Domain',
+      /(?:https?:\/\/)?(?:[a-z0-9-]+\.)?(?:internal|intranet|staging|dev|test|local|corp)\.[a-z0-9-]+/gi,
+      'high',
+    ],
+    ['eval() 使用', /eval\s*\(/g, 'medium'],
+    ['innerHTML 赋值', /innerHTML\s*=/g, 'medium'],
+    ['document.write', /document\.write\s*\(/g, 'medium'],
+    ['CORS 通配符', /Access-Control-Allow-Origin['"]\s*[:=]\s*['"]\*['"]/gi, 'medium'],
+    ['CSP 禁用', /Content-Security-Policy['"]\s*[:=]\s*['"]unsafe/gi, 'medium'],
+    ['路径穿越', /\.\.[\/\\]/g, 'medium'],
+    ['XXE 风险', /DOMParser|xmlHttpRequest|\.parseFromString/gi, 'medium'],
+    ['命令拼接风险', /(?:exec|execSync|spawn|child_process)\s*\(/g, 'medium'],
+    [
+      'SQL 拼接',
+      /(?:SELECT|INSERT|UPDATE|DELETE|DROP)\s+.*\+\s*(?:req|params|query|body)/gi,
+      'medium',
+    ],
+    ['unsafe eval (CSP)', /unsafe-eval/gi, 'medium'],
+    ['window.location 赋值', /(?:window\.)?location\s*=\s*[^=]/g, 'low'],
+    ['postMessage 无 origin 校验', /postMessage\s*\([^)]*\)/g, 'medium'],
+    [
+      'localStorage 敏感数据',
+      /localStorage\.(?:setItem|set)\s*\(\s*['"](?:token|auth|session|password|secret|key)/gi,
+      'medium',
+    ],
+    ['调试代码 (console.log)', /console\.(?:log|debug|info)\s*\(/g, 'low'],
+    [
+      'localStorage/sessionStorage',
+      /(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)/g,
+      'low',
+    ],
+    ['document.cookie', /document\.cookie/g, 'low'],
+    ['调试断点 (debugger)', /debugger\s*;/g, 'low'],
+    ['TODO/FIXME/HACK', /(?:TODO|FIXME|HACK|XXX|BUG)\s*[:\(]/gi, 'info'],
+    ['Swagger/OpenAPI 端点', /['"]\/(?:swagger|api-docs|openapi|graphql)(?:\/)?['"]/gi, 'info'],
+    [
+      'Spring Actuator',
+      /['"]\/(?:actuator|env|health|metrics|trace|beans|mappings)(?:\/)?['"]/gi,
+      'info',
+    ],
+    [
+      '备份文件路径',
+      /['"](?:backup|\.bak|\.old|\.orig|\.save|\.tar|\.zip|\.sql|\.dump)['"]/gi,
+      'info',
+    ],
+    ['.git 暴露', /['"]\/\.git(?:\/|['"])/g, 'high'],
+    ['测试文件', /['"](?:test|spec|mock|fixture|stub)s?['"]/gi, 'info'],
+    ['环境配置引用', /process\.env\.[A-Z_]+/g, 'info'],
+  ];
+
   var SOURCE_TYPE_LABELS = {
     runtime: 'Webpack 运行时',
     sourcemap: 'Source Map',
     chunk: 'JS 文件解析',
   };
+
+  var SM_MAX_SCRIPTS_SCAN = 15;
+  var SM_MAX_MAPS_PARSE = 20;
+  var SM_MAX_CHUNK_SAMPLES = 50;
+  var SM_MAX_JS_FALLBACK = 10;
+  var SM_MAX_OTHER_BUNDLES = 3;
+  var SM_MAX_MODULES = 2000;
+  var SM_MAX_FINDINGS = 200;
+  var SM_MAX_LABEL_LEN = 40;
+  var SM_MAX_MATCH_LEN = 60;
+  var SM_MAX_INLINE_SCRIPT = 500000;
+
+  function smSingleFetch(url, tailOnly) {
+    return chrome.runtime
+      .sendMessage({ type: 'FETCH_URL', url: url, tailOnly: tailOnly })
+      .then(function (r) {
+        return r && !r.error ? r.data : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
 
   async function smBatchFetch(urls, tailOnly, tabId) {
     var concurrency = tailOnly ? 10 : 5;
@@ -28,14 +162,7 @@ window.VulnKitSourcemap = (function () {
       } else {
         batchResults = await Promise.all(
           batch.map(function (url) {
-            return chrome.runtime
-              .sendMessage({ type: 'FETCH_URL', url: url, tailOnly: tailOnly })
-              .then(function (r) {
-                return r && !r.error ? r.data : null;
-              })
-              .catch(function () {
-                return null;
-              });
+            return smSingleFetch(url, tailOnly);
           })
         );
       }
@@ -78,14 +205,7 @@ window.VulnKitSourcemap = (function () {
     }
     return Promise.all(
       urls.map(function (url) {
-        return chrome.runtime
-          .sendMessage({ type: 'FETCH_URL', url: url, tailOnly: tailOnly })
-          .then(function (r) {
-            return r && !r.error ? r.data : null;
-          })
-          .catch(function () {
-            return null;
-          });
+        return smSingleFetch(url, tailOnly);
       })
     );
   }
@@ -96,6 +216,68 @@ window.VulnKitSourcemap = (function () {
     } catch (e) {
       return relative;
     }
+  }
+
+  function smParseMapToModules(mapText, mapUrl, idPrefix, allModules, sourceCache, mapCache) {
+    try {
+      var mapJson = JSON.parse(mapText);
+      if (mapCache) mapCache[mapUrl] = mapJson;
+      var sources = mapJson.sources || [];
+      var content = mapJson.sourcesContent || [];
+      for (var i = 0; i < sources.length; i++) {
+        var srcPath = sources[i];
+        if (srcPath.indexOf('webpack://') === 0) srcPath = srcPath.replace('webpack://', '');
+        var exists = false;
+        for (var e = 0; e < allModules.length; e++) {
+          if (allModules[e].path === srcPath) {
+            exists = true;
+            break;
+          }
+        }
+        if (!exists) {
+          var resolved = content[i] !== undefined && content[i] !== null;
+          var mod = {
+            id: idPrefix + i,
+            path: srcPath,
+            deps: [],
+            source: 'sourcemap',
+            resolved: resolved,
+            sourceUrl: mapUrl,
+          };
+          if (resolved) sourceCache[srcPath] = content[i];
+          allModules.push(mod);
+        }
+      }
+    } catch (e) {
+      // skip invalid source map
+    }
+  }
+
+  function smAddDiscoveredChunk(chunkUrl, chunkId, chunkList, excludeUrls) {
+    if (excludeUrls && excludeUrls.indexOf(chunkUrl) !== -1) return;
+    for (var i = 0; i < chunkList.length; i++) {
+      if (chunkList[i].url === chunkUrl) return;
+    }
+    chunkList.push({ chunkId: chunkId, url: chunkUrl });
+  }
+
+  function smParseHashPairs(text, regex) {
+    var map = {};
+    var m;
+    while ((m = regex.exec(text)) !== null) {
+      map[m[1]] = m[2];
+    }
+    return map;
+  }
+
+  function smExtractWebpackPublicPath(code) {
+    if (!code) return null;
+    var m = code.match(/\.p\s*=\s*"([^"]*\/)"/);
+    if (m) return m[1];
+    m = code.match(/__webpack_require__\.p\s*=\s*"([^"]+)"/);
+    if (m) return m[1];
+    m = code.match(/__webpack_public_path__\s*=\s*"([^"]+)"/);
+    return m ? m[1] : null;
   }
 
   function smUpdateProgress(percent, activePhase) {
@@ -726,7 +908,11 @@ window.VulnKitSourcemap = (function () {
       if (scriptUrls.length > 0 && sourceMapUrls.length < 5) {
         statusEl.textContent =
           'Phase 2: 解析脚本 Source Map URL (' + scriptUrls.length + ' 个文件)...';
-        var scriptContents = await smBatchFetch(scriptUrls.slice(0, 15), false, tab.id);
+        var scriptContents = await smBatchFetch(
+          scriptUrls.slice(0, SM_MAX_SCRIPTS_SCAN),
+          false,
+          tab.id
+        );
         for (var si = 0; si < scriptContents.length; si++) {
           if (!scriptContents[si]) continue;
           var content = scriptContents[si];
@@ -747,43 +933,21 @@ window.VulnKitSourcemap = (function () {
       if (sourceMapUrls.length > 0) {
         statusEl.textContent = 'Phase 2: 解析 ' + sourceMapUrls.length + ' 个 Source Map 文件...';
         smUpdateProgress(50, 2);
-        var mapContents = await smBatchFetch(sourceMapUrls.slice(0, 20), false, tab.id);
+        var mapContents = await smBatchFetch(
+          sourceMapUrls.slice(0, SM_MAX_MAPS_PARSE),
+          false,
+          tab.id
+        );
         for (var mi = 0; mi < mapContents.length; mi++) {
           if (!mapContents[mi]) continue;
-          try {
-            var mapJson = JSON.parse(mapContents[mi]);
-            sourcemapMapCache[sourceMapUrls[mi]] = mapJson;
-            var sources = mapJson.sources || [];
-            var sourcesContent = mapJson.sourcesContent || [];
-            var mapBaseUrl = sourceMapUrls[mi].substring(0, sourceMapUrls[mi].lastIndexOf('/') + 1);
-            for (var sIdx = 0; sIdx < sources.length; sIdx++) {
-              var srcPath = sources[sIdx];
-              // Normalize webpack:// prefix
-              if (srcPath.indexOf('webpack://') === 0) srcPath = srcPath.replace('webpack://', '');
-              var existingPath = false;
-              for (var ep = 0; ep < allModules.length; ep++) {
-                if (allModules[ep].path === srcPath) {
-                  existingPath = true;
-                  break;
-                }
-              }
-              if (!existingPath) {
-                var resolved = sourcesContent[sIdx] !== undefined && sourcesContent[sIdx] !== null;
-                var mod = {
-                  id: 'sm-' + sIdx,
-                  path: srcPath,
-                  deps: [],
-                  source: 'sourcemap',
-                  resolved: resolved,
-                  sourceUrl: sourceMapUrls[mi],
-                };
-                if (resolved) sourcemapSourceCache[srcPath] = sourcesContent[sIdx];
-                allModules.push(mod);
-              }
-            }
-          } catch (parseErr) {
-            // skip invalid source map
-          }
+          smParseMapToModules(
+            mapContents[mi],
+            sourceMapUrls[mi],
+            'sm-',
+            allModules,
+            sourcemapSourceCache,
+            sourcemapMapCache
+          );
         }
       }
 
@@ -870,22 +1034,18 @@ window.VulnKitSourcemap = (function () {
                 var mappingObj = uFuncMatch[1].match(/\{[^{}]+\}/g);
                 if (mappingObj) {
                   var chunkIdToHash = {};
+                  var _hashPairRe = /(\d+)\s*:\s*"([a-f0-9]{4,})"/g;
                   mappingObj.forEach(function (obj) {
-                    var pairs = obj.match(/(\d+)\s*:\s*"([a-f0-9]{4,})"/g);
-                    if (pairs) {
-                      pairs.forEach(function (p) {
-                        var kv = p.match(/(\d+)\s*:\s*"([a-f0-9]{4,})"/);
-                        if (kv) chunkIdToHash[kv[1]] = kv[2];
-                      });
-                    }
+                    var parsed = smParseHashPairs(obj, _hashPairRe);
+                    Object.keys(parsed).forEach(function (k) {
+                      chunkIdToHash[k] = parsed[k];
+                    });
                   });
                   var returnMatch = uFuncMatch[1].match(/return\s+["']([^"']*\/)["']/);
                   var urlPrefix = returnMatch ? returnMatch[1] : '';
-                  var ppMatch1 = rc.match(/\.p\s*=\s*"([^"]*\/)"/);
-                  if (!ppMatch1) ppMatch1 = rc.match(/__webpack_require__\.p\s*=\s*"([^"]+)"/);
-                  if (!ppMatch1) ppMatch1 = rc.match(/__webpack_public_path__\s*=\s*"([^"]+)"/);
+                  var ppMatch1 = smExtractWebpackPublicPath(rc);
                   var finalBase = ppMatch1
-                    ? smResolveUrl(ppMatch1[1], tab.url)
+                    ? smResolveUrl(ppMatch1, tab.url)
                     : urlPrefix
                       ? smResolveUrl(urlPrefix, rcBase)
                       : rcBase;
@@ -898,12 +1058,7 @@ window.VulnKitSourcemap = (function () {
                       '.' +
                       hash +
                       '.js';
-                    if (scriptUrls.indexOf(chunkUrl) === -1) {
-                      var dup = discoveredChunkUrls.some(function (cu) {
-                        return cu.url === chunkUrl;
-                      });
-                      if (!dup) discoveredChunkUrls.push({ chunkId: cid, url: chunkUrl });
-                    }
+                    smAddDiscoveredChunk(chunkUrl, cid, discoveredChunkUrls, scriptUrls);
                   });
                 }
               } catch (e) {}
@@ -914,18 +1069,15 @@ window.VulnKitSourcemap = (function () {
               var hashMaps = rc.match(/\{[^\{\}]{10,}?"?\d+"?\s*:\s*"[a-f0-9]{4,}"[^\{\}]*?\}/g);
               if (hashMaps) {
                 var tempChunkMap = {};
+                var _broadPairRe = /"?(\d+)"?\s*:\s*"([a-f0-9]{4,})"/g;
                 hashMaps.forEach(function (hm) {
-                  var pairs = hm.match(/"?(\d+)"?\s*:\s*"([a-f0-9]{4,})"/g);
-                  if (pairs) {
-                    pairs.forEach(function (pair) {
-                      var kv = pair.match(/"?(\d+)"?\s*:\s*"([a-f0-9]{4,})"/);
-                      if (kv) tempChunkMap[kv[1]] = kv[2];
-                    });
-                  }
+                  var parsed = smParseHashPairs(hm, _broadPairRe);
+                  Object.keys(parsed).forEach(function (k) {
+                    tempChunkMap[k] = parsed[k];
+                  });
                 });
                 if (Object.keys(tempChunkMap).length > 2) {
-                  var ppMatch2 = rc.match(/\.p\s*=\s*"([^"]*\/)"/);
-                  if (!ppMatch2) ppMatch2 = rc.match(/__webpack_require__\.p\s*=\s*"([^"]+)"/);
+                  var ppMatch2 = smExtractWebpackPublicPath(rc);
                   var prefixMatch2 = rc.match(/return\s+["']([^"']*\/)["']/);
                   var urlPrefix2 = prefixMatch2 ? prefixMatch2[1] : '';
                   var hasPublicPath2 = !!ppMatch2;
@@ -938,12 +1090,7 @@ window.VulnKitSourcemap = (function () {
                     var hash = tempChunkMap[cid];
                     var chunkUrl =
                       (hasPublicPath2 ? base2 + urlPrefix2 : base2) + cid + '.' + hash + '.js';
-                    if (scriptUrls.indexOf(chunkUrl) === -1) {
-                      var dup = discoveredChunkUrls.some(function (cu) {
-                        return cu.url === chunkUrl;
-                      });
-                      if (!dup) discoveredChunkUrls.push({ chunkId: cid, url: chunkUrl });
-                    }
+                    smAddDiscoveredChunk(chunkUrl, cid, discoveredChunkUrls, scriptUrls);
                   });
                 }
               }
@@ -955,13 +1102,12 @@ window.VulnKitSourcemap = (function () {
               chunkNameRefs.forEach(function (ref) {
                 var nameMatch = ref.match(/["']([\w.-]+\.[a-f0-9]{6,}\.js)["']/);
                 if (nameMatch) {
-                  var fullRef = rcBase + nameMatch[1];
-                  if (scriptUrls.indexOf(fullRef) === -1) {
-                    var dup = discoveredChunkUrls.some(function (cu) {
-                      return cu.url === fullRef;
-                    });
-                    if (!dup) discoveredChunkUrls.push({ chunkId: 'ref', url: fullRef });
-                  }
+                  smAddDiscoveredChunk(
+                    rcBase + nameMatch[1],
+                    'ref',
+                    discoveredChunkUrls,
+                    scriptUrls
+                  );
                 }
               });
             }
@@ -974,7 +1120,11 @@ window.VulnKitSourcemap = (function () {
                 );
               });
               if (otherBundles.length > 0) {
-                var bundleContents = await smBatchFetch(otherBundles.slice(0, 3), false, tab.id);
+                var bundleContents = await smBatchFetch(
+                  otherBundles.slice(0, SM_MAX_OTHER_BUNDLES),
+                  false,
+                  tab.id
+                );
                 for (var bi = 0; bi < bundleContents.length; bi++) {
                   if (!bundleContents[bi]) continue;
                   // Dynamic imports: import("./chunk-xxx.hash.js")
@@ -990,12 +1140,7 @@ window.VulnKitSourcemap = (function () {
                           otherBundles[bi].lastIndexOf('/') + 1
                         );
                         var fullImp = bundleBase + nameMatch[1];
-                        if (scriptUrls.indexOf(fullImp) === -1) {
-                          var dup = discoveredChunkUrls.some(function (cu) {
-                            return cu.url === fullImp;
-                          });
-                          if (!dup) discoveredChunkUrls.push({ chunkId: 'import', url: fullImp });
-                        }
+                        smAddDiscoveredChunk(fullImp, 'import', discoveredChunkUrls, scriptUrls);
                       }
                     });
                   }
@@ -1005,11 +1150,10 @@ window.VulnKitSourcemap = (function () {
                     chunkERefs.forEach(function (ref) {
                       var idMatch = ref.match(/\.e\s*\(\s*(\d+)\s*\)/);
                       if (idMatch) {
-                        var eid = idMatch[1];
-                        var dup = discoveredChunkUrls.some(function (cu) {
-                          return cu.chunkId === eid;
+                        var hasEid = discoveredChunkUrls.some(function (cu) {
+                          return cu.chunkId === idMatch[1];
                         });
-                        if (!dup) discoveredChunkUrls.push({ chunkId: eid, url: null });
+                        if (!hasEid) discoveredChunkUrls.push({ chunkId: idMatch[1], url: null });
                       }
                     });
                   }
@@ -1052,7 +1196,11 @@ window.VulnKitSourcemap = (function () {
         });
 
         // Tail-fetch chunks (up to 50) to find sourceMappingURL
-        var chunkSamples = await smBatchFetch(chunkFetchUrls.slice(0, 50), true, tab.id);
+        var chunkSamples = await smBatchFetch(
+          chunkFetchUrls.slice(0, SM_MAX_CHUNK_SAMPLES),
+          true,
+          tab.id
+        );
         var newSourceMapUrls = [];
         for (var ci = 0; ci < chunkSamples.length; ci++) {
           if (!chunkSamples[ci]) continue;
@@ -1067,7 +1215,7 @@ window.VulnKitSourcemap = (function () {
         }
 
         // Fetch new source maps
-        var allNewMaps = newSourceMapUrls.slice(0, 50);
+        var allNewMaps = newSourceMapUrls.slice(0, SM_MAX_CHUNK_SAMPLES);
         if (allNewMaps.length > 0) {
           statusEl.textContent = 'Phase 2.5: 解析 ' + allNewMaps.length + ' 个新 Source Map...';
           var newMapContents = await smBatchFetch(allNewMaps, false, tab.id);
@@ -1075,38 +1223,14 @@ window.VulnKitSourcemap = (function () {
             if (!newMapContents[nmi]) continue;
             var nmUrl = allNewMaps[nmi];
             if (sourcemapMapCache[nmUrl]) continue;
-            try {
-              var nmJson = JSON.parse(newMapContents[nmi]);
-              sourcemapMapCache[nmUrl] = nmJson;
-              var nmSources = nmJson.sources || [];
-              var nmContent = nmJson.sourcesContent || [];
-              for (var nsIdx = 0; nsIdx < nmSources.length; nsIdx++) {
-                var nsPath = nmSources[nsIdx];
-                if (nsPath.indexOf('webpack://') === 0) nsPath = nsPath.replace('webpack://', '');
-                var nsExists = false;
-                for (var nse = 0; nse < allModules.length; nse++) {
-                  if (allModules[nse].path === nsPath) {
-                    nsExists = true;
-                    break;
-                  }
-                }
-                if (!nsExists) {
-                  var nsResolved = nmContent[nsIdx] !== undefined && nmContent[nsIdx] !== null;
-                  var nsMod = {
-                    id: 'sm2-' + nsIdx,
-                    path: nsPath,
-                    deps: [],
-                    source: 'sourcemap',
-                    resolved: nsResolved,
-                    sourceUrl: nmUrl,
-                  };
-                  if (nsResolved) sourcemapSourceCache[nsPath] = nmContent[nsIdx];
-                  allModules.push(nsMod);
-                }
-              }
-            } catch (e) {
-              // skip invalid source map
-            }
+            smParseMapToModules(
+              newMapContents[nmi],
+              nmUrl,
+              'sm2-',
+              allModules,
+              sourcemapSourceCache,
+              sourcemapMapCache
+            );
           }
         }
       }
@@ -1115,7 +1239,7 @@ window.VulnKitSourcemap = (function () {
       if (allModules.length === 0 && scriptUrls.length > 0) {
         statusEl.textContent = 'Phase 3: 解析 JS 文件中的模块路径...';
         smUpdateProgress(70, 3);
-        var jsContents = await smBatchFetch(scriptUrls.slice(0, 10), false, tab.id);
+        var jsContents = await smBatchFetch(scriptUrls.slice(0, SM_MAX_JS_FALLBACK), false, tab.id);
         for (var ji = 0; ji < jsContents.length; ji++) {
           if (!jsContents[ji]) continue;
           var jsText = jsContents[ji];
@@ -1193,7 +1317,7 @@ window.VulnKitSourcemap = (function () {
         deduped.push(m);
       }
 
-      sourcemapModules = deduped.slice(0, 2000);
+      sourcemapModules = deduped.slice(0, SM_MAX_MODULES);
       statusEl.textContent = '找到 ' + sourcemapModules.length + ' 个模块';
       smUpdateProgress(100, 3);
       renderSourcemapModules();
@@ -1286,26 +1410,6 @@ window.VulnKitSourcemap = (function () {
       html += '<span class="sm-stat-item">显示 ' + filtered.length + '</span>';
     }
     html += '</div>';
-
-    // Extension badge helper
-    var extColors = {
-      '.vue': '#42B883',
-      '.js': '#F7DF1E',
-      '.ts': '#3178C6',
-      '.tsx': '#3178C6',
-      '.jsx': '#61DAFB',
-      '.css': '#264DE4',
-      '.scss': '#CF649A',
-      '.less': '#1D365D',
-      '.json': '#5B5EA6',
-      '.html': '#E34F26',
-      '.svg': '#FFB13B',
-      '.png': '#FFB13B',
-      '.jpg': '#FFB13B',
-      '.gif': '#FFB13B',
-      '.woff': '#888',
-      '.woff2': '#888',
-    };
 
     var groupLabels = SOURCE_TYPE_LABELS;
     var groupClasses = {
@@ -1404,50 +1508,39 @@ window.VulnKitSourcemap = (function () {
     titleEl.insertAdjacentHTML('afterend', bcHtml);
 
     // Render deps
-    var depsHtml = '';
-    if (mod.deps && mod.deps.length > 0) {
-      depsHtml +=
-        '<div class="sourcemap-deps-section"><span class="sourcemap-deps-label">依赖:</span>';
-      mod.deps.forEach(function (depId) {
-        var depMod = null;
-        for (var d = 0; d < sourcemapModules.length; d++) {
-          if (sourcemapModules[d].id === String(depId)) {
-            depMod = sourcemapModules[d];
+    function renderDepTags(ids, labelText, cssClass) {
+      if (!ids || ids.length === 0) return '';
+      var html =
+        '<div class="sourcemap-deps-section"><span class="sourcemap-deps-label">' +
+        labelText +
+        '</span>';
+      ids.forEach(function (id) {
+        var found = null;
+        for (var i = 0; i < sourcemapModules.length; i++) {
+          if (sourcemapModules[i].id === String(id)) {
+            found = sourcemapModules[i];
             break;
           }
         }
-        var label = depMod ? depMod.path : depId;
-        depsHtml +=
-          '<span class="sourcemap-dep-tag" title="' +
+        var label = found ? found.path : id;
+        var display =
+          label.length > SM_MAX_LABEL_LEN ? label.substring(0, SM_MAX_LABEL_LEN) + '...' : label;
+        html +=
+          '<span class="sourcemap-dep-tag ' +
+          cssClass +
+          '" title="' +
           utils.escapeHtml(label) +
           '">' +
-          utils.escapeHtml(label.length > 40 ? label.substring(0, 40) + '...' : label) +
+          utils.escapeHtml(display) +
           '</span>';
       });
-      depsHtml += '</div>';
+      html += '</div>';
+      return html;
     }
-    if (mod.reverseDeps && mod.reverseDeps.length > 0) {
-      depsHtml +=
-        '<div class="sourcemap-deps-section"><span class="sourcemap-deps-label">被引用:</span>';
-      mod.reverseDeps.forEach(function (rdepId) {
-        var rMod = null;
-        for (var r = 0; r < sourcemapModules.length; r++) {
-          if (sourcemapModules[r].id === rdepId) {
-            rMod = sourcemapModules[r];
-            break;
-          }
-        }
-        var label = rMod ? rMod.path : rdepId;
-        depsHtml +=
-          '<span class="sourcemap-dep-tag sourcemap-dep-tag-reverse" title="' +
-          utils.escapeHtml(label) +
-          '">' +
-          utils.escapeHtml(label.length > 40 ? label.substring(0, 40) + '...' : label) +
-          '</span>';
-      });
-      depsHtml += '</div>';
-    }
-    depsEl.innerHTML = depsHtml;
+
+    depsEl.innerHTML =
+      renderDepTags(mod.deps, '依赖:', '') +
+      renderDepTags(mod.reverseDeps, '被引用:', 'sourcemap-dep-tag-reverse');
 
     // Load source code
     codeEl.value = '';
@@ -1516,7 +1609,11 @@ window.VulnKitSourcemap = (function () {
       var chunkUrls = chunkToFetch.map(function (m) {
         return m.path.split('?')[0];
       });
-      var contents = await smBatchFetch(chunkUrls.slice(0, 50), false, sourcemapTabId);
+      var contents = await smBatchFetch(
+        chunkUrls.slice(0, SM_MAX_CHUNK_SAMPLES),
+        false,
+        sourcemapTabId
+      );
       for (var ci = 0; ci < contents.length; ci++) {
         if (contents[ci]) {
           sourcemapSourceCache[chunkToFetch[ci].path] = contents[ci];
@@ -1541,265 +1638,7 @@ window.VulnKitSourcemap = (function () {
       resolvedModules.length +
       ' 个源码模块（Source Map）...</div>';
 
-    var securityRules = [
-      // === Critical ===
-      {
-        name: 'AWS Access Key',
-        pattern: /AKIA[0-9A-Z]{16}/g,
-        severity: 'critical',
-      },
-      {
-        name: 'AWS Secret Key',
-        pattern:
-          /(?:aws[_-]?secret[_-]?access[_-]?key|AWS_SECRET_ACCESS_KEY)\s*[:=]\s*['"]([A-Za-z0-9/+=]{40})['"]/gi,
-        severity: 'critical',
-      },
-      {
-        name: 'GitHub Token',
-        pattern: /gh[pousr]_[A-Za-z0-9_]{36,255}/g,
-        severity: 'critical',
-      },
-      {
-        name: 'Stripe Secret Key',
-        pattern: /sk_live_[0-9a-zA-Z]{24,}/g,
-        severity: 'critical',
-      },
-      {
-        name: 'Stripe Publishable Key',
-        pattern: /pk_live_[0-9a-zA-Z]{24,}/g,
-        severity: 'high',
-      },
-      {
-        name: 'Slack Token',
-        pattern: /xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,}/g,
-        severity: 'critical',
-      },
-      {
-        name: 'Slack Webhook',
-        pattern: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[a-zA-Z0-9]+/g,
-        severity: 'high',
-      },
-      {
-        name: 'Google API Key',
-        pattern: /AIza[0-9A-Za-z\-_]{35}/g,
-        severity: 'high',
-      },
-      {
-        name: 'Google OAuth Token',
-        pattern: /ya29\.[0-9A-Za-z\-_]+/g,
-        severity: 'high',
-      },
-      {
-        name: 'SendGrid API Key',
-        pattern: /SG\.[A-Za-z0-9\-_]{22}\.[A-Za-z0-9\-_]{43}/g,
-        severity: 'critical',
-      },
-      {
-        name: 'Twilio API Key',
-        pattern: /SK[0-9a-fA-F]{32}/g,
-        severity: 'critical',
-      },
-      {
-        name: '数据库连接串',
-        pattern: /(?:mongodb|mysql|postgres|postgresql|redis|ftp|smtp|ssh|amqp):\/\/[^\s'"]+/gi,
-        severity: 'critical',
-      },
-      {
-        name: 'MongoDB URI',
-        pattern: /mongodb(?:\+srv)?:\/\/[^\s'"]+/gi,
-        severity: 'critical',
-      },
-      {
-        name: '私钥 (RSA/EC/DSA)',
-        pattern: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/g,
-        severity: 'critical',
-      },
-      // === High ===
-      {
-        name: 'API 密钥泄露',
-        pattern:
-          /(?:api[_-]?key|apikey|secret[_-]?key|app[_-]?key|app[_-]?secret)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
-        severity: 'high',
-      },
-      {
-        name: '硬编码密码',
-        pattern: /(?:password|passwd|pwd|pass[_-]?word)\s*[:=]\s*['"]([^'"]{4,})['"]/gi,
-        severity: 'high',
-      },
-      {
-        name: 'JWT Secret',
-        pattern: /(?:jwt[_-]?secret|token[_-]?secret|jwt[_-]?key)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
-        severity: 'high',
-      },
-      {
-        name: 'Authorization Header',
-        pattern:
-          /(?:Authorization|Bearer)\s*[:=]\s*['"](?:Bearer\s+)?([A-Za-z0-9\-_.~+/]+=*)['"]/gi,
-        severity: 'high',
-      },
-      {
-        name: 'OAuth Client Secret',
-        pattern: /(?:client[_-]?secret|oauth[_-]?secret)\s*[:=]\s*['"]([^'"]{8,})['"]/gi,
-        severity: 'high',
-      },
-      {
-        name: 'Heroku API Key',
-        pattern:
-          /(?:heroku|HEROKU)\s*[:=]\s*['"]([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})['"]/gi,
-        severity: 'high',
-      },
-      {
-        name: 'Firebase URL',
-        pattern: /https:\/\/[a-z0-9-]+\.firebaseio\.com/gi,
-        severity: 'high',
-      },
-      {
-        name: 'Shopify Token',
-        pattern: /shpat_[a-fA-F0-9]{32}/g,
-        severity: 'high',
-      },
-      {
-        name: 'PayPal Braintree Token',
-        pattern: /access_token\$production\$[0-9a-z]{16}\$[0-9a-f]{32}/g,
-        severity: 'high',
-      },
-      {
-        name: '内部IP地址',
-        pattern:
-          /(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})/g,
-        severity: 'medium',
-      },
-      {
-        name: 'Internal Domain',
-        pattern:
-          /(?:https?:\/\/)?(?:[a-z0-9-]+\.)?(?:internal|intranet|staging|dev|test|local|corp)\.[a-z0-9-]+/gi,
-        severity: 'high',
-      },
-      // === Medium ===
-      {
-        name: 'eval() 使用',
-        pattern: /eval\s*\(/g,
-        severity: 'medium',
-      },
-      {
-        name: 'innerHTML 赋值',
-        pattern: /innerHTML\s*=/g,
-        severity: 'medium',
-      },
-      {
-        name: 'document.write',
-        pattern: /document\.write\s*\(/g,
-        severity: 'medium',
-      },
-      {
-        name: 'CORS 通配符',
-        pattern: /Access-Control-Allow-Origin['"]\s*[:=]\s*['"]\*['"]/gi,
-        severity: 'medium',
-      },
-      {
-        name: 'CSP 禁用',
-        pattern: /Content-Security-Policy['"]\s*[:=]\s*['"]unsafe/gi,
-        severity: 'medium',
-      },
-      {
-        name: '路径穿越',
-        pattern: /\.\.[\/\\]/g,
-        severity: 'medium',
-      },
-      {
-        name: 'XXE 风险',
-        pattern: /DOMParser|xmlHttpRequest|\.parseFromString/gi,
-        severity: 'medium',
-      },
-      {
-        name: '命令拼接风险',
-        pattern: /(?:exec|execSync|spawn|child_process)\s*\(/g,
-        severity: 'medium',
-      },
-      {
-        name: 'SQL 拼接',
-        pattern: /(?:SELECT|INSERT|UPDATE|DELETE|DROP)\s+.*\+\s*(?:req|params|query|body)/gi,
-        severity: 'medium',
-      },
-      {
-        name: 'unsafe eval (CSP)',
-        pattern: /unsafe-eval/gi,
-        severity: 'medium',
-      },
-      {
-        name: 'window.location 赋值',
-        pattern: /(?:window\.)?location\s*=\s*[^=]/g,
-        severity: 'low',
-      },
-      {
-        name: 'postMessage 无 origin 校验',
-        pattern: /postMessage\s*\([^)]*\)/g,
-        severity: 'medium',
-      },
-      {
-        name: 'localStorage 敏感数据',
-        pattern:
-          /localStorage\.(?:setItem|set)\s*\(\s*['"](?:token|auth|session|password|secret|key)/gi,
-        severity: 'medium',
-      },
-      // === Low ===
-      {
-        name: '调试代码 (console.log)',
-        pattern: /console\.(?:log|debug|info)\s*\(/g,
-        severity: 'low',
-      },
-      {
-        name: 'localStorage/sessionStorage',
-        pattern: /(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)/g,
-        severity: 'low',
-      },
-      {
-        name: 'document.cookie',
-        pattern: /document\.cookie/g,
-        severity: 'low',
-      },
-      {
-        name: '调试断点 (debugger)',
-        pattern: /debugger\s*;/g,
-        severity: 'low',
-      },
-      // === Info ===
-      {
-        name: 'TODO/FIXME/HACK',
-        pattern: /(?:TODO|FIXME|HACK|XXX|BUG)\s*[:\(]/gi,
-        severity: 'info',
-      },
-      {
-        name: 'Swagger/OpenAPI 端点',
-        pattern: /['"]\/(?:swagger|api-docs|openapi|graphql)(?:\/)?['"]/gi,
-        severity: 'info',
-      },
-      {
-        name: 'Spring Actuator',
-        pattern: /['"]\/(?:actuator|env|health|metrics|trace|beans|mappings)(?:\/)?['"]/gi,
-        severity: 'info',
-      },
-      {
-        name: '备份文件路径',
-        pattern: /['"](?:backup|\.bak|\.old|\.orig|\.save|\.tar|\.zip|\.sql|\.dump)['"]/gi,
-        severity: 'info',
-      },
-      {
-        name: '.git 暴露',
-        pattern: /['"]\/\.git(?:\/|['"])/g,
-        severity: 'high',
-      },
-      {
-        name: '测试文件',
-        pattern: /['"](?:test|spec|mock|fixture|stub)s?['"]/gi,
-        severity: 'info',
-      },
-      {
-        name: '环境配置引用',
-        pattern: /process\.env\.[A-Z_]+/g,
-        severity: 'info',
-      },
-    ];
+    var securityRules = SM_SECURITY_RULES;
 
     var allFindings = [];
 
@@ -1809,17 +1648,19 @@ window.VulnKitSourcemap = (function () {
       if (!source) continue;
 
       for (var ri = 0; ri < securityRules.length; ri++) {
-        var rule = securityRules[ri];
-        var regex = new RegExp(rule.pattern.source, rule.pattern.flags);
+        var rName = securityRules[ri][0];
+        var rPattern = securityRules[ri][1];
+        var rSeverity = securityRules[ri][2];
+        var regex = new RegExp(rPattern.source, rPattern.flags);
         var match;
         var matchCount = 0;
         while ((match = regex.exec(source)) !== null) {
           matchCount++;
           if (matchCount > 20) break;
           allFindings.push({
-            severity: rule.severity,
-            name: rule.name,
-            match: (match[1] || match[0]).substring(0, 60),
+            severity: rSeverity,
+            name: rName,
+            match: (match[1] || match[0]).substring(0, SM_MAX_MATCH_LEN),
             file: mod.path,
             moduleIndex: sourcemapModules.indexOf(mod),
           });
@@ -1875,7 +1716,7 @@ window.VulnKitSourcemap = (function () {
     resultsEl.innerHTML = summaryHtml;
 
     var itemsHtml = '';
-    var displayFindings = allFindings.slice(0, 200);
+    var displayFindings = allFindings.slice(0, SM_MAX_FINDINGS);
     for (var fi = 0; fi < displayFindings.length; fi++) {
       var f = displayFindings[fi];
       itemsHtml += '<div class="sm-analysis-item" data-idx="' + f.moduleIndex + '">';

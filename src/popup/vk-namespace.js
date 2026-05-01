@@ -237,6 +237,24 @@
     });
   };
 
+  utils.filterByQuery = function (items, query, fields) {
+    if (!query) return items;
+    var lower = query.toLowerCase();
+    return items.filter(function (item) {
+      for (var i = 0; i < fields.length; i++) {
+        var val = item[fields[i]];
+        if (val && String(val).toLowerCase().indexOf(lower) !== -1) return true;
+      }
+      return false;
+    });
+  };
+
+  utils.bindEnterKey = function (id, callback) {
+    utils.on(id, 'keydown', function (e) {
+      if (e.key === 'Enter') callback(e);
+    });
+  };
+
   utils.fetchUrlJson = function (options) {
     return utils.fetchUrl(options).then(function (result) {
       if (!result) return null;
@@ -341,6 +359,8 @@
     'fetchUrlJson',
     'batchFetch',
     'updateIndicator',
+    'filterByQuery',
+    'bindEnterKey',
   ].forEach(function (method) {
     utilsProxy[method] = function () {
       return utils[method].apply(utils, arguments);

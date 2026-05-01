@@ -20,6 +20,8 @@ window.VulnKitRuoYi = (function () {
   var common = window.VulnKitRuoYiCommon;
   var utils = common ? common.utils : {};
   var updateWorkflowStep = common ? common.updateWorkflowStep : null;
+  var commonToggleAll = common ? common.toggleSelectAll : null;
+  var commonCopyPaths = common ? common.copyRoutePaths : null;
 
   // ====== Initialize Sub-modules ======
 
@@ -647,30 +649,11 @@ window.VulnKitRuoYi = (function () {
   }
 
   function copyExtraPaths() {
-    if (state.extraRoutes.length === 0) {
-      utils.showToast('没有额外路由', 'warning');
-      return;
-    }
-    utils.copyText(
-      state.extraRoutes
-        .map(function (r) {
-          return r.path || r.component;
-        })
-        .join('\n')
-    );
-    utils.showToast('已复制 ' + state.extraRoutes.length + ' 条路径', 'success');
+    commonCopyPaths(state.extraRoutes, '没有额外路由');
   }
 
   function toggleSelectAll() {
-    var checks = document.querySelectorAll('.ruoyi-route-check');
-    var allChecked =
-      checks.length > 0 &&
-      Array.from(checks).every(function (cb) {
-        return cb.checked;
-      });
-    checks.forEach(function (cb) {
-      cb.checked = !allChecked;
-    });
+    commonToggleAll('.ruoyi-route-check');
   }
 
   // ====== Public API ======

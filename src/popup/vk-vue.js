@@ -3,6 +3,8 @@ window.VulnKitVue = (function () {
 
   var utils = window.VulnKitUtils.utilsProxy;
 
+  var ROLE_VALS_RE = /^(admin|superadmin|user|vip|normal|guest|member|manager)$/i;
+
   // ====== Vue Analysis ======
   let lastVueResult = '';
   let permInterceptActive = false;
@@ -153,7 +155,6 @@ window.VulnKitVue = (function () {
   function collectAllPaths(routes, prefix, base, mode) {
     var result = [];
     if (!routes || !Array.isArray(routes)) return result;
-    var probeValues = ['1', 'admin', 'test', '0'];
     routes.forEach(function (r) {
       var p = r.path || '/';
       if (p.charAt(0) !== '/' && prefix && prefix !== '/') {
@@ -1020,19 +1021,21 @@ window.VulnKitVue = (function () {
     if (permEditor) permEditor.value = JSON.stringify(item.data, null, 2);
   }
 
+  var ROLE_CONTROL_RE =
+    /^(isadmin|admin|is_superuser|isvip|vip|role|isSuperAdmin|userType|user_type|level|grade)$/i;
+  var MENU_ID_LIST_RE = /^menuIds$|^menu_ids$|^menuIdList$|^permissionIds$|^permIds$/i;
+
   function classifyPermType(data) {
     if (data && typeof data === 'object' && !Array.isArray(data)) {
       var keys = Object.keys(data);
       for (var k = 0; k < keys.length; k++) {
-        if (
-          /^(isadmin|admin|is_superuser|isvip|vip|role|isSuperAdmin|userType|user_type|level|grade)$/i.test(
-            keys[k]
-          )
-        ) {
-          var val = data[keys[k]];
+        var key = keys[k];
+        // Check role control fields
+        if (ROLE_CONTROL_RE.test(key)) {
+          var val = data[key];
           if (val === 0 || val === false || val === '0' || val === '' || val === null) {
             return {
-              label: '特殊0开放 - ' + keys[k] + '=' + val + '，可修改为1/true/admin',
+              label: '特殊0开放 - ' + key + '=' + val + '，可修改为1/true/admin',
               cssClass: 'perm-classify-danger',
               type: 'special-zero',
             };
@@ -1043,18 +1046,16 @@ window.VulnKitVue = (function () {
             type: 'special-zero',
           };
         }
-      }
-      for (var kt = 0; kt < keys.length; kt++) {
-        if (/^type$/i.test(keys[kt])) {
-          var tval = data[keys[kt]];
-          var roleVals = /^(admin|superadmin|user|vip|normal|guest|member|manager)$/i;
+        // Check type field
+        if (/^type$/i.test(key)) {
+          var tval = data[key];
           if (
-            (typeof tval === 'string' && roleVals.test(tval)) ||
+            (typeof tval === 'string' && ROLE_VALS_RE.test(tval)) ||
             (typeof tval === 'number' && tval >= 0 && tval <= 10)
           ) {
             if (tval === 0 || /^(user|normal|guest)$/i.test(String(tval))) {
               return {
-                label: '特殊0开放 - ' + keys[kt] + '=' + tval + '，可修改为admin/1',
+                label: '特殊0开放 - ' + key + '=' + tval + '，可修改为admin/1',
                 cssClass: 'perm-classify-danger',
                 type: 'special-zero',
               };
@@ -1066,10 +1067,9 @@ window.VulnKitVue = (function () {
             };
           }
         }
-      }
-      for (var k2 = 0; k2 < keys.length; k2++) {
-        if (/menuIds|menu_ids|menuIdList|permissionIds|permIds/i.test(keys[k2])) {
-          var arr = data[keys[k2]];
+        // Check menu ID list fields
+        if (MENU_ID_LIST_RE.test(key)) {
+          var arr = data[key];
           if (
             Array.isArray(arr) &&
             arr.length > 0 &&
@@ -1078,7 +1078,7 @@ window.VulnKitVue = (function () {
             })
           ) {
             return {
-              label: '菜单ID限制 - ' + keys[k2] + ': [' + arr.join(',') + ']，可展开范围',
+              label: '菜单ID限制 - ' + key + ': [' + arr.join(',') + ']，可展开范围',
               cssClass: 'perm-classify-info',
               type: 'menuid-limit',
             };
@@ -1249,17 +1249,21 @@ window.VulnKitVue = (function () {
     return data;
   }
 
-  function permOpenAll() {
+  function applyEditorTransform(transformFn, successMsg) {
     var editor = utils.get('perm-json-editor');
     if (!editor) return;
     try {
       var data = JSON.parse(editor.value);
-      data = transformShowAll(data);
+      data = transformFn(data);
       editor.value = JSON.stringify(data, null, 2);
-      utils.showToast('已将所有 isshow/display 改为显示', 'success');
+      utils.showToast(successMsg, 'success');
     } catch (e) {
       utils.showToast('JSON 解析失败', 'error');
     }
+  }
+
+  function permOpenAll() {
+    applyEditorTransform(transformShowAll, '已将所有 isshow/display 改为显示');
   }
 
   function transformAdmin(data) {
@@ -1278,9 +1282,8 @@ window.VulnKitVue = (function () {
         c[k] = 1;
       } else if (/^type$/i.test(k)) {
         var tv = data[k];
-        var roleVals = /^(admin|superadmin|user|vip|normal|guest|member|manager)$/i;
         if (
-          (typeof tv === 'string' && roleVals.test(tv)) ||
+          (typeof tv === 'string' && ROLE_VALS_RE.test(tv)) ||
           (typeof tv === 'number' && tv >= 0 && tv <= 10)
         ) {
           c[k] = typeof tv === 'string' ? 'admin' : 1;
@@ -1297,16 +1300,7 @@ window.VulnKitVue = (function () {
   }
 
   function permChangeAdmin() {
-    var editor = utils.get('perm-json-editor');
-    if (!editor) return;
-    try {
-      var data = JSON.parse(editor.value);
-      data = transformAdmin(data);
-      editor.value = JSON.stringify(data, null, 2);
-      utils.showToast('已提权：角色/管理员字段已修改', 'success');
-    } catch (e) {
-      utils.showToast('JSON 解析失败', 'error');
-    }
+    applyEditorTransform(transformAdmin, '已提权：角色/管理员字段已修改');
   }
 
   function expandMenuIds(data) {
@@ -1342,16 +1336,7 @@ window.VulnKitVue = (function () {
   }
 
   function permExpandMenuIds() {
-    var editor = utils.get('perm-json-editor');
-    if (!editor) return;
-    try {
-      var data = JSON.parse(editor.value);
-      data = expandMenuIds(data);
-      editor.value = JSON.stringify(data, null, 2);
-      utils.showToast('已展开菜单ID范围', 'success');
-    } catch (e) {
-      utils.showToast('JSON 解析失败', 'error');
-    }
+    applyEditorTransform(expandMenuIds, '已展开菜单ID范围');
   }
 
   async function applyPermOverride() {
@@ -2271,45 +2256,33 @@ window.VulnKitVue = (function () {
       }
       lastCompareHiddenRoutes = hiddenRoutes.slice();
 
+      function renderCompareSection(routes, cssClass, label) {
+        if (!routes || routes.length === 0) return '';
+        var h = '<div class="compare-section-title">' + label + ' - ' + routes.length + ' 条</div>';
+        for (var i = 0; i < routes.length; i++) {
+          h += '<div class="compare-route-item">';
+          h +=
+            '<span class="' +
+            cssClass +
+            '">[' +
+            (cssClass.indexOf('hidden') !== -1 ? '隐藏' : '显示') +
+            ']</span> ';
+          h += '<span class="compare-route-path">' + utils.escapeHtml(routes[i].path) + '</span>';
+          if (routes[i].name)
+            h +=
+              '<span class="compare-route-status">' + utils.escapeHtml(routes[i].name) + '</span>';
+          h += '</div>';
+        }
+        return h;
+      }
+
       var html = '';
-      if (hiddenRoutes.length > 0) {
-        html +=
-          '<div class="compare-section-title">隐藏路由 (路由存在但菜单中未显示) - ' +
-          hiddenRoutes.length +
-          ' 条</div>';
-        for (var h = 0; h < hiddenRoutes.length; h++) {
-          html += '<div class="compare-route-item">';
-          html += '<span class="compare-route-hidden">[隐藏]</span> ';
-          html +=
-            '<span class="compare-route-path">' +
-            utils.escapeHtml(hiddenRoutes[h].path) +
-            '</span>';
-          if (hiddenRoutes[h].name)
-            html +=
-              '<span class="compare-route-status">' +
-              utils.escapeHtml(hiddenRoutes[h].name) +
-              '</span>';
-          html += '</div>';
-        }
-      }
-      if (visibleRoutes.length > 0) {
-        html +=
-          '<div class="compare-section-title">已显示路由 - ' + visibleRoutes.length + ' 条</div>';
-        for (var v = 0; v < visibleRoutes.length; v++) {
-          html += '<div class="compare-route-item">';
-          html += '<span class="compare-route-visible">[显示]</span> ';
-          html +=
-            '<span class="compare-route-path">' +
-            utils.escapeHtml(visibleRoutes[v].path) +
-            '</span>';
-          if (visibleRoutes[v].name)
-            html +=
-              '<span class="compare-route-status">' +
-              utils.escapeHtml(visibleRoutes[v].name) +
-              '</span>';
-          html += '</div>';
-        }
-      }
+      html += renderCompareSection(
+        hiddenRoutes,
+        'compare-route-hidden',
+        '隐藏路由 (路由存在但菜单中未显示)'
+      );
+      html += renderCompareSection(visibleRoutes, 'compare-route-visible', '已显示路由');
       if (captured.length === 0) {
         html += '<div class="compare-section-title compare-hint-title">提示</div>';
         html +=
@@ -2390,44 +2363,13 @@ window.VulnKitVue = (function () {
             '</span>';
           html += '</div>';
           html += renderStoreTree(storeData.state, '', 0);
-          if (storeData.getters && storeData.getters.length > 0) {
-            html += '<div class="vue-store-section">';
-            html +=
-              '<div class="vue-store-section-title">Getters (' +
-              storeData.getters.length +
-              ')</div>';
-            html += '<div class="vue-store-tags">';
-            storeData.getters.forEach(function (g) {
-              html += '<span class="vue-store-tag">' + utils.escapeHtml(g) + '</span>';
-            });
-            html += '</div></div>';
-          }
-          if (storeData.mutations && storeData.mutations.length > 0) {
-            html += '<div class="vue-store-section">';
-            html +=
-              '<div class="vue-store-section-title">Mutations (' +
-              storeData.mutations.length +
-              ')</div>';
-            html += '<div class="vue-store-tags">';
-            storeData.mutations.forEach(function (m) {
-              html +=
-                '<span class="vue-store-tag vue-store-tag-mut">' + utils.escapeHtml(m) + '</span>';
-            });
-            html += '</div></div>';
-          }
-          if (storeData.actions && storeData.actions.length > 0) {
-            html += '<div class="vue-store-section">';
-            html +=
-              '<div class="vue-store-section-title">Actions (' +
-              storeData.actions.length +
-              ')</div>';
-            html += '<div class="vue-store-tags">';
-            storeData.actions.forEach(function (a) {
-              html +=
-                '<span class="vue-store-tag vue-store-tag-act">' + utils.escapeHtml(a) + '</span>';
-            });
-            html += '</div></div>';
-          }
+          html += renderTagList(storeData.getters, 'vue-store-tag', 'Getters');
+          html += renderTagList(
+            storeData.mutations,
+            'vue-store-tag vue-store-tag-mut',
+            'Mutations'
+          );
+          html += renderTagList(storeData.actions, 'vue-store-tag vue-store-tag-act', 'Actions');
           html += '</div>';
         });
       }
@@ -2461,25 +2403,10 @@ window.VulnKitVue = (function () {
             actionHtml += '</div></div>';
           }
           if (actionNames.length > 0) {
-            actionHtml += '<div class="vue-store-section">';
-            actionHtml +=
-              '<div class="vue-store-section-title">Actions (' + actionNames.length + ')</div>';
-            actionHtml += '<div class="vue-store-tags">';
-            actionNames.forEach(function (a) {
-              actionHtml +=
-                '<span class="vue-store-tag vue-store-tag-act">' + utils.escapeHtml(a) + '</span>';
-            });
-            actionHtml += '</div></div>';
+            actionHtml += renderTagList(actionNames, 'vue-store-tag vue-store-tag-act', 'Actions');
           }
           if (getterNames.length > 0) {
-            actionHtml += '<div class="vue-store-section">';
-            actionHtml +=
-              '<div class="vue-store-section-title">Getters (' + getterNames.length + ')</div>';
-            actionHtml += '<div class="vue-store-tags">';
-            getterNames.forEach(function (g) {
-              actionHtml += '<span class="vue-store-tag">' + utils.escapeHtml(g) + '</span>';
-            });
-            actionHtml += '</div></div>';
+            actionHtml += renderTagList(getterNames, 'vue-store-tag', 'Getters');
           }
         }
         actionsEl.innerHTML = actionHtml;
@@ -2526,6 +2453,18 @@ window.VulnKitVue = (function () {
       if (statusEl) statusEl.textContent = '探索失败';
       if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('错误: ' + e.message);
     }
+  }
+
+  function renderTagList(items, tagClass, label) {
+    if (!items || items.length === 0) return '';
+    var h = '<div class="vue-store-section">';
+    h += '<div class="vue-store-section-title">' + label + ' (' + items.length + ')</div>';
+    h += '<div class="vue-store-tags">';
+    items.forEach(function (item) {
+      h += '<span class="' + tagClass + '">' + utils.escapeHtml(item) + '</span>';
+    });
+    h += '</div></div>';
+    return h;
   }
 
   function renderStoreTree(obj, prefix, depth) {
@@ -2595,18 +2534,6 @@ window.VulnKitVue = (function () {
     }
 
     return html;
-  }
-
-  function copyVueStoreJson() {
-    var resultsEl = utils.get('vue-store-results');
-    if (!resultsEl) return;
-    // Find the stored data from last explore
-    var storeCards = resultsEl.querySelectorAll('.vue-store-card');
-    if (storeCards.length === 0) {
-      utils.showToast('没有 Store 数据可复制', 'error');
-      return;
-    }
-    utils.showToast('请先点击「读取 Store」获取数据，然后使用浏览器复制');
   }
 
   async function copyFullStoreJson() {

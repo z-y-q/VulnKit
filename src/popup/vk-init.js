@@ -349,18 +349,18 @@
         if (!input) return;
         decodeJwt(input);
       });
-    var jwtClearBtn = utils.bindClick('jwt-clear-btn', clearJwt);
-    var jwtCopyHeaderBtn = utils.bindClick('jwt-copy-header-btn', copyJwtHeader);
-    var jwtCopyPayloadBtn = utils.bindClick('jwt-copy-payload-btn', copyJwtPayload);
+    utils.bindClick('jwt-clear-btn', clearJwt);
+    utils.bindClick('jwt-copy-header-btn', copyJwtHeader);
+    utils.bindClick('jwt-copy-payload-btn', copyJwtPayload);
 
     // Crypto algo tabs
     utils.bindTabSwitch('crypto-algo-btn', 'algo', switchCryptoAlgo);
 
     // Crypto action buttons
-    var cryptoEncBtn = utils.bindClick('crypto-enc-btn', doCryptoEncrypt);
-    var cryptoDecBtn = utils.bindClick('crypto-dec-btn', doCryptoDecrypt);
-    var cryptoVerifyBtn = utils.bindClick('crypto-verify-btn', doCryptoVerify);
-    var hashHmacCheck = utils.on('hash-hmac', 'change', toggleHashHmac);
+    utils.bindClick('crypto-enc-btn', doCryptoEncrypt);
+    utils.bindClick('crypto-dec-btn', doCryptoDecrypt);
+    utils.bindClick('crypto-verify-btn', doCryptoVerify);
+    utils.on('hash-hmac', 'change', toggleHashHmac);
     utils.bindClick('crypto-clear-btn', function () {
       var ci = utils.get('crypto-input');
       if (ci) ci.value = '';
@@ -422,11 +422,8 @@
     utils.bindTabSwitch('source-btn', 'source', switchAssetSource);
 
     utils.bindClick('asset-scan-btn', handleAssetScan);
-    utils.on('asset-query', 'keydown', function (e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handleAssetScan();
-      }
+    utils.bindEnterKey('asset-query', function () {
+      handleAssetScan();
     });
     utils.bindClick('asset-custom-toggle', function () {
       toggleCustomQueryMode(!this.classList.contains('active'));
@@ -438,11 +435,8 @@
     });
 
     utils.bindClick('shodan-host-btn', shodanHostLookup);
-    utils.on('shodan-host-input', 'keydown', function (e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        shodanHostLookup();
-      }
+    utils.bindEnterKey('shodan-host-input', function () {
+      shodanHostLookup();
     });
 
     utils.bindClick('save-keys-btn', saveApiKeys);
@@ -455,8 +449,8 @@
     utils.on('gather-search', 'input', function () {
       gather.applySearchFilter(this.value.trim());
     });
-    const gatherCopyBtn = utils.bindClick('gather-copy-btn', gather.copyAllData);
-    const gatherExportBtn = utils.bindClick('gather-export-btn', gather.exportAllData);
+    utils.bindClick('gather-copy-btn', gather.copyAllData);
+    utils.bindClick('gather-export-btn', gather.exportAllData);
 
     // Rules management
     const rulesBtn = utils.get('gather-rules-btn');
@@ -607,9 +601,7 @@
       utils.copyAndToast(cdxUrl, '查询URL已复制');
     });
 
-    utils.on('history-domain', 'keydown', function (e) {
-      if (e.key === 'Enter') queryHistory();
-    });
+    utils.bindEnterKey('history-domain', queryHistory);
     utils.on('history-domain', 'blur', function () {
       const val = this.value.trim();
       if (val) showHistoryQuickLinks(val);
@@ -683,9 +675,7 @@
       fetchExifFromUrl(url);
     };
     utils.bindClick('exif-fetch-btn', exifFetchHandler);
-    utils.on('exif-url-input', 'keydown', function (e) {
-      if (e.key === 'Enter') exifFetchHandler();
-    });
+    utils.bindEnterKey('exif-url-input', exifFetchHandler);
 
     utils.bindClick('exif-scan-page-btn', scanPageImages);
 
@@ -843,9 +833,7 @@
       searchJsKeywords(utils.get('jssearch-keyword').value.trim());
     };
     utils.bindClick('jssearch-btn', doJsSearch);
-    utils.on('jssearch-keyword', 'keydown', function (e) {
-      if (e.key === 'Enter') doJsSearch();
-    });
+    utils.bindEnterKey('jssearch-keyword', doJsSearch);
     utils.bindTabSwitch('jssearch-preset', 'kw', function (kw) {
       var input = utils.get('jssearch-keyword');
       if (input) input.value = kw;
