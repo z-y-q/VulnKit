@@ -39,6 +39,33 @@ window.VulnKitSpoof = (function () {
     });
   }
 
+  function sendBgMsg(msg, successMsg) {
+    return new Promise(function (resolve) {
+      chrome.runtime.sendMessage(msg, function (response) {
+        if (chrome.runtime.lastError) {
+          utils.showToast(
+            (successMsg || '操作').replace('已', '') + '失败: ' + chrome.runtime.lastError.message,
+            'error'
+          );
+          resolve(false);
+          return;
+        }
+        if (response && response.success) {
+          utils.showToast(successMsg || '操作成功', 'success');
+          resolve(true);
+        } else {
+          utils.showToast(
+            (successMsg || '操作').replace('已', '') +
+              '失败: ' +
+              (response && response.error ? response.error : '未知错误'),
+            'error'
+          );
+          resolve(false);
+        }
+      });
+    });
+  }
+
   const UA_PRESETS = {
     mobile: [
       {
@@ -207,21 +234,11 @@ window.VulnKitSpoof = (function () {
       spoofState.ua.enabled = true;
       spoofState.ua.current = ua;
 
-      chrome.runtime.sendMessage(
+      await sendBgMsg(
         { type: 'SPOOF_UA', tabId: tab.id, url: tab.url, userAgent: ua },
-        response => {
-          if (chrome.runtime.lastError) {
-            utils.showToast('应用失败: ' + chrome.runtime.lastError.message, 'error');
-            return;
-          }
-          if (response?.success) {
-            updateUaStatus();
-            utils.showToast('UA 已应用', 'success');
-          } else {
-            utils.showToast('应用失败: ' + (response?.error || '未知错误'), 'error');
-          }
-        }
+        'UA 已应用'
       );
+      updateUaStatus();
 
       chrome.storage.local.set({ pentest_spoof: spoofState });
     } catch (e) {
@@ -236,18 +253,8 @@ window.VulnKitSpoof = (function () {
       spoofState.ua.enabled = false;
       spoofState.ua.current = '';
 
-      chrome.runtime.sendMessage({ type: 'RESET_SPOOF_UA', tabId: tab?.id }, response => {
-        if (chrome.runtime.lastError) {
-          utils.showToast('恢复失败: ' + chrome.runtime.lastError.message, 'error');
-          return;
-        }
-        if (response?.success) {
-          updateUaStatus();
-          utils.showToast('UA 已恢复', 'success');
-        } else {
-          utils.showToast('恢复失败: ' + (response?.error || '未知错误'), 'error');
-        }
-      });
+      await sendBgMsg({ type: 'RESET_SPOOF_UA', tabId: tab?.id }, 'UA 已恢复');
+      updateUaStatus();
 
       chrome.storage.local.set({ pentest_spoof: spoofState });
     } catch (e) {
@@ -592,19 +599,9 @@ window.VulnKitSpoof = (function () {
         return;
       }
 
-      chrome.runtime.sendMessage(
+      await sendBgMsg(
         { type: 'SPOOF_HEADERS', tabId: tab.id, url: tab.url, headers: spoofState.headers },
-        response => {
-          if (chrome.runtime.lastError) {
-            utils.showToast('应用失败: ' + chrome.runtime.lastError.message, 'error');
-            return;
-          }
-          if (response?.success) {
-            utils.showToast('Header 伪造已应用', 'success');
-          } else {
-            utils.showToast('应用失败: ' + (response?.error || '未知错误'), 'error');
-          }
-        }
+        'Header 伪造已应用'
       );
 
       chrome.storage.local.set({ pentest_spoof: spoofState });
@@ -613,36 +610,30 @@ window.VulnKitSpoof = (function () {
     }
   }
 
+  var HEADER_ROW_HTML =
+    '<div class="custom-header-row">' +
+    '<input type="text" class="input custom-header-key" placeholder="Header Name">' +
+    '<input type="text" class="input custom-header-value" placeholder="Header Value">' +
+    '<button class="btn btn-sm btn-outline custom-header-remove" title="删除">-</button></div>';
+
   function addCustomHeaderRow() {
     const container = utils.get('custom-headers');
     if (!container) return;
-    const row = document.createElement('div');
-    row.className = 'custom-header-row';
-    row.innerHTML =
-      '<input type="text" class="input custom-header-key" placeholder="Header Name">' +
-      '<input type="text" class="input custom-header-value" placeholder="Header Value">' +
-      '<button class="btn btn-sm btn-outline custom-header-remove" title="删除">-</button>';
-    container.appendChild(row);
+    container.insertAdjacentHTML('beforeend', HEADER_ROW_HTML);
+    const row = container.lastElementChild;
     row.querySelector('.custom-header-remove').addEventListener('click', () => row.remove());
   }
 
   async function resetHeaders() {
-    const xffEl = utils.get('header-xff');
-    const refererEl = utils.get('header-referer');
-    const refererPresetEl = utils.get('referer-preset');
-    const clientIpEl = utils.get('header-client-ip');
-    const customHeadersEl = utils.get('custom-headers');
-    if (xffEl) xffEl.value = '';
-    if (refererEl) refererEl.value = '';
-    if (refererPresetEl) refererPresetEl.value = '';
-    if (clientIpEl) clientIpEl.value = '';
+    var ids = ['header-xff', 'header-referer', 'referer-preset', 'header-client-ip'];
+    ids.forEach(function (id) {
+      var el = utils.get(id);
+      if (el) el.value = '';
+    });
 
+    const customHeadersEl = utils.get('custom-headers');
     if (customHeadersEl) {
-      customHeadersEl.innerHTML =
-        '<div class="custom-header-row">' +
-        '<input type="text" class="input custom-header-key" placeholder="Header Name">' +
-        '<input type="text" class="input custom-header-value" placeholder="Header Value">' +
-        '<button class="btn btn-sm btn-outline custom-header-remove" title="删除">-</button></div>';
+      customHeadersEl.innerHTML = HEADER_ROW_HTML;
       const rmBtn = customHeadersEl.querySelector('.custom-header-remove');
       if (rmBtn)
         rmBtn.addEventListener('click', function () {
@@ -654,16 +645,7 @@ window.VulnKitSpoof = (function () {
 
     try {
       const tab = await utils.getActiveTab();
-      chrome.runtime.sendMessage({ type: 'RESET_SPOOF_HEADERS', tabId: tab?.id }, response => {
-        if (chrome.runtime.lastError || !response?.success) {
-          utils.showToast(
-            '重置失败: ' + (chrome.runtime.lastError?.message || '未知错误'),
-            'error'
-          );
-          return;
-        }
-        utils.showToast('Header 已重置', 'success');
-      });
+      await sendBgMsg({ type: 'RESET_SPOOF_HEADERS', tabId: tab?.id }, 'Header 已重置');
       chrome.storage.local.set({ pentest_spoof: spoofState });
     } catch (e) {
       utils.showToast('操作失败: ' + e.message, 'error');

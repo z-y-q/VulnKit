@@ -168,108 +168,90 @@ window.VulnKitCrypto = (function () {
     }
   }
 
-  function aesEncrypt(input) {
-    var mode = (utils.get('aes-mode') || {}).value || 'CBC';
-    var keySize = parseInt((utils.get('aes-keysize') || {}).value) || 128;
-    var padding = (utils.get('aes-padding') || {}).value || 'Pkcs7';
-    var key = padOrTruncate((utils.get('aes-key') || {}).value, keySize / 8);
+  function readCryptoSelect(id) {
+    return (utils.get(id) || {}).value || '';
+  }
+  function readCryptoCheck(id) {
+    return (utils.get(id) || {}).checked;
+  }
+
+  function aesParams() {
+    var mode = readCryptoSelect('aes-mode') || 'CBC';
+    var keySize = parseInt(readCryptoSelect('aes-keysize')) || 128;
+    var padding = readCryptoSelect('aes-padding') || 'Pkcs7';
+    var key = padOrTruncate(readCryptoSelect('aes-key'), keySize / 8);
     if (!key || key.length < 1) throw new Error('请输入密钥');
-    var opts = {
-      mode: CryptoJS.mode[mode],
-      padding: CryptoJS.pad[padding],
-    };
+    var opts = { mode: CryptoJS.mode[mode], padding: CryptoJS.pad[padding] };
     if (mode !== 'ECB') {
-      var iv = padOrTruncate((utils.get('aes-iv') || {}).value, 16);
-      opts.iv = CryptoJS.enc.Utf8.parse(iv);
+      opts.iv = CryptoJS.enc.Utf8.parse(padOrTruncate(readCryptoSelect('aes-iv'), 16));
     }
-    var keyWA = CryptoJS.enc.Utf8.parse(key);
-    var data = CryptoJS.enc.Utf8.parse(input);
-    return CryptoJS.AES.encrypt(data, keyWA, opts).toString();
+    return { keyWA: CryptoJS.enc.Utf8.parse(key), opts: opts };
+  }
+
+  function aesEncrypt(input) {
+    var p = aesParams();
+    return CryptoJS.AES.encrypt(CryptoJS.enc.Utf8.parse(input), p.keyWA, p.opts).toString();
   }
 
   function aesDecrypt(input) {
-    var mode = (utils.get('aes-mode') || {}).value || 'CBC';
-    var keySize = parseInt((utils.get('aes-keysize') || {}).value) || 128;
-    var padding = (utils.get('aes-padding') || {}).value || 'Pkcs7';
-    var key = padOrTruncate((utils.get('aes-key') || {}).value, keySize / 8);
-    if (!key || key.length < 1) throw new Error('请输入密钥');
-    var opts = {
-      mode: CryptoJS.mode[mode],
-      padding: CryptoJS.pad[padding],
-    };
+    var p = aesParams();
+    return CryptoJS.enc.Utf8.stringify(CryptoJS.AES.decrypt(input, p.keyWA, p.opts));
+  }
+
+  function desParams() {
+    var mode = readCryptoSelect('des-mode') || 'CBC';
+    var padding = readCryptoSelect('des-padding') || 'Pkcs7';
+    var key = padOrTruncate(readCryptoSelect('des-key'), 8);
+    if (!key || key.length < 8) throw new Error('密钥需 8 字符');
+    var opts = { mode: CryptoJS.mode[mode], padding: CryptoJS.pad[padding] };
     if (mode !== 'ECB') {
-      var iv = padOrTruncate((utils.get('aes-iv') || {}).value, 16);
-      opts.iv = CryptoJS.enc.Utf8.parse(iv);
+      opts.iv = CryptoJS.enc.Utf8.parse(padOrTruncate(readCryptoSelect('des-iv'), 8));
     }
-    var keyWA = CryptoJS.enc.Utf8.parse(key);
-    var bytes = CryptoJS.AES.decrypt(input, keyWA, opts);
-    return CryptoJS.enc.Utf8.stringify(bytes);
+    return { keyWA: CryptoJS.enc.Utf8.parse(key), opts: opts };
   }
 
   function desEncrypt(input) {
-    var mode = (utils.get('des-mode') || {}).value || 'CBC';
-    var padding = (utils.get('des-padding') || {}).value || 'Pkcs7';
-    var key = padOrTruncate((utils.get('des-key') || {}).value, 8);
-    if (!key || key.length < 8) throw new Error('密钥需 8 字符');
-    var opts = { mode: CryptoJS.mode[mode], padding: CryptoJS.pad[padding] };
-    if (mode !== 'ECB') {
-      var iv = padOrTruncate((utils.get('des-iv') || {}).value, 8);
-      opts.iv = CryptoJS.enc.Utf8.parse(iv);
-    }
-    return CryptoJS.DES.encrypt(
-      CryptoJS.enc.Utf8.parse(input),
-      CryptoJS.enc.Utf8.parse(key),
-      opts
-    ).toString();
+    var p = desParams();
+    return CryptoJS.DES.encrypt(CryptoJS.enc.Utf8.parse(input), p.keyWA, p.opts).toString();
   }
 
   function desDecrypt(input) {
-    var mode = (utils.get('des-mode') || {}).value || 'CBC';
-    var padding = (utils.get('des-padding') || {}).value || 'Pkcs7';
-    var key = padOrTruncate((utils.get('des-key') || {}).value, 8);
-    if (!key || key.length < 8) throw new Error('密钥需 8 字符');
-    var opts = { mode: CryptoJS.mode[mode], padding: CryptoJS.pad[padding] };
-    if (mode !== 'ECB') {
-      var iv = padOrTruncate((utils.get('des-iv') || {}).value, 8);
-      opts.iv = CryptoJS.enc.Utf8.parse(iv);
-    }
-    var bytes = CryptoJS.DES.decrypt(input, CryptoJS.enc.Utf8.parse(key), opts);
-    return CryptoJS.enc.Utf8.stringify(bytes);
+    var p = desParams();
+    return CryptoJS.enc.Utf8.stringify(CryptoJS.DES.decrypt(input, p.keyWA, p.opts));
   }
 
   function rc4Encrypt(input) {
-    var key = (utils.get('rc4-key') || {}).value || '';
+    var key = readCryptoSelect('rc4-key');
     if (!key) throw new Error('请输入密钥');
     return CryptoJS.RC4.encrypt(CryptoJS.enc.Utf8.parse(input), key).toString();
   }
 
   function rc4Decrypt(input) {
-    var key = (utils.get('rc4-key') || {}).value || '';
+    var key = readCryptoSelect('rc4-key');
     if (!key) throw new Error('请输入密钥');
     var bytes = CryptoJS.RC4.decrypt(input, key);
     return CryptoJS.enc.Utf8.stringify(bytes);
   }
 
   function sm2Encrypt(input) {
-    var pubKey = (utils.get('sm2-pubkey') || {}).value || '';
+    var pubKey = readCryptoSelect('sm2-pubkey');
     if (!pubKey) throw new Error('请输入公钥');
     if (pubKey.length === 128) pubKey = '04' + pubKey;
     if (pubKey.length !== 130 || !pubKey.startsWith('04'))
       throw new Error('公钥格式错误（需 130 位十六进制，04 开头）');
-    var cipherMode = parseInt((utils.get('sm2-cipher') || {}).value) || 1;
     return sm2.doEncrypt(
       input.split('').map(function (c) {
         return c.charCodeAt(0);
       }),
       pubKey,
-      cipherMode
+      parseInt(readCryptoSelect('sm2-cipher')) || 1
     );
   }
 
   function sm2Decrypt(input) {
-    var priKey = (utils.get('sm2-prikey') || {}).value || '';
+    var priKey = readCryptoSelect('sm2-prikey');
     if (!priKey) throw new Error('请输入私钥');
-    var cipherMode = parseInt((utils.get('sm2-cipher') || {}).value) || 1;
+    var cipherMode = parseInt(readCryptoSelect('sm2-cipher')) || 1;
     var decrypted = sm2.doDecrypt(input, priKey, cipherMode, { output: 'array' });
     if (!decrypted) throw new Error('解密失败，请检查密钥和密文');
     return decrypted
@@ -279,73 +261,50 @@ window.VulnKitCrypto = (function () {
       .join('');
   }
 
-  function sm4Encrypt(input) {
-    var key = (utils.get('sm4-key') || {}).value || '';
-    if (!key || key.length !== 16) throw new Error('密钥需 16 字符');
-    var isCbc = (utils.get('sm4-mode') || {}).value === 'cbc';
-    var usePadding = (utils.get('sm4-padding') || {}).checked !== false;
-    var keyHex = Array.from(key)
+  function toHex(str) {
+    return Array.from(str)
       .map(function (c) {
         return c.charCodeAt(0).toString(16).padStart(2, '0');
       })
       .join('');
-    var iv = '';
-    if (isCbc) {
-      var ivVal = (utils.get('sm4-iv') || {}).value || '';
-      iv = Array.from(ivVal)
-        .map(function (c) {
-          return c.charCodeAt(0).toString(16).padStart(2, '0');
-        })
-        .join('');
-    }
-    return sm4.encrypt(input, keyHex, {
-      padding: usePadding ? 'pkcs#5' : 'none',
-      mode: isCbc ? 'cbc' : undefined,
-      iv: isCbc ? iv : undefined,
-    });
+  }
+
+  function sm4Params() {
+    var key = readCryptoSelect('sm4-key');
+    if (!key || key.length !== 16) throw new Error('密钥需 16 字符');
+    var isCbc = readCryptoSelect('sm4-mode') === 'cbc';
+    var usePadding = readCryptoCheck('sm4-padding') !== false;
+    return {
+      keyHex: toHex(key),
+      opts: {
+        padding: usePadding ? 'pkcs#5' : 'none',
+        mode: isCbc ? 'cbc' : undefined,
+        iv: isCbc ? toHex(readCryptoSelect('sm4-iv') || '') : undefined,
+      },
+    };
+  }
+
+  function sm4Encrypt(input) {
+    var p = sm4Params();
+    return sm4.encrypt(input, p.keyHex, p.opts);
   }
 
   function sm4Decrypt(input) {
-    var key = (utils.get('sm4-key') || {}).value || '';
-    if (!key || key.length !== 16) throw new Error('密钥需 16 字符');
-    var isCbc = (utils.get('sm4-mode') || {}).value === 'cbc';
-    var usePadding = (utils.get('sm4-padding') || {}).checked !== false;
-    var keyHex = Array.from(key)
-      .map(function (c) {
-        return c.charCodeAt(0).toString(16).padStart(2, '0');
-      })
-      .join('');
-    var iv = '';
-    if (isCbc) {
-      var ivVal = (utils.get('sm4-iv') || {}).value || '';
-      iv = Array.from(ivVal)
-        .map(function (c) {
-          return c.charCodeAt(0).toString(16).padStart(2, '0');
-        })
-        .join('');
-    }
-    return sm4.decrypt(input, keyHex, {
-      padding: usePadding ? 'pkcs#5' : 'none',
-      mode: isCbc ? 'cbc' : undefined,
-      iv: isCbc ? iv : undefined,
-    });
+    var p = sm4Params();
+    return sm4.decrypt(input, p.keyHex, p.opts);
   }
 
   function computeHash(input) {
-    var algo = (utils.get('hash-algo') || {}).value || 'sha256';
-    var useHex = (utils.get('hash-hex') || {}).checked !== false;
-    var useHmac = (utils.get('hash-hmac') || {}).checked;
-    var hmacKey = (utils.get('hash-hmac-key') || {}).value || '';
+    var algo = readCryptoSelect('hash-algo') || 'sha256';
+    var useHex = readCryptoCheck('hash-hex') !== false;
+    var useHmac = readCryptoCheck('hash-hmac');
+    var hmacKey = readCryptoSelect('hash-hmac-key');
     if (useHmac && !hmacKey) throw new Error('请输入 HMAC 密钥');
     var algoName = algo.toUpperCase().replace('-', '');
     if (useHmac) {
       var keyWA = CryptoJS.enc.Utf8.parse(hmacKey);
-      var hash = CryptoJS.HmacSHA256(input, keyWA);
-      if (algo === 'md5') hash = CryptoJS.HmacMD5(input, keyWA);
-      else if (algo === 'sha1') hash = CryptoJS.HmacSHA1(input, keyWA);
-      else if (algo === 'sha256') hash = CryptoJS.HmacSHA256(input, keyWA);
-      else if (algo === 'sha512') hash = CryptoJS.HmacSHA512(input, keyWA);
-      else if (algo === 'sha384') hash = CryptoJS.HmacSHA384(input, keyWA);
+      var fn = CryptoJS['Hmac' + algoName.charAt(0).toUpperCase() + algoName.slice(1)];
+      var hash = fn ? fn(input, keyWA) : CryptoJS.HmacSHA256(input, keyWA);
       return useHex ? hash.toString(CryptoJS.enc.Hex) : CryptoJS.enc.Base64.stringify(hash);
     }
     var result = CryptoJS[algoName](input);
@@ -353,13 +312,12 @@ window.VulnKitCrypto = (function () {
   }
 
   function toggleHashHmac() {
-    var useHmac = (utils.get('hash-hmac') || {}).checked;
     var row = utils.get('hash-hmac-key-row');
-    if (row) row.classList.toggle('hidden', !useHmac);
+    if (row) row.classList.toggle('hidden', !readCryptoCheck('hash-hmac'));
   }
 
   function bcryptHash(input) {
-    var rounds = parseInt((utils.get('bcrypt-rounds') || {}).value) || 10;
+    var rounds = parseInt(readCryptoSelect('bcrypt-rounds')) || 10;
     var salt = dcodeIO.bcrypt.genSaltSync(rounds);
     return dcodeIO.bcrypt.hashSync(input, salt);
   }

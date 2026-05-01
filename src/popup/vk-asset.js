@@ -501,33 +501,42 @@ window.VulnKitAsset = (function () {
     if (toggle) toggle.classList.toggle('active', enabled);
   }
 
+  var API_KEY_FIELDS = [
+    { id: 'key-fofa-email', storageKey: 'fofa_email' },
+    { id: 'key-fofa-key', storageKey: 'fofa_key' },
+    { id: 'key-zoomeye', storageKey: 'zoomeye' },
+    { id: 'key-shodan', storageKey: 'shodan' },
+  ];
+
+  function readKeyField(field) {
+    var v = (utils.get(field.id) || {}).value;
+    return v ? v.trim() : '';
+  }
+
   function saveApiKeys() {
-    var el = id => utils.get(id);
-    const keys = {
-      fofa_email: (el('key-fofa-email') || {}).value ? el('key-fofa-email').value.trim() : '',
-      fofa_key: (el('key-fofa-key') || {}).value ? el('key-fofa-key').value.trim() : '',
-      zoomeye: (el('key-zoomeye') || {}).value ? el('key-zoomeye').value.trim() : '',
-      shodan: (el('key-shodan') || {}).value ? el('key-shodan').value.trim() : '',
-    };
-    chrome.storage.local.set({ pentest_keys: keys }, () => {
+    var keys = {};
+    API_KEY_FIELDS.forEach(function (f) {
+      keys[f.storageKey] = readKeyField(f);
+    });
+    chrome.storage.local.set({ pentest_keys: keys }, function () {
       utils.showToast('配置已保存', 'success');
     });
   }
 
   function loadApiKeys() {
-    chrome.storage.local.get(['pentest_keys'], result => {
-      const keys = result.pentest_keys || {};
-      if (utils.get('key-fofa-email')) utils.get('key-fofa-email').value = keys.fofa_email || '';
-      if (utils.get('key-fofa-key')) utils.get('key-fofa-key').value = keys.fofa_key || '';
-      if (utils.get('key-zoomeye')) utils.get('key-zoomeye').value = keys.zoomeye || '';
-      if (utils.get('key-shodan')) utils.get('key-shodan').value = keys.shodan || '';
+    chrome.storage.local.get(['pentest_keys'], function (result) {
+      var keys = result.pentest_keys || {};
+      API_KEY_FIELDS.forEach(function (f) {
+        var el = utils.get(f.id);
+        if (el) el.value = keys[f.storageKey] || '';
+      });
     });
   }
 
   function clearApiKeys() {
-    chrome.storage.local.remove(['pentest_keys'], () => {
-      ['key-fofa-email', 'key-fofa-key', 'key-zoomeye', 'key-shodan'].forEach(id => {
-        var el = utils.get(id);
+    chrome.storage.local.remove(['pentest_keys'], function () {
+      API_KEY_FIELDS.forEach(function (f) {
+        var el = utils.get(f.id);
         if (el) el.value = '';
       });
       utils.showToast('配置已清除', 'success');

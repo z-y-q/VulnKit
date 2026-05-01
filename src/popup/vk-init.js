@@ -470,9 +470,10 @@
         html += '<div class="rules-group-header">' + utils.escapeHtml(group.group) + '</div>';
         (group.rules || []).forEach(rule => {
           const checked = rule.loaded ? ' checked' : '';
-          const scopeLabel = isPageScope(rule.scope)
-            ? ''
-            : ' <span class="rules-scope-na">[不适用]</span>';
+          const scopeLabel =
+            ['response body', 'response', 'any'].indexOf(rule.scope) !== -1
+              ? ''
+              : ' <span class="rules-scope-na">[不适用]</span>';
           html += '<label class="rules-item">';
           html +=
             '<input type="checkbox"' +
@@ -514,13 +515,17 @@
       });
     }
     if (rulesModalClose && rulesModal) {
-      rulesModalClose.addEventListener('click', () => {
+      var closeRulesModal = () => {
         rulesModal.style.display = 'none';
-      });
-      rulesModal.querySelector('.modal-overlay').addEventListener('click', () => {
-        rulesModal.style.display = 'none';
-      });
+      };
+      rulesModalClose.addEventListener('click', closeRulesModal);
+      rulesModal.querySelector('.modal-overlay').addEventListener('click', closeRulesModal);
     }
+    var applyRules = (rules, msg) => {
+      gather.updateRules(rules);
+      renderRulesList();
+      utils.showToast(msg, 'success');
+    };
     if (rulesImportBtn && rulesFileInput && haeRules) {
       rulesImportBtn.addEventListener('click', () => {
         rulesFileInput.click();
@@ -532,11 +537,9 @@
         reader.onload = () => {
           const imported = haeRules.importRules(reader.result);
           if (imported && imported.length > 0) {
-            gather.updateRules(imported);
-            renderRulesList();
-            utils.showToast(
-              '已导入 ' + imported.reduce((s, g) => s + (g.rules || []).length, 0) + ' 条规则',
-              'success'
+            applyRules(
+              imported,
+              '已导入 ' + imported.reduce((s, g) => s + (g.rules || []).length, 0) + ' 条规则'
             );
           } else {
             utils.showToast('规则文件解析失败', 'error');
@@ -548,15 +551,8 @@
     }
     if (rulesResetBtn && haeRules) {
       rulesResetBtn.addEventListener('click', () => {
-        const defaults = haeRules.getDefaultRules();
-        gather.updateRules(defaults);
-        renderRulesList();
-        utils.showToast('已恢复默认规则', 'success');
+        applyRules(haeRules.getDefaultRules(), '已恢复默认规则');
       });
-    }
-
-    function isPageScope(scope) {
-      return ['response body', 'response', 'any'].indexOf(scope) !== -1;
     }
 
     // Link extract

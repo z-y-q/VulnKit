@@ -126,36 +126,19 @@ window.VulnKitXss = (function () {
           Object.keys(obj).forEach(function (k) {
             if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
               Object.keys(obj[k]).forEach(function (nk) {
-                window.__XSS_INTERCEPT__.push({
-                  url: urlBase,
-                  param: k + '.' + nk,
-                  method: method,
-                });
+                window.__XSS_INTERCEPT__.push({ url: urlBase, param: k + '.' + nk, method: method });
               });
             } else {
-              window.__XSS_INTERCEPT__.push({
-                url: urlBase,
-                param: k,
-                method: method,
-              });
+              window.__XSS_INTERCEPT__.push({ url: urlBase, param: k, method: method });
             }
           });
         } catch (e) {}
       }
-
-      const origOpen = window.__XSS_ORIGINAL__.xhrOpen;
-      const origSend = window.__XSS_ORIGINAL__.xhrSend;
-      const origFetch = window.__XSS_ORIGINAL__.fetch;
-
       function collectQueryParams(rawUrl, method) {
         try {
           const u = new URL(rawUrl, location.href);
           u.searchParams.forEach((_, k) => {
-            window.__XSS_INTERCEPT__.push({
-              url: u.origin + u.pathname + u.search,
-              param: k,
-              method: method,
-            });
+            window.__XSS_INTERCEPT__.push({ url: u.origin + u.pathname + u.search, param: k, method: method });
           });
         } catch {}
       }
@@ -165,15 +148,24 @@ window.VulnKitXss = (function () {
           params.forEach((_, k) => {
             try {
               const u = new URL(rawUrl, location.href);
-              window.__XSS_INTERCEPT__.push({
-                url: u.origin + u.pathname,
-                param: k,
-                method: method,
-              });
+              window.__XSS_INTERCEPT__.push({ url: u.origin + u.pathname, param: k, method: method });
             } catch {}
           });
         } catch {}
       }
+      function processRequest(rawUrl, method, body) {
+        collectQueryParams(rawUrl, method);
+        if (typeof body === 'string' && body) {
+          collectBodyParams(body, rawUrl, method);
+          try {
+            var u = new URL(rawUrl, location.href);
+            extractJsonParams(body, u.origin + u.pathname, method);
+          } catch (e) {}
+        }
+      }
+      const origOpen = window.__XSS_ORIGINAL__.xhrOpen;
+      const origSend = window.__XSS_ORIGINAL__.xhrSend;
+      const origFetch = window.__XSS_ORIGINAL__.fetch;
 
       XMLHttpRequest.prototype.open = function (method, url) {
         this.__xss_method = method;
@@ -181,49 +173,13 @@ window.VulnKitXss = (function () {
         return origOpen.apply(this, arguments);
       };
       XMLHttpRequest.prototype.send = function (body) {
-        if (this.__xss_url) {
-          collectQueryParams(this.__xss_url, this.__xss_method || 'GET');
-        }
-        if (typeof body === 'string' && body) {
-          collectBodyParams(body, this.__xss_url || location.href, this.__xss_method || 'POST');
-          try {
-            const fallbackUrl2 = this.__xss_url || location.href;
-            let parsedUrl2;
-            try {
-              parsedUrl2 = new URL(fallbackUrl2, location.href);
-            } catch {
-              return;
-            }
-            extractJsonParams(
-              body,
-              parsedUrl2.origin + parsedUrl2.pathname,
-              this.__xss_method || 'POST'
-            );
-          } catch {}
-        }
+        processRequest(this.__xss_url || location.href, this.__xss_method || 'GET', body);
         return origSend.apply(this, arguments);
       };
-
       window.fetch = function (input, init) {
-        const url =
-          typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-        collectQueryParams(url, (init?.method || 'GET').toUpperCase());
-        if (init?.body && typeof init.body === 'string') {
-          collectBodyParams(init.body, url, (init?.method || 'POST').toUpperCase());
-          try {
-            let parsedUrl;
-            try {
-              parsedUrl = new URL(url, location.href);
-            } catch {
-              return origFetch.apply(this, arguments);
-            }
-            extractJsonParams(
-              init.body,
-              parsedUrl.origin + parsedUrl.pathname,
-              (init?.method || 'POST').toUpperCase()
-            );
-          } catch {}
-        }
+        var url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
+        var method = (init && init.method ? init.method : 'GET').toUpperCase();
+        processRequest(url, method, init && init.body);
         return origFetch.apply(this, arguments);
       };
       return 'injected';
@@ -271,15 +227,9 @@ window.VulnKitXss = (function () {
     utils
       .execInTab(tab.id, () => {
         if (!window.__XSS_ORIGINAL__) return;
-        if (window.__XSS_ORIGINAL__.xhrOpen) {
-          XMLHttpRequest.prototype.open = window.__XSS_ORIGINAL__.xhrOpen;
-        }
-        if (window.__XSS_ORIGINAL__.xhrSend) {
-          XMLHttpRequest.prototype.send = window.__XSS_ORIGINAL__.xhrSend;
-        }
-        if (window.__XSS_ORIGINAL__.fetch) {
-          window.fetch = window.__XSS_ORIGINAL__.fetch;
-        }
+        if (window.__XSS_ORIGINAL__.xhrOpen) XMLHttpRequest.prototype.open = window.__XSS_ORIGINAL__.xhrOpen;
+        if (window.__XSS_ORIGINAL__.xhrSend) XMLHttpRequest.prototype.send = window.__XSS_ORIGINAL__.xhrSend;
+        if (window.__XSS_ORIGINAL__.fetch) window.fetch = window.__XSS_ORIGINAL__.fetch;
         delete window.__XSS_INTERCEPT__;
         delete window.__XSS_ORIGINAL__;
       })
@@ -290,12 +240,7 @@ window.VulnKitXss = (function () {
     const el = utils.get('xssscan-status');
     if (!el) return;
     if (xssInterceptActive) {
-      el.textContent =
-        '拦截监听中... 剩余 ' +
-        xssInterceptCountdown +
-        's — 已捕获 ' +
-        xssPoints.length +
-        ' 个参数点';
+      el.textContent = '拦截监听中... 剩余 ' + xssInterceptCountdown + 's — 已捕获 ' + xssPoints.length + ' 个参数点';
       el.style.color = '#e67e22';
     } else {
       el.textContent =
@@ -333,11 +278,7 @@ window.VulnKitXss = (function () {
     const filtered = getFilteredXssPoints();
     if (countEl) {
       var hasFilter = xssFilterType !== 'all' || xssSearchText;
-      countEl.textContent =
-        '共发现 ' +
-        xssPoints.length +
-        ' 个注入点' +
-        (hasFilter ? '（显示: ' + filtered.length + '）' : '');
+      countEl.textContent = '共发现 ' + xssPoints.length + ' 个注入点' + (hasFilter ? '（显示: ' + filtered.length + '）' : '');
     }
     if (filtered.length === 0) {
       utils.setEmpty('xssscan-results', '暂无注入点');
@@ -350,27 +291,21 @@ window.VulnKitXss = (function () {
     filtered.forEach((p, i) => {
       const shortUrl = p.url.length > 40 ? p.url.substring(0, 37) + '...' : p.url;
       html +=
-        '<tr>' +
-        '<td><input type="checkbox" class="xssscan-point-check" data-idx="' +
+        '<tr><td><input type="checkbox" class="xssscan-point-check" data-idx="' +
         i +
-        '" checked></td>' +
-        '<td><span class="xssscan-source-tag" style="background:' +
+        '" checked></td><td><span class="xssscan-source-tag" style="background:' +
         (sourceColors[p.source] || '#999') +
         '">' +
         (sourceLabels[p.source] || p.source) +
-        '</span></td>' +
-        '<td class="xssscan-url-cell" title="' +
+        '</span></td><td class="xssscan-url-cell" title="' +
         utils.escapeHtml(p.url) +
         '">' +
         utils.escapeHtml(shortUrl) +
-        '</td>' +
-        '<td class="xssscan-param-cell">' +
+        '</td><td class="xssscan-param-cell">' +
         utils.escapeHtml(p.param) +
-        '</td>' +
-        '<td>' +
+        '</td><td>' +
         utils.escapeHtml(p.method) +
-        '</td>' +
-        '</tr>';
+        '</td></tr>';
     });
     html += '</tbody></table>';
     container.innerHTML = html;
@@ -437,6 +372,12 @@ window.VulnKitXss = (function () {
     return XSS_SCAN_PAYLOADS[0].value;
   }
 
+  function getEncodedPayload() {
+    var raw = getSelectedPayload();
+    var encoding = (utils.get('xssscan-encoding') || {}).value || 'none';
+    return encodePayload(raw, encoding);
+  }
+
   async function handleXssHarvest() {
     const statusEl = utils.get('xssscan-status');
     if (statusEl) {
@@ -446,18 +387,14 @@ window.VulnKitXss = (function () {
     try {
       const domPoints = await harvestXssParamsFromDom();
       const existing = new Set(xssPoints.map(p => p.url + '|' + p.param + '|' + p.method));
-      const newPoints = domPoints.filter(
-        p => !existing.has(p.url + '|' + p.param + '|' + p.method)
-      );
+      const newPoints = domPoints.filter(p => !existing.has(p.url + '|' + p.param + '|' + p.method));
       xssPoints = [...xssPoints, ...newPoints];
       renderXssPoints();
       if (statusEl) {
-        statusEl.textContent =
-          '采集完成，新增 ' + newPoints.length + ' 个注入点，共 ' + xssPoints.length + ' 个';
+        statusEl.textContent = '采集完成，新增 ' + newPoints.length + ' 个注入点，共 ' + xssPoints.length + ' 个';
         statusEl.style.color = '#27ae60';
       }
-      if (newPoints.length > 0)
-        utils.showToast('发现 ' + newPoints.length + ' 个注入点', 'success');
+      if (newPoints.length > 0) utils.showToast('发现 ' + newPoints.length + ' 个注入点', 'success');
       else utils.showToast('未发现新的注入点', 'info');
     } catch (e) {
       if (statusEl) {
@@ -474,9 +411,7 @@ window.VulnKitXss = (function () {
       utils.showToast('没有选中的注入点', 'warning');
       return;
     }
-    const rawPayload = getSelectedPayload();
-    const encoding = (utils.get('xssscan-encoding') || {}).value || 'none';
-    const payload = encodePayload(rawPayload, encoding);
+    const payload = getEncodedPayload();
     const getPoints = selected.filter(p => p.method !== 'POST');
     const postPoints = selected.filter(p => p.method === 'POST');
     let opened = 0;
@@ -528,18 +463,16 @@ window.VulnKitXss = (function () {
             const formHtml =
               '<form method="POST" action="' +
               escAttr(targetUrl) +
-              '">' +
-              '<input type="hidden" name="' +
+              '"><input type="hidden" name="' +
               escAttr(point.param) +
               '" value="' +
               escAttr(payload) +
-              '">' +
-              '</form><script>document.forms[0].submit()<\/script>';
+              '"></form><script>document.forms[0].submit()<\/script>';
             const blobUrl = URL.createObjectURL(new Blob([formHtml], { type: 'text/html' }));
             chrome.tabs.create({ url: blobUrl, active: false });
             opened++;
           } catch {
-            /* skip this point */
+            /* skip */
           }
         }
       }
@@ -555,9 +488,7 @@ window.VulnKitXss = (function () {
       utils.showToast('没有选中的注入点', 'warning');
       return;
     }
-    const rawPayload = getSelectedPayload();
-    const encoding = (utils.get('xssscan-encoding') || {}).value || 'none';
-    const payload = encodePayload(rawPayload, encoding);
+    const payload = getEncodedPayload();
     const lines = selected
       .map(p => {
         const result = buildXssTestUrl(p, payload);
@@ -615,24 +546,20 @@ window.VulnKitXss = (function () {
     var rows = xssPoints.map(function (p) {
       return [p.source, p.url, p.param, p.method];
     });
-    utils.buildCsv(
-      ['Source', 'URL', 'Param', 'Method'],
-      rows,
-      'vulnkit-xss-' + Date.now() + '.csv'
-    );
+    utils.buildCsv(['Source', 'URL', 'Param', 'Method'], rows, 'vulnkit-xss-' + Date.now() + '.csv');
   }
 
   return {
-    startXssIntercept,
-    stopXssIntercept,
-    updateXssInterceptStatus,
-    renderXssPoints,
-    handleXssHarvest,
-    handleBatchOpenXss,
-    handleCopyXssUrls,
-    initXssScanPayloadSelect,
-    clearResults,
-    exportData,
+    startXssIntercept: startXssIntercept,
+    stopXssIntercept: stopXssIntercept,
+    updateXssInterceptStatus: updateXssInterceptStatus,
+    renderXssPoints: renderXssPoints,
+    handleXssHarvest: handleXssHarvest,
+    handleBatchOpenXss: handleBatchOpenXss,
+    handleCopyXssUrls: handleCopyXssUrls,
+    initXssScanPayloadSelect: initXssScanPayloadSelect,
+    clearResults: clearResults,
+    exportData: exportData,
     get xssPoints() {
       return xssPoints;
     },

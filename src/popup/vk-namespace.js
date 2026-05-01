@@ -329,42 +329,14 @@
   };
 
   var utilsProxy = {};
-  [
-    'get',
-    'escapeHtml',
-    'copyText',
-    'showToast',
-    'copyAndToast',
-    'downloadCsv',
-    'downloadBlob',
-    'buildCsv',
-    'bindClick',
-    'on',
-    'emptyHtml',
-    'setStatus',
-    'setEmpty',
-    'switchSubTabs',
-    'execInTab',
-    'execInTabData',
-    'execResult',
-    'csvField',
-    'requireTabId',
-    'requireInput',
-    'withTab',
-    'getActiveTab',
-    'getCurrentDomain',
-    'toggleBtnPair',
-    'bindTabSwitch',
-    'fetchUrl',
-    'fetchUrlJson',
-    'batchFetch',
-    'updateIndicator',
-    'filterByQuery',
-    'bindEnterKey',
-  ].forEach(function (method) {
-    utilsProxy[method] = function () {
-      return utils[method].apply(utils, arguments);
-    };
-  });
+  Object.keys(utils)
+    .filter(function (k) {
+      return typeof utils[k] === 'function';
+    })
+    .forEach(function (method) {
+      utilsProxy[method] = function () {
+        return utils[method].apply(utils, arguments);
+      };
+    });
   utils.utilsProxy = utilsProxy;
 })();
