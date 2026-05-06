@@ -59,6 +59,9 @@
 
   var _cachedCustomUrls = '';
   var _cachedPatterns = null;
+  var _quickSkipRe = /(?:getRouters?|getUserInfo|getInfo)\b/i;
+  var _quickApiSkipRe =
+    /\b(?:api|admin|system|monitor|tool|gen|auth|login|logout|captcha|code|user|role|menu|dept|post|dict|config|notice|log)\b|\.(?:json|xml)\b/i;
 
   function isRouterUrl(url) {
     var hook = window.__VK_RUOYI_HOOK__;
@@ -226,11 +229,13 @@
     var url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
     var fetchOpts = args[1] && typeof args[1] === 'object' ? args[1] : {};
     var fetchMethod = (fetchOpts.method || 'GET').toUpperCase();
+    var isRouter = _quickSkipRe.test(url);
+    var isUserInfo = !isRouter && /(?:getUserInfo|getInfo)\b/i.test(url);
     return origFetch.apply(this, args).then(function (response) {
       var config = window.__VK_RUOYI_HOOK__;
 
       // ALWAYS capture /getRouters responses (passive, no modification)
-      if (isRouterUrl(url)) {
+      if (isRouter) {
         if (!response.ok) {
           logRequest('router-error', url, response.status, fetchMethod);
           return response;
@@ -284,7 +289,7 @@
       }
 
       // ALWAYS capture userinfo responses
-      if (isUserInfoUrl(url)) {
+      if (isUserInfo) {
         if (!response.ok) {
           logRequest('userinfo-error', url, response.status, fetchMethod);
           return response;
@@ -294,7 +299,7 @@
       }
 
       // API traffic logging only when enabled (more expensive)
-      if (config && config.enabled && isApiUrl(url) && !isRouterUrl(url) && !isUserInfoUrl(url)) {
+      if (config && config.enabled && _quickApiSkipRe.test(url) && !isRouter && !isUserInfo) {
         response
           .clone()
           .text()
@@ -322,9 +327,11 @@
     var self = this;
     var config = window.__VK_RUOYI_HOOK__;
     var reqUrl = this.__vk_ruoyi_url;
+    var xhrIsRouter = reqUrl ? _quickSkipRe.test(reqUrl) : false;
+    var xhrIsUserInfo = !xhrIsRouter && reqUrl ? /(?:getUserInfo|getInfo)\b/i.test(reqUrl) : false;
 
     // ALWAYS capture router responses (passive)
-    if (reqUrl && isRouterUrl(reqUrl)) {
+    if (xhrIsRouter) {
       this.addEventListener('readystatechange', function () {
         if (self.readyState === 4) {
           if (self.status !== 200) {
@@ -385,9 +392,9 @@
       config &&
       config.enabled &&
       reqUrl &&
-      isApiUrl(reqUrl) &&
-      !isRouterUrl(reqUrl) &&
-      !isUserInfoUrl(reqUrl)
+      _quickApiSkipRe.test(reqUrl) &&
+      !xhrIsRouter &&
+      !xhrIsUserInfo
     ) {
       this.addEventListener('load', function () {
         logApiRequest(

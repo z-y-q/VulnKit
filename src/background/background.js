@@ -376,7 +376,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'FETCH_PROBE':
-      // Probing uses the tab's own origin — allow private IPs but validate protocol
+      // Probing uses the tab's own origin — allow private IPs but validate protocol and sender origin
       {
         let probeUrl;
         try {
@@ -388,6 +388,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         } catch {
           sendResponse({ error: 'Invalid URL' });
           return true;
+        }
+        if (sender.tab && sender.tab.url) {
+          try {
+            var senderOrigin = new URL(sender.tab.url).origin;
+            if (probeUrl.origin !== senderOrigin && probeUrl.hostname !== sender.tab.url) {
+              sendResponse({ error: 'Origin mismatch' });
+              return true;
+            }
+          } catch {}
         }
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), message.timeout || 5000);
@@ -435,6 +444,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
       }
       return true;
+
+    case 'VK_RUOYI_HOOK_EVENT':
+      chrome.storage.local
+        .set({
+          __vk_ruoyi_event: {
+            event: message.event,
+            augmented: message.augmented || false,
+            ts: Date.now(),
+          },
+        })
+        .catch(function () {});
+      return false;
 
     default:
       return false;

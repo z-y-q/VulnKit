@@ -9,19 +9,11 @@
     "clipboardWrite",
     "scripting",
     "contextMenus",
-    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
     "cookies",
     "downloads"
   ],
   "host_permissions": [
-    "https://web.archive.org/*",
-    "https://fofa.info/*",
-    "https://api.zoomeye.org/*",
-    "https://api.zoomeye.ai/*",
-    "https://api.shodan.io/*",
-    "https://internetdb.shodan.io/*",
-    "https://geonet.shodan.io/*",
-    "https://dns.google/*",
     "<all_urls>"
   ],
   "background": {

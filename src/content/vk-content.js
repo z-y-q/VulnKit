@@ -117,7 +117,7 @@
     }
     if (message.type === 'VK_VUE_STORE_EXPLORE') {
       storeExploreResolve = null;
-      return new Promise(function (resolve) {
+      new Promise(function (resolve) {
         storeExploreResolve = resolve;
         var script = document.createElement('script');
         script.src = chrome.runtime.getURL('src/inject/vue-store-explorer.js');
@@ -138,9 +138,13 @@
           }
         };
         (document.head || document.documentElement).appendChild(script);
-      }).then(function (result) {
-        sendResponse(result);
-      });
+      })
+        .then(function (result) {
+          sendResponse(result);
+        })
+        .catch(function (err) {
+          sendResponse({ error: err.message || 'Store explore failed' });
+        });
       return true;
     }
   });
