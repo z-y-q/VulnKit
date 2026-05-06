@@ -1,0 +1,124 @@
+/* popup/info-gather.css -- 灵眸 Chrome Extension */
+/* ====== Info Gather Panel ====== */
+.gather-sub-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.gather-tab {
+  padding: 4px 10px;
+  border: 1px solid #E0E0E0;
+  background: #fff;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gather-tab:hover { color: #4A90E2; border-color: #4A90E2; }
+.gather-tab.active { background: #4A90E2; color: #fff; border-color: #4A90E2; }
+
+.gather-status {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 6px;
+  min-height: 16px;
+}
+
+.gather-results {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.gather-item {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 12px;
+}
+
+.gather-item:last-child { border-bottom: none; }
+.gather-item:hover { background: #F5F7FA; }
+
+.gather-item-type {
+  flex-shrink: 0;
+  width: 52px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+  padding: 2px 4px;
+  border-radius: 3px;
+  margin-right: 8px;
+}
+
+.type-get { background: #10b981; }
+.type-post { background: #4A90E2; }
+.type-put { background: #f59e0b; }
+.type-delete { background: #ef4444; }
+.type-api { background: #8b5cf6; }
+.type-ws { background: #06b6d4; }
+.type-domain { background: #6366f1; }
+.type-cookie { background: #f97316; }
+.type-meta { background: #ec4899; }
+.type-ip { background: #14b8a6; }
+.type-email { background: #a855f7; }
+.type-token { background: #ef4444; }
+.type-other { background: #6b7280; }
+.type-red { background: #ef4444; }
+.type-orange { background: #f97316; }
+.type-yellow { background: #eab308; }
+.type-green { background: #10b981; }
+.type-cyan { background: #06b6d4; }
+.type-blue { background: #3b82f6; }
+.type-pink { background: #ec4899; }
+.type-magenta { background: #d946ef; }
+.type-gray { background: #6b7280; }
+.type-api { background: #f59e0b; }
+
+.gather-item-value {
+  flex: 1;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 11px;
+}
+
+.gather-item-value:hover { color: #4A90E2; text-decoration: underline; }
+
+.gather-item-copy {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: #999;
+  background: transparent;
+  border: 1px solid #E0E0E0;
+  border-radius: 3px;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+.gather-item-copy:hover { background: #E6F0FA; color: #4A90E2; }
+
+
+.gather-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+[data-theme='dark'] .gather-tab { background: var(--bg-secondary); color: var(--text-secondary); border-color: var(--border-color); }
+[data-theme='dark'] .gather-tab:hover { color: var(--accent); border-color: var(--accent); }
+[data-theme='dark'] .gather-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+[data-theme='dark'] .gather-item { border-color: var(--border-color); }
+[data-theme='dark'] .gather-item:hover { background: var(--bg-tertiary); }
+[data-theme='dark'] .gather-item-value { color: var(--text-primary); }
+[data-theme='dark'] .gather-item-copy { color: var(--text-secondary); border-color: var(--border-color); }
+[data-theme='dark'] .gather-item-copy:hover { background: var(--accent-light); color: var(--accent); }

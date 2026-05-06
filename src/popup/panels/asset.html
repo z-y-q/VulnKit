@@ -1,0 +1,72 @@
+    <!-- 资产测绘面板 -->
+    <div id="panel-asset" class="panel">
+      <div class="content-card">
+        <div class="card-title">资产测绘</div>
+        <div class="asset-input-row">
+          <input type="text" id="asset-query" class="input" placeholder="留空使用当前页面域名" />
+          <button class="btn btn-primary" id="asset-scan-btn">扫描</button>
+          <button class="btn btn-outline" id="asset-scan-all-btn">全部搜索</button>
+        </div>
+        <div class="asset-query-options">
+          <button id="asset-custom-toggle" class="toggle-btn">自定义语法</button>
+          <span id="asset-query-hint" class="asset-query-hint"></span>
+        </div>
+        <div class="asset-source-tabs">
+          <button class="source-btn active" data-source="fofa">FOFA</button>
+          <button class="source-btn" data-source="zoomeye">ZoomEye</button>
+          <button class="source-btn" data-source="shodan">Shodan</button>
+          <div class="asset-size-select">
+            <label>数量</label>
+            <select id="asset-size">
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+        </div>
+        <div class="asset-status" id="asset-status"></div>
+        <div class="asset-actions-row" id="asset-actions-row" style="display:none">
+          <button id="asset-export-btn" class="btn btn-sm btn-outline">导出结果</button>
+        </div>
+        <input type="text" id="asset-search" class="input" placeholder="搜索结果..." style="display:none;margin:6px 0;">
+        <div class="asset-results" id="asset-results"></div>
+
+        <div class="card-spacing">
+          <div class="card-title">Shodan 主机信息查询</div>
+          <div class="asset-input-row">
+            <input type="text" id="shodan-host-input" class="input" placeholder="IP 或域名，留空查询当前网站" />
+            <button class="btn btn-primary" id="shodan-host-btn">查询</button>
+          </div>
+          <div style="font-size:11px;color:#888;padding:0 0 4px;">免费查询，无需 API Key。配置 Key 可获取更多详情（ISP/组织/OS）</div>
+          <div id="shodan-host-info"></div>
+        </div>
+
+        <div class="card-spacing">
+          <div class="card-title">API Key 配置</div>
+          <div class="settings-grid">
+            <div class="setting-item">
+              <label>FOFA Email</label>
+              <input type="text" id="key-fofa-email" class="input" placeholder="FOFA 账号邮箱">
+            </div>
+            <div class="setting-item">
+              <label>FOFA Key</label>
+              <input type="text" id="key-fofa-key" class="input" placeholder="FOFA API Key">
+            </div>
+            <div class="setting-item">
+              <label>ZoomEye Key</label>
+              <input type="text" id="key-zoomeye" class="input" placeholder="ZoomEye API Key">
+            </div>
+            <div class="setting-item">
+              <label>Shodan Key</label>
+              <input type="text" id="key-shodan" class="input" placeholder="Shodan API Key">
+            </div>
+          </div>
+          <div class="panel-actions">
+            <button class="btn btn-sm btn-primary" id="save-keys-btn">保存配置</button>
+            <button class="btn btn-sm btn-outline" id="clear-keys-btn">清除配置</button>
+          </div>
+        </div>
+      </div>
+    </div>
+

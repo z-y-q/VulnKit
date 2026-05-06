@@ -1,0 +1,53 @@
+    <!-- 图标识别面板 -->
+    <div id="panel-favicon" class="panel">
+      <div class="content-card">
+        <div class="card-title">网站图标识别</div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="extract-favicon-btn">提取当前页面图标</button>
+        </div>
+        <div class="card-spacing">
+          <div class="favicon-info">
+            <div class="favicon-preview">
+              <img id="favicon-img" class="hidden" alt="favicon">
+              <div id="favicon-placeholder" class="favicon-empty">暂无图标</div>
+            </div>
+            <div class="favicon-details">
+              <div class="detail-row">
+                <span class="detail-label">Favicon URL</span>
+                <span class="detail-value link-value" id="favicon-url">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Favicon Hash (mmh3)</span>
+                <span class="detail-value hash-value" id="favicon-hash">-</span>
+              </div>
+              <div class="detail-row">
+                <button class="btn btn-sm btn-outline" id="copy-favicon-url-btn">复制 URL</button>
+                <button class="btn btn-sm btn-outline" id="copy-favicon-hash-btn">复制 Hash</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="favicon-search-links" id="favicon-search-links"></div>
+      </div>
+    </div>
+
+    <!-- 信息收集面板 -->
+    <div id="panel-gather" class="panel">
+      <div class="content-card">
+        <div class="card-title">信息收集</div>
+        <div class="gather-actions">
+          <button class="btn btn-primary" id="gather-btn">收集当前页面</button>
+          <button class="btn btn-sm btn-outline" id="gather-copy-btn">复制当前分类</button>
+          <button class="btn btn-sm btn-outline" id="gather-export-btn">导出</button>
+          <button class="btn btn-sm btn-outline" id="gather-rules-btn">规则管理</button>
+        </div>
+        <div class="gather-sub-tabs" id="gather-sub-tabs">
+          <!-- 由 JS 动态生成 -->
+        </div>
+        <input type="text" id="gather-search" class="input" placeholder="搜索过滤结果..." style="margin-bottom:4px;display:none;">
+        <div class="gather-status" id="gather-status"></div>
+        <div class="gather-results" id="gather-results">
+          <div class="empty-state">点击「收集当前页面」开始</div>
+        </div>
+      </div>
+    </div>

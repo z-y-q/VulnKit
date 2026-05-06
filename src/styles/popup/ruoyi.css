@@ -1,0 +1,1284 @@
+/* popup/ruoyi.css -- 灵眸 Chrome Extension */
+/* ====== RuoYi Route Module ====== */
+
+.ruoyi-module-desc {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.ruoyi-workflow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  background: #f0f4f8;
+  border-radius: 6px;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.ruoyi-wf-step {
+  color: #999;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ruoyi-wf-step.active {
+  color: #4A90E2;
+  font-weight: 600;
+}
+
+.ruoyi-wf-step.done {
+  color: #27ae60;
+  font-weight: 500;
+}
+
+.ruoyi-wf-arrow {
+  color: #ccc;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ruoyi-section-header {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.ruoyi-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ruoyi-section-desc {
+  font-size: 11px;
+  color: #888;
+  line-height: 1.6;
+}
+
+.ruoyi-prereq {
+  font-size: 10px;
+  font-weight: 400;
+  color: #e67e22;
+  background: #fef5e7;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.ruoyi-sub-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ruoyi-stab {
+  padding: 5px 12px;
+  border: 1px solid #E0E0E0;
+  background: #F5F7FA;
+  color: #666;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.ruoyi-stab:hover {
+  color: #4A90E2;
+  border-color: #4A90E2;
+}
+
+.ruoyi-stab.active {
+  background: #4A90E2;
+  color: #fff;
+  border-color: #4A90E2;
+}
+
+.ruoyi-subpanel {
+  display: none;
+}
+
+.ruoyi-subpanel.active {
+  display: block;
+}
+
+.ruoyi-augment-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.ruoyi-augment-row label {
+  white-space: nowrap;
+  color: #666;
+}
+
+.ruoyi-augment-row .select-filter {
+  width: 180px;
+}
+
+.ruoyi-status {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+  min-height: 16px;
+}
+
+.ruoyi-results,
+.ruoyi-captured-panel,
+.ruoyi-analyze-results {
+  max-height: 320px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.ruoyi-detect-info {
+  padding: 8px;
+}
+
+.ruoyi-detect-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.ruoyi-badge-ok {
+  background: #D4EDDA;
+  color: #155724;
+}
+
+.ruoyi-badge-warn {
+  background: #FFF3CD;
+  color: #856404;
+}
+
+.ruoyi-evidence-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ruoyi-evidence-item {
+  background: #F0F4FF;
+  color: #4A90E2;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.ruoyi-route-summary {
+  font-size: 12px;
+  color: #666;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 8px;
+}
+
+.ruoyi-route-tree {
+  font-family: monospace;
+}
+
+.ruoyi-route-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  border-bottom: 1px solid #f5f5f5;
+  flex-wrap: wrap;
+}
+
+.ruoyi-route-node:hover {
+  background: #F5F7FA;
+}
+
+.ruoyi-route-toggle {
+  cursor: pointer;
+  font-size: 10px;
+  color: #999;
+  width: 14px;
+  text-align: center;
+  user-select: none;
+}
+
+.ruoyi-route-hidden {
+  background: #F8D7DA;
+  color: #721C24;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.ruoyi-route-type {
+  background: #E8F4FD;
+  color: #1565C0;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ruoyi-route-nocache {
+  background: #FFF3E0;
+  color: #E65100;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ruoyi-route-path {
+  color: #4A90E2;
+  font-weight: 600;
+}
+
+.ruoyi-route-name {
+  color: #666;
+  margin-left: 4px;
+  font-size: 11px;
+}
+
+.ruoyi-route-title {
+  color: #999;
+  margin-left: 4px;
+  font-size: 11px;
+}
+
+.ruoyi-route-component {
+  color: #aaa;
+  margin-left: 4px;
+  font-size: 10px;
+  font-style: italic;
+}
+
+.ruoyi-route-children {
+  margin-left: 8px;
+}
+
+.ruoyi-discovery-summary {
+  font-size: 12px;
+  color: #666;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 8px;
+}
+
+.ruoyi-extra-routes {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ruoyi-extra-route-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.ruoyi-extra-route-item label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.ruoyi-route-check {
+  margin: 0;
+}
+
+.ruoyi-route-source {
+  color: #999;
+  font-size: 10px;
+  margin-left: auto;
+}
+
+.ruoyi-results::-webkit-scrollbar,
+.ruoyi-captured-panel::-webkit-scrollbar,
+.ruoyi-analyze-results::-webkit-scrollbar,
+.ruoyi-extra-routes::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ruoyi-results::-webkit-scrollbar-track,
+.ruoyi-captured-panel::-webkit-scrollbar-track,
+.ruoyi-analyze-results::-webkit-scrollbar-track,
+.ruoyi-extra-routes::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ruoyi-results::-webkit-scrollbar-thumb,
+.ruoyi-captured-panel::-webkit-scrollbar-thumb,
+.ruoyi-analyze-results::-webkit-scrollbar-thumb,
+.ruoyi-extra-routes::-webkit-scrollbar-thumb {
+  background: #D0D0D0;
+  border-radius: 2px;
+}
+
+[data-theme='dark'] .ruoyi-module-desc {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-workflow {
+  background: var(--bg-tertiary, #2a2a3e);
+}
+
+[data-theme='dark'] .ruoyi-wf-step {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-wf-step.active {
+  color: var(--accent, #4A90E2);
+}
+
+[data-theme='dark'] .ruoyi-wf-step.done {
+  color: #2ecc71;
+}
+
+[data-theme='dark'] .ruoyi-wf-arrow {
+  color: var(--border-color, #444);
+}
+
+[data-theme='dark'] .ruoyi-section-header {
+  border-bottom-color: var(--border-color, #444);
+}
+
+[data-theme='dark'] .ruoyi-section-title {
+  color: var(--text-primary, #e0e0e0);
+}
+
+[data-theme='dark'] .ruoyi-section-desc {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-prereq {
+  color: #f0a050;
+  background: #3a2a1a;
+}
+
+[data-theme='dark'] .ruoyi-stab {
+  background: var(--bg-tertiary, #2a2a3e);
+  border-color: var(--border-color, #444);
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-stab:hover {
+  color: var(--accent, #4A90E2);
+  border-color: var(--accent);
+}
+
+[data-theme='dark'] .ruoyi-stab.active {
+  background: var(--accent, #4A90E2);
+  color: #fff;
+}
+
+[data-theme='dark'] .ruoyi-status {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-route-node {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .ruoyi-route-node:hover {
+  background: var(--bg-tertiary, #2a2a3e);
+}
+
+[data-theme='dark'] .ruoyi-route-path {
+  color: var(--accent, #4A90E2);
+}
+
+[data-theme='dark'] .ruoyi-route-name {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-route-title {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-route-component {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-badge-ok {
+  background: var(--bg-tertiary);
+  color: #10b981;
+}
+
+[data-theme='dark'] .ruoyi-badge-warn {
+  background: var(--bg-tertiary);
+  color: #f59e0b;
+}
+
+[data-theme='dark'] .ruoyi-evidence-item {
+  background: var(--bg-tertiary, #2a2a3e);
+  color: var(--accent);
+}
+
+[data-theme='dark'] .ruoyi-route-summary {
+  color: var(--text-secondary);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .ruoyi-discovery-summary {
+  color: var(--text-secondary);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .ruoyi-extra-route-item {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .ruoyi-route-source {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-results::-webkit-scrollbar-thumb,
+[data-theme='dark'] .ruoyi-captured-panel::-webkit-scrollbar-thumb,
+[data-theme='dark'] .ruoyi-analyze-results::-webkit-scrollbar-thumb,
+[data-theme='dark'] .ruoyi-extra-routes::-webkit-scrollbar-thumb {
+  background: #3A3A5E;
+}
+
+/* RuoYi — Detection extras */
+.ruoyi-detect-extra {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ruoyi-detect-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ruoyi-detect-tag.tag-token {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ruoyi-detect-tag.tag-version {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.ruoyi-cve-link {
+  font-size: 10px;
+  color: #e74c3c;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ruoyi-cve-link:hover {
+  color: #c0392b;
+}
+
+/* RuoYi — Custom URL input */
+.ruoyi-custom-url-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 6px 10px;
+  background: var(--bg-tertiary, #f8f9fa);
+  border-radius: 6px;
+}
+
+.ruoyi-custom-url-row label {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  white-space: nowrap;
+}
+
+.ruoyi-custom-url-row .text-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  padding: 3px 8px;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  color: var(--text-primary, #333);
+  outline: none;
+}
+
+.ruoyi-custom-url-row .text-input:focus {
+  border-color: var(--accent, #4A90E2);
+}
+
+/* RuoYi — Route toolbar */
+.ruoyi-route-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-color, #eee);
+  margin-bottom: 4px;
+}
+
+.ruoyi-route-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ruoyi-search-input {
+  width: 120px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  outline: none;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #333);
+}
+
+.ruoyi-search-input:focus {
+  border-color: var(--accent, #4A90E2);
+  width: 150px;
+}
+
+.ruoyi-hidden-count {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* RuoYi — Node styling */
+.ruoyi-route-node.node-hidden {
+  opacity: 0.5;
+}
+
+.ruoyi-route-roles {
+  font-size: 10px;
+  color: #8b5cf6;
+  background: #f3f0ff;
+  padding: 0 6px;
+  border-radius: 3px;
+  margin-left: 4px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* RuoYi — Request log */
+.ruoyi-log-section {
+  margin-bottom: 8px;
+}
+
+.ruoyi-log-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+  margin-bottom: 4px;
+}
+
+.ruoyi-log-list {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.ruoyi-log-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border-color, #eee);
+}
+
+.ruoyi-log-entry.log-router {
+  border-left: 3px solid #10b981;
+}
+
+.ruoyi-log-entry.log-info {
+  border-left: 3px solid #3b82f6;
+}
+
+.ruoyi-log-entry.log-error {
+  border-left: 3px solid #ef4444;
+}
+
+.ruoyi-log-entry.log-userinfo {
+  border-left: 3px solid #f59e0b;
+}
+
+.ruoyi-log-type {
+  font-weight: 600;
+  color: #10b981;
+  min-width: 55px;
+}
+
+.ruoyi-log-url {
+  flex: 1;
+  color: var(--text-primary, #333);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ruoyi-log-status {
+  color: var(--text-secondary, #999);
+  font-size: 10px;
+}
+
+.ruoyi-log-time {
+  color: var(--text-secondary, #999);
+  font-size: 10px;
+  min-width: 55px;
+  text-align: right;
+}
+
+/* RuoYi — Discovery stats */
+.ruoyi-discovery-stats {
+  display: flex;
+  gap: 12px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text-secondary, #666);
+}
+
+.ruoyi-stat-item {
+  background: var(--bg-tertiary, #f0f0f0);
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+
+/* Dark mode — new elements */
+[data-theme='dark'] .ruoyi-detect-tag.tag-token {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .ruoyi-detect-tag.tag-version {
+  background: #1e3a5f;
+  color: #93c5fd;
+}
+
+[data-theme='dark'] .ruoyi-cve-link {
+  color: #f87171;
+}
+[data-theme='dark'] .ruoyi-cve-link:hover {
+  color: #fca5a5;
+}
+
+[data-theme='dark'] .ruoyi-custom-url-row {
+  background: var(--bg-tertiary, #2a2a3e);
+}
+
+[data-theme='dark'] .ruoyi-custom-url-row .text-input {
+  background: var(--bg-primary, #1a1a2e);
+  border-color: var(--border-color, #444);
+  color: var(--text-primary, #e0e0e0);
+}
+
+[data-theme='dark'] .ruoyi-route-toolbar {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .ruoyi-search-input {
+  background: var(--bg-primary, #1a1a2e);
+  border-color: var(--border-color, #444);
+  color: var(--text-primary, #e0e0e0);
+}
+
+[data-theme='dark'] .ruoyi-route-roles {
+  background: #2e1065;
+  color: #c4b5fd;
+}
+
+[data-theme='dark'] .ruoyi-route-type {
+  background: #1e3a5f;
+  color: #90caf9;
+}
+
+[data-theme='dark'] .ruoyi-route-nocache {
+  background: #4e342e;
+  color: #ffb74d;
+}
+
+[data-theme='dark'] .ruoyi-log-entry {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .ruoyi-log-url {
+  color: var(--text-primary, #e0e0e0);
+}
+
+[data-theme='dark'] .ruoyi-stat-item {
+  background: var(--bg-tertiary, #2a2a3e);
+}
+
+/* RuoYi — Route Perms */
+.ruoyi-route-perms {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: #dbeafe;
+  color: #1e40af;
+  margin-right: 4px;
+}
+
+[data-theme='dark'] .ruoyi-route-perms {
+  background: #1e3a5f;
+  color: #90caf9;
+}
+
+/* RuoYi — Batch Probe */
+.ruoyi-probe-opts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.ruoyi-probe-opts label {
+  white-space: nowrap;
+  color: #666;
+}
+
+.ruoyi-probe-opts .select-filter {
+  width: 70px;
+}
+
+.ruoyi-probe-opts .text-input {
+  width: 80px;
+}
+
+.ruoyi-probe-check-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ruoyi-probe-progress {
+  font-size: 12px;
+  color: #4A90E2;
+  margin-bottom: 6px;
+  min-height: 16px;
+  font-weight: 500;
+}
+
+.ruoyi-probe-results {
+  max-height: 300px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.ruoyi-probe-stats {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.probe-stat {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.probe-stat.probe-ok {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.probe-stat.probe-redirect {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.probe-stat.probe-auth {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.probe-stat.probe-notfound {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.probe-stat.probe-error {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.probe-stat.probe-other {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.ruoyi-probe-list {
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+
+.ruoyi-probe-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 11px;
+}
+
+.ruoyi-probe-item:last-child {
+  border-bottom: none;
+}
+
+.probe-code {
+  display: inline-block;
+  min-width: 36px;
+  text-align: center;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.probe-code.probe-status-ok {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.probe-code.probe-status-redirect {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.probe-code.probe-status-auth {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.probe-code.probe-status-notfound {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.probe-code.probe-status-error {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.probe-code.probe-status-other {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.probe-path {
+  flex: 1;
+  color: #333;
+  font-family: monospace;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.probe-badge {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.probe-error {
+  color: #ef4444;
+  font-size: 10px;
+}
+
+/* RuoYi — API Traffic */
+.ruoyi-traffic-filter-row {
+  margin-bottom: 8px;
+}
+
+.ruoyi-traffic-filter-row .text-input {
+  width: 100%;
+}
+
+.ruoyi-traffic-stats {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 6px;
+  min-height: 14px;
+}
+
+.ruoyi-traffic-results {
+  max-height: 350px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.ruoyi-traffic-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+
+.ruoyi-traffic-item:hover {
+  background: #f5f5f5;
+}
+
+.ruoyi-traffic-item:last-child {
+  border-bottom: none;
+}
+
+.traffic-method {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #e0e7ff;
+  color: #3730a3;
+  min-width: 36px;
+  text-align: center;
+}
+
+.traffic-status {
+  font-weight: 600;
+  font-size: 11px;
+  min-width: 28px;
+  text-align: center;
+}
+
+.traffic-status.traffic-ok {
+  color: #10b981;
+}
+
+.traffic-status.traffic-err {
+  color: #ef4444;
+}
+
+.traffic-url {
+  flex: 1;
+  color: #333;
+  font-family: monospace;
+  font-size: 11px;
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.traffic-time {
+  color: #999;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.traffic-preview {
+  background: #f8f8f8;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 4px 8px;
+  font-family: monospace;
+  font-size: 10px;
+  color: #555;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Dark theme — Probe & Traffic */
+[data-theme='dark'] .ruoyi-probe-opts label {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-probe-list {
+  border-color: var(--border-color);
+}
+
+[data-theme='dark'] .ruoyi-probe-item {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .probe-path {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .probe-stat.probe-ok {
+  background: #064e3b;
+  color: #6ee7b7;
+}
+
+[data-theme='dark'] .probe-stat.probe-redirect {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .probe-stat.probe-auth {
+  background: #7f1d1d;
+  color: #fca5a5;
+}
+
+[data-theme='dark'] .probe-stat.probe-notfound {
+  background: #374151;
+  color: #9ca3af;
+}
+
+[data-theme='dark'] .probe-stat.probe-error {
+  background: #831843;
+  color: #f9a8d4;
+}
+
+[data-theme='dark'] .probe-code.probe-status-ok {
+  background: #064e3b;
+  color: #6ee7b7;
+}
+
+[data-theme='dark'] .probe-code.probe-status-redirect {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .probe-code.probe-status-auth {
+  background: #7f1d1d;
+  color: #fca5a5;
+}
+
+[data-theme='dark'] .probe-code.probe-status-notfound {
+  background: #374151;
+  color: #9ca3af;
+}
+
+[data-theme='dark'] .probe-code.probe-status-error {
+  background: #831843;
+  color: #f9a8d4;
+}
+
+[data-theme='dark'] .probe-code.probe-status-other {
+  background: #312e81;
+  color: #a5b4fc;
+}
+
+[data-theme='dark'] .probe-error {
+  color: #fca5a5;
+}
+
+[data-theme='dark'] .ruoyi-traffic-stats {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ruoyi-traffic-item {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .ruoyi-traffic-item:hover {
+  background: var(--bg-tertiary);
+}
+
+[data-theme='dark'] .traffic-method {
+  background: #312e81;
+  color: #a5b4fc;
+}
+
+/* ====== MaR Dynamic Route Loading ====== */
+
+.mar-info-section {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.mar-info-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.mar-label {
+  color: #666;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.mar-value {
+  color: #333;
+  word-break: break-all;
+}
+
+.mar-highlight {
+  color: #e67e22;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.mar-warn {
+  color: #e74c3c;
+}
+
+.mar-stats {
+  display: flex;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 11px;
+}
+
+.mar-stat-item {
+  padding: 2px 8px;
+  background: #eef;
+  border-radius: 3px;
+  color: #555;
+}
+
+.mar-stat-hidden {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.mar-stat-dict {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.mar-routes-header {
+  font-size: 11px;
+  color: #555;
+  padding: 4px 0;
+  border-top: 1px solid #eee;
+  margin-top: 6px;
+}
+
+.mar-route-list {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.mar-route-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.mar-route-item label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.mar-route-path {
+  font-family: monospace;
+  font-size: 11px;
+  color: #333;
+}
+
+.mar-route-title {
+  font-size: 11px;
+  color: #888;
+  margin-left: 4px;
+}
+
+/* Dark theme — MaR */
+[data-theme='dark'] .mar-info-section {
+  background: var(--bg-secondary);
+}
+
+[data-theme='dark'] .mar-label {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .mar-value {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .mar-highlight {
+  color: #f0a040;
+}
+
+[data-theme='dark'] .mar-warn {
+  color: #f87171;
+}
+
+[data-theme='dark'] .mar-stat-item {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .mar-stat-hidden {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .mar-stat-dict {
+  background: #0c4a6e;
+  color: #7dd3fc;
+}
+
+[data-theme='dark'] .mar-routes-header {
+  border-top-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .mar-route-item {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .mar-route-path {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .mar-route-title {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .traffic-url {
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .traffic-time {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .traffic-preview {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+/* RuoYi Module continued */
+/* ====== RuoYi Module ====== */
+
+.asset-actions-row {
+  display: flex;
+  gap: 6px;
+  padding: 4px 0;
+}
+

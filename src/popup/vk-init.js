@@ -1208,9 +1208,13 @@
     });
   }
 
+  function startApp() {
+    window._panelsReady.then(initApp);
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
+    document.addEventListener('DOMContentLoaded', startApp);
   } else {
-    initApp();
+    startApp();
   }
 })();

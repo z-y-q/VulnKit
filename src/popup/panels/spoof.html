@@ -1,0 +1,92 @@
+    <!-- 请求伪造面板 -->
+    <div id="panel-spoof" class="panel">
+      <div class="content-card">
+        <div class="card-title">请求伪造</div>
+        <div class="spoof-tabs">
+          <button class="spoof-tab active" data-spoof="ua">UA切换</button>
+          <button class="spoof-tab" data-spoof="cookie">Cookie设置</button>
+          <button class="spoof-tab" data-spoof="header">Header伪造</button>
+        </div>
+
+        <!-- UA 切换 -->
+        <div id="spoof-ua" class="spoof-panel active">
+          <div class="spoof-ua-status" id="spoof-ua-status"></div>
+          <div class="ua-categories">
+            <select id="ua-category" class="select-filter">
+              <option value="mobile">手机</option>
+              <option value="desktop" selected>电脑</option>
+              <option value="brand">品牌预设</option>
+              <option value="custom">自定义</option>
+            </select>
+          </div>
+          <div class="ua-list" id="ua-list"></div>
+          <div class="form-group card-spacing hidden" id="ua-custom-group">
+            <label>自定义 User-Agent</label>
+            <textarea class="textarea" id="ua-custom-input" rows="3" placeholder="输入自定义 User-Agent 字符串"></textarea>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="spoof-ua-apply">应用 UA</button>
+            <button class="btn btn-secondary" id="spoof-ua-reset">恢复原始 UA</button>
+          </div>
+        </div>
+
+        <!-- Cookie 设置 -->
+        <div id="spoof-cookie" class="spoof-panel">
+          <div class="spoof-cookie-actions">
+            <button class="btn btn-primary" id="cookie-refresh-btn">刷新 Cookie</button>
+            <button class="btn btn-sm btn-secondary" id="cookie-add-btn">添加 Cookie</button>
+            <button class="btn btn-sm btn-outline" id="cookie-import-btn">导入</button>
+            <button class="btn btn-sm btn-outline" id="cookie-export-btn">导出</button>
+            <button class="btn btn-sm btn-outline" id="cookie-clear-btn">清除全部</button>
+          </div>
+          <input type="text" id="cookie-search" class="input" placeholder="搜索 Cookie 名称/值/域名...">
+          <div class="cookie-domain-info" id="cookie-domain-info"></div>
+          <div class="cookie-list" id="cookie-list">
+            <div class="empty-state">点击「刷新 Cookie」获取当前域名的 Cookie</div>
+          </div>
+        </div>
+
+        <!-- Header 伪造 -->
+        <div id="spoof-header" class="spoof-panel">
+          <div class="header-fields">
+            <div class="form-group">
+              <label>X-Forwarded-For</label>
+              <input type="text" id="header-xff" class="input" placeholder="例: 192.168.1.100, 10.0.0.1">
+            </div>
+            <div class="form-group">
+              <label>Referer</label>
+              <div class="referer-row">
+                <select id="referer-preset" class="select-filter">
+                  <option value="">自定义</option>
+                  <option value="none">空 Referer (无)</option>
+                  <option value="same">同域名</option>
+                  <option value="google">Google</option>
+                  <option value="baidu">百度</option>
+                </select>
+                <input type="text" id="header-referer" class="input" placeholder="自定义 Referer URL">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Client-IP</label>
+              <input type="text" id="header-client-ip" class="input" placeholder="例: 203.0.113.50">
+            </div>
+          </div>
+          <div class="card-spacing">
+            <div class="card-title">自定义请求头</div>
+            <div class="custom-headers" id="custom-headers">
+              <div class="custom-header-row">
+                <input type="text" class="input custom-header-key" placeholder="Header Name">
+                <input type="text" class="input custom-header-value" placeholder="Header Value">
+                <button class="btn btn-sm btn-outline custom-header-remove" title="删除">-</button>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-outline" id="custom-header-add">添加自定义头</button>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="header-apply">应用伪造</button>
+            <button class="btn btn-secondary" id="header-reset">重置全部</button>
+          </div>
+        </div>
+      </div>
+    </div>
+

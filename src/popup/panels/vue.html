@@ -1,0 +1,156 @@
+    <!-- Vue 分析面板 -->
+    <div id="panel-vue" class="panel">
+      <div class="content-card">
+        <div class="card-title">Vue 分析</div>
+        <div class="vue-sub-tabs">
+          <button class="vue-stab active" data-vstab="detect">基础检测</button>
+          <button class="vue-stab" data-vstab="perm">权限菜单</button>
+          <button class="vue-stab" data-vstab="jssearch">JS搜索</button>
+          <button class="vue-stab" data-vstab="compare">路由对比</button>
+          <button class="vue-stab" data-vstab="store">状态探索</button>
+        </div>
+
+        <!-- 基础检测 -->
+        <div id="vstab-detect" class="vue-subpanel active">
+          <div class="vue-actions">
+            <button class="btn btn-primary" id="vue-detect-btn">检测 Vue</button>
+            <button class="btn btn-sm btn-primary" id="vue-export-routes-btn">导出路由</button>
+            <button class="btn btn-sm btn-secondary" id="vue-bypass-guards-btn">绕过路由守卫</button>
+            <button class="btn btn-sm btn-secondary" id="vue-disable-auth-btn">关闭 Auth</button>
+            <button class="btn btn-sm btn-outline" id="vue-copy-btn">复制结果</button>
+          </div>
+          <div class="vue-status" id="vue-status"></div>
+          <div class="vue-results" id="vue-results">
+            <div class="empty-state">点击「检测 Vue」分析当前页面</div>
+          </div>
+        </div>
+
+        <!-- 权限菜单 -->
+        <div id="vstab-perm" class="vue-subpanel">
+          <div class="perm-actions">
+            <button class="btn btn-primary" id="perm-start-btn">开始拦截</button>
+            <button class="btn btn-sm btn-secondary" id="perm-stop-btn" disabled>停止拦截</button>
+            <button class="btn btn-sm btn-outline" id="perm-refresh-btn">刷新捕获</button>
+          </div>
+          <div class="perm-status" id="perm-status"></div>
+          <div class="perm-filter-row" id="perm-filter-row">
+            <input type="text" id="perm-filter" class="input" placeholder="URL关键词过滤...">
+            <select id="perm-type-filter" class="select-filter">
+              <option value="all">全部类型</option>
+              <option value="menu">菜单数据</option>
+              <option value="permission">权限数据</option>
+              <option value="role">角色数据</option>
+              <option value="other">其他</option>
+            </select>
+          </div>
+          <div class="perm-count" id="perm-count"></div>
+          <div class="perm-captured-list" id="perm-captured-list">
+            <div class="empty-state">点击「开始拦截」捕获权限菜单 API 响应</div>
+          </div>
+          <div id="perm-detail" class="perm-detail hidden">
+            <div class="perm-detail-header">
+              <span class="perm-detail-url" id="perm-detail-url"></span>
+              <span class="perm-detail-type" id="perm-detail-type"></span>
+              <button class="btn btn-sm btn-outline" id="perm-detail-back">返回列表</button>
+            </div>
+            <div class="perm-detail-actions">
+              <button class="btn btn-sm btn-secondary" id="perm-open-all">全部显示</button>
+              <button class="btn btn-sm btn-secondary" id="perm-change-admin">提权至管理员</button>
+              <button class="btn btn-sm btn-secondary" id="perm-expand-ids">展开menuIds</button>
+              <button class="btn btn-sm btn-primary" id="perm-apply-btn">应用修改</button>
+              <button class="btn btn-sm btn-outline" id="perm-copy-json">复制JSON</button>
+            </div>
+            <div class="perm-classify" id="perm-classify"></div>
+            <div class="perm-suggestions hidden" id="perm-suggestions"></div>
+            <textarea class="textarea perm-json-editor" id="perm-json-editor" rows="12" placeholder="权限菜单 JSON 数据"></textarea>
+          </div>
+        </div>
+
+        <!-- JS搜索 -->
+        <div id="vstab-jssearch" class="vue-subpanel">
+          <div class="jssearch-actions">
+            <input type="text" id="jssearch-keyword" class="input" placeholder="搜索关键词 (menu, permission, router, role...)">
+            <button class="btn btn-primary" id="jssearch-btn">搜索</button>
+          </div>
+          <div class="jssearch-presets">
+            <button class="btn btn-sm btn-outline jssearch-preset" data-kw="menu">menu</button>
+            <button class="btn btn-sm btn-outline jssearch-preset" data-kw="permission">permission</button>
+            <button class="btn btn-sm btn-outline jssearch-preset" data-kw="menuList">menuList</button>
+            <button class="btn btn-sm btn-outline jssearch-preset" data-kw="routes">routes</button>
+            <button class="btn btn-sm btn-outline jssearch-preset" data-kw="isAdmin">isAdmin</button>
+            <button class="btn btn-sm btn-outline jssearch-preset" data-kw="isadmin">isadmin</button>
+            <button class="btn btn-sm btn-outline jssearch-preset" data-kw="role">role</button>
+            <button class="btn btn-sm btn-outline jssearch-preset" data-kw="menuIds">menuIds</button>
+          </div>
+          <div class="jssearch-status" id="jssearch-status"></div>
+          <div class="jssearch-results" id="jssearch-results">
+            <div class="empty-state">输入关键词搜索页面 JS 中的菜单/权限定义</div>
+          </div>
+        </div>
+
+        <!-- 路由对比 -->
+        <div id="vstab-compare" class="vue-subpanel">
+          <div class="compare-actions">
+            <button class="btn btn-primary" id="compare-btn">开始对比</button>
+            <button class="btn btn-sm btn-outline" id="compare-copy-hidden">复制隐藏路由</button>
+            <button class="btn btn-sm btn-primary" id="compare-inject-btn">一键补全到菜单</button>
+          </div>
+          <div class="compare-status" id="compare-status"></div>
+          <div class="compare-results" id="compare-results">
+            <div class="empty-state">点击「开始对比」比较路由与权限菜单的差异</div>
+          </div>
+          <div class="traverse-section" id="traverse-section">
+            <div class="traverse-header">自动遍历路由</div>
+            <div class="traverse-desc">自动逐个访问隐藏路由，配合 Burpsuite 抓包检测未授权访问</div>
+            <div class="traverse-controls">
+              <div class="traverse-delay-row">
+                <label>间隔</label>
+                <select id="traverse-delay" class="select-filter">
+                  <option value="2000">2 秒</option>
+                  <option value="3000" selected>3 秒</option>
+                  <option value="5000">5 秒</option>
+                  <option value="8000">8 秒</option>
+                </select>
+                <label class="traverse-scope-label">
+                  <input type="checkbox" id="traverse-hidden-only" checked>
+                  仅隐藏路由
+                </label>
+              </div>
+              <div class="traverse-btn-row">
+                <button class="btn btn-sm btn-primary" id="traverse-start-btn">开始遍历</button>
+                <button class="btn btn-sm btn-secondary" id="traverse-stop-btn" disabled>停止</button>
+                <span class="traverse-progress" id="traverse-progress"></span>
+              </div>
+            </div>
+            <div class="traverse-log" id="traverse-log"></div>
+          </div>
+        </div>
+
+        <!-- 状态探索 -->
+        <div id="vstab-store" class="vue-subpanel">
+          <div class="vue-store-actions">
+            <button class="btn btn-primary" id="vue-store-read-btn">读取 Store</button>
+            <button class="btn btn-sm btn-outline" id="vue-store-copy-btn">复制 JSON</button>
+            <button class="btn btn-sm btn-secondary" id="vue-store-refresh-btn">刷新</button>
+          </div>
+          <div class="vue-store-status" id="vue-store-status"></div>
+
+          <div class="vue-store-section-label">Store 数据</div>
+          <div class="vue-store-results" id="vue-store-results">
+            <div class="empty-state">点击「读取 Store」探索 Vuex/Pinia 状态数据</div>
+          </div>
+
+          <div class="vue-store-section-label">Actions / API 端点</div>
+          <div class="vue-store-actions-list" id="vue-store-actions">
+            <div class="empty-state">读取 Store 后自动提取</div>
+          </div>
+
+          <div class="vue-store-section-label">自定义指令</div>
+          <div class="vue-store-directives" id="vue-store-directives">
+            <div class="empty-state">读取 Store 后自动扫描</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+

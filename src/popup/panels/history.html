@@ -1,0 +1,76 @@
+    <!-- 历史档案面板 -->
+    <div id="panel-history" class="panel">
+      <div class="content-card">
+        <div class="card-title">历史档案收集</div>
+        <div class="history-input-row">
+          <input type="text" id="history-domain" class="input" placeholder="输入域名，如 bigmodel.cn（留空自动获取）" />
+          <button id="history-query-btn" class="btn btn-primary">查询</button>
+          <button id="history-copy-url-btn" class="btn btn-secondary" title="复制查询URL，可在浏览器直接打开">复制URL</button>
+        </div>
+        <div class="history-quick-links" id="history-quick-links"></div>
+        <div class="history-params">
+          <div class="param-row">
+            <div class="param-item">
+              <label>匹配方式</label>
+              <select id="history-match-type" class="select-filter">
+                <option value="domain" selected>域名+子域名</option>
+                <option value="prefix">前缀匹配</option>
+                <option value="exact">精确匹配</option>
+              </select>
+            </div>
+            <div class="param-item">
+              <label>输出格式</label>
+              <select id="history-output-type" class="select-filter">
+                <option value="text" selected>纯文本</option>
+                <option value="json">JSON</option>
+              </select>
+            </div>
+            <div class="param-item">
+              <label>返回字段</label>
+              <select id="history-fields" class="select-filter">
+                <option value="original" selected>原始URL</option>
+                <option value="timestamp,original">时间戳+URL</option>
+                <option value="timestamp,original,statuscode">时间+状态码</option>
+                <option value="timestamp,original,statuscode,mimetype">完整信息</option>
+              </select>
+            </div>
+            <div class="param-item">
+              <label>起始时间</label>
+              <input type="date" id="history-from" class="input" />
+            </div>
+            <div class="param-item">
+              <label>结束时间</label>
+              <input type="date" id="history-to" class="input" />
+            </div>
+          </div>
+          <div class="history-filter-row">
+            <input type="text" id="history-type-filter" class="input" placeholder="筛选文件类型: html, png, js, css, pdf..." />
+          </div>
+        </div>
+        <div class="history-actions-row">
+          <button id="history-copy-result-btn" class="btn btn-sm btn-outline">复制全部</button>
+          <button id="history-copy-filtered-btn" class="btn btn-sm btn-primary">复制筛选结果</button>
+          <button id="history-export-btn" class="btn btn-sm btn-outline">导出</button>
+          <button id="history-send-links-btn" class="btn btn-sm btn-secondary">发送到URL多开</button>
+        </div>
+        <div class="history-status" id="history-status"></div>
+        <div id="history-summary" class="history-summary hidden">
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span class="summary-value" id="history-total">0</span>
+              <span class="summary-label">总条目</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-value" id="history-first">-</span>
+              <span class="summary-label">首次归档</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-value" id="history-last">-</span>
+              <span class="summary-label">最近归档</span>
+            </div>
+          </div>
+        </div>
+        <div class="history-timeline" id="history-timeline"></div>
+      </div>
+    </div>
+

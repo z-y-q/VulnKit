@@ -1,0 +1,18 @@
+    <!-- HaE 规则管理弹窗 -->
+    <div id="rules-modal" class="modal" style="display:none">
+      <div class="modal-overlay"></div>
+      <div class="modal-content rules-modal-content">
+        <div class="modal-header">
+          <span>HaE 规则管理</span>
+          <button class="modal-close" id="rules-modal-close">&times;</button>
+        </div>
+        <div class="rules-toolbar">
+          <button class="btn btn-sm btn-primary" id="rules-import-btn">导入规则</button>
+          <button class="btn btn-sm btn-outline" id="rules-reset-btn">恢复默认</button>
+        </div>
+        <div class="rules-list" id="rules-list">
+          <!-- 由 JS 动态生成 -->
+        </div>
+      </div>
+    </div>
+    <input type="file" id="rules-file-input" accept=".yml,.yaml,.json" style="display:none">

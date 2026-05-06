@@ -1,0 +1,59 @@
+    <!-- XSS 扫描面板 -->
+    <div id="panel-xssscan" class="panel">
+      <div class="content-card">
+        <div class="card-title">XSS 扫描</div>
+        <div class="xssscan-actions">
+          <button class="btn btn-primary" id="xssscan-harvest-btn">采集参数</button>
+          <button class="btn btn-secondary" id="xssscan-start-intercept-btn">启动拦截</button>
+          <button class="btn btn-outline" id="xssscan-stop-intercept-btn" disabled>停止拦截</button>
+          <button class="btn btn-outline" id="xssscan-clear-btn">清空</button>
+        </div>
+        <div class="xssscan-status" id="xssscan-status">点击「采集参数」开始扫描当前页面</div>
+
+        <div class="xssscan-filter-row">
+          <span class="xssscan-filter-label">来源筛选:</span>
+          <button class="xssscan-filter-btn active" data-xfilter="all">全部</button>
+          <button class="xssscan-filter-btn" data-xfilter="link">链接</button>
+          <button class="xssscan-filter-btn" data-xfilter="form">表单</button>
+          <button class="xssscan-filter-btn" data-xfilter="url">URL</button>
+          <button class="xssscan-filter-btn" data-xfilter="ajax">AJAX</button>
+          <input type="text" id="xssscan-search" class="input" placeholder="搜索URL/参数..." style="margin-left:8px;max-width:160px;">
+        </div>
+        <div class="xssscan-count" id="xssscan-count"></div>
+        <div class="xssscan-results" id="xssscan-results">
+          <div class="empty-state">暂无注入点</div>
+        </div>
+
+        <div class="card-spacing">
+          <div class="card-title">Payload 配置</div>
+          <div class="xssscan-payload-row">
+            <select id="xssscan-payload-select" class="select-filter">
+              <option value="">-- 选择内置 Payload --</option>
+            </select>
+          </div>
+          <div class="form-group card-spacing">
+            <label>自定义 Payload</label>
+            <input type="text" id="xssscan-custom-payload" class="input" placeholder="输入自定义 XSS Payload">
+          </div>
+          <div class="form-group">
+            <label>编码方式</label>
+            <select id="xssscan-encoding" class="select-filter">
+              <option value="none">无编码</option>
+              <option value="url">URL 编码</option>
+              <option value="html">HTML 编码</option>
+              <option value="base64">Base64 编码</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card-spacing">
+          <div class="xssscan-batch-actions">
+            <button class="btn btn-sm btn-outline" id="xssscan-selectall-btn">全选</button>
+            <button class="btn btn-sm btn-primary" id="xssscan-batchopen-btn">批量打开</button>
+            <button class="btn btn-sm btn-outline" id="xssscan-copyall-btn">复制所有URL</button>
+            <button class="btn btn-sm btn-outline" id="xssscan-export-btn">导出</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
