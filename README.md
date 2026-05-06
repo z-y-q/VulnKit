@@ -25,6 +25,86 @@ Chrome 渗透测试辅助工具包，集成 12 个功能模块，覆盖编码解
 
 ---
 
+## 项目结构
+
+```
+src/
+├── manifest.json
+├── background/
+│   └── background.js            # Service Worker，消息中转、请求头注入、Cookie 代理
+├── content/
+│   └── vk-content.js            # Content Script，右键菜单处理
+├── inject/
+│   ├── vue-detect.js            # 注入脚本：Vue 实例检测 + 路由/Store 读取
+│   ├── vue-store-explorer.js    # 注入脚本：Pinia/Vuex Store 遍历导出
+│   └── ruoyi-route-hook.js      # 注入脚本：RuoYi 动态路由拦截
+├── popup/
+│   ├── popup.html               # Shell：头部 + 标签栏 + 状态栏，面板由 JS 加载
+│   ├── panel-loader.js          # 并行加载 14 个面板 HTML 片段到 #app-main
+│   ├── panels/                  # 面板 HTML 片段（14 个文件）
+│   │   ├── encoding.html        # 编码工具 + 加密解密
+│   │   ├── favicon-gather.html  # 图标识别 + 信息收集
+│   │   ├── rules-modal.html     # HaE 规则弹窗
+│   │   ├── asset.html           # 资产测绘
+│   │   ├── links-multiurl.html  # 链接提取 + URL 多开
+│   │   ├── history.html         # 历史档案
+│   │   ├── exif.html            # EXIF 查看
+│   │   ├── spoof.html           # 请求伪造
+│   │   ├── vue.html             # Vue 分析
+│   │   ├── jsctrl.html          # JS 控制
+│   │   ├── payload.html         # Payload 工具
+│   │   ├── xssscan.html         # XSS 扫描
+│   │   ├── sourcemap.html       # Source Map 分析
+│   │   └── ruoyi.html           # RuoYi 路由
+│   ├── vk-namespace.js          # 全局命名空间 VulnKit / VulnKitUtils
+│   ├── vk-init.js               # 初始化：标签切换、面板绑定、主题管理
+│   ├── vk-encoding.js           # 编码/解码模块
+│   ├── vk-jwt.js                # JWT 解析模块
+│   ├── vk-crypto.js             # 加密解密（AES/DES/RC4/SM2/SM4/RSA/Bcrypt）
+│   ├── vk-favicon.js            # 图标识别 + MurmurHash3
+│   ├── vk-hae-rules.js          # HaE 安全规则管理
+│   ├── vk-gather.js             # 信息收集（API/域名/敏感信息/IP/注释）
+│   ├── vk-asset.js              # 资产测绘（FOFA/ZoomEye/Shodan）
+│   ├── vk-links.js              # 链接提取
+│   ├── vk-multiurl.js           # URL 批量多开
+│   ├── vk-tabsave.js            # 标签页保存
+│   ├── vk-exif.js               # EXIF 元数据查看
+│   ├── vk-history.js            # Wayback Machine 历史快照
+│   ├── vk-spoof.js              # 请求伪造（UA/Cookie/Header）
+│   ├── vk-payload.js            # Payload 工具（XSS/SQLi/LFI/反弹Shell/WebShell）
+│   ├── vk-xss.js                # XSS 自动扫描
+│   ├── vk-sourcemap.js          # Webpack Source Map 分析 + 模块扫描
+│   ├── vk-vue.js                # Vue 分析（检测/拦截/权限菜单/路由对比/JS搜索）
+│   ├── vk-ruoyi-common.js       # RuoYi 公共工具
+│   ├── vk-ruoyi-detect.js       # RuoYi 框架检测
+│   ├── vk-ruoyi-hook.js         # RuoYi 拦截器 + API 流量查看
+│   ├── vk-ruoyi-mar.js          # RuoYi MaR 动态路由
+│   ├── vk-ruoyi.js              # RuoYi 主模块（批量探测/路由管理）
+│   ├── vk-jsctrl.js             # JS 控制（开关/反调试/复制限制解除）
+│   └── lib/                     # 第三方库（crypto-js, jsrsasign, sm2, sm4, bcrypt, exifr）
+├── styles/
+│   ├── popup/                   # Popup 样式（13 个文件，按模块拆分）
+│   │   ├── base.css             # 全局样式、暗色变量、Toast、确认弹窗、无障碍
+│   │   ├── favicon.css          # 图标识别
+│   │   ├── info-gather.css      # 信息收集
+│   │   ├── link-extract.css     # 链接提取
+│   │   ├── asset-shodan.css     # 资产测绘
+│   │   ├── history.css          # 历史档案
+│   │   ├── ruoyi.css            # RuoYi 路由
+│   │   ├── exif.css             # EXIF 查看
+│   │   ├── request-spoofing.css # 请求伪造
+│   │   ├── vue-js-perm.css      # Vue 分析 + JS 控制
+│   │   ├── perm-search-compare.css # 权限菜单 + 搜索 + 路由对比
+│   │   ├── payload-xss.css      # Payload + XSS 扫描
+│   │   └── sourcemap-vue-store.css # Source Map + HaE + Vue Store
+│   └── options.css              # 选项页样式
+└── options/
+    ├── options.html             # 选项页
+    └── options.js               # 选项页逻辑
+```
+
+---
+
 ## 安装
 
 1. 打开 Chrome，地址栏输入 `chrome://extensions/`
