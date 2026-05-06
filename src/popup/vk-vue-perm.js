@@ -122,7 +122,9 @@
 
     if (countEl)
       countEl.textContent =
-        '共 ' + permCapturedData.length + ' 条' +
+        '共 ' +
+        permCapturedData.length +
+        ' 条' +
         (filtered.length < permCapturedData.length ? ' (显示 ' + filtered.length + ')' : '');
 
     var html = '';
@@ -188,12 +190,14 @@
           if (val === 0 || val === false || val === '0' || val === '' || val === null) {
             return {
               label: '特殊0开放 - ' + key + '=' + val + '，可修改为1/true/admin',
-              cssClass: 'perm-classify-danger', type: 'special-zero',
+              cssClass: 'perm-classify-danger',
+              type: 'special-zero',
             };
           }
           return {
             label: '特殊0开放 - 检测到角色控制字段',
-            cssClass: 'perm-classify-warning', type: 'special-zero',
+            cssClass: 'perm-classify-warning',
+            type: 'special-zero',
           };
         }
         if (/^type$/i.test(key)) {
@@ -205,24 +209,30 @@
             if (tval === 0 || /^(user|normal|guest)$/i.test(String(tval))) {
               return {
                 label: '特殊0开放 - ' + key + '=' + tval + '，可修改为admin/1',
-                cssClass: 'perm-classify-danger', type: 'special-zero',
+                cssClass: 'perm-classify-danger',
+                type: 'special-zero',
               };
             }
             return {
               label: '特殊0开放 - 检测到角色控制字段 type=' + tval,
-              cssClass: 'perm-classify-warning', type: 'special-zero',
+              cssClass: 'perm-classify-warning',
+              type: 'special-zero',
             };
           }
         }
         if (MENU_ID_LIST_RE.test(key)) {
           var arr = data[key];
           if (
-            Array.isArray(arr) && arr.length > 0 &&
-            arr.every(function (v) { return typeof v === 'number'; })
+            Array.isArray(arr) &&
+            arr.length > 0 &&
+            arr.every(function (v) {
+              return typeof v === 'number';
+            })
           ) {
             return {
               label: '菜单ID限制 - ' + key + ': [' + arr.join(',') + ']，可展开范围',
-              cssClass: 'perm-classify-info', type: 'menuid-limit',
+              cssClass: 'perm-classify-info',
+              type: 'menuid-limit',
             };
           }
         }
@@ -231,38 +241,49 @@
     if (Array.isArray(data) && data.length > 0) {
       var allHaveShowField = data.every(function (item) {
         return (
-          item && typeof item === 'object' &&
-          ('isshow' in item || 'isShow' in item || 'hidden' in item ||
-           'display' in item || 'status' in item)
+          item &&
+          typeof item === 'object' &&
+          ('isshow' in item ||
+            'isShow' in item ||
+            'hidden' in item ||
+            'display' in item ||
+            'status' in item)
         );
       });
       if (allHaveShowField) {
         var hasHidden = data.some(function (item) {
           return (
-            item.isshow === '0' || item.isShow === '0' ||
-            item.hidden === true || item.display === false || item.status === 0
+            item.isshow === '0' ||
+            item.isShow === '0' ||
+            item.hidden === true ||
+            item.display === false ||
+            item.status === 0
           );
         });
         if (hasHidden) {
           return {
             label: '全开放 - 所有菜单已返回，部分标记为隐藏 (isshow/display)',
-            cssClass: 'perm-classify-success', type: 'full-open',
+            cssClass: 'perm-classify-success',
+            type: 'full-open',
           };
         }
         return {
           label: '全开放 - 所有菜单已返回且均已显示',
-          cssClass: 'perm-classify-success', type: 'full-open',
+          cssClass: 'perm-classify-success',
+          type: 'full-open',
         };
       }
       return {
         label: '半开放 - 返回了部分菜单列表',
-        cssClass: 'perm-classify-info', type: 'semi-open',
+        cssClass: 'perm-classify-info',
+        type: 'semi-open',
       };
     }
     if (Array.isArray(data) && data.length === 0) {
       return {
         label: '0开放 - 菜单返回为空，需要搜索JS源码',
-        cssClass: 'perm-classify-danger', type: 'zero-open',
+        cssClass: 'perm-classify-danger',
+        type: 'zero-open',
       };
     }
     if (data && typeof data === 'object' && !Array.isArray(data)) {
@@ -270,13 +291,15 @@
       if (Array.isArray(inner) && inner.length === 0) {
         return {
           label: '0开放 - 菜单返回为空，需要搜索JS源码',
-          cssClass: 'perm-classify-danger', type: 'zero-open',
+          cssClass: 'perm-classify-danger',
+          type: 'zero-open',
         };
       }
     }
     return {
       label: '未知类型 - 请手动检查数据结构',
-      cssClass: 'perm-classify-unknown', type: 'unknown',
+      cssClass: 'perm-classify-unknown',
+      type: 'unknown',
     };
   }
 
@@ -287,24 +310,28 @@
     var html = '<span class="perm-suggestion-hint">建议操作：</span>';
 
     var actionBtns = document.querySelectorAll('.perm-detail-actions .btn');
-    actionBtns.forEach(function (b) { b.classList.remove('btn-suggested'); });
+    actionBtns.forEach(function (b) {
+      b.classList.remove('btn-suggested');
+    });
 
     if (cType === 'full-open') {
       var openAllBtn = utils.get('perm-open-all');
       if (openAllBtn) openAllBtn.classList.add('btn-suggested');
-      html += '<span class="perm-suggestion-hint">点击下方高亮的「全部显示」按钮</span>';
+      html += '<span class="perm-suggestion-hint">点击上方高亮的「全部显示」按钮</span>';
     } else if (cType === 'semi-open') {
-      html += '<button class="btn btn-sm btn-primary" id="sug-compare-inject">对比并补全缺失菜单</button>';
+      html +=
+        '<button class="btn btn-sm btn-primary" id="sug-compare-inject">对比并补全缺失菜单</button>';
     } else if (cType === 'zero-open') {
-      html += '<button class="btn btn-sm btn-primary" id="sug-auto-search">自动搜索JS菜单定义</button>';
+      html +=
+        '<button class="btn btn-sm btn-primary" id="sug-auto-search">自动搜索JS菜单定义</button>';
     } else if (cType === 'special-zero') {
       var adminBtn = utils.get('perm-change-admin');
       if (adminBtn) adminBtn.classList.add('btn-suggested');
-      html += '<span class="perm-suggestion-hint">点击下方高亮的「提权至管理员」按钮</span>';
+      html += '<span class="perm-suggestion-hint">点击上方高亮的「提权至管理员」按钮</span>';
     } else if (cType === 'menuid-limit') {
       var expandBtn = utils.get('perm-expand-ids');
       if (expandBtn) expandBtn.classList.add('btn-suggested');
-      html += '<span class="perm-suggestion-hint">点击下方高亮的「展开menuIds」按钮</span>';
+      html += '<span class="perm-suggestion-hint">点击上方高亮的「展开menuIds」按钮</span>';
     } else {
       sugEl.innerHTML = '';
       sugEl.classList.add('hidden');
@@ -335,7 +362,10 @@
         }
       });
     var sugAutoSearch = utils.get('sug-auto-search');
-    if (sugAutoSearch) sugAutoSearch.addEventListener('click', function () { S.JsSearch.autoSearchForZeroOpen(); });
+    if (sugAutoSearch)
+      sugAutoSearch.addEventListener('click', function () {
+        S.JsSearch.autoSearchForZeroOpen();
+      });
   }
 
   function transformShowAll(data) {
@@ -394,7 +424,9 @@
     for (var k in data) {
       if (!data.hasOwnProperty(k)) continue;
       if (
-        /^(isadmin|admin|is_superuser|isvip|vip|role|isSuperAdmin|userType|user_type|level|grade)$/i.test(k)
+        /^(isadmin|admin|is_superuser|isvip|vip|role|isSuperAdmin|userType|user_type|level|grade)$/i.test(
+          k
+        )
       ) {
         c[k] = typeof data[k] === 'string' ? '1' : 1;
       } else if (k === 'roleId' || k === 'role_id') {
@@ -429,7 +461,9 @@
     for (var k in data) {
       if (!data.hasOwnProperty(k)) continue;
       if (/menuIds|menu_ids|menuIdList|permissionIds|permIds/i.test(k) && Array.isArray(data[k])) {
-        var allNum = data[k].every(function (v) { return typeof v === 'number'; });
+        var allNum = data[k].every(function (v) {
+          return typeof v === 'number';
+        });
         if (allNum && data[k].length > 0) {
           var max = Math.max.apply(null, data[k]);
           var end = Math.max(max, 50);
@@ -490,8 +524,14 @@
               var val = state[key];
               if (Array.isArray(val)) {
                 if (typeof state.__ob__ === 'object' && state.__ob__) {
-                  try { state[key].splice(0, state[key].length); } catch (e) {}
-                  try { override.forEach(function (item) { state[key].push(item); }); } catch (e) {}
+                  try {
+                    state[key].splice(0, state[key].length);
+                  } catch (e) {}
+                  try {
+                    override.forEach(function (item) {
+                      state[key].push(item);
+                    });
+                  } catch (e) {}
                 } else {
                   state[key] = override;
                 }
@@ -555,7 +595,10 @@
                 var sKeyLower = sKey.toLowerCase();
                 var matched = false;
                 for (var sp = 0; sp < storagePrefixes.length; sp++) {
-                  if (sKeyLower.indexOf(storagePrefixes[sp]) !== -1) { matched = true; break; }
+                  if (sKeyLower.indexOf(storagePrefixes[sp]) !== -1) {
+                    matched = true;
+                    break;
+                  }
                 }
                 if (!matched) continue;
                 try {
@@ -568,7 +611,10 @@
                     var patched = false;
                     for (var sk in sParsed) {
                       if (!sParsed.hasOwnProperty(sk)) continue;
-                      if (/menu|permission|route|nav|sidebar/i.test(sk) && Array.isArray(sParsed[sk])) {
+                      if (
+                        /menu|permission|route|nav|sidebar/i.test(sk) &&
+                        Array.isArray(sParsed[sk])
+                      ) {
                         sParsed[sk] = overrideData;
                         patched = true;
                       }

@@ -80,8 +80,8 @@
 }
 .jsctrl-tab:hover { color: #4A90E2; border-color: #4A90E2; }
 .jsctrl-tab.active { background: #4A90E2; color: #fff; border-color: #4A90E2; }
-.jsctrl-panel { display: none; }
-.jsctrl-panel.active { display: block; }
+.jsctrl-subpanel { display: none; }
+.jsctrl-subpanel.active { display: block; }
 
 .js-toggle-indicator {
   display: flex;
@@ -222,8 +222,8 @@
 
 .vue-stab:hover { color: #4A90E2; border-color: #4A90E2; }
 .vue-stab.active { background: #4A90E2; color: #fff; border-color: #4A90E2; }
-.vue-subpanel { display: none; }
-.vue-subpanel.active { display: block; }
+.vstab-subpanel { display: none; }
+.vstab-subpanel.active { display: block; }
 
 /* Relocated vue sub-tabs dark overrides */
 /* ====== Dark Theme Overrides for New Components ====== */

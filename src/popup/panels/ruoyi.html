@@ -22,7 +22,7 @@
         </div>
 
         <!-- 框架检测 -->
-        <div id="rstab-detect" class="ruoyi-subpanel active">
+        <div id="rstab-detect" class="rstab-subpanel active">
           <div class="ruoyi-section-header">
             <div class="ruoyi-section-title">识别目标系统</div>
             <div class="ruoyi-section-desc">检测当前页面是否使用 RuoYi 框架，识别版本号和变体（Vue2 前后端分离 / Vue3 / Thymeleaf 模板 / 微服务版本）。这是所有后续操作的前提。</div>
@@ -37,7 +37,7 @@
         </div>
 
         <!-- 路由钩子 -->
-        <div id="rstab-hook" class="ruoyi-subpanel">
+        <div id="rstab-hook" class="rstab-subpanel">
           <div class="ruoyi-section-header">
             <div class="ruoyi-section-title">拦截路由数据 <span class="ruoyi-prereq">需要先检测框架</span></div>
             <div class="ruoyi-section-desc">注入脚本拦截 /getRouters 接口响应，获取当前用户被授权的完整菜单路由树。需要登录后操作。支持增强模式自动注入额外路由。</div>
@@ -71,7 +71,7 @@
         </div>
 
         <!-- 动态路由 (MaR) -->
-        <div id="rstab-mar" class="ruoyi-subpanel">
+        <div id="rstab-mar" class="rstab-subpanel">
           <div class="ruoyi-section-header">
             <div class="ruoyi-section-title">发现隐藏路由 <span class="ruoyi-prereq">需要先检测框架</span></div>
             <div class="ruoyi-section-desc">通过扫描 JS 源码和 RuoYi 标准路由字典（35条），发现被权限系统过滤掉的隐藏菜单路由。找到后可一键注入 Vue Router 直接访问，或复制 URL 手动测试。对非 Vue 应用（Thymeleaf）自动切换为 URL 模式。</div>
@@ -89,7 +89,7 @@
         </div>
 
         <!-- JS分析 -->
-        <div id="rstab-analyze" class="ruoyi-subpanel">
+        <div id="rstab-analyze" class="rstab-subpanel">
           <div class="ruoyi-section-header">
             <div class="ruoyi-section-title">深度分析 JS 路由 <span class="ruoyi-prereq">需要先检测框架</span></div>
             <div class="ruoyi-section-desc">扫描页面所有 JS 文件中的路由定义（path / component / meta），对比已注册路由找出额外的路由入口。适合发现开发者自定义的、未在标准菜单中注册的路由。</div>
@@ -110,7 +110,7 @@
         </div>
 
         <!-- 批量探测 -->
-        <div id="rstab-probe" class="ruoyi-subpanel">
+        <div id="rstab-probe" class="rstab-subpanel">
           <div class="ruoyi-section-header">
             <div class="ruoyi-section-title">批量请求探测 <span class="ruoyi-prereq">需要先发现路由</span></div>
             <div class="ruoyi-section-desc">对已发现的路由路径逐个发送 HTTP 请求，根据状态码判断：200 可访问 / 301-302 重定向 / 401 未授权 / 403 禁止 / 404 不存在。快速定位可越权访问的隐藏接口。</div>
@@ -147,7 +147,7 @@
         </div>
 
         <!-- API流量 -->
-        <div id="rstab-traffic" class="ruoyi-subpanel">
+        <div id="rstab-traffic" class="rstab-subpanel">
           <div class="ruoyi-section-header">
             <div class="ruoyi-section-title">API 请求监控 <span class="ruoyi-prereq">需要先安装钩子</span></div>
             <div class="ruoyi-section-desc">被动监控浏览过程中的所有 API 请求，记录请求方法、URL、状态码和响应内容。可用于发现隐藏接口、分析参数和敏感数据泄露。</div>
