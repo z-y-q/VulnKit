@@ -867,7 +867,7 @@
     utils.bindClick('perm-change-admin', permChangeAdmin);
     utils.bindClick('perm-apply-btn', applyPermOverride);
     utils.bindClick('perm-copy-json', () => {
-      const val = utils.get('perm-json-editor').value;
+      let val = utils.get('perm-json-editor').value;
       val = utils.requireInput(val, '没有数据');
       if (!val) return;
       utils.copyAndToast(val);
