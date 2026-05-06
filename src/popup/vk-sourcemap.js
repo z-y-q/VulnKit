@@ -1797,7 +1797,7 @@ window.VulnKitSourcemap = (function () {
             });
             return injected;
           },
-          { args: [jsUrls] }
+          { args: [jsUrls], world: 'MAIN' }
         )) || 0;
       if (count === 0) {
         utils.showToast('所有 JS 文件已在页面中加载', 'info');
