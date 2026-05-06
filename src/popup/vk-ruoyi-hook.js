@@ -66,7 +66,17 @@ window.VulnKitRuoYiHook = (function () {
           state.ruoyiTabId = tab.id;
           state.hookStatus = 'active';
         }
-        chrome.storage.local.set({ ruoyiHookTabId: tab.id, ruoyiHookEnabled: true });
+        var origin = tab.url ? new URL(tab.url).origin : '';
+        chrome.storage.local.set({
+          ruoyiHookTabId: tab.id,
+          ruoyiHookEnabled: true,
+          ruoyiHookOrigin: origin,
+        });
+        if (origin) {
+          chrome.runtime
+            .sendMessage({ type: 'REGISTER_RUOYI_HOOK', origin: origin })
+            .catch(function () {});
+        }
         setHookUI(true);
 
         var capData = await utils.execInTabData(tab.id, function () {
@@ -119,7 +129,17 @@ window.VulnKitRuoYiHook = (function () {
         state.ruoyiTabId = tab.id;
         state.hookStatus = 'active';
       }
-      chrome.storage.local.set({ ruoyiHookTabId: tab.id, ruoyiHookEnabled: true });
+      var origin = tab.url ? new URL(tab.url).origin : '';
+      chrome.storage.local.set({
+        ruoyiHookTabId: tab.id,
+        ruoyiHookEnabled: true,
+        ruoyiHookOrigin: origin,
+      });
+      if (origin) {
+        chrome.runtime
+          .sendMessage({ type: 'REGISTER_RUOYI_HOOK', origin: origin })
+          .catch(function () {});
+      }
       setHookUI(true);
       updateWorkflowStep(2);
       utils.setStatus('ruoyi-hook-status', '钩子已启用，正在刷新页面...');
@@ -153,7 +173,8 @@ window.VulnKitRuoYiHook = (function () {
           state.ruoyiTabId = null;
           state.hookStatus = 'idle';
         }
-        chrome.storage.local.remove(['ruoyiHookTabId', 'ruoyiHookEnabled']);
+        chrome.storage.local.remove(['ruoyiHookTabId', 'ruoyiHookEnabled', 'ruoyiHookOrigin']);
+        chrome.runtime.sendMessage({ type: 'UNREGISTER_RUOYI_HOOK' }).catch(function () {});
 
         setHookUI(false);
         utils.setStatus('ruoyi-hook-status', '钩子已禁用');

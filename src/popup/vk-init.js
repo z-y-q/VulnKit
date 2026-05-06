@@ -1027,15 +1027,18 @@
     });
 
     // Restore RuoYi hook state
-    // The hook always passively captures /getRouters, so always check status for current tab.
-    chrome.storage.local.get(['ruoyiHookTabId', 'ruoyiHookEnabled'], result => {
+    // Hook auto re-injects via registerContentScripts, so check by origin (not just tab ID).
+    chrome.storage.local.get(['ruoyiHookEnabled', 'ruoyiHookOrigin', 'ruoyiHookTabId'], result => {
       getActiveTab().then(tab => {
         if (!tab) return;
 
-        if (result.ruoyiHookTabId && result.ruoyiHookEnabled && tab.id === result.ruoyiHookTabId) {
-          // Was explicitly enabled for this tab — restore full UI
+        var tabOrigin = tab.url ? new URL(tab.url).origin : '';
+        var hookEnabled = result.ruoyiHookEnabled && result.ruoyiHookOrigin;
+
+        if (hookEnabled && tabOrigin === result.ruoyiHookOrigin) {
+          // Hook is enabled for this origin — restore full UI
           ruoyiHookActive = true;
-          ruoyiTabId = result.ruoyiHookTabId;
+          ruoyiTabId = tab.id;
           utils.toggleBtnPair('ruoyi-hook-install-btn', 'ruoyi-hook-remove-btn', true);
           checkHookStatus();
         } else if (tab.url && /^https?:/.test(tab.url)) {

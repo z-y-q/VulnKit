@@ -457,9 +457,69 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .catch(function () {});
       return false;
 
+    case 'REGISTER_RUOYI_HOOK':
+      if (message.origin) {
+        registerRuoYiHook(message.origin).then(function () {
+          sendResponse({ success: true });
+        });
+      } else {
+        sendResponse({ success: false, error: 'Missing origin' });
+      }
+      return true;
+
+    case 'UNREGISTER_RUOYI_HOOK':
+      unregisterRuoYiHook().then(function () {
+        sendResponse({ success: true });
+      });
+      return true;
+
     default:
       return false;
   }
+});
+
+// ====== RuoYi Route Hook auto re-injection ======
+const RUOYI_HOOK_CS_ID = 'ruoyi-route-hook-auto';
+
+async function registerRuoYiHook(origin) {
+  try {
+    await chrome.scripting.unregisterContentScripts([RUOYI_HOOK_CS_ID]).catch(function () {});
+    await chrome.scripting.registerContentScripts([
+      {
+        id: RUOYI_HOOK_CS_ID,
+        js: ['src/inject/ruoyi-route-hook.js'],
+        matches: [origin + '/*'],
+        runAt: 'document_start',
+        world: 'MAIN',
+      },
+    ]);
+  } catch (e) {
+    console.warn('[灵眸] registerRuoYiHook:', e);
+  }
+}
+
+async function unregisterRuoYiHook() {
+  try {
+    await chrome.scripting.unregisterContentScripts([RUOYI_HOOK_CS_ID]);
+  } catch (e) {
+    // ignore
+  }
+}
+
+// Restore hook content script on service worker startup
+chrome.storage.local.get(['ruoyiHookEnabled', 'ruoyiHookOrigin'], function (result) {
+  if (result.ruoyiHookEnabled && result.ruoyiHookOrigin) {
+    registerRuoYiHook(result.ruoyiHookOrigin);
+  }
+});
+
+// Clean up tab-specific tracking when tab closes (hook persists for the origin)
+chrome.tabs.onRemoved.addListener(function (tabId) {
+  chrome.storage.local.get(['ruoyiHookTabId'], function (result) {
+    if (result.ruoyiHookTabId === tabId) {
+      chrome.storage.local.remove(['ruoyiHookTabId']).catch(function () {});
+    }
+  });
 });
 
 // ====== Context menus ======
@@ -490,7 +550,15 @@ function createContextMenus() {
   });
 }
 
-chrome.runtime.onInstalled.addListener(createContextMenus);
+chrome.runtime.onInstalled.addListener(function () {
+  createContextMenus();
+  // Restore RuoYi hook content script if it was active
+  chrome.storage.local.get(['ruoyiHookEnabled', 'ruoyiHookOrigin'], function (result) {
+    if (result.ruoyiHookEnabled && result.ruoyiHookOrigin) {
+      registerRuoYiHook(result.ruoyiHookOrigin);
+    }
+  });
+});
 
 // Rebuild menus when settings change
 chrome.storage.onChanged.addListener((changes, area) => {
