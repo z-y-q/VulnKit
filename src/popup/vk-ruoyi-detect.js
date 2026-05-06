@@ -1,4 +1,4 @@
-// VulnKit - RuoYi Detect Sub-module
+// 灵眸 - RuoYi Detect Sub-module
 // Framework detection, auto-capture, and CVE lookup
 window.VulnKitRuoYiDetect = (function () {
   'use strict';

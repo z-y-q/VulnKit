@@ -1,4 +1,4 @@
-// VulnKit Init
+// 灵眸 Init
 (function () {
   'use strict';
 
@@ -20,6 +20,7 @@
   const clearJwt = jwt.clearJwt;
   const copyJwtHeader = jwt.copyJwtHeader;
   const copyJwtPayload = jwt.copyJwtPayload;
+  const verifyJwtSignature = jwt.verifyJwtSignature;
 
   // ====== Crypto (AES/DES/RC4/SM2/SM4/Bcrypt) ======
 
@@ -56,6 +57,7 @@
   // ====== Asset Mapping (loaded from vk-asset.js) ======
   const {
     handleAssetScan,
+    scanAllEngines,
     switchAssetSource,
     toggleCustomQueryMode,
     shodanHostLookup,
@@ -275,13 +277,34 @@
   exposeGlobal('sourcemapCurrentModule', sourcemap, 'sourcemapCurrentModule');
 
   // ====== Init ======
-  function initApp() {
+  async function initApp() {
+    // Load options settings so showToast gating and defaults work
+    await utils.loadSettings();
+
+    // Restore persisted UI state
+    var savedState = await utils.restoreUIState();
+
+    // Restore encoding sub-tab if persisted
+    if (savedState && savedState['encoding-subtab']) {
+      switchEncodingTab(savedState['encoding-subtab']);
+    }
+
+    // Restore asset source if persisted
+    if (savedState && savedState['asset-source']) {
+      switchAssetSource(savedState['asset-source']);
+    }
+
     // Tab pagination (2 rows x 4 cols = 8 per page)
     var tabBtns = Array.from(document.querySelectorAll('.tab-btn'));
     var tabsPerPage = 8;
     var totalTabs = tabBtns.length;
     var totalPages = Math.ceil(totalTabs / tabsPerPage);
     var currentPage = 0;
+
+    var pageIndicator = utils.get('tab-page-indicator');
+    if (totalPages <= 1) {
+      if (pageIndicator) pageIndicator.style.display = 'none';
+    }
 
     function showTabPage(page) {
       currentPage = page;
@@ -294,6 +317,7 @@
       });
       if (scrollLeftBtn) scrollLeftBtn.disabled = page === 0;
       if (scrollRightBtn) scrollRightBtn.disabled = page >= totalPages - 1;
+      if (pageIndicator) pageIndicator.textContent = page + 1 + '/' + totalPages;
     }
 
     var scrollLeftBtn = utils.bindClick('tab-scroll-left', function () {
@@ -305,26 +329,33 @@
     showTabPage(0);
 
     // Main panel tabs
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const panel = btn.dataset.panel;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        const target = utils.get('panel-' + panel);
-        if (target) target.classList.add('active');
-        utils.get('status-text').textContent = btn.textContent;
+    var onTabClick = function onTabClick() {
+      const panel = this.dataset.panel;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      const target = utils.get('panel-' + panel);
+      if (target) target.classList.add('active');
+      utils.get('status-text').textContent = this.textContent;
 
-        // Auto-fill history domain when switching to history panel
-        if (panel === 'history') {
-          var historyDomainInput = utils.get('history-domain');
-          if (historyDomainInput && !historyDomainInput.value.trim()) {
-            getCurrentDomain().then(d => {
-              if (d && !historyDomainInput.value.trim()) historyDomainInput.value = d;
-            });
-          }
+      // Auto-fill history domain when switching to history panel
+      if (panel === 'history') {
+        var historyDomainInput = utils.get('history-domain');
+        if (historyDomainInput && !historyDomainInput.value.trim()) {
+          getCurrentDomain().then(d => {
+            if (d && !historyDomainInput.value.trim()) historyDomainInput.value = d;
+          });
         }
-      });
+      }
+
+      // Lazy-load exifr when switching to exif panel
+      if (panel === 'exif' && !onTabClick._exifLoaded) {
+        onTabClick._exifLoaded = true;
+        utils.loadLibs(['lib/exifr.full.js']).catch(function () {});
+      }
+    };
+    document.querySelectorAll('.tab-btn').forEach(function (btn) {
+      btn.addEventListener('click', onTabClick);
     });
 
     // Encoding sub-tabs
@@ -352,6 +383,7 @@
     utils.bindClick('jwt-clear-btn', clearJwt);
     utils.bindClick('jwt-copy-header-btn', copyJwtHeader);
     utils.bindClick('jwt-copy-payload-btn', copyJwtPayload);
+    utils.bindClick('jwt-verify-btn', verifyJwtSignature);
 
     // Crypto algo tabs
     utils.bindTabSwitch('crypto-algo-btn', 'algo', switchCryptoAlgo);
@@ -385,6 +417,10 @@
 
     // SM2 generate keypair
     utils.bindClick('sm2-genkey-btn', function () {
+      if (typeof sm2 === 'undefined') {
+        utils.showToast('SM2 库加载中，请稍候...', 'info');
+        return;
+      }
       try {
         var kp = sm2.generateKeyPairHex();
         var pubEl = utils.get('sm2-pubkey');
@@ -401,6 +437,17 @@
     toggleIvVisibility('aes', 'aes-iv-group', 'aes-mode');
     toggleIvVisibility('des', 'des-iv-group', 'des-mode');
     switchCryptoAlgo('aes');
+
+    // Apply default settings from options page
+    var defaultEncoding = utils.getSetting('defaultEncoding', 'base64');
+    if (defaultEncoding && ENCODING_NAMES[defaultEncoding]) {
+      switchEncodingTab(defaultEncoding);
+    }
+    var defaultHash = utils.getSetting('defaultHash', 'SHA256');
+    if (defaultHash) {
+      var hashAlgoEl = utils.get('hash-algo');
+      if (hashAlgoEl) hashAlgoEl.value = defaultHash;
+    }
 
     // RSA genkey
     utils.bindClick('rsa-genkey-btn', rsaGenerateKeyPair);
@@ -420,8 +467,14 @@
 
     // Asset mapping
     utils.bindTabSwitch('source-btn', 'source', switchAssetSource);
+    chrome.storage.local.get(['pentest_ui_state'], function (r) {
+      if (r.pentest_ui_state && r.pentest_ui_state['asset-source']) {
+        switchAssetSource(r.pentest_ui_state['asset-source']);
+      }
+    });
 
     utils.bindClick('asset-scan-btn', handleAssetScan);
+    utils.bindClick('asset-scan-all-btn', scanAllEngines);
     utils.bindEnterKey('asset-query', function () {
       handleAssetScan();
     });
@@ -429,6 +482,10 @@
       toggleCustomQueryMode(!this.classList.contains('active'));
     });
     utils.bindClick('asset-export-btn', assetExportData);
+    utils.bindPersist('asset-size');
+    utils.bindPersist('ruoyi-probe-concurrency');
+    utils.bindPersist('ruoyi-probe-method');
+    utils.bindPersist('ruoyi-augment-mode');
 
     utils.on('asset-search', 'input', function () {
       assetApplySearchFilter(this.value.trim());
@@ -562,6 +619,9 @@
     utils.bindClick('links-send-multiurl-btn', sendToMultiUrl);
     utils.on('links-filter', 'input', renderLinks);
     utils.on('links-filter-type', 'change', renderLinks);
+    utils.bindPersist('links-filter-type');
+    utils.bindPersist('history-match-type');
+    utils.bindPersist('history-output-type');
 
     // URL multi-open
     utils.on('multiurl-input', 'input', () => updateMultiurlInfo(parseUrls().length));
@@ -692,6 +752,7 @@
     utils.on('ua-category', 'change', function () {
       renderUaList(this.value);
     });
+    utils.bindPersist('ua-category');
     renderUaList('desktop');
 
     utils.bindClick('spoof-ua-apply', applyUserAgent);
@@ -792,6 +853,7 @@
     utils.bindClick('perm-refresh-btn', refreshPermCaptured);
     utils.on('perm-filter', 'input', renderPermList);
     utils.on('perm-type-filter', 'change', renderPermList);
+    utils.bindPersist('perm-type-filter');
     utils.bindClick('perm-detail-back', () => {
       permViewMode = 'list';
       const permList = utils.get('perm-captured-list');
@@ -927,19 +989,41 @@
       });
     }
 
-    // Restore perm intercept state
+    // Restore perm intercept state — verify interceptor is still in page
     restoreTabState('permInterceptTabId', function () {
-      permInterceptActive = true;
-      utils.toggleBtnPair('perm-start-btn', 'perm-stop-btn', true);
-      utils.setStatus('perm-status', '拦截中... 页面刷新后会自动重新注入');
-      refreshPermCaptured();
-      startPermAutoRefresh();
+      utils.requireTabId().then(function (tab) {
+        if (!tab) {
+          chrome.storage.local.remove('permInterceptTabId');
+          return;
+        }
+        utils
+          .execInTabData(tab.id, function () {
+            return !!(window.__PERM_INTERCEPTOR__ && window.__PERM_INTERCEPTOR__.active);
+          })
+          .then(function (active) {
+            if (active) {
+              permInterceptActive = true;
+              utils.toggleBtnPair('perm-start-btn', 'perm-stop-btn', true);
+              utils.setStatus('perm-status', '拦截中...');
+              refreshPermCaptured();
+            } else {
+              chrome.storage.local.remove('permInterceptTabId');
+            }
+          })
+          .catch(function () {
+            chrome.storage.local.remove('permInterceptTabId');
+          });
+      });
     });
 
-    // Restore JS toggle state
-    restoreTabState('js_blocked_tabId', function () {
-      jsBlocked = true;
-      updateJsToggleStatus();
+    // Restore JS toggle state — DNR rules are global, check actual rule presence
+    chrome.runtime.sendMessage({ type: 'QUERY_JS_BLOCK' }, function (resp) {
+      if (resp && resp.blocked) {
+        jsBlocked = true;
+        updateJsToggleStatus();
+      } else {
+        chrome.storage.local.remove('js_blocked_tabId');
+      }
     });
 
     // Restore RuoYi hook state
@@ -1010,6 +1094,7 @@
       }
     });
     utils.on('revshell-type', 'change', generateReverseShell);
+    utils.bindPersist('revshell-type');
     utils.on('revshell-ip', 'input', generateReverseShell);
     utils.on('revshell-port', 'input', generateReverseShell);
 
@@ -1020,6 +1105,8 @@
 
     // XSS Scan
     initXssScanPayloadSelect();
+    utils.bindPersist('xssscan-payload-select');
+    utils.bindPersist('xssscan-encoding');
     utils.bindClick('xssscan-harvest-btn', handleXssHarvest);
     utils.bindClick('xssscan-start-intercept-btn', startXssIntercept);
     utils.bindClick('xssscan-stop-intercept-btn', stopXssIntercept);
@@ -1098,6 +1185,27 @@
       update();
       setInterval(update, 30000);
     }
+
+    // Keyboard shortcuts: Alt+1~8 switch tab, Alt+Left/Right flip page
+    document.addEventListener('keydown', function (e) {
+      if (!e.altKey) return;
+      var num = parseInt(e.key, 10);
+      if (num >= 1 && num <= tabsPerPage) {
+        e.preventDefault();
+        var idx = currentPage * tabsPerPage + (num - 1);
+        if (idx < tabBtns.length) {
+          tabBtns[idx].click();
+        }
+        return;
+      }
+      if (e.key === 'ArrowLeft' && currentPage > 0) {
+        e.preventDefault();
+        showTabPage(currentPage - 1);
+      } else if (e.key === 'ArrowRight' && currentPage < totalPages - 1) {
+        e.preventDefault();
+        showTabPage(currentPage + 1);
+      }
+    });
   }
 
   if (document.readyState === 'loading') {

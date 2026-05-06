@@ -1,4 +1,4 @@
-// VulnKit - RuoYi Dynamic Route Module (Main Orchestrator)
+// 灵眸 - RuoYi Dynamic Route Module (Main Orchestrator)
 // State management, JS route analysis, batch probing, API traffic, public API facade
 window.VulnKitRuoYi = (function () {
   'use strict';
@@ -303,7 +303,7 @@ window.VulnKitRuoYi = (function () {
       if (resultsEl) resultsEl.innerHTML = utils.emptyHtml('已清除');
       utils.showToast('已清除额外路由', 'info');
     } catch (e) {
-      console.warn('[VulnKit] clearExtraRoutes:', e);
+      console.warn('[灵眸] clearExtraRoutes:', e);
     }
   }
 
@@ -320,7 +320,7 @@ window.VulnKitRuoYi = (function () {
         );
       });
     } catch (e) {
-      console.warn('[VulnKit] setAugmentMode:', e);
+      console.warn('[灵眸] setAugmentMode:', e);
     }
   }
 
@@ -346,7 +346,32 @@ window.VulnKitRuoYi = (function () {
   // ====== Batch Route Probing ======
 
   var probeAbortFlag = false;
+  var probeTimerInterval = null;
+  var probeStartTime = 0;
   var lastProbeResults = [];
+
+  function probeStartTimer() {
+    probeStopTimer();
+    probeStartTime = Date.now();
+    probeTimerInterval = setInterval(function () {
+      var el = utils.get('ruoyi-probe-progress');
+      if (el) {
+        var base = el.textContent.replace(/\s*\d+s$/, '');
+        el.textContent = base + ' ' + Math.floor((Date.now() - probeStartTime) / 1000) + 's';
+      }
+    }, 1000);
+  }
+
+  function probeStopTimer() {
+    if (probeTimerInterval) {
+      clearInterval(probeTimerInterval);
+      probeTimerInterval = null;
+    }
+  }
+
+  function probeElapsed() {
+    return Math.floor((Date.now() - probeStartTime) / 1000);
+  }
 
   async function batchProbeRoutes() {
     var resultsEl = utils.get('ruoyi-probe-results');
@@ -380,6 +405,7 @@ window.VulnKitRuoYi = (function () {
 
       utils.toggleBtnPair('ruoyi-probe-btn', 'ruoyi-probe-stop-btn', true);
       probeAbortFlag = false;
+      probeStartTimer();
 
       var results = [];
       var completed = 0;
@@ -427,17 +453,19 @@ window.VulnKitRuoYi = (function () {
         }
       }
 
+      probeStopTimer();
       utils.toggleBtnPair('ruoyi-probe-btn', 'ruoyi-probe-stop-btn', false);
       utils.setStatus(
         'ruoyi-probe-progress',
         probeAbortFlag
-          ? '已停止 (' + completed + '/' + paths.length + ')'
-          : '完成 (' + completed + '/' + paths.length + ')'
+          ? '已停止 (' + completed + '/' + paths.length + ', ' + probeElapsed() + 's)'
+          : '完成 (' + completed + '/' + paths.length + ', ' + probeElapsed() + 's)'
       );
 
       lastProbeResults = results.slice();
       renderProbeResults(results, resultsEl);
     } catch (e) {
+      probeStopTimer();
       utils.toggleBtnPair('ruoyi-probe-btn', 'ruoyi-probe-stop-btn', false);
       utils.showToast('探测失败: ' + e.message, 'error');
     }
@@ -556,7 +584,7 @@ window.VulnKitRuoYi = (function () {
         });
       });
     } catch (e) {
-      console.warn('[VulnKit] loadApiTraffic:', e);
+      console.warn('[灵眸] loadApiTraffic:', e);
     }
   }
 

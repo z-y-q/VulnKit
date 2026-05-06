@@ -1,4 +1,4 @@
-// VulnKit - RuoYi Hook Sub-module
+// 灵眸 - RuoYi Hook Sub-module
 // Route hook install/remove/check, request log, route rendering, export functions
 window.VulnKitRuoYiHook = (function () {
   'use strict';
@@ -22,21 +22,7 @@ window.VulnKitRuoYiHook = (function () {
       await utils.execInTab(tabId, ['src/inject/ruoyi-route-hook.js']);
       return 'files';
     } catch (e) {
-      try {
-        await chrome.tabs.sendMessage(tabId, { type: 'VK_RUOYI_INJECT_HOOK' });
-        for (var i = 0; i < 10; i++) {
-          await new Promise(function (r) {
-            setTimeout(r, 100);
-          });
-          var check = await utils.execInTabData(tabId, function () {
-            return !!window.__VK_RUOYI_HOOK__;
-          });
-          if (check) return 'content-script';
-        }
-        return null;
-      } catch (e2) {
-        return null;
-      }
+      return null;
     }
   }
 

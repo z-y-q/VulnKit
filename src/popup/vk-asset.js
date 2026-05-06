@@ -1,4 +1,4 @@
-// VulnKit - Asset Mapping
+// 灵眸 - Asset Mapping
 window.VulnKitAsset = (function () {
   'use strict';
 
@@ -9,15 +9,17 @@ window.VulnKitAsset = (function () {
   var utils = window.VulnKitUtils.utilsProxy;
 
   async function getApiKey(source) {
-    return new Promise(resolve => {
-      chrome.storage.local.get(['pentest_keys'], result => {
-        const keys = result.pentest_keys || {};
-        if (source === 'fofa') resolve({ email: keys.fofa_email, key: keys.fofa_key });
-        else if (source === 'zoomeye') resolve(keys.zoomeye);
-        else if (source === 'shodan') resolve(keys.shodan);
-        else resolve(null);
-      });
-    });
+    var result = await chrome.storage.local.get(['pentest_keys']);
+    var keys = result.pentest_keys || {};
+    if (source === 'fofa') {
+      return {
+        email: await decryptValue(keys.fofa_email),
+        key: await decryptValue(keys.fofa_key),
+      };
+    }
+    if (source === 'zoomeye') return await decryptValue(keys.zoomeye);
+    if (source === 'shodan') return await decryptValue(keys.shodan);
+    return null;
   }
 
   async function getCurrentUrl() {
@@ -124,7 +126,7 @@ window.VulnKitAsset = (function () {
     utils.buildCsv(
       ['IP/域名', '端口', '协议', '标题'],
       rows,
-      'vulnkit-asset-' + currentAssetSource + '-' + Date.now() + '.csv'
+      'lingmou-asset-' + currentAssetSource + '-' + Date.now() + '.csv'
     );
   }
 
@@ -475,8 +477,59 @@ window.VulnKitAsset = (function () {
     if (scanner) scanner(query);
   }
 
+  async function scanAllEngines() {
+    var queryEl = utils.get('asset-query');
+    var query = queryEl ? queryEl.value.trim() : '';
+    if (!query) {
+      query = await getCurrentUrl().then(function (url) {
+        if (!url) return null;
+        try {
+          return new URL(url).hostname;
+        } catch (e) {
+          return null;
+        }
+      });
+      if (!query) {
+        utils.showToast('请输入目标或打开一个网页', 'warning');
+        return;
+      }
+      if (queryEl) queryEl.value = query;
+    }
+
+    setAssetStatus('正在并发查询全部引擎...');
+    var scanBtn = utils.get('asset-scan-all-btn');
+    if (scanBtn) {
+      scanBtn.disabled = true;
+      scanBtn.textContent = '查询中...';
+    }
+
+    var engineNames = ['FOFA', 'ZoomEye', 'Shodan'];
+    var scanFns = [scanFofa, scanZoomEye, scanShodan];
+
+    try {
+      var results = await Promise.allSettled(
+        scanFns.map(function (fn) {
+          return fn(query);
+        })
+      );
+
+      var successCount = results.filter(function (r) {
+        return r.status === 'fulfilled';
+      }).length;
+      setAssetStatus('全部引擎查询完成 (' + successCount + '/' + engineNames.length + ' 成功)');
+    } catch (e) {
+      setAssetStatus('查询出错: ' + e.message);
+    } finally {
+      if (scanBtn) {
+        scanBtn.disabled = false;
+        scanBtn.textContent = '全部搜索';
+      }
+    }
+  }
+
   function switchAssetSource(source) {
     currentAssetSource = source;
+    utils.saveUIState('asset-source', source);
 
     document
       .querySelectorAll('.source-btn')
@@ -508,28 +561,89 @@ window.VulnKitAsset = (function () {
     { id: 'key-shodan', storageKey: 'shodan' },
   ];
 
+  var ENCRYPTED_KEY_PREFIX = 'enc:aes256:gcm:';
+  var _cryptoKey = null;
+
+  async function getCryptoKey() {
+    if (_cryptoKey) return _cryptoKey;
+    var extId = chrome.runtime.id;
+    var enc = new TextEncoder();
+    var keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      enc.encode('vulnkit-key-v1:' + extId),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    _cryptoKey = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: enc.encode('vulnkit-salt'), iterations: 100000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+    return _cryptoKey;
+  }
+
+  async function encryptValue(plaintext) {
+    if (!plaintext) return '';
+    var key = await getCryptoKey();
+    var iv = crypto.getRandomValues(new Uint8Array(12));
+    var enc = new TextEncoder();
+    var ciphertext = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      enc.encode(plaintext)
+    );
+    var combined = new Uint8Array(iv.length + ciphertext.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(ciphertext), iv.length);
+    return ENCRYPTED_KEY_PREFIX + btoa(String.fromCharCode.apply(null, combined));
+  }
+
+  async function decryptValue(stored) {
+    if (!stored || !stored.startsWith(ENCRYPTED_KEY_PREFIX)) return stored || '';
+    var b64 = stored.slice(ENCRYPTED_KEY_PREFIX.length);
+    var combined = Uint8Array.from(atob(b64), function (c) {
+      return c.charCodeAt(0);
+    });
+    var iv = combined.slice(0, 12);
+    var ciphertext = combined.slice(12);
+    var key = await getCryptoKey();
+    var plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, ciphertext);
+    return new TextDecoder().decode(plaintext);
+  }
+
   function readKeyField(field) {
     var v = (utils.get(field.id) || {}).value;
     return v ? v.trim() : '';
   }
 
-  function saveApiKeys() {
+  async function saveApiKeys() {
     var keys = {};
-    API_KEY_FIELDS.forEach(function (f) {
-      keys[f.storageKey] = readKeyField(f);
-    });
+    for (var i = 0; i < API_KEY_FIELDS.length; i++) {
+      var f = API_KEY_FIELDS[i];
+      keys[f.storageKey] = await encryptValue(readKeyField(f));
+    }
     chrome.storage.local.set({ pentest_keys: keys }, function () {
-      utils.showToast('配置已保存', 'success');
+      utils.showToast('配置已加密保存', 'success');
     });
   }
 
-  function loadApiKeys() {
-    chrome.storage.local.get(['pentest_keys'], function (result) {
+  async function loadApiKeys() {
+    chrome.storage.local.get(['pentest_keys'], async function (result) {
       var keys = result.pentest_keys || {};
-      API_KEY_FIELDS.forEach(function (f) {
+      for (var i = 0; i < API_KEY_FIELDS.length; i++) {
+        var f = API_KEY_FIELDS[i];
         var el = utils.get(f.id);
-        if (el) el.value = keys[f.storageKey] || '';
-      });
+        if (el) {
+          try {
+            el.value = await decryptValue(keys[f.storageKey]);
+          } catch (e) {
+            el.value = keys[f.storageKey] || '';
+          }
+        }
+      }
     });
   }
 
@@ -545,6 +659,7 @@ window.VulnKitAsset = (function () {
 
   return {
     handleAssetScan,
+    scanAllEngines,
     switchAssetSource,
     toggleCustomQueryMode,
     shodanHostLookup,

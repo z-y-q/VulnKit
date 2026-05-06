@@ -1,4 +1,4 @@
-// VulnKit - Vue Detect (Stealth Injection)
+// 灵眸 - Vue Detect (Stealth Injection)
 // This script is injected via <script> tag by content script, then removed.
 (function () {
   'use strict';
@@ -212,5 +212,5 @@
     info.version = window.Vue.version;
   }
 
-  window.postMessage({ __vk_detect: true, result: info }, '*');
+  window.postMessage({ __vk_detect: true, result: info }, location.origin);
 })();

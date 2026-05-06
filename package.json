@@ -1,5 +1,5 @@
 {
-  "name": "pentest-tools-chrome-extension",
+  "name": "lingmou-chrome-extension",
   "version": "3.0.0",
   "description": "Professional penetration testing and security analysis Chrome extension",
   "main": "src/background/background.ts",
@@ -31,7 +31,7 @@
     "hacking-tools"
   ],
   "author": {
-    "name": "PenTest Tools Team",
+    "name": "灵眸 Team",
     "email": "support@pentest-tools.com",
     "url": "https://pentest-tools.com"
   },

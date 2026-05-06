@@ -5,9 +5,9 @@
   <link rel="stylesheet" href="../styles/popup.css">
 </head>
 <body>
-<div class="vulnkit-app">
+<div class="lingmou-app">
   <div class="app-header">
-    <div class="app-title">VulnKit</div>
+    <div class="app-title">灵眸</div>
     <div class="tab-nav-wrapper">
       <button class="tab-page-btn" id="tab-scroll-left">&#9664;</button>
       <div class="tab-grid" id="tab-grid">
@@ -28,6 +28,7 @@
         <button class="tab-btn" data-panel="sourcemap">Source Map</button>
       </div>
       <button class="tab-page-btn" id="tab-scroll-right">&#9654;</button>
+      <span class="tab-page-indicator" id="tab-page-indicator"></span>
     </div>
   </div>
 
@@ -88,6 +89,14 @@
               <pre class="jwt-pre jwt-sig" id="jwt-signature"></pre>
             </div>
             <div id="jwt-claims" class="jwt-claims"></div>
+            <div class="jwt-verify-section">
+              <label class="form-label">签名验证（HS256/HS384/HS512）</label>
+              <div class="form-group">
+                <input type="text" class="input" id="jwt-verify-key" placeholder="输入密钥 (Secret)" />
+                <button class="btn btn-sm btn-primary" id="jwt-verify-btn">验证签名</button>
+              </div>
+              <div id="jwt-verify-result" class="jwt-verify-result hidden"></div>
+            </div>
             <div class="result-actions">
               <button class="btn btn-sm btn-outline" id="jwt-copy-header-btn">复制 Header</button>
               <button class="btn btn-sm btn-outline" id="jwt-copy-payload-btn">复制 Payload</button>
@@ -342,6 +351,7 @@
         <div class="asset-input-row">
           <input type="text" id="asset-query" class="input" placeholder="留空使用当前页面域名" />
           <button class="btn btn-primary" id="asset-scan-btn">扫描</button>
+          <button class="btn btn-outline" id="asset-scan-all-btn">全部搜索</button>
         </div>
         <div class="asset-query-options">
           <button id="asset-custom-toggle" class="toggle-btn">自定义语法</button>
@@ -1092,6 +1102,7 @@
         <div class="sm-progress hidden" id="sm-progress">
           <div class="sm-progress-bar" id="sm-progress-bar"></div>
         </div>
+        <div class="sm-timer hidden" id="sm-timer"></div>
         <div class="sm-phases hidden" id="sm-phases">
           <span class="sm-phase" data-phase="1">①运行时</span>
           <span class="sm-phase-divider">→</span>
@@ -1332,12 +1343,7 @@
     </div>
   </div>
 </div>
-<script src="lib/jsrsasign.min.js"></script>
-<script src="lib/crypto-js.min.js"></script>
-<script src="lib/sm2.js"></script>
-<script src="lib/sm4.js"></script>
-<script src="lib/bcrypt.min.js"></script>
-<script src="lib/exifr.full.js"></script>
+<!-- Lazy-loaded on first use: crypto-js, jsrsasign, sm2, sm4, bcrypt, exifr -->
 <!-- Core -->
 <script src="vk-namespace.js"></script>
 <script src="vk-encoding.js"></script>

@@ -1,4 +1,4 @@
-// VulnKit - Favicon (MMH3 Hash)
+// 灵眸 - Favicon (MMH3 Hash)
 window.VulnKitFavicon = (function () {
   'use strict';
 

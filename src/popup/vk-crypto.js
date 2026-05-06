@@ -3,6 +3,18 @@ window.VulnKitCrypto = (function () {
 
   var utils = window.VulnKitUtils.utilsProxy;
 
+  function ensureCryptoLibs() {
+    if (typeof CryptoJS !== 'undefined') return true;
+    utils.showToast('加密库加载中，请稍候...', 'info');
+    return false;
+  }
+
+  function ensureLib(name, loaded) {
+    if (loaded) return true;
+    utils.showToast(name + ' 库加载中，请稍候...', 'info');
+    return false;
+  }
+
   // ====== Crypto (AES/DES/RC4/SM2/SM4/Bcrypt) ======
   var currentCryptoAlgo = 'aes';
   function padOrTruncate(key, len) {
@@ -13,8 +25,16 @@ window.VulnKitCrypto = (function () {
     return key;
   }
 
+  var WEAK_ALGO_WARNINGS = {
+    des: 'DES 密钥仅 56 位，已被认为不安全，建议使用 AES 或 SM4',
+    rc4: 'RC4 存在多个已知漏洞，已被认为不安全，建议使用 AES 或 SM4',
+  };
+
   function switchCryptoAlgo(algo) {
     currentCryptoAlgo = algo;
+    if (WEAK_ALGO_WARNINGS[algo]) {
+      utils.showToast(WEAK_ALGO_WARNINGS[algo], 'warning');
+    }
     document.querySelectorAll('.crypto-algo-btn').forEach(function (b) {
       b.classList.toggle('active', b.dataset.algo === algo);
     });
@@ -54,6 +74,7 @@ window.VulnKitCrypto = (function () {
   }
 
   function doCryptoEncrypt() {
+    if (!ensureCryptoLibs()) return;
     var input = (utils.get('crypto-input') || {}).value || '';
     input = utils.requireInput(input, '请输入内容');
     if (!input) return;
@@ -106,6 +127,7 @@ window.VulnKitCrypto = (function () {
   }
 
   function doCryptoDecrypt() {
+    if (!ensureCryptoLibs()) return;
     var input = (utils.get('crypto-input') || {}).value || '';
     input = utils.requireInput(input, '请输入密文');
     if (!input) return;
@@ -153,6 +175,7 @@ window.VulnKitCrypto = (function () {
   }
 
   function doCryptoVerify() {
+    if (!ensureLib('Bcrypt', typeof dcodeIO !== 'undefined')) return;
     var input = (utils.get('crypto-input') || {}).value || '';
     var hash = (utils.get('crypto-output') || {}).value || '';
     if (!input || !hash) {
@@ -369,6 +392,9 @@ window.VulnKitCrypto = (function () {
 
   function rsaGenerateKeyPair() {
     var keySize = parseInt((utils.get('rsa-keysize') || {}).value) || 2048;
+    if (keySize < 2048) {
+      utils.showToast('RSA ' + keySize + ' 位密钥太短，建议至少 2048 位', 'warning');
+    }
     var btn = utils.get('rsa-genkey-btn');
     if (btn) {
       btn.disabled = true;

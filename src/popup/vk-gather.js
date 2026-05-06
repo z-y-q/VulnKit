@@ -1,4 +1,4 @@
-// VulnKit - Info Gather (HaE Rules Engine)
+// 灵眸 - Info Gather (HaE Rules Engine)
 window.VulnKitGather = (function () {
   'use strict';
 
@@ -11,6 +11,9 @@ window.VulnKitGather = (function () {
   var currentGatherTab = DOM_GROUP;
   var loadedRules = [];
   var searchFilter = '';
+  var gatherAbortFlag = false;
+  var gatherTimerInterval = null;
+  var gatherStartTime = 0;
 
   var utils = window.VulnKitUtils.utilsProxy;
 
@@ -159,6 +162,29 @@ window.VulnKitGather = (function () {
     });
   }
 
+  function gatherStartTimer() {
+    gatherStopTimer();
+    gatherStartTime = Date.now();
+    gatherTimerInterval = setInterval(function () {
+      var el = utils.get('gather-status');
+      if (el) {
+        var base = el.textContent.replace(/\s*\(\d+s\)$/, '');
+        el.textContent = base + ' (' + Math.floor((Date.now() - gatherStartTime) / 1000) + 's)';
+      }
+    }, 1000);
+  }
+
+  function gatherStopTimer() {
+    if (gatherTimerInterval) {
+      clearInterval(gatherTimerInterval);
+      gatherTimerInterval = null;
+    }
+  }
+
+  function gatherElapsed() {
+    return Math.floor((Date.now() - gatherStartTime) / 1000);
+  }
+
   var API_PATTERNS = [
     {
       regex:
@@ -211,6 +237,8 @@ window.VulnKitGather = (function () {
     });
     filesToFetch = filesToFetch.slice(0, 15);
 
+    if (gatherAbortFlag) return endpoints;
+
     var fetchPromises = filesToFetch.map(function (src) {
       return utils.fetchUrl({ url: src, tailOnly: false, timeout: 12000 });
     });
@@ -261,12 +289,33 @@ window.VulnKitGather = (function () {
   }
 
   async function gatherInfo() {
+    if (gatherAbortFlag === false) {
+      var btn = utils.get('gather-btn');
+      if (btn && btn.classList.contains('btn-danger')) {
+        gatherAbortFlag = true;
+        return;
+      }
+    }
+
     utils.setStatus('gather-status', '正在收集...');
+    gatherAbortFlag = false;
+    gatherStartTimer();
+    var gatherBtn = utils.get('gather-btn');
+    if (gatherBtn) {
+      gatherBtn.textContent = '停止收集';
+      gatherBtn.classList.remove('btn-primary');
+      gatherBtn.classList.add('btn-danger');
+    }
 
     try {
       var tab = await utils.getActiveTab();
       if (!tab || !tab.url) {
         utils.setStatus('gather-status', '无法获取当前页面');
+        return;
+      }
+
+      if (gatherAbortFlag) {
+        utils.setStatus('gather-status', '已取消');
         return;
       }
 
@@ -458,7 +507,7 @@ window.VulnKitGather = (function () {
         delete gatherData._scriptSrcs;
 
         // Fetch external JS files and extract API endpoints
-        if (scriptSrcs.length > 0) {
+        if (scriptSrcs.length > 0 && !gatherAbortFlag) {
           utils.setStatus('gather-status', '正在分析 JS 文件（' + scriptSrcs.length + ' 个）...');
           var apiEndpoints = await extractApiFromJsFiles(scriptSrcs, tab.url);
           if (apiEndpoints.length > 0) {
@@ -473,6 +522,7 @@ window.VulnKitGather = (function () {
         if (meta && meta.truncated) {
           statusText += '（HTML 已截断至 500KB/' + (meta.totalSize / 1024).toFixed(0) + 'KB）';
         }
+        statusText += '（' + gatherElapsed() + 's）';
         utils.setStatus('gather-status', statusText);
         utils.showToast(
           meta && meta.truncated ? '收集完成（页面过大，部分内容被截断）' : '收集完成',
@@ -480,22 +530,34 @@ window.VulnKitGather = (function () {
         );
 
         var groups = buildGroups();
-        chrome.storage.local.set({
-          gatherData: gatherData,
-          gatherDataUrl: tab.url,
-          gatherDataTabs: groups,
-        });
+        if (utils.getSetting('storeHistory', true)) {
+          chrome.storage.local.set({
+            gatherData: gatherData,
+            gatherDataUrl: tab.url,
+            gatherDataTabs: groups,
+            gatherDataTime: Date.now(),
+          });
+        }
       } else {
         utils.setStatus('gather-status', '收集失败');
       }
     } catch (e) {
       utils.setStatus('gather-status', '收集失败: ' + e.message);
       utils.showToast('收集失败', 'error');
+    } finally {
+      gatherStopTimer();
+      var gatherBtn = utils.get('gather-btn');
+      if (gatherBtn) {
+        gatherBtn.textContent = '收集当前页面';
+        gatherBtn.disabled = false;
+        gatherBtn.classList.remove('btn-danger');
+        gatherBtn.classList.add('btn-primary');
+      }
     }
   }
 
   function restoreData(url) {
-    chrome.storage.local.get([STORAGE_KEY, URL_KEY, TABS_KEY], function (result) {
+    chrome.storage.local.get([STORAGE_KEY, URL_KEY, TABS_KEY, 'gatherDataTime'], function (result) {
       if (result[STORAGE_KEY] && result[URL_KEY] === url) {
         gatherData = result[STORAGE_KEY];
         if (result[TABS_KEY]) {
@@ -514,7 +576,17 @@ window.VulnKitGather = (function () {
         var total = Object.values(gatherData).reduce(function (s, a) {
           return s + (Array.isArray(a) ? a.length : 0);
         }, 0);
-        utils.setStatus('gather-status', '已恢复，共 ' + countAll() + ' 条');
+        var statusMsg = '已恢复，共 ' + countAll() + ' 条';
+        var savedTime = result.gatherDataTime;
+        if (savedTime) {
+          var ageMinutes = Math.floor((Date.now() - savedTime) / 60000);
+          if (ageMinutes > 60) {
+            statusMsg += '（上次收集: ' + Math.floor(ageMinutes / 60) + '小时前，建议重新收集）';
+          } else if (ageMinutes > 5) {
+            statusMsg += '（上次收集: ' + ageMinutes + '分钟前）';
+          }
+        }
+        utils.setStatus('gather-status', statusMsg);
       }
     });
   }
@@ -532,7 +604,7 @@ window.VulnKitGather = (function () {
       utils.showToast('没有数据可导出', 'warning');
       return;
     }
-    utils.buildCsv(['Group', 'Type', 'Value'], rows, 'vulnkit-gather-' + Date.now() + '.csv');
+    utils.buildCsv(['Group', 'Type', 'Value'], rows, 'lingmou-gather-' + Date.now() + '.csv');
   }
 
   function copyAllData() {

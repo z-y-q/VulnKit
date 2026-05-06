@@ -57,7 +57,7 @@ function exportSettings() {
 
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'pentest-tools-settings.json';
+    a.download = 'lingmou-settings.json';
     a.click();
 
     URL.revokeObjectURL(url);
@@ -75,17 +75,46 @@ function importSettings() {
     const reader = new FileReader();
     reader.onload = function (evt) {
       try {
-        const settings = JSON.parse(evt.target.result);
-        chrome.storage.local.set({ pentestSettings: settings }, () => {
+        const data = JSON.parse(evt.target.result);
+        if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+          showStatus('设置格式错误：需要 JSON 对象', 'error');
+          return;
+        }
+        var knownKeys = {
+          enableNotifications: 'boolean',
+          enableContextMenu: 'boolean',
+          theme: 'string',
+          storeHistory: 'boolean',
+          analytics: 'boolean',
+          defaultEncoding: 'string',
+          defaultHash: 'string',
+        };
+        var cleaned = {};
+        var skipped = 0;
+        for (var key in data) {
+          if (!data.hasOwnProperty(key)) continue;
+          if (!knownKeys[key]) {
+            skipped++;
+            continue;
+          }
+          if (typeof data[key] !== knownKeys[key]) {
+            skipped++;
+            continue;
+          }
+          cleaned[key] = data[key];
+        }
+        chrome.storage.local.set({ pentestSettings: cleaned }, () => {
           if (chrome.runtime.lastError) {
             showStatus('导入失败: ' + chrome.runtime.lastError.message, 'error');
             return;
           }
           loadSettings();
-          showStatus('设置已导入', 'success');
+          var msg = '设置已导入';
+          if (skipped > 0) msg += '（跳过 ' + skipped + ' 个无效字段）';
+          showStatus(msg, 'success');
         });
       } catch {
-        showStatus('文件格式错误', 'error');
+        showStatus('文件格式错误：无法解析 JSON', 'error');
       }
     };
     reader.readAsText(file);
@@ -122,6 +151,19 @@ function resetSettings() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Sync theme from popup's localStorage preference
+  var savedTheme = localStorage.getItem('pentest-theme');
+  if (savedTheme && savedTheme !== 'light') {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }
+  // Listen for theme changes from popup (same origin localStorage)
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'pentest-theme') {
+      var theme = e.newValue || 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  });
+
   const version = chrome.runtime.getManifest().version;
   const versionEl = $('version');
   if (versionEl) versionEl.textContent = version;
@@ -137,4 +179,19 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('input, select').forEach(input => {
     input.addEventListener('change', saveSettings);
   });
+
+  // Theme select also syncs to localStorage so popup picks it up
+  var themeSelect = $('theme');
+  if (themeSelect) {
+    themeSelect.addEventListener('change', function () {
+      var theme =
+        this.value === 'auto'
+          ? window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light'
+          : this.value;
+      localStorage.setItem('pentest-theme', theme);
+      document.documentElement.setAttribute('data-theme', theme);
+    });
+  }
 });

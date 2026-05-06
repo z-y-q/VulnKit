@@ -1,4 +1,4 @@
-// VulnKit - Vue Store Explorer (MAIN world injection)
+// 灵眸 - Vue Store Explorer (MAIN world injection)
 // Reads Vuex/Pinia state, actions/getters, and scans DOM for custom directives
 (function () {
   'use strict';
@@ -17,7 +17,9 @@
       var vueRoot = null;
       if (window.__VUE__) vueRoot = window.__VUE__;
       if (!vueRoot && document.querySelector('[data-v-app]')) {
-        vueRoot = document.querySelector('[data-v-app]').__vue_app__ || document.querySelector('[data-v-app]').__vue__;
+        vueRoot =
+          document.querySelector('[data-v-app]').__vue_app__ ||
+          document.querySelector('[data-v-app]').__vue__;
       }
       // Vue 3 app
       if (vueRoot && vueRoot.config && vueRoot.config.globalProperties) {
@@ -48,7 +50,8 @@
       if (window.pinia || window.__pinia__) {
         result.frameworks.push('Pinia');
         var piniaInstance = window.pinia || window.__pinia__;
-        var state = piniaInstance.state && piniaInstance.state.value ? piniaInstance.state.value : {};
+        var state =
+          piniaInstance.state && piniaInstance.state.value ? piniaInstance.state.value : {};
         Object.keys(state).forEach(function (storeId) {
           result.stores[storeId] = {
             state: safeClone(state[storeId]),
@@ -83,14 +86,16 @@
     if (obj === null || obj === undefined) return obj;
     if (typeof obj !== 'object') return obj;
     try {
-      return JSON.parse(JSON.stringify(obj, function (key, value) {
-        if (typeof value === 'function') return '[Function]';
-        if (value instanceof HTMLElement) return '[HTMLElement:' + value.tagName + ']';
-        if (value instanceof Window) return '[Window]';
-        if (value instanceof Error) return '[Error: ' + value.message + ']';
-        if (typeof value === 'symbol') return value.toString();
-        return value;
-      }));
+      return JSON.parse(
+        JSON.stringify(obj, function (key, value) {
+          if (typeof value === 'function') return '[Function]';
+          if (value instanceof HTMLElement) return '[HTMLElement:' + value.tagName + ']';
+          if (value instanceof Window) return '[Window]';
+          if (value instanceof Error) return '[Error: ' + value.message + ']';
+          if (typeof value === 'symbol') return value.toString();
+          return value;
+        })
+      );
     } catch (e) {
       return String(obj);
     }
@@ -104,7 +109,9 @@
       var vueRoot = null;
       if (window.__VUE__) vueRoot = window.__VUE__;
       if (!vueRoot && document.querySelector('[data-v-app]')) {
-        vueRoot = document.querySelector('[data-v-app]').__vue_app__ || document.querySelector('[data-v-app]').__vue__;
+        vueRoot =
+          document.querySelector('[data-v-app]').__vue_app__ ||
+          document.querySelector('[data-v-app]').__vue__;
       }
       if (vueRoot && vueRoot.config && vueRoot.config.globalProperties) {
         store = vueRoot.config.globalProperties.$store;
@@ -142,7 +149,8 @@
         });
       }
 
-      var urlPattern = /['"`](\/(?:api|v[0-9]+|admin|system|user|auth|login|query|search|list|get|post|put|delete)\/[^\s'"`)]{2,})['"`]/gi;
+      var urlPattern =
+        /['"`](\/(?:api|v[0-9]+|admin|system|user|auth|login|query|search|list|get|post|put|delete)\/[^\s'"`)]{2,})['"`]/gi;
       var seen = {};
       actionSrc.forEach(function (src) {
         var match;
@@ -164,9 +172,19 @@
   function scanDirectives() {
     var directives = [];
     var knownDirectives = [
-      'v-permission', 'v-auth', 'v-hasPermi', 'v-hasRole',
-      'v-access', 'v-role', 'v-permit', 'v-acl',
-      'v-if', 'v-show', 'v-model', 'v-slot', 'v-for',
+      'v-permission',
+      'v-auth',
+      'v-hasPermi',
+      'v-hasRole',
+      'v-access',
+      'v-role',
+      'v-permit',
+      'v-acl',
+      'v-if',
+      'v-show',
+      'v-model',
+      'v-slot',
+      'v-for',
     ];
     var customAttrs = {};
     var allEls = document.querySelectorAll('*');
@@ -175,8 +193,14 @@
       var attrs = el.attributes;
       for (var j = 0; j < attrs.length; j++) {
         var name = attrs[j].name;
-        if (name.indexOf('v-') === 0 || name.indexOf('data-v-') === -1 && name.indexOf(':') !== -1) {
-          if (name.indexOf('v-') === 0 && knownDirectives.indexOf(name.split('=')[0].split(':')[0]) === -1) {
+        if (
+          name.indexOf('v-') === 0 ||
+          (name.indexOf('data-v-') === -1 && name.indexOf(':') !== -1)
+        ) {
+          if (
+            name.indexOf('v-') === 0 &&
+            knownDirectives.indexOf(name.split('=')[0].split(':')[0]) === -1
+          ) {
             // Custom directive
             var dirName = name.split('=')[0].split(':')[0];
             if (!customAttrs[dirName]) {
@@ -197,7 +221,9 @@
         examples: customAttrs[dir].examples,
       });
     });
-    directives.sort(function (a, b) { return b.count - a.count; });
+    directives.sort(function (a, b) {
+      return b.count - a.count;
+    });
     return directives;
   }
 
@@ -206,12 +232,15 @@
   var actionsData = exploreActionsGetters();
   var directivesData = scanDirectives();
 
-  window.postMessage({
-    __vk_vue_store: true,
-    result: {
-      store: storeData,
-      actions: actionsData,
-      directives: directivesData,
+  window.postMessage(
+    {
+      __vk_vue_store: true,
+      result: {
+        store: storeData,
+        actions: actionsData,
+        directives: directivesData,
+      },
     },
-  }, location.origin);
+    location.origin
+  );
 })();

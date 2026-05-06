@@ -1,6 +1,10 @@
-// VulnKit v5.0
+// 灵眸 v5.0
 (function () {
   'use strict';
+
+  // Settings cache — declared before utils so showToast closure can reference it
+  var _settingsCache = null;
+  var _settingsPromise = null;
 
   const utils = {
     cache: new Map(),
@@ -30,31 +34,69 @@
       });
     },
     showToast: (() => {
-      let current = null;
-      const types = ['success', 'error', 'warning', 'info'];
-      return function (message, type, duration) {
-        if (current && current.parentNode) current.parentNode.removeChild(current);
-        current = document.createElement('div');
-        current.className = 'toast toast-' + (types.includes(type) ? type : 'info');
-        current.textContent = message;
-        document.body.appendChild(current);
-        requestAnimationFrame(() => {
-          if (current) current.classList.add('toast-show');
+      var queue = [];
+      var showing = false;
+      var types = ['success', 'error', 'warning', 'info'];
+      function processQueue() {
+        if (showing || queue.length === 0) return;
+        showing = true;
+        var item = queue.shift();
+        var el = document.createElement('div');
+        el.className = 'toast toast-' + (types.includes(item.type) ? item.type : 'info');
+        el.textContent = item.message;
+        el.addEventListener('click', function () {
+          clearTimeout(timer);
+          dismiss();
         });
-        setTimeout(() => {
-          if (current) {
-            current.classList.remove('toast-show');
-            setTimeout(() => {
-              if (current && current.parentNode) {
-                current.parentNode.removeChild(current);
-                current = null;
-              }
-            }, 200);
-          }
-        }, duration || 2000);
+        document.body.appendChild(el);
+        requestAnimationFrame(function () {
+          el.classList.add('toast-show');
+        });
+        var timer = setTimeout(function () {
+          dismiss();
+        }, item.duration || 2000);
+        function dismiss() {
+          el.classList.remove('toast-show');
+          setTimeout(function () {
+            if (el.parentNode) el.parentNode.removeChild(el);
+            showing = false;
+            processQueue();
+          }, 200);
+        }
+      }
+      return function (message, type, duration) {
+        if (_settingsCache && _settingsCache.enableNotifications === false) return;
+        queue.push({ message: message, type: type, duration: duration });
+        processQueue();
       };
     })(),
   };
+
+  utils.loadSettings = function () {
+    if (_settingsCache) return Promise.resolve(_settingsCache);
+    if (!_settingsPromise) {
+      _settingsPromise = new Promise(function (resolve) {
+        chrome.storage.local.get(['pentestSettings'], function (result) {
+          _settingsCache = result.pentestSettings || {};
+          resolve(_settingsCache);
+        });
+      });
+    }
+    return _settingsPromise;
+  };
+  utils.getSetting = function (key, defaultVal) {
+    if (!_settingsCache) return defaultVal;
+    var val = _settingsCache[key];
+    return val !== undefined && val !== null ? val : defaultVal;
+  };
+
+  // Invalidate cache when settings change (e.g. options page modified while popup is open)
+  chrome.storage.onChanged.addListener(function (changes, area) {
+    if (area === 'local' && changes.pentestSettings) {
+      _settingsCache = null;
+      _settingsPromise = null;
+    }
+  });
 
   window.VulnKitUtils = utils;
 
@@ -122,6 +164,31 @@
 
   utils.csvField = function (val) {
     return '"' + (val || '').replace(/"/g, '""') + '"';
+  };
+
+  utils.confirmDanger = function (message) {
+    return new Promise(function (resolve) {
+      var overlay = document.createElement('div');
+      overlay.className = 'confirm-overlay';
+      overlay.innerHTML =
+        '<div class="confirm-dialog">' +
+        '<p>' +
+        utils.escapeHtml(message) +
+        '</p>' +
+        '<div class="confirm-buttons">' +
+        '<button class="confirm-cancel" data-action="cancel">取消</button>' +
+        '<button class="confirm-ok" data-action="ok">确认执行</button>' +
+        '</div></div>';
+      document.body.appendChild(overlay);
+      overlay.querySelector('[data-action="cancel"]').addEventListener('click', function () {
+        overlay.remove();
+        resolve(false);
+      });
+      overlay.querySelector('[data-action="ok"]').addEventListener('click', function () {
+        overlay.remove();
+        resolve(true);
+      });
+    });
   };
 
   utils.requireTabId = async function () {
@@ -328,6 +395,80 @@
     return results;
   };
 
+  var UI_STATE_KEY = 'pentest_ui_state';
+  var _uiStateCache = null;
+
+  utils.saveUIState = function (id, value) {
+    if (!_uiStateCache) _uiStateCache = {};
+    _uiStateCache[id] = value;
+    chrome.storage.local.set({ pentest_ui_state: _uiStateCache });
+  };
+
+  utils.restoreUIState = function () {
+    return new Promise(function (resolve) {
+      chrome.storage.local.get([UI_STATE_KEY], function (result) {
+        _uiStateCache = result[UI_STATE_KEY] || {};
+        Object.keys(_uiStateCache).forEach(function (id) {
+          if (id === 'asset-source') return;
+          var el = utils.get(id);
+          if (!el) return;
+          var val = _uiStateCache[id];
+          if (el.tagName === 'SELECT' || el.tagName === 'INPUT') {
+            el.value = val;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+        resolve(_uiStateCache);
+      });
+    });
+  };
+
+  utils.bindPersist = function (id) {
+    var el = utils.get(id);
+    if (!el) return;
+    el.addEventListener('change', function () {
+      utils.saveUIState(id, el.value);
+    });
+  };
+
+  utils.loadLibs = function (srcs) {
+    var key = srcs.join('|');
+    if (utils.loadLibs._loaded && utils.loadLibs._loaded[key]) {
+      return Promise.resolve();
+    }
+    return new Promise(function (resolve) {
+      var remaining = srcs.filter(function (src) {
+        return !utils.loadLibs._pending || !utils.loadLibs._pending[src];
+      });
+      if (remaining.length === 0) {
+        if (!utils.loadLibs._loaded) utils.loadLibs._loaded = {};
+        utils.loadLibs._loaded[key] = true;
+        resolve();
+        return;
+      }
+      if (!utils.loadLibs._pending) utils.loadLibs._pending = {};
+      var count = remaining.length;
+      var failed = false;
+      remaining.forEach(function (src) {
+        utils.loadLibs._pending[src] = true;
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = s.onerror = function () {
+          delete utils.loadLibs._pending[src];
+          if (!failed) {
+            count--;
+            if (count === 0) {
+              if (!utils.loadLibs._loaded) utils.loadLibs._loaded = {};
+              utils.loadLibs._loaded[key] = true;
+              resolve();
+            }
+          }
+        };
+        (document.head || document.documentElement).appendChild(s);
+      });
+    });
+  };
+
   var utilsProxy = {};
   Object.keys(utils)
     .filter(function (k) {
@@ -338,5 +479,6 @@
         return utils[method].apply(utils, arguments);
       };
     });
+
   utils.utilsProxy = utilsProxy;
 })();

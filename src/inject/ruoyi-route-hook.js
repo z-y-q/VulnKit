@@ -1,4 +1,4 @@
-// VulnKit - RuoYi Route Hook (document_start, MAIN world)
+// 灵眸 - RuoYi Route Hook (document_start, MAIN world)
 // Intercepts fetch/XHR to capture and augment /getRouters responses
 // Capture is ALWAYS active (passive). `enabled` controls augmentation and API logging.
 (function () {

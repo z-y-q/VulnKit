@@ -1,4 +1,4 @@
-/* VulnKit Background Service Worker */
+/* 灵眸 Background Service Worker */
 /* eslint-disable no-undef */
 
 // ====== declarativeNetRequest helpers ======
@@ -292,6 +292,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.type) return false;
 
   switch (message.type) {
+    case 'QUERY_JS_BLOCK':
+      chrome.declarativeNetRequest
+        .getDynamicRules()
+        .then(rules => {
+          sendResponse({ blocked: rules.some(r => r.id === JS_BLOCK_RULE_ID) });
+        })
+        .catch(() => sendResponse({ blocked: false }));
+      return true;
+
     case 'TOGGLE_JS':
       if (message.enable) {
         removeJsBlockRule()
@@ -433,24 +442,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // ====== Context menus ======
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'vulnkit-extract-links',
-    title: 'VulnKit: Extract Links',
-    contexts: ['page'],
+function createContextMenus() {
+  chrome.storage.local.get(['pentestSettings'], result => {
+    var settings = result.pentestSettings || {};
+    if (settings.enableContextMenu === false) {
+      chrome.contextMenus.removeAll().catch(() => {});
+      return;
+    }
+    chrome.contextMenus.removeAll(() => {
+      chrome.contextMenus.create({
+        id: 'vulnkit-extract-links',
+        title: '灵眸: Extract Links',
+        contexts: ['page'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-encode',
+        title: '灵眸: Encode Selection',
+        contexts: ['selection'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-decode',
+        title: '灵眸: Decode Selection',
+        contexts: ['selection'],
+      });
+    });
   });
+}
 
-  chrome.contextMenus.create({
-    id: 'vulnkit-encode',
-    title: 'VulnKit: Encode Selection',
-    contexts: ['selection'],
-  });
+chrome.runtime.onInstalled.addListener(createContextMenus);
 
-  chrome.contextMenus.create({
-    id: 'vulnkit-decode',
-    title: 'VulnKit: Decode Selection',
-    contexts: ['selection'],
-  });
+// Rebuild menus when settings change
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.pentestSettings) {
+    createContextMenus();
+  }
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {

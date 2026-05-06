@@ -1,4 +1,4 @@
-// VulnKit - Content Script Bridge
+// 灵眸 - Content Script Bridge
 (function () {
   'use strict';
 
@@ -113,20 +113,6 @@
       });
       chrome.storage.local.set({ contextExtractedLinks: links, contextExtractedUrl: pageUrl });
       sendResponse({ count: links.length });
-      return true;
-    }
-    if (message.type === 'VK_RUOYI_INJECT_HOOK') {
-      var hookScript = document.createElement('script');
-      hookScript.src = chrome.runtime.getURL('src/inject/ruoyi-route-hook.js');
-      hookScript.onload = function () {
-        hookScript.remove();
-        sendResponse({ status: 'ok' });
-      };
-      hookScript.onerror = function () {
-        hookScript.remove();
-        sendResponse({ status: 'load-failed' });
-      };
-      (document.head || document.documentElement).appendChild(hookScript);
       return true;
     }
     if (message.type === 'VK_VUE_STORE_EXPLORE') {

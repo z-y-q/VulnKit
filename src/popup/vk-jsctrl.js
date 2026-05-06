@@ -1,5 +1,5 @@
 /**
- * vk-jsctrl.js - JS Control Module (VulnKit)
+ * vk-jsctrl.js - JS Control Module (灵眸)
  *
  * Extracted from inline-optimized.js lines 3082-3725.
  * Provides JavaScript toggle, anti-debug scanning/bypass, and copy-restriction removal.
@@ -263,6 +263,10 @@ window.VulnKitJsCtrl = (function () {
   }
 
   async function bypassAntiDebug() {
+    var ok = await utils.confirmDanger(
+      '即将重写 Function.prototype 并覆盖 console 方法绕过反调试，是否继续？'
+    );
+    if (!ok) return;
     return utils.withTab(async function (tab) {
       try {
         await utils.execInTab(tab.id, function () {

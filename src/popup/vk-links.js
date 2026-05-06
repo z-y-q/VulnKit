@@ -1,4 +1,4 @@
-// VulnKit - Link Extract
+// 灵眸 - Link Extract
 window.VulnKitLinks = (function () {
   'use strict';
 
@@ -125,7 +125,9 @@ window.VulnKitLinks = (function () {
         renderStats();
         utils.setStatus('links-count', '提取完成，共 ' + allLinks.length + ' 个链接');
         utils.showToast('提取完成', 'success');
-        chrome.storage.local.set({ allLinks: allLinks, allLinksUrl: tab.url });
+        if (utils.getSetting('storeHistory', true)) {
+          chrome.storage.local.set({ allLinks: allLinks, allLinksUrl: tab.url });
+        }
       }
     } catch (e) {
       utils.setStatus('links-count', '提取失败: ' + e.message);
@@ -214,7 +216,8 @@ window.VulnKitLinks = (function () {
     var html = '';
     filtered.forEach(function (link) {
       var tagClass = 'tag-' + link.tag;
-      html += '<div class="link-item">';
+      var extClass = link.isExternal ? ' link-item-external' : '';
+      html += '<div class="link-item' + extClass + '">';
       html +=
         '<span class="link-item-tag ' +
         tagClass +
@@ -279,7 +282,7 @@ window.VulnKitLinks = (function () {
     utils.buildCsv(
       ['URL', 'Tag', 'Domain', 'Text', 'External'],
       rows,
-      'vulnkit-links-' + Date.now() + '.csv'
+      'lingmou-links-' + Date.now() + '.csv'
     );
   }
 

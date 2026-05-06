@@ -1,4 +1,4 @@
-// VulnKit - HaE Rules Engine
+// 灵眸 - HaE Rules Engine
 window.VulnKitHaeRules = (function () {
   'use strict';
 

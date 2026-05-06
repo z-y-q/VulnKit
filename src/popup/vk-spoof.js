@@ -1,4 +1,4 @@
-// VulnKit - Request Spoofing (UA, Cookie, Headers)
+// 灵眸 - Request Spoofing (UA, Cookie, Headers)
 window.VulnKitSpoof = (function () {
   'use strict';
 

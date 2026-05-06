@@ -1,4 +1,4 @@
-// VulnKit - URL Multi-Open
+// 灵眸 - URL Multi-Open
 window.VulnKitMultiUrl = (function () {
   'use strict';
 
@@ -24,7 +24,7 @@ window.VulnKitMultiUrl = (function () {
     if (el) el.textContent = count > 0 ? '已识别 ' + count + ' 个 URL' : '';
   }
 
-  function handleMultiurlOpen() {
+  async function handleMultiurlOpen() {
     const urls = parseUrls();
     if (urls.length === 0) {
       utils.showToast('请输入URL', 'warning');
@@ -34,6 +34,8 @@ window.VulnKitMultiUrl = (function () {
       utils.showToast('一次最多打开 50 个', 'warning');
       return;
     }
+    var ok = await utils.confirmDanger('即将打开 ' + urls.length + ' 个标签页，是否继续？');
+    if (!ok) return;
     urls.forEach(url => chrome.tabs.create({ url, active: false }));
     utils.showToast('已打开 ' + urls.length + ' 个标签页', 'success');
   }

@@ -3,6 +3,8 @@ body {
     margin: 0;
     padding: 20px;
     background-color: #f5f5f5;
+    color: #333;
+    transition: background-color 0.2s, color 0.2s;
 }
 .container {
     max-width: 800px;
@@ -11,13 +13,16 @@ body {
     padding: 30px;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: background 0.2s, box-shadow 0.2s;
 }
-h1 { color: #333; }
+h1 { color: #333; transition: color 0.2s; }
+h3 { color: #444; transition: color 0.2s; }
 .section {
     margin: 20px 0;
     padding: 15px;
     border: 1px solid #ddd;
     border-radius: 4px;
+    transition: border-color 0.2s, background 0.2s;
 }
 .setting {
     margin: 10px 0;
@@ -26,6 +31,17 @@ label {
     display: block;
     margin-bottom: 5px;
     font-weight: bold;
+    color: #333;
+    transition: color 0.2s;
+}
+select {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+    color: #333;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
 button {
     background-color: #007bff;
@@ -35,13 +51,50 @@ button {
     border-radius: 4px;
     cursor: pointer;
     margin: 5px;
+    transition: background-color 0.2s;
 }
 button:hover { background-color: #0056b3; }
+p { color: #666; transition: color 0.2s; }
 .status {
     padding: 10px;
     border-radius: 4px;
     margin: 10px 0;
 }
 .success { background-color: #d4edda; color: #155724; }
+.error { background-color: #f8d7da; color: #721c24; }
 .info { background-color: #d1ecf1; color: #0c5460; }
 .status-hidden { display: none; }
+
+/* Dark theme */
+[data-theme='dark'] body {
+    background-color: #1a1a2e;
+    color: #e0e0e0;
+}
+[data-theme='dark'] .container {
+    background: #16213e;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+}
+[data-theme='dark'] h1, [data-theme='dark'] h3, [data-theme='dark'] label {
+    color: #e0e0e0;
+}
+[data-theme='dark'] p {
+    color: #aaa;
+}
+[data-theme='dark'] .section {
+    border-color: #2a3a5c;
+    background: #1a2744;
+}
+[data-theme='dark'] select {
+    background: #1a2744;
+    color: #e0e0e0;
+    border-color: #2a3a5c;
+}
+[data-theme='dark'] button {
+    background-color: #4A90E2;
+}
+[data-theme='dark'] button:hover {
+    background-color: #3a7bc8;
+}
+[data-theme='dark'] .success { background-color: #1a3a2a; color: #75d99a; }
+[data-theme='dark'] .error { background-color: #3a1a1a; color: #f87171; }
+[data-theme='dark'] .info { background-color: #1a2a3a; color: #7dd3fc; }

@@ -285,6 +285,10 @@ window.VulnKitVue = (function () {
   }
 
   async function bypassVueGuards() {
+    var ok = await utils.confirmDanger(
+      '即将清除所有 Vue Router 导航守卫，此操作不可逆，是否继续？'
+    );
+    if (!ok) return;
     const tab = await utils.requireTabId();
     if (!tab) return;
 

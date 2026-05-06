@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "VulnKit",
+  "name": "灵眸",
   "version": "5.0.0",
-  "description": "漏洞工具包 - 编码解码、图标识别、资产测绘、信息收集、权限分析",
+  "description": "灵眸 - 编码解码、图标识别、资产测绘、信息收集、权限分析",
   "permissions": [
     "activeTab",
     "storage",
@@ -32,12 +32,6 @@
       "matches": ["<all_urls>"],
       "js": ["src/content/vk-content.js"],
       "run_at": "document_idle"
-    },
-    {
-      "matches": ["<all_urls>"],
-      "js": ["src/inject/ruoyi-route-hook.js"],
-      "run_at": "document_start",
-      "world": "MAIN"
     }
   ],
   "web_accessible_resources": [
@@ -48,7 +42,7 @@
   ],
   "action": {
     "default_popup": "src/popup/popup.html",
-    "default_title": "VulnKit - 漏洞工具包"
+    "default_title": "灵眸 - 漏洞工具包"
   },
   "options_page": "src/options/options.html",
   "content_security_policy": {

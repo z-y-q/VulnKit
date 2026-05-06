@@ -1,4 +1,4 @@
-// VulnKit - EXIF Viewer
+// 灵眸 - EXIF Viewer
 window.VulnKitExif = (function () {
   'use strict';
 
@@ -139,6 +139,10 @@ window.VulnKitExif = (function () {
     if (els.fileSize) els.fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
 
     try {
+      if (typeof exifr === 'undefined') {
+        showExifError(els, 'EXIF 库加载中，请稍候...');
+        return;
+      }
       const exif = await exifr.parse(file, {
         tiff: true,
         exif: true,

@@ -1,4 +1,4 @@
-// VulnKit - RuoYi Common Utilities
+// 灵眸 - RuoYi Common Utilities
 // Shared helpers used by all RuoYi sub-modules
 window.VulnKitRuoYiCommon = (function () {
   'use strict';

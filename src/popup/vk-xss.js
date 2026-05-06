@@ -1,4 +1,4 @@
-// VulnKit - XSS Scanner
+// 灵眸 - XSS Scanner
 window.VulnKitXss = (function () {
   'use strict';
 
@@ -126,7 +126,11 @@ window.VulnKitXss = (function () {
           Object.keys(obj).forEach(function (k) {
             if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
               Object.keys(obj[k]).forEach(function (nk) {
-                window.__XSS_INTERCEPT__.push({ url: urlBase, param: k + '.' + nk, method: method });
+                window.__XSS_INTERCEPT__.push({
+                  url: urlBase,
+                  param: k + '.' + nk,
+                  method: method,
+                });
               });
             } else {
               window.__XSS_INTERCEPT__.push({ url: urlBase, param: k, method: method });
@@ -138,7 +142,11 @@ window.VulnKitXss = (function () {
         try {
           const u = new URL(rawUrl, location.href);
           u.searchParams.forEach((_, k) => {
-            window.__XSS_INTERCEPT__.push({ url: u.origin + u.pathname + u.search, param: k, method: method });
+            window.__XSS_INTERCEPT__.push({
+              url: u.origin + u.pathname + u.search,
+              param: k,
+              method: method,
+            });
           });
         } catch {}
       }
@@ -148,7 +156,11 @@ window.VulnKitXss = (function () {
           params.forEach((_, k) => {
             try {
               const u = new URL(rawUrl, location.href);
-              window.__XSS_INTERCEPT__.push({ url: u.origin + u.pathname, param: k, method: method });
+              window.__XSS_INTERCEPT__.push({
+                url: u.origin + u.pathname,
+                param: k,
+                method: method,
+              });
             } catch {}
           });
         } catch {}
@@ -177,7 +189,8 @@ window.VulnKitXss = (function () {
         return origSend.apply(this, arguments);
       };
       window.fetch = function (input, init) {
-        var url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
+        var url =
+          typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
         var method = (init && init.method ? init.method : 'GET').toUpperCase();
         processRequest(url, method, init && init.body);
         return origFetch.apply(this, arguments);
@@ -227,8 +240,10 @@ window.VulnKitXss = (function () {
     utils
       .execInTab(tab.id, () => {
         if (!window.__XSS_ORIGINAL__) return;
-        if (window.__XSS_ORIGINAL__.xhrOpen) XMLHttpRequest.prototype.open = window.__XSS_ORIGINAL__.xhrOpen;
-        if (window.__XSS_ORIGINAL__.xhrSend) XMLHttpRequest.prototype.send = window.__XSS_ORIGINAL__.xhrSend;
+        if (window.__XSS_ORIGINAL__.xhrOpen)
+          XMLHttpRequest.prototype.open = window.__XSS_ORIGINAL__.xhrOpen;
+        if (window.__XSS_ORIGINAL__.xhrSend)
+          XMLHttpRequest.prototype.send = window.__XSS_ORIGINAL__.xhrSend;
         if (window.__XSS_ORIGINAL__.fetch) window.fetch = window.__XSS_ORIGINAL__.fetch;
         delete window.__XSS_INTERCEPT__;
         delete window.__XSS_ORIGINAL__;
@@ -240,7 +255,12 @@ window.VulnKitXss = (function () {
     const el = utils.get('xssscan-status');
     if (!el) return;
     if (xssInterceptActive) {
-      el.textContent = '拦截监听中... 剩余 ' + xssInterceptCountdown + 's — 已捕获 ' + xssPoints.length + ' 个参数点';
+      el.textContent =
+        '拦截监听中... 剩余 ' +
+        xssInterceptCountdown +
+        's — 已捕获 ' +
+        xssPoints.length +
+        ' 个参数点';
       el.style.color = '#e67e22';
     } else {
       el.textContent =
@@ -278,7 +298,11 @@ window.VulnKitXss = (function () {
     const filtered = getFilteredXssPoints();
     if (countEl) {
       var hasFilter = xssFilterType !== 'all' || xssSearchText;
-      countEl.textContent = '共发现 ' + xssPoints.length + ' 个注入点' + (hasFilter ? '（显示: ' + filtered.length + '）' : '');
+      countEl.textContent =
+        '共发现 ' +
+        xssPoints.length +
+        ' 个注入点' +
+        (hasFilter ? '（显示: ' + filtered.length + '）' : '');
     }
     if (filtered.length === 0) {
       utils.setEmpty('xssscan-results', '暂无注入点');
@@ -387,14 +411,18 @@ window.VulnKitXss = (function () {
     try {
       const domPoints = await harvestXssParamsFromDom();
       const existing = new Set(xssPoints.map(p => p.url + '|' + p.param + '|' + p.method));
-      const newPoints = domPoints.filter(p => !existing.has(p.url + '|' + p.param + '|' + p.method));
+      const newPoints = domPoints.filter(
+        p => !existing.has(p.url + '|' + p.param + '|' + p.method)
+      );
       xssPoints = [...xssPoints, ...newPoints];
       renderXssPoints();
       if (statusEl) {
-        statusEl.textContent = '采集完成，新增 ' + newPoints.length + ' 个注入点，共 ' + xssPoints.length + ' 个';
+        statusEl.textContent =
+          '采集完成，新增 ' + newPoints.length + ' 个注入点，共 ' + xssPoints.length + ' 个';
         statusEl.style.color = '#27ae60';
       }
-      if (newPoints.length > 0) utils.showToast('发现 ' + newPoints.length + ' 个注入点', 'success');
+      if (newPoints.length > 0)
+        utils.showToast('发现 ' + newPoints.length + ' 个注入点', 'success');
       else utils.showToast('未发现新的注入点', 'info');
     } catch (e) {
       if (statusEl) {
@@ -411,6 +439,17 @@ window.VulnKitXss = (function () {
       utils.showToast('没有选中的注入点', 'warning');
       return;
     }
+    var postCount = selected.filter(p => p.method === 'POST').length;
+    var warn =
+      postCount > 0
+        ? '即将对 ' +
+          selected.length +
+          ' 个注入点进行 XSS 测试（含 ' +
+          postCount +
+          ' 个 POST 表单自动提交），是否继续？'
+        : '即将对 ' + selected.length + ' 个注入点打开测试页面，是否继续？';
+    var ok = await utils.confirmDanger(warn);
+    if (!ok) return;
     const payload = getEncodedPayload();
     const getPoints = selected.filter(p => p.method !== 'POST');
     const postPoints = selected.filter(p => p.method === 'POST');
@@ -546,7 +585,11 @@ window.VulnKitXss = (function () {
     var rows = xssPoints.map(function (p) {
       return [p.source, p.url, p.param, p.method];
     });
-    utils.buildCsv(['Source', 'URL', 'Param', 'Method'], rows, 'vulnkit-xss-' + Date.now() + '.csv');
+    utils.buildCsv(
+      ['Source', 'URL', 'Param', 'Method'],
+      rows,
+      'lingmou-xss-' + Date.now() + '.csv'
+    );
   }
 
   return {

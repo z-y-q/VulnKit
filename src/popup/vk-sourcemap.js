@@ -11,6 +11,31 @@ window.VulnKitSourcemap = (function () {
   let sourcemapTabId = null;
   let sourcemapMapCache = {};
 
+  let smAbortFlag = false;
+  var smTimerInterval = null;
+  var smStartTime = 0;
+
+  function smStartTimer() {
+    smStopTimer();
+    smStartTime = Date.now();
+    var el = utils.get('sm-timer');
+    if (el) {
+      el.classList.remove('hidden');
+      el.textContent = '0s';
+    }
+    smTimerInterval = setInterval(function () {
+      var elapsed = Math.floor((Date.now() - smStartTime) / 1000);
+      if (el) el.textContent = elapsed + 's';
+    }, 1000);
+  }
+
+  function smStopTimer() {
+    if (smTimerInterval) {
+      clearInterval(smTimerInterval);
+      smTimerInterval = null;
+    }
+  }
+
   var SM_SECURITY_RULES = [
     ['AWS Access Key', /AKIA[0-9A-Z]{16}/g, 'critical'],
     [
@@ -155,6 +180,7 @@ window.VulnKitSourcemap = (function () {
     var concurrency = tailOnly ? 10 : 5;
     var results = [];
     for (var i = 0; i < urls.length; i += concurrency) {
+      if (smAbortFlag) return results;
       var batch = urls.slice(i, i + concurrency);
       var batchResults;
       if (tabId) {
@@ -328,12 +354,31 @@ window.VulnKitSourcemap = (function () {
   function setScanState(scanning) {
     var btn = utils.get('sourcemap-scan-btn');
     if (!btn) return;
-    btn.disabled = scanning;
-    btn.textContent = scanning ? '扫描中...' : '扫描[v2]';
-    btn.classList.toggle('scanning', scanning);
+    if (scanning) {
+      smStartTimer();
+      btn.disabled = false;
+      btn.textContent = '停止扫描';
+      btn.classList.add('scanning', 'btn-danger');
+      btn.classList.remove('btn-primary');
+    } else {
+      smStopTimer();
+      btn.disabled = false;
+      btn.textContent = '扫描[v2]';
+      btn.classList.remove('scanning', 'btn-danger');
+      btn.classList.add('btn-primary');
+    }
+  }
+
+  function stopSourcemapScan() {
+    smAbortFlag = true;
   }
 
   async function scanWebpackModules() {
+    if (smAbortFlag === false && document.querySelector('#sourcemap-scan-btn.scanning')) {
+      smAbortFlag = true;
+      return;
+    }
+
     var statusEl = utils.get('sourcemap-status');
     var resultsEl = utils.get('sourcemap-results');
     if (!statusEl) return;
@@ -342,6 +387,7 @@ window.VulnKitSourcemap = (function () {
     sourcemapSourceCache = {};
     sourcemapMapCache = {};
     sourcemapTabId = null;
+    smAbortFlag = false;
     setScanState(true);
     if (resultsEl) resultsEl.innerHTML = '';
 
@@ -858,6 +904,11 @@ window.VulnKitSourcemap = (function () {
         // MAIN world may fail on some pages, continue with fallback
       }
 
+      if (smAbortFlag) {
+        statusEl.textContent = '扫描已取消';
+        return;
+      }
+
       // Phase 2: ISOLATED world -- collect script URLs + extract source map URLs
       statusEl.textContent = 'Phase 2: 收集脚本和 Source Map...';
       smUpdateProgress(30, 2);
@@ -974,6 +1025,11 @@ window.VulnKitSourcemap = (function () {
             sourcemapMapCache
           );
         }
+      }
+
+      if (smAbortFlag) {
+        statusEl.textContent = '扫描已取消';
+        return;
       }
 
       // Phase 2.5: Discover unloaded chunks via manifest + fetch their source maps
@@ -1204,6 +1260,11 @@ window.VulnKitSourcemap = (function () {
         }
       }
 
+      if (smAbortFlag) {
+        statusEl.textContent = '扫描已取消';
+        return;
+      }
+
       // Phase 3: Fallback -- parse JS files for webpack paths
       if (allModules.length === 0 && scriptUrls.length > 0) {
         statusEl.textContent = 'Phase 3: 解析 JS 文件中的模块路径...';
@@ -1312,6 +1373,9 @@ window.VulnKitSourcemap = (function () {
       statusEl.textContent = '扫描失败: ' + (err.message || '未知错误');
     } finally {
       setScanState(false);
+      if (smAbortFlag && sourcemapModules.length > 0) {
+        renderSourcemapModules();
+      }
       // Hide progress bar after a brief delay
       setTimeout(function () {
         var progressEl = utils.get('sm-progress');
@@ -1667,10 +1731,14 @@ window.VulnKitSourcemap = (function () {
     });
 
     var summaryHtml = '<div class="sm-analysis-summary">共发现 ' + allFindings.length + ' 个问题：';
+    var filterHtml = '<div class="sm-analysis-filters">';
+    filterHtml += '<span class="sm-filter-btn active" data-severity="all">全部</span>';
     severityOrder.forEach(function (s) {
       if (counts[s] > 0) {
-        summaryHtml +=
-          ' <span class="sm-analysis-severity sm-severity-' +
+        filterHtml +=
+          ' <span class="sm-filter-btn sm-severity-' +
+          s +
+          '" data-severity="' +
           s +
           '">' +
           severityLabels[s] +
@@ -1679,14 +1747,20 @@ window.VulnKitSourcemap = (function () {
           '</span>';
       }
     });
+    filterHtml += '</div>';
     summaryHtml += '</div>';
-    resultsEl.innerHTML = summaryHtml;
+    resultsEl.innerHTML = summaryHtml + filterHtml;
 
     var itemsHtml = '';
     var displayFindings = allFindings.slice(0, SM_MAX_FINDINGS);
     for (var fi = 0; fi < displayFindings.length; fi++) {
       var f = displayFindings[fi];
-      itemsHtml += '<div class="sm-analysis-item" data-idx="' + f.moduleIndex + '">';
+      itemsHtml +=
+        '<div class="sm-analysis-item" data-severity="' +
+        f.severity +
+        '" data-idx="' +
+        f.moduleIndex +
+        '">';
       itemsHtml +=
         '<span class="sm-analysis-severity sm-severity-' +
         f.severity +
@@ -1706,6 +1780,21 @@ window.VulnKitSourcemap = (function () {
         var idx = parseInt(this.dataset.idx);
         analysisCard.classList.add('hidden');
         if (!isNaN(idx)) showSourcemapModuleDetail(idx);
+      });
+    });
+
+    // Bind severity filter buttons
+    resultsEl.querySelectorAll('.sm-filter-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        resultsEl.querySelectorAll('.sm-filter-btn').forEach(function (b) {
+          b.classList.remove('active');
+        });
+        this.classList.add('active');
+        var severity = this.dataset.severity;
+        resultsEl.querySelectorAll('.sm-analysis-item').forEach(function (item) {
+          item.style.display =
+            severity === 'all' || item.dataset.severity === severity ? '' : 'none';
+        });
       });
     });
   }
@@ -1772,6 +1861,10 @@ window.VulnKitSourcemap = (function () {
       utils.showToast('未找到可加载的 JS 文件', 'warning');
       return;
     }
+    var ok = await utils.confirmDanger(
+      '即将加载 ' + jsUrls.length + ' 个 JS 源文件到 DevTools Sources 面板，是否继续？'
+    );
+    if (!ok) return;
     try {
       var tab = await utils.requireTabId();
       if (!tab) {
@@ -1975,6 +2068,7 @@ window.VulnKitSourcemap = (function () {
   return {
     // Functions
     scanWebpackModules: scanWebpackModules,
+    stopSourcemapScan: stopSourcemapScan,
     copyAllSourcemapPaths: copyAllSourcemapPaths,
     generateSourcemapTree: generateSourcemapTree,
     loadSourcesToDevTools: loadSourcesToDevTools,

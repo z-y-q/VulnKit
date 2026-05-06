@@ -1,4 +1,4 @@
-// VulnKit - History Archive (Wayback Machine)
+// 灵眸 - History Archive (Wayback Machine)
 window.VulnKitHistory = (function () {
   'use strict';
 
@@ -266,7 +266,7 @@ window.VulnKitHistory = (function () {
     utils.buildCsv(
       ['时间戳', 'URL', '状态码', 'MIME类型'],
       rows,
-      'vulnkit-history-' + Date.now() + '.csv'
+      'lingmou-history-' + Date.now() + '.csv'
     );
   }
 

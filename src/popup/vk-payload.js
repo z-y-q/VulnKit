@@ -1,4 +1,4 @@
-// VulnKit - Payload Reference Library
+// 灵眸 - Payload Reference Library
 window.VulnKitPayload = (function () {
   'use strict';
 

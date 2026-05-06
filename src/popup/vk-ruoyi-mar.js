@@ -1,4 +1,4 @@
-// VulnKit - RuoYi MaR Sub-module
+// 灵眸 - RuoYi MaR Sub-module
 // Dynamic route scanning (dictionary-based), rendering, and Vue Router injection
 window.VulnKitRuoYiMar = (function () {
   'use strict';

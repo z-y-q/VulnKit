@@ -1,4 +1,4 @@
-// VulnKit - Encoding Tools
+// 灵眸 - Encoding Tools
 window.VulnKitEncoding = (function () {
   'use strict';
 
@@ -114,6 +114,7 @@ window.VulnKitEncoding = (function () {
 
   function switchEncodingTab(type) {
     currentEncodingType = type;
+    utils.saveUIState('encoding-subtab', type);
     document.querySelectorAll('.sub-tab-btn').forEach(function (b) {
       b.classList.toggle('active', b.dataset.type === type);
     });
@@ -126,6 +127,18 @@ window.VulnKitEncoding = (function () {
       if (jwtSection) jwtSection.classList.add('hidden');
       if (cryptoSection) cryptoSection.classList.remove('hidden');
       if (cardTitle) cardTitle.textContent = '加密解密';
+      if (!switchEncodingTab._cryptoLoaded) {
+        switchEncodingTab._cryptoLoaded = true;
+        utils
+          .loadLibs([
+            'lib/crypto-js.min.js',
+            'lib/jsrsasign.min.js',
+            'lib/sm2.js',
+            'lib/sm4.js',
+            'lib/bcrypt.min.js',
+          ])
+          .catch(function () {});
+      }
     } else if (type === 'jwt') {
       if (encSection) encSection.classList.add('hidden');
       if (cryptoSection) cryptoSection.classList.add('hidden');
