@@ -28,7 +28,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/inject/vue-detect.js", "src/inject/ruoyi-route-hook.js", "src/inject/vue-store-explorer.js"],
+      "resources": ["src/inject/vue-detect.js", "src/inject/ruoyi-route-hook.js", "src/inject/vue-store-explorer.js", "src/inject/react-detect.js", "src/inject/angular-detect.js", "src/inject/sourcemap-detect.js"],
       "matches": ["<all_urls>"]
     }
   ],

@@ -50,4 +50,14 @@
           <div class="empty-state">点击「收集当前页面」开始</div>
         </div>
       </div>
+
+      <div class="content-card card-spacing">
+        <div class="card-title">API 流量捕获</div>
+        <div class="gather-actions">
+          <button class="btn btn-secondary" id="gather-api-start-btn">启动监听</button>
+          <button class="btn btn-outline" id="gather-api-stop-btn" disabled>停止监听</button>
+        </div>
+        <div class="gather-status" id="gather-api-status">未启动监听</div>
+        <div style="font-size:11px;color:#999;">捕获页面中的 XHR/Fetch 请求，结果将显示在「信息收集」的 API Traffic 子标签中</div>
+      </div>
     </div>

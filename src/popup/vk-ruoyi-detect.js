@@ -176,6 +176,39 @@ window.VulnKitRuoYiDetect = (function () {
           }
         });
 
+        // --- Cloud-specific signals ---
+        var pageText = document.documentElement.innerText || '';
+        if (/actuator\/gateway/i.test(pageText) || /Spring Cloud Gateway/i.test(pageText)) {
+          if (evidence.indexOf('cloud:gateway') === -1) {
+            evidence.push('cloud:gateway');
+            variant = variant || 'cloud';
+          }
+        }
+        if (/nacos/i.test(pageText)) {
+          if (evidence.indexOf('cloud:nacos') === -1) {
+            evidence.push('cloud:nacos');
+            variant = variant || 'cloud';
+          }
+        }
+        if (/sentinel/i.test(pageText)) {
+          if (evidence.indexOf('cloud:sentinel') === -1) evidence.push('cloud:sentinel');
+        }
+        if (/spring-cloud/i.test(pageText) || /SpringCloud/i.test(pageText)) {
+          if (evidence.indexOf('cloud:spring-cloud') === -1) {
+            evidence.push('cloud:spring-cloud');
+            variant = variant || 'cloud';
+          }
+        }
+        scriptSrcs.forEach(function (src) {
+          if (/actuator/i.test(src) && evidence.indexOf('cloud:actuator-script') === -1) {
+            evidence.push('cloud:actuator-script');
+          }
+          if (/gateway/i.test(src) && evidence.indexOf('cloud:gateway-script') === -1) {
+            evidence.push('cloud:gateway-script');
+            variant = variant || 'cloud';
+          }
+        });
+
         if (!variant && evidence.length >= 2) variant = 'unknown';
 
         return {
@@ -196,6 +229,7 @@ window.VulnKitRuoYiDetect = (function () {
       };
 
       if (data.detected) {
+        if (state) state.detectedVariant = data.variant;
         updateWorkflowStep(1);
         var variantLabel = data.variant ? ' [' + data.variant.toUpperCase() + ']' : '';
         var html = buildDetectHtml(
@@ -318,6 +352,65 @@ window.VulnKitRuoYiDetect = (function () {
             utils.setStatus('ruoyi-hook-status', '已主动获取路由数据');
             await fetchCapturedRoutes();
             return;
+          }
+        }
+
+        // Cloud: probe gateway routes
+        var gatewayPaths = [
+          '/actuator/gateway/routes',
+          '/gateway/routes',
+          '/actuator/gateway/routes.json',
+        ];
+        for (var gi = 0; gi < gatewayPaths.length; gi++) {
+          var gwUrl = origin + gatewayPaths[gi];
+          var gwResp = await chrome.runtime
+            .sendMessage({
+              type: 'FETCH_PROBE',
+              url: gwUrl,
+              method: 'GET',
+              timeout: 8000,
+              followRedirect: false,
+              includeBody: true,
+              headers: cookieHeader,
+            })
+            .catch(function () {
+              return null;
+            });
+
+          if (gwResp && gwResp.status === 200 && gwResp.body) {
+            try {
+              var gwRoutes = JSON.parse(gwResp.body);
+              var routeList = Array.isArray(gwRoutes) ? gwRoutes : [];
+              if (routeList.length > 0) {
+                var cloudRoutes = routeList.map(function (r) {
+                  return {
+                    path: r.route_definition
+                      ? r.route_definition.uri || r.route_id
+                      : r.uri || r.route_id || '',
+                    predicate: r.route_definition
+                      ? r.route_definition.predicates
+                      : r.predicates || '',
+                    filters: r.route_definition ? r.route_definition.filters : r.filters || [],
+                    id: r.route_id || r.route_id || '',
+                  };
+                });
+                if (state) state.capturedGatewayRoutes = cloudRoutes;
+                if (panelEl) {
+                  var gwHtml = '<div class="ruoyi-detect-extra">';
+                  gwHtml +=
+                    '<span class="ruoyi-detect-tag tag-token">Gateway Routes (' +
+                    cloudRoutes.length +
+                    ')</span>';
+                  gwHtml += '</div>';
+                  panelEl.innerHTML += gwHtml;
+                }
+                utils.setStatus(
+                  'ruoyi-hook-status',
+                  '发现 ' + cloudRoutes.length + ' 条 Gateway 路由'
+                );
+                utils.showToast('发现 Gateway 路由: ' + cloudRoutes.length + ' 条', 'success');
+              }
+            } catch (e) {}
           }
         }
       }

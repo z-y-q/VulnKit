@@ -14,6 +14,9 @@ window.VulnKitGather = (function () {
   var gatherAbortFlag = false;
   var gatherTimerInterval = null;
   var gatherStartTime = 0;
+  var apiTrafficRunning = false;
+  var apiTrafficTimer = null;
+  var API_TRAFFIC_GROUP = 'API Traffic';
 
   var utils = window.VulnKitUtils.utilsProxy;
 
@@ -110,7 +113,9 @@ window.VulnKitGather = (function () {
 
   function buildGroups() {
     return [DOM_GROUP].concat(
+      gatherData['API Traffic'] ? [API_TRAFFIC_GROUP] : [],
       gatherData['JS API'] ? ['JS API'] : [],
+      gatherData['JS Sensitive Info'] ? ['JS Sensitive Info'] : [],
       getHaeRules() ? getHaeRules().getGroups(loadedRules) : []
     );
   }
@@ -185,6 +190,44 @@ window.VulnKitGather = (function () {
     return Math.floor((Date.now() - gatherStartTime) / 1000);
   }
 
+  var SENSITIVE_PATTERNS = [
+    { regex: /AKIA[0-9A-Z]{16}/g, label: 'AWS Access Key', color: 'red' },
+    {
+      regex: /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
+      label: 'Private Key',
+      color: 'red',
+    },
+    {
+      regex: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}/g,
+      label: 'JWT Token',
+      color: 'yellow',
+    },
+    {
+      regex: /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g,
+      label: 'IP Address',
+      color: 'cyan',
+    },
+    {
+      regex: /(?:mongodb|mysql|postgres|redis):\/\/[^\s'"]+/gi,
+      label: 'DB Connection',
+      color: 'red',
+    },
+    {
+      regex: /(?:password|passwd|pwd)\s*[:=]\s*['"][^'"]{4,}['"]/gi,
+      label: 'Hardcoded Password',
+      color: 'red',
+    },
+    { regex: /AIza[0-9A-Za-z_-]{35}/g, label: 'Google API Key', color: 'yellow' },
+    { regex: /xox[baprs]-[0-9a-zA-Z-]{10,}/g, label: 'Slack Token', color: 'red' },
+    { regex: /(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}/g, label: 'GitHub Token', color: 'red' },
+    {
+      regex: /["'](api[_-]?key|apikey|api[_-]?secret)["']\s*[:=]\s*["']([^"']{8,})["']/gi,
+      label: 'API Key',
+      color: 'yellow',
+      captureIdx: 2,
+    },
+  ];
+
   var API_PATTERNS = [
     {
       regex:
@@ -222,6 +265,8 @@ window.VulnKitGather = (function () {
   async function extractApiFromJsFiles(scriptSrcs, pageUrl) {
     var seen = {};
     var endpoints = [];
+    var sensitiveItems = [];
+    var sensitiveSeen = {};
     var pageOrigin = '';
     try {
       pageOrigin = new URL(pageUrl).origin;
@@ -237,7 +282,7 @@ window.VulnKitGather = (function () {
     });
     filesToFetch = filesToFetch.slice(0, 15);
 
-    if (gatherAbortFlag) return endpoints;
+    if (gatherAbortFlag) return { endpoints: endpoints, sensitiveItems: sensitiveItems };
 
     var fetchPromises = filesToFetch.map(function (src) {
       return utils.fetchUrl({ url: src, tailOnly: false, timeout: 12000 });
@@ -248,7 +293,7 @@ window.VulnKitGather = (function () {
       return r && r.success ? r.data : null;
     });
 
-    jsContents.forEach(function (content, idx) {
+    jsContents.forEach(function (content) {
       if (!content) return;
       if (content.length > 500000) content = content.substring(0, 500000);
 
@@ -283,9 +328,26 @@ window.VulnKitGather = (function () {
           });
         }
       });
+
+      SENSITIVE_PATTERNS.forEach(function (pattern) {
+        var regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+        var match;
+        while ((match = regex.exec(content)) !== null) {
+          var value = pattern.captureIdx ? match[pattern.captureIdx] : match[0];
+          if (!value) continue;
+          var sKey = pattern.label + '::' + value;
+          if (sensitiveSeen[sKey]) continue;
+          sensitiveSeen[sKey] = true;
+          sensitiveItems.push({
+            name: pattern.label,
+            value: value,
+            color: pattern.color || 'gray',
+          });
+        }
+      });
     });
 
-    return endpoints;
+    return { endpoints: endpoints, sensitiveItems: sensitiveItems };
   }
 
   async function gatherInfo() {
@@ -506,12 +568,15 @@ window.VulnKitGather = (function () {
         var scriptSrcs = gatherData._scriptSrcs || [];
         delete gatherData._scriptSrcs;
 
-        // Fetch external JS files and extract API endpoints
+        // Fetch external JS files and extract API endpoints + sensitive info
         if (scriptSrcs.length > 0 && !gatherAbortFlag) {
           utils.setStatus('gather-status', '正在分析 JS 文件（' + scriptSrcs.length + ' 个）...');
-          var apiEndpoints = await extractApiFromJsFiles(scriptSrcs, tab.url);
-          if (apiEndpoints.length > 0) {
-            gatherData['JS API'] = apiEndpoints;
+          var jsResult = await extractApiFromJsFiles(scriptSrcs, tab.url);
+          if (jsResult.endpoints.length > 0) {
+            gatherData['JS API'] = jsResult.endpoints;
+          }
+          if (jsResult.sensitiveItems.length > 0) {
+            gatherData['JS Sensitive Info'] = jsResult.sensitiveItems;
           }
         }
 
@@ -631,6 +696,97 @@ window.VulnKitGather = (function () {
     renderSubTabs();
   }
 
+  // ====== API Traffic ======
+
+  async function startApiTraffic() {
+    var tab = await utils.requireTabId();
+    if (!tab) {
+      utils.showToast('无法获取当前标签页', 'error');
+      return;
+    }
+    var result = await chrome.tabs
+      .sendMessage(tab.id, { type: 'VK_API_TRAFFIC_START' })
+      .catch(function () {
+        return null;
+      });
+    if (result && result.status === 'already_running') {
+      utils.showToast('API 流量监听已在运行', 'info');
+      return;
+    }
+    apiTrafficRunning = true;
+    utils.toggleBtnPair('gather-api-start-btn', 'gather-api-stop-btn', true);
+    updateApiTrafficStatus();
+    apiTrafficTimer = setInterval(async function () {
+      await collectApiTraffic();
+    }, 3000);
+    utils.showToast('API 流量监听已启动', 'success');
+  }
+
+  async function stopApiTraffic() {
+    if (apiTrafficTimer) {
+      clearInterval(apiTrafficTimer);
+      apiTrafficTimer = null;
+    }
+    apiTrafficRunning = false;
+    var tab = await utils.requireTabId();
+    if (tab) {
+      await chrome.tabs.sendMessage(tab.id, { type: 'VK_API_TRAFFIC_STOP' }).catch(function () {});
+      await collectApiTraffic();
+    }
+    utils.toggleBtnPair('gather-api-start-btn', 'gather-api-stop-btn', false);
+    updateApiTrafficStatus();
+    utils.showToast('API 流量监听已停止', 'info');
+  }
+
+  async function collectApiTraffic() {
+    var tab = await utils.requireTabId();
+    if (!tab) return;
+    var result = await chrome.tabs
+      .sendMessage(tab.id, { type: 'VK_API_TRAFFIC_COLLECT' })
+      .catch(function () {
+        return null;
+      });
+    if (!result || !result.entries || result.entries.length === 0) return;
+    var existing = gatherData[API_TRAFFIC_GROUP] || [];
+    var existingKeys = {};
+    existing.forEach(function (e) {
+      existingKeys[e.value] = true;
+    });
+    var newEntries = result.entries.filter(function (e) {
+      if (existingKeys[e.url + ' ' + e.method]) return false;
+      existingKeys[e.url + ' ' + e.method] = true;
+      return true;
+    });
+    if (newEntries.length === 0) return;
+    var items = newEntries.map(function (e) {
+      var statusColor =
+        e.status >= 200 && e.status < 300 ? 'green' : e.status >= 400 ? 'red' : 'orange';
+      return {
+        name: e.method + ' [' + e.status + ']',
+        value: e.url,
+        color: statusColor,
+        _meta: { contentType: e.contentType, duration: e.duration, status: e.status },
+      };
+    });
+    gatherData[API_TRAFFIC_GROUP] = (existing || []).concat(items);
+    renderSubTabs();
+    if (currentGatherTab === API_TRAFFIC_GROUP) renderGatherTab();
+    updateApiTrafficStatus();
+  }
+
+  function updateApiTrafficStatus() {
+    var el = utils.get('gather-api-status');
+    if (!el) return;
+    var count = (gatherData[API_TRAFFIC_GROUP] || []).length;
+    if (apiTrafficRunning) {
+      el.textContent = '监听中... 已捕获 ' + count + ' 个请求';
+      el.style.color = '#e67e22';
+    } else {
+      el.textContent = count > 0 ? '监听已停止，共捕获 ' + count + ' 个请求' : '未启动监听';
+      el.style.color = '';
+    }
+  }
+
   return {
     init: init,
     gatherInfo: gatherInfo,
@@ -640,6 +796,8 @@ window.VulnKitGather = (function () {
     copyAllData: copyAllData,
     getActiveRules: getActiveRules,
     updateRules: updateRules,
+    startApiTraffic: startApiTraffic,
+    stopApiTraffic: stopApiTraffic,
     get gatherData() {
       return gatherData;
     },

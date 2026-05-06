@@ -18,12 +18,20 @@
     'payload.html',
     'xssscan.html',
     'sourcemap.html',
-    'ruoyi.html'
+    'ruoyi.html',
+    'waf.html',
+    'cookie-audit.html',
+    'react.html',
+    'angular.html',
+    'cors.html',
+    'subdomain.html',
   ];
 
   var appMain = document.getElementById('app-main');
   var resolve;
-  window._panelsReady = new Promise(function (r) { resolve = r; });
+  window._panelsReady = new Promise(function (r) {
+    resolve = r;
+  });
 
   Promise.all(
     PANEL_FILES.map(function (file) {
@@ -32,18 +40,20 @@
         return resp.text();
       });
     })
-  ).then(function (htmls) {
-    htmls.forEach(function (html) {
-      var doc = new DOMParser().parseFromString(html, 'text/html');
-      var frag = document.createDocumentFragment();
-      while (doc.body.firstChild) {
-        frag.appendChild(doc.body.firstChild);
-      }
-      appMain.appendChild(frag);
+  )
+    .then(function (htmls) {
+      htmls.forEach(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var frag = document.createDocumentFragment();
+        while (doc.body.firstChild) {
+          frag.appendChild(doc.body.firstChild);
+        }
+        appMain.appendChild(frag);
+      });
+      resolve();
+    })
+    .catch(function (err) {
+      console.error('[panel-loader]', err);
+      resolve();
     });
-    resolve();
-  }).catch(function (err) {
-    console.error('[panel-loader]', err);
-    resolve();
-  });
 })();

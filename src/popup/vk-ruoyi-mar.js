@@ -45,6 +45,28 @@ window.VulnKitRuoYiMar = (function () {
     { path: '/system/menu/menus', title: '菜单分配', component: 'system/role/menu' },
   ];
 
+  // Cloud-specific endpoint dictionary
+  var CLOUD_KNOWN_ROUTES = [
+    { path: '/actuator', title: 'Actuator', component: '' },
+    { path: '/actuator/health', title: '健康检查', component: '' },
+    { path: '/actuator/info', title: '应用信息', component: '' },
+    { path: '/actuator/env', title: '环境变量', component: '' },
+    { path: '/actuator/beans', title: 'Bean列表', component: '' },
+    { path: '/actuator/mappings', title: '请求映射', component: '' },
+    { path: '/actuator/gateway/routes', title: 'Gateway路由', component: '' },
+    { path: '/actuator/configprops', title: '配置属性', component: '' },
+    { path: '/actuator/metrics', title: '指标', component: '' },
+    { path: '/actuator/trace', title: '链路追踪', component: '' },
+    { path: '/actuator/loggers', title: '日志级别', component: '' },
+    { path: '/nacos', title: 'Nacos', component: '' },
+    { path: '/nacos/v1/ns/service/list', title: 'Nacos服务列表', component: '' },
+    { path: '/nacos/v1/cs/configs', title: 'Nacos配置', component: '' },
+    { path: '/swagger-ui.html', title: 'Swagger UI', component: '' },
+    { path: '/v3/api-docs', title: 'OpenAPI 3', component: '' },
+    { path: '/v2/api-docs', title: 'Swagger 2', component: '' },
+    { path: '/doc.html', title: 'Knife4j', component: '' },
+  ];
+
   // ====== MaR Dynamic Route Scan ======
 
   async function marScanDynamicRoutes() {
@@ -273,6 +295,24 @@ window.VulnKitRuoYiMar = (function () {
           });
         }
       });
+
+      // Step 5b: Detect cloud variant and merge cloud routes
+      var isCloudVariant = state && state.capturedRouterData && false;
+      var detectedVariant = state ? state.detectedVariant : null;
+      if (detectedVariant === 'cloud' || detectedVariant === 'microservice') {
+        CLOUD_KNOWN_ROUTES.forEach(function (cr) {
+          if (!seenPaths[cr.path]) {
+            seenPaths[cr.path] = true;
+            extractedRoutes.push({
+              path: cr.path,
+              type: 'cloud-dict',
+              source: 'Cloud端点',
+              title: cr.title,
+              component: cr.component,
+            });
+          }
+        });
+      }
 
       if (extractedRoutes.length === 0) {
         utils.setStatus('mar-scan-status', '未发现任何路由');

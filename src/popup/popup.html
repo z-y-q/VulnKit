@@ -15,6 +15,12 @@
   <link rel="stylesheet" href="../styles/popup/perm-search-compare.css">
   <link rel="stylesheet" href="../styles/popup/payload-xss.css">
   <link rel="stylesheet" href="../styles/popup/sourcemap-vue-store.css">
+  <link rel="stylesheet" href="../styles/popup/waf.css">
+  <link rel="stylesheet" href="../styles/popup/cookie-audit.css">
+  <link rel="stylesheet" href="../styles/popup/react.css">
+  <link rel="stylesheet" href="../styles/popup/angular.css">
+  <link rel="stylesheet" href="../styles/popup/cors.css">
+  <link rel="stylesheet" href="../styles/popup/subdomain.css">
 </head>
 <body>
 <div class="lingmou-app">
@@ -38,6 +44,12 @@
         <button class="tab-btn" data-panel="payload">Payload</button>
         <button class="tab-btn" data-panel="xssscan">XSS扫描</button>
         <button class="tab-btn" data-panel="sourcemap">Source Map</button>
+        <button class="tab-btn" data-panel="waf">WAF指纹</button>
+        <button class="tab-btn" data-panel="cookie-audit">Cookie审计</button>
+        <button class="tab-btn" data-panel="react">React分析</button>
+        <button class="tab-btn" data-panel="angular">Angular分析</button>
+        <button class="tab-btn" data-panel="cors">CORS检测</button>
+        <button class="tab-btn" data-panel="subdomain">子域名</button>
       </div>
       <button class="tab-page-btn" id="tab-scroll-right">&#9654;</button>
       <span class="tab-page-indicator" id="tab-page-indicator"></span>
@@ -109,6 +121,13 @@
 <script src="vk-ruoyi-mar.js"></script>
 <script src="vk-ruoyi.js"></script>
 <script src="vk-jsctrl.js"></script>
+<!-- WAF / Cookie Audit / React / Angular / CORS / Subdomain -->
+<script src="vk-waf.js"></script>
+<script src="vk-cookie-audit.js"></script>
+<script src="vk-react.js"></script>
+<script src="vk-angular.js"></script>
+<script src="vk-cors.js"></script>
+<script src="vk-subdomain.js"></script>
 <!-- Init (must load last) -->
 <script src="vk-init.js"></script>
 </body>

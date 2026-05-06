@@ -1,0 +1,98 @@
+// 灵眸 - Angular Detection
+window.VulnKitAngular = (function () {
+  'use strict';
+
+  var utils = window.VulnKitUtils.utilsProxy;
+  var lastResult = null;
+
+  function detectAngular() {
+    var statusEl = utils.get('angular-status');
+    var resultsEl = utils.get('angular-results');
+    var copyBtn = utils.get('angular-copy-btn');
+
+    if (statusEl) statusEl.textContent = '正在检测 Angular...';
+    if (resultsEl) resultsEl.innerHTML = '';
+
+    utils.requireTabId().then(function (tab) {
+      if (!tab || !/^https?:/.test(tab.url)) {
+        if (statusEl) statusEl.textContent = '请打开一个网页';
+        return;
+      }
+
+      chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_DETECT' }, function (response) {
+        if (chrome.runtime.lastError) {
+          if (statusEl) statusEl.textContent = '检测失败: ' + chrome.runtime.lastError.message;
+          return;
+        }
+        if (!response) {
+          if (statusEl) statusEl.textContent = '检测失败: 无响应';
+          return;
+        }
+
+        lastResult = response;
+        if (response.detected) {
+          if (statusEl) statusEl.textContent = '检测到 Angular';
+          if (copyBtn) copyBtn.style.display = '';
+        } else {
+          if (statusEl) statusEl.textContent = '未检测到 Angular';
+          if (copyBtn) copyBtn.style.display = 'none';
+        }
+        renderResult(response);
+      });
+    });
+  }
+
+  function renderResult(data) {
+    var resultsEl = utils.get('angular-results');
+    if (!resultsEl) return;
+
+    if (!data.detected && (!data.signals || data.signals.length === 0)) {
+      resultsEl.innerHTML = '<div class="angular-not-detected">未在当前页面检测到 Angular 框架</div>';
+      return;
+    }
+
+    var html = '<div class="angular-card">';
+    html += '<div class="angular-card-header">';
+    html += '<span class="angular-badge ' + (data.detected ? 'detected' : 'not-detected') + '">' + (data.detected ? '已检测到' : '未检测到') + '</span>';
+    var title = 'Angular';
+    if (data.variant) title = data.variant;
+    if (data.version) title += ' ' + data.version;
+    html += '<span class="angular-card-title">' + utils.escapeHtml(title) + '</span>';
+    html += '</div>';
+
+    if (data.variant) {
+      html += '<div class="angular-info-row"><span class="angular-info-label">框架变体</span><span class="angular-info-value"><span class="angular-badge info">' + utils.escapeHtml(data.variant) + '</span></span></div>';
+    }
+    if (data.version) {
+      html += '<div class="angular-info-row"><span class="angular-info-label">版本</span><span class="angular-info-value">' + utils.escapeHtml(data.version) + '</span></div>';
+    }
+
+    if (data.signals && data.signals.length > 0) {
+      html += '<div class="angular-info-row"><span class="angular-info-label">检测信号</span><span class="angular-info-value">' + data.signals.map(function (s) { return '<div>' + utils.escapeHtml(s) + '</div>'; }).join('') + '</span></div>';
+    }
+
+    html += '</div>';
+    resultsEl.innerHTML = html;
+  }
+
+  function copyResults() {
+    if (!lastResult) {
+      utils.showToast('没有检测结果', 'warning');
+      return;
+    }
+    var lines = [];
+    if (lastResult.detected) {
+      var name = lastResult.variant || 'Angular';
+      lines.push(name + ' Detected: ' + (lastResult.version || 'unknown'));
+    } else {
+      lines.push('Angular: Not detected');
+    }
+    if (lastResult.signals && lastResult.signals.length > 0) {
+      lines.push('Signals:');
+      lastResult.signals.forEach(function (s) { lines.push('  - ' + s); });
+    }
+    utils.copyAndToast(lines.join('\n'));
+  }
+
+  return { detectAngular: detectAngular, copyResults: copyResults, get lastResult() { return lastResult; } };
+})();

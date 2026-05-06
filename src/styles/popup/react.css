@@ -1,0 +1,124 @@
+/* React Detection */
+.react-container {
+  padding: 10px;
+}
+.react-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.react-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.react-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 8px;
+  padding: 12px;
+}
+[data-theme="dark"] .react-card {
+  background: var(--surface, #1a1a2e);
+  border-color: var(--border, #333);
+}
+.react-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.react-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+[data-theme="dark"] .react-card-title {
+  color: var(--text-primary, #e0e0e0);
+}
+.react-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+.react-badge.detected { background: #27ae60; }
+.react-badge.not-detected { background: #95a5a6; }
+.react-badge.warning { background: #f39c12; }
+.react-badge.info { background: #3498db; }
+.react-info-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+.react-info-label {
+  color: var(--text-secondary, #888);
+  min-width: 80px;
+  flex-shrink: 0;
+}
+[data-theme="dark"] .react-info-label {
+  color: var(--text-secondary, #aaa);
+}
+.react-info-value {
+  color: var(--text-primary, #333);
+  word-break: break-all;
+}
+[data-theme="dark"] .react-info-value {
+  color: var(--text-primary, #e0e0e0);
+}
+.react-info-value code {
+  background: var(--surface-alt, #f0f2f5);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+[data-theme="dark"] .react-info-value code {
+  background: var(--surface-alt, #2a2a3e);
+}
+.react-route-list {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 0;
+}
+.react-route-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border, #f0f0f0);
+}
+[data-theme="dark"] .react-route-item {
+  border-color: var(--border, #2a2a2a);
+}
+.react-route-item:last-child {
+  border-bottom: none;
+}
+.react-route-path {
+  font-family: monospace;
+  color: var(--accent, #0066cc);
+  word-break: break-all;
+}
+.react-route-method {
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--surface-alt, #f0f2f5);
+  color: var(--text-secondary, #666);
+}
+[data-theme="dark"] .react-route-method {
+  background: var(--surface-alt, #2a2a3e);
+  color: var(--text-secondary, #aaa);
+}
+.react-not-detected {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+}

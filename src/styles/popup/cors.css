@@ -1,0 +1,123 @@
+/* CORS Detection */
+.cors-container {
+  padding: 10px;
+}
+.cors-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.cors-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cors-endpoint-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 8px;
+  padding: 12px;
+}
+[data-theme="dark"] .cors-endpoint-card {
+  background: var(--surface, #1a1a2e);
+  border-color: var(--border, #333);
+}
+.cors-endpoint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.cors-endpoint-url {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--accent, #0066cc);
+  word-break: break-all;
+}
+.cors-severity-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+.cors-severity-badge.safe { background: #27ae60; }
+.cors-severity-badge.warning { background: #f39c12; }
+.cors-severity-badge.danger { background: #e74c3c; }
+.cors-severity-badge.critical { background: #8e44ad; }
+.cors-detail-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+.cors-detail-label {
+  color: var(--text-secondary, #888);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+[data-theme="dark"] .cors-detail-label {
+  color: var(--text-secondary, #aaa);
+}
+.cors-detail-value {
+  color: var(--text-primary, #333);
+  word-break: break-all;
+}
+[data-theme="dark"] .cors-detail-value {
+  color: var(--text-primary, #e0e0e0);
+}
+.cors-detail-value code {
+  background: var(--surface-alt, #f0f2f5);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+[data-theme="dark"] .cors-detail-value code {
+  background: var(--surface-alt, #2a2a3e);
+}
+.cors-summary {
+  background: var(--surface-alt, #f0f2f5);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+[data-theme="dark"] .cors-summary {
+  background: var(--surface-alt, #1e1e2e);
+}
+.cors-summary strong {
+  color: var(--text-primary, #333);
+}
+[data-theme="dark"] .cors-summary strong {
+  color: var(--text-primary, #e0e0e0);
+}
+.cors-not-tested {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+}
+.cors-scanning {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary, #888);
+}
+.cors-scanning .spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border, #ddd);
+  border-top-color: var(--accent, #0066cc);
+  border-radius: 50%;
+  animation: cors-spin 0.6s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+@keyframes cors-spin {
+  to { transform: rotate(360deg); }
+}

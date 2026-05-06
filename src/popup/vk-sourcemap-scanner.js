@@ -52,6 +52,7 @@
       var scriptUrls = [];
       var chunkManifest = null;
       var wpPublicPath = '';
+      var buildTool = null;
 
       // Phase 1: MAIN world -- access webpack runtime
       statusEl.textContent = 'Phase 1: 检测 Webpack 运行时...';
@@ -503,6 +504,26 @@
         return;
       }
 
+      // Build tool detection
+      statusEl.textContent = '检测构建工具...';
+      U.smUpdateProgress(25, 1);
+      try {
+        var btResult = await chrome.tabs.sendMessage(tab.id, { type: 'VK_SOURCEMAP_DETECT' });
+        if (btResult && btResult.tool) {
+          buildTool = btResult.tool;
+          var toolHints = (btResult.hints || []).join('; ');
+          statusEl.textContent =
+            '构建工具: ' + buildTool.toUpperCase() + (toolHints ? ' (' + toolHints + ')' : '');
+        }
+      } catch (e) {
+        // content script may not be ready, continue
+      }
+
+      if (S.smAbortFlag) {
+        statusEl.textContent = '扫描已取消';
+        return;
+      }
+
       // Phase 2: ISOLATED world -- collect script URLs + extract source map URLs
       statusEl.textContent = 'Phase 2: 收集脚本和 Source Map...';
       U.smUpdateProgress(30, 2);
@@ -622,6 +643,44 @@
       // Phase 2.5: Discover unloaded chunks via manifest + fetch their source maps
       var discoveredChunkUrls = [];
 
+      // Vite-specific: look for /assets/*.js.map patterns from module scripts
+      if (buildTool === 'vite' && scriptUrls.length > 0) {
+        statusEl.textContent = 'Phase 2.5: Vite — 探测 /assets/ Source Map...';
+        U.smUpdateProgress(40, 2);
+        var viteAssetBase = null;
+        scriptUrls.forEach(function (sUrl) {
+          var m = sUrl.match(/^(https?:\/\/[^/]+\/.*)\/assets\//);
+          if (m && !viteAssetBase) viteAssetBase = m[1] + '/assets/';
+        });
+        if (viteAssetBase) {
+          scriptUrls.forEach(function (sUrl) {
+            if (sUrl.indexOf(viteAssetBase) !== 0) return;
+            var guessMap = sUrl + '.map';
+            if (sourceMapUrls.indexOf(guessMap) === -1) sourceMapUrls.push(guessMap);
+          });
+        }
+      }
+
+      // Rollup-specific: look for co-located .map files for all chunks
+      if (buildTool === 'rollup' && scriptUrls.length > 0) {
+        statusEl.textContent = 'Phase 2.5: Rollup — 探测 Chunk Source Map...';
+        U.smUpdateProgress(40, 2);
+        scriptUrls.forEach(function (sUrl) {
+          var guessMap = sUrl + '.map';
+          if (sourceMapUrls.indexOf(guessMap) === -1) sourceMapUrls.push(guessMap);
+        });
+      }
+
+      // esbuild-specific: check for banner comments and guess .map locations
+      if (buildTool === 'esbuild' && scriptUrls.length > 0) {
+        statusEl.textContent = 'Phase 2.5: esbuild — 探测 Source Map...';
+        U.smUpdateProgress(40, 2);
+        scriptUrls.forEach(function (sUrl) {
+          var guessMap = sUrl + '.map';
+          if (sourceMapUrls.indexOf(guessMap) === -1) sourceMapUrls.push(guessMap);
+        });
+      }
+
       if (chunkManifest && scriptUrls.length > 0) {
         var inferredBase = null;
         for (var si = 0; si < scriptUrls.length && !inferredBase; si++) {
@@ -685,7 +744,10 @@
               try {
                 var mappingObj = uFuncMatch[1].match(/\{[^{}]+\}/g);
                 if (mappingObj) {
-                  var chunkIdToHash = U.smMergeHashMaps(mappingObj, /(\d+)\s*:\s*"([a-f0-9]{4,})"/g);
+                  var chunkIdToHash = U.smMergeHashMaps(
+                    mappingObj,
+                    /(\d+)\s*:\s*"([a-f0-9]{4,})"/g
+                  );
                   var baseInfo1 = U.smResolveWebpackBase(rc, rcBase, tab.url);
                   U.smRegisterChunkUrls(chunkIdToHash, baseInfo1, discoveredChunkUrls, scriptUrls);
                 }
@@ -835,20 +897,33 @@
         return;
       }
 
-      // Phase 3: Fallback -- parse JS files for webpack paths
+      // Phase 3: Fallback -- parse JS files for module paths
       if (allModules.length === 0 && scriptUrls.length > 0) {
-        statusEl.textContent = 'Phase 3: 解析 JS 文件中的模块路径...';
+        statusEl.textContent =
+          'Phase 3: 解析 JS 文件中的模块路径...' + (buildTool ? ' (' + buildTool + ')' : '');
         U.smUpdateProgress(70, 3);
-        var jsContents = await U.smBatchFetch(scriptUrls.slice(0, S.SM_MAX_JS_FALLBACK), false, tab.id);
+        var jsContents = await U.smBatchFetch(
+          scriptUrls.slice(0, S.SM_MAX_JS_FALLBACK),
+          false,
+          tab.id
+        );
         for (var ji = 0; ji < jsContents.length; ji++) {
           if (!jsContents[ji]) continue;
           var jsText = jsContents[ji];
-          var wpPathRegex =
-            /webpack:\/\/[^\s"']+|\.[\/]?[a-zA-Z_][\w.\/-]*(?:\.vue|\.js|\.ts|\.jsx|\.tsx)/g;
+          var pathRegex;
+          if (buildTool === 'vite') {
+            pathRegex =
+              /(?:\/[a-zA-Z_][\w.-]*(?:\/[a-zA-Z_][\w.-]*)*)(?:\.vue|\.jsx|\.tsx|\.ts|\.js|\.css|\.scss)/g;
+          } else if (buildTool === 'rollup' || buildTool === 'esbuild') {
+            pathRegex = /(?:\/src\/[^\s"'`]+)(?:\.vue|\.jsx|\.tsx|\.ts|\.js|\.css)/g;
+          } else {
+            pathRegex =
+              /webpack:\/\/[^\s"']+|\.[\/]?[a-zA-Z_][\w.\/-]*(?:\.vue|\.js|\.ts|\.jsx|\.tsx)/g;
+          }
           var pathMatch;
           var seen = {};
-          while ((pathMatch = wpPathRegex.exec(jsText)) !== null) {
-            var p = pathMatch[0].replace('webpack://', '');
+          while ((pathMatch = pathRegex.exec(jsText)) !== null) {
+            var p = buildTool ? pathMatch[0] : pathMatch[0].replace('webpack://', '');
             if (seen[p]) continue;
             seen[p] = true;
             allModules.push({
@@ -915,7 +990,8 @@
       }
 
       S.sourcemapModules = deduped.slice(0, S.SM_MAX_MODULES);
-      statusEl.textContent = '找到 ' + S.sourcemapModules.length + ' 个模块';
+      var toolLabel = buildTool ? '[' + buildTool.toUpperCase() + '] ' : '';
+      statusEl.textContent = toolLabel + '找到 ' + S.sourcemapModules.length + ' 个模块';
       U.smUpdateProgress(100, 3);
       S.Render.renderSourcemapModules();
 

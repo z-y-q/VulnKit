@@ -83,6 +83,8 @@
   const gather = window.VulnKitGather;
   const haeRules = window.VulnKitHaeRules;
   const gatherInfo = gather.gatherInfo.bind(gather);
+  const gatherStartApiTraffic = gather.startApiTraffic.bind(gather);
+  const gatherStopApiTraffic = gather.stopApiTraffic.bind(gather);
   gather.init();
 
   // ====== Link Extract (loaded from vk-links.js) ======
@@ -235,6 +237,7 @@
     clearResults: xssClearResults,
     exportData: xssExportData,
     setXssSearchText,
+    analyzeDomSinks,
   } = window.VulnKitXss;
   exposeGlobal('xssPoints', window.VulnKitXss, 'xssPoints');
   exposeGlobal('xssFilterType', window.VulnKitXss, 'xssFilterType');
@@ -253,6 +256,35 @@
     renderSqliPayloads,
     applySearch: payloadApplySearch,
   } = window.VulnKitPayload;
+
+  // ====== WAF Fingerprint (loaded from vk-waf.js) ======
+  const waf = window.VulnKitWaf;
+  const { scanWaf, copyResults: wafCopyResults, exportResults: wafExportResults } = waf;
+
+  // ====== Cookie Security Audit (loaded from vk-cookie-audit.js) ======
+  const cookieAudit = window.VulnKitCookieAudit;
+  const { auditCookies, copyResults: cookieAuditCopy } = cookieAudit;
+
+  // ====== React Detection (loaded from vk-react.js) ======
+  const reactDetect = window.VulnKitReact;
+  const { detectReact, copyResults: reactCopyResults } = reactDetect;
+
+  // ====== Angular Detection (loaded from vk-angular.js) ======
+  const angularDetect = window.VulnKitAngular;
+  const { detectAngular, copyResults: angularCopyResults } = angularDetect;
+
+  // ====== CORS Detection (loaded from vk-cors.js) ======
+  const corsDetect = window.VulnKitCors;
+  const { scanCors, copyResults: corsCopyResults } = corsDetect;
+
+  // ====== Subdomain Collection (loaded from vk-subdomain.js) ======
+  const subdomain = window.VulnKitSubdomain;
+  const {
+    collectSubdomains,
+    extractFromPage,
+    copyResults: subdomainCopyResults,
+    exportResults: subdomainExportResults,
+  } = subdomain;
 
   // ====== Webpack Module Mapping (Source Map Scan v2) ======
   // Loaded from vk-sourcemap.js
@@ -508,6 +540,10 @@
     });
     utils.bindClick('gather-copy-btn', gather.copyAllData);
     utils.bindClick('gather-export-btn', gather.exportAllData);
+
+    // API Traffic
+    utils.bindClick('gather-api-start-btn', gatherStartApiTraffic);
+    utils.bindClick('gather-api-stop-btn', gatherStopApiTraffic);
 
     // Rules management
     const rulesBtn = utils.get('gather-rules-btn');
@@ -969,6 +1005,33 @@
     utils.bindClick('ruoyi-traffic-export-btn', exportApiTraffic);
     utils.on('ruoyi-traffic-filter', 'input', filterApiTraffic);
 
+    // WAF Fingerprint
+    utils.bindClick('waf-scan-btn', scanWaf);
+    utils.bindClick('waf-copy-btn', wafCopyResults);
+    utils.bindClick('waf-export-btn', wafExportResults);
+
+    // Cookie Security Audit
+    utils.bindClick('cookie-audit-btn', auditCookies);
+    utils.bindClick('cookie-audit-copy-btn', cookieAuditCopy);
+
+    // React Detection
+    utils.bindClick('react-detect-btn', detectReact);
+    utils.bindClick('react-copy-btn', reactCopyResults);
+
+    // Angular Detection
+    utils.bindClick('angular-detect-btn', detectAngular);
+    utils.bindClick('angular-copy-btn', angularCopyResults);
+
+    // CORS Detection
+    utils.bindClick('cors-scan-btn', scanCors);
+    utils.bindClick('cors-copy-btn', corsCopyResults);
+
+    // Subdomain Collection
+    utils.bindClick('subdomain-scan-btn', collectSubdomains);
+    utils.bindClick('subdomain-page-btn', extractFromPage);
+    utils.bindClick('subdomain-copy-btn', subdomainCopyResults);
+    utils.bindClick('subdomain-export-btn', subdomainExportResults);
+
     // MaR dynamic route loading
     utils.bindClick('mar-scan-btn', marScanDynamicRoutes);
     utils.bindClick('mar-inject-btn', marInjectToRouter);
@@ -1142,6 +1205,15 @@
     utils.bindClick('xssscan-batchopen-btn', handleBatchOpenXss);
     utils.bindClick('xssscan-copyall-btn', handleCopyXssUrls);
     utils.bindClick('xssscan-export-btn', xssExportData);
+    utils.bindClick('xssscan-sink-btn', analyzeDomSinks);
+    utils.bindClick('xssscan-sink-clear-btn', function () {
+      utils.setEmpty('xssscan-sink-results', '暂无分析结果');
+      var st = utils.get('xssscan-sink-status');
+      if (st) {
+        st.textContent = '点击「分析 DOM 汇点」扫描页面中的危险 Sink';
+        st.style.color = '';
+      }
+    });
 
     // Webpack Module Mapping (Source Map Scan)
     utils.bindClick('sourcemap-scan-btn', scanWebpackModules);

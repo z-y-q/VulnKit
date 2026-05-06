@@ -1,0 +1,125 @@
+/* Subdomain Collection */
+.subdomain-container {
+  padding: 10px;
+}
+.subdomain-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.subdomain-results {
+  max-height: 400px;
+  overflow-y: auto;
+}
+.subdomain-stats {
+  display: flex;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--surface-alt, #f0f2f5);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+[data-theme="dark"] .subdomain-stats {
+  background: var(--surface-alt, #1e1e2e);
+}
+.subdomain-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.subdomain-stat-count {
+  font-weight: 600;
+  color: var(--accent, #0066cc);
+}
+.subdomain-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.subdomain-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border, #f0f0f0);
+  transition: background 0.1s;
+}
+[data-theme="dark"] .subdomain-item {
+  border-color: var(--border, #2a2a2a);
+}
+.subdomain-item:hover {
+  background: var(--surface-alt, #f8f9fa);
+}
+[data-theme="dark"] .subdomain-item:hover {
+  background: var(--surface-alt, #252540);
+}
+.subdomain-item:last-child {
+  border-bottom: none;
+}
+.subdomain-hostname {
+  font-family: monospace;
+  color: var(--accent, #0066cc);
+  word-break: break-all;
+  cursor: pointer;
+}
+.subdomain-hostname:hover {
+  text-decoration: underline;
+}
+.subdomain-source-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+}
+.subdomain-source-badge.ct { background: #27ae60; }
+.subdomain-source-badge.page { background: #3498db; }
+.subdomain-source-badge.dns { background: #9b59b6; }
+.subdomain-copy-single {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-secondary, #999);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.subdomain-item:hover .subdomain-copy-single {
+  opacity: 1;
+}
+.subdomain-copy-single:hover {
+  color: var(--accent, #0066cc);
+}
+.subdomain-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+}
+.subdomain-scanning {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary, #888);
+}
+.subdomain-scanning .spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border, #ddd);
+  border-top-color: var(--accent, #0066cc);
+  border-radius: 50%;
+  animation: subdomain-spin 0.6s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+@keyframes subdomain-spin {
+  to { transform: rotate(360deg); }
+}

@@ -1,0 +1,113 @@
+/* Angular Detection */
+.angular-container {
+  padding: 10px;
+}
+.angular-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.angular-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.angular-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 8px;
+  padding: 12px;
+}
+[data-theme="dark"] .angular-card {
+  background: var(--surface, #1a1a2e);
+  border-color: var(--border, #333);
+}
+.angular-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.angular-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+[data-theme="dark"] .angular-card-title {
+  color: var(--text-primary, #e0e0e0);
+}
+.angular-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+.angular-badge.detected { background: #27ae60; }
+.angular-badge.not-detected { background: #95a5a6; }
+.angular-badge.warning { background: #f39c12; }
+.angular-badge.info { background: #3498db; }
+.angular-info-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+.angular-info-label {
+  color: var(--text-secondary, #888);
+  min-width: 80px;
+  flex-shrink: 0;
+}
+[data-theme="dark"] .angular-info-label {
+  color: var(--text-secondary, #aaa);
+}
+.angular-info-value {
+  color: var(--text-primary, #333);
+  word-break: break-all;
+}
+[data-theme="dark"] .angular-info-value {
+  color: var(--text-primary, #e0e0e0);
+}
+.angular-info-value code {
+  background: var(--surface-alt, #f0f2f5);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+[data-theme="dark"] .angular-info-value code {
+  background: var(--surface-alt, #2a2a3e);
+}
+.angular-route-list {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 0;
+}
+.angular-route-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border, #f0f0f0);
+}
+[data-theme="dark"] .angular-route-item {
+  border-color: var(--border, #2a2a2a);
+}
+.angular-route-item:last-child {
+  border-bottom: none;
+}
+.angular-route-path {
+  font-family: monospace;
+  color: var(--accent, #0066cc);
+  word-break: break-all;
+}
+.angular-not-detected {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+}
