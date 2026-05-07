@@ -53,17 +53,20 @@ window.VulnKitCors = (function () {
     return origins;
   }
 
-  function sendProbe(tabId, url, method, origin, timeoutMs) {
+  function sendCorsProbe(url, method, origin, timeoutMs) {
     return new Promise(function (resolve) {
-      var headers = { Origin: origin, 'X-Requested-With': 'XMLHttpRequest' };
       var timer = setTimeout(function () {
         resolve({ error: 'timeout' });
       }, timeoutMs || PROBE_TIMEOUT_MS);
 
-      chrome.tabs.sendMessage(
-        tabId,
+      var headers = { Origin: origin };
+      if (origin !== 'null') {
+        headers['X-Requested-With'] = 'XMLHttpRequest';
+      }
+
+      chrome.runtime.sendMessage(
         {
-          type: 'VK_WAF_PROBE',
+          type: 'FETCH_CORS_PROBE',
           url: url,
           method: method || 'GET',
           headers: headers,
@@ -75,7 +78,7 @@ window.VulnKitCors = (function () {
             resolve({ error: chrome.runtime.lastError.message });
             return;
           }
-          resolve(resp);
+          resolve(resp || { error: 'no response' });
         }
       );
     });
@@ -109,11 +112,11 @@ window.VulnKitCors = (function () {
       var baseUrl = new URL(tab.url).origin;
       var endpoints = getAllEndpoints();
       var origins = getSelectedOrigins();
-      var methods = METHOD_VARIANTS;
 
-      var totalTasks = endpoints.length * origins.length;
+      var totalTasks = endpoints.length * origins.length + endpoints.length;
       var completed = 0;
       var allResults = [];
+      var errors = [];
 
       for (var ei = 0; ei < endpoints.length; ei++) {
         if (scanAborted) break;
@@ -124,12 +127,18 @@ window.VulnKitCors = (function () {
           if (scanAborted) break;
           var origin = origins[oi];
 
-          var resp = await sendProbe(tabId, epUrl, 'GET', origin.value);
+          var resp = await sendCorsProbe(epUrl, 'GET', origin.value);
           completed++;
           if (statusEl) {
             statusEl.textContent = '检测中... (' + completed + '/' + totalTasks + ')';
           }
-          if (!resp || resp.error) continue;
+
+          if (resp && resp.error) {
+            if (resp.error !== 'timeout') {
+              errors.push({ url: epUrl, origin: origin.value, error: resp.error });
+            }
+            continue;
+          }
 
           allResults.push({
             endpoint: ep,
@@ -142,7 +151,7 @@ window.VulnKitCors = (function () {
 
         if (scanAborted) break;
 
-        var optionsResp = await sendProbe(tabId, epUrl, 'OPTIONS', origins[0].value);
+        var optionsResp = await sendCorsProbe(epUrl, 'OPTIONS', origins[0].value);
         completed++;
         if (statusEl) {
           statusEl.textContent = '检测中... (' + completed + '/' + totalTasks + ')';
@@ -160,9 +169,13 @@ window.VulnKitCors = (function () {
 
       if (!scanAborted) {
         var analysis = analyzeResults(allResults);
+        analysis.errors = errors;
         lastResult = analysis;
         renderResults(analysis);
-        if (statusEl) statusEl.textContent = '检测完成: ' + completed + ' 个请求';
+        if (statusEl) {
+          statusEl.textContent = '检测完成: ' + completed + ' 个请求' +
+            (errors.length > 0 ? '，' + errors.length + ' 个失败' : '');
+        }
         if (copyBtn) copyBtn.style.display = '';
       } else {
         if (statusEl) statusEl.textContent = '检测已取消';
@@ -191,6 +204,28 @@ window.VulnKitCors = (function () {
       var severity = 'safe';
       var findings = [];
       var isOptions = r.method === 'OPTIONS';
+
+      // Opaque response (no-cors) — server didn't reflect our Origin
+      if (r.response.type === 'opaque' && !acao) {
+        findings.push('服务器未返回 CORS 头 (安全)');
+        safeCount++;
+        issues.push({
+          endpoint: r.endpoint,
+          url: r.url,
+          origin: r.origin,
+          method: r.method,
+          acao: '',
+          acac: '',
+          acam: '',
+          acah: '',
+          acae: '',
+          acma: '',
+          severity: 'safe',
+          findings: findings,
+          statusCode: r.response.status || 0,
+        });
+        return;
+      }
 
       if (!acao) {
         severity = 'safe';
@@ -252,7 +287,7 @@ window.VulnKitCors = (function () {
       });
     });
 
-    return { issues: issues, safeCount: safeCount, total: results.length };
+    return { issues: issues, safeCount: safeCount, total: results.length, errors: [] };
   }
 
   function renderResults(analysis) {
@@ -267,7 +302,16 @@ window.VulnKitCors = (function () {
     html += '<strong>扫描结果:</strong> 共 ' + analysis.total + ' 个请求，';
     html += '<span style="color:#27ae60">' + analysis.safeCount + ' 安全</span>，';
     html += '<span style="color:#e74c3c">' + dangerItems.length + ' 存在风险</span>';
+    if (analysis.errors && analysis.errors.length > 0) {
+      html += '，<span style="color:#f39c12">' + analysis.errors.length + ' 请求失败</span>';
+    }
     html += '</div>';
+
+    if (analysis.errors && analysis.errors.length > 0) {
+      html += '<div class="cors-error-info" style="color:#f39c12;font-size:11px;margin:4px 0 8px;padding:6px 8px;background:rgba(243,156,18,0.1);border-radius:4px">';
+      html += '部分请求失败 (网络错误/CORS 阻止)。跨域探测需要目标服务器响应不同 Origin 的请求。';
+      html += '</div>';
+    }
 
     analysis.issues.forEach(function (issue) {
       html += '<div class="cors-endpoint-card">';

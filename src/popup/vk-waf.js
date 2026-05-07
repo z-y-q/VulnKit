@@ -274,6 +274,7 @@ window.VulnKitWaf = (function () {
         '<div style="font-size:32px;margin-bottom:8px">&#128274;</div>' +
         '<div>未检测到 WAF</div>' +
         '<div style="font-size:11px;margin-top:4px;color:var(--text-secondary)">目标站点可能没有部署 WAF，或使用了自定义规则</div>' +
+        '<div style="font-size:11px;margin-top:2px;color:var(--text-secondary)">提示: 探测请求已通过后台发送(不带 Cookie)，如仍无法检测，可尝试手动访问恶意路径</div>' +
         '</div>';
       if (copyBtn) copyBtn.style.display = 'none';
       if (exportBtn) exportBtn.style.display = 'none';
@@ -403,15 +404,15 @@ window.VulnKitWaf = (function () {
             var timer = setTimeout(function () {
               resolve(null);
             }, 8000);
-            chrome.tabs.sendMessage(
-              tab.id,
+            chrome.runtime.sendMessage(
               {
-                type: 'VK_WAF_PROBE',
+                type: 'FETCH_WAF_PROBE',
                 url: probeUrl,
                 method: 'GET',
                 headers: {
                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 },
+                timeout: 8000,
               },
               function (response) {
                 clearTimeout(timer);

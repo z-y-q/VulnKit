@@ -6,7 +6,7 @@ window.VulnKitSubdomain = (function () {
   var lastSubdomains = [];
   var dnsScanActive = false;
   var dnsScanAborted = false;
-  var CT_TIMEOUT_MS = 15000;
+  var CT_TIMEOUT_MS = 30000;
   var DNS_BATCH_SIZE = 10;
   var DNS_BATCH_DELAY_MS = 200;
 
@@ -151,6 +151,7 @@ window.VulnKitSubdomain = (function () {
       // Method 1: Certificate Transparency via crt.sh
       var ctUrl = 'https://crt.sh/?q=%.' + encodeURIComponent(baseDomain) + '&output=json';
       fetchWithTimeout(ctUrl, CT_TIMEOUT_MS).then(function (resp) {
+        var ctFailed = false;
         if (resp && resp.body) {
           try {
             var entries = JSON.parse(resp.body);
@@ -166,10 +167,20 @@ window.VulnKitSubdomain = (function () {
                 });
               });
             }
-          } catch (e) {}
+          } catch (e) {
+            ctFailed = true;
+          }
+        } else {
+          ctFailed = true;
         }
 
-        if (statusEl) statusEl.textContent = 'CT 收集完成: ' + lastSubdomains.length + ' 个子域名';
+        var statusText = 'CT 收集完成: ' + lastSubdomains.length + ' 个子域名';
+        if (ctFailed) {
+          statusText += ' — crt.sh 查询超时或失败，请稍后重试';
+        } else if (lastSubdomains.length === 0) {
+          statusText += ' — 该域名在证书透明度日志中未发现子域名';
+        }
+        if (statusEl) statusEl.textContent = statusText;
         renderSubdomains(lastSubdomains, baseDomain);
         if (copyBtn) copyBtn.style.display = '';
         if (exportBtn) exportBtn.style.display = '';
@@ -323,10 +334,13 @@ window.VulnKitSubdomain = (function () {
       var timer = setTimeout(function () {
         resolve(null);
       }, timeoutMs || CT_TIMEOUT_MS);
-      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url }, function (resp) {
-        clearTimeout(timer);
-        resolve(resp || null);
-      });
+      chrome.runtime.sendMessage(
+        { type: 'FETCH_URL', url: url, timeout: timeoutMs },
+        function (resp) {
+          clearTimeout(timer);
+          resolve(resp || null);
+        }
+      );
     });
   }
 
@@ -487,13 +501,11 @@ window.VulnKitSubdomain = (function () {
             var timer = setTimeout(function () {
               resolve(null);
             }, 5000);
-            chrome.tabs.sendMessage(
-              tab.id,
+            chrome.runtime.sendMessage(
               {
-                type: 'VK_WAF_PROBE',
+                type: 'FETCH_DNS_PROBE',
                 url: 'https://' + host,
                 method: 'HEAD',
-                headers: {},
                 timeout: 5000,
               },
               function (resp) {
@@ -507,13 +519,13 @@ window.VulnKitSubdomain = (function () {
             );
           });
 
-          if (result && result.status && result.status > 0 && result.status < 600) {
-            if (wildcardDetected && wildcardIp === result.remoteAddress) continue;
+          // no-cors mode: status=1 means opaque response (reachable), status>0 means connected
+          if (result && !result.error && result.status > 0) {
+            if (wildcardDetected) continue;
             if (!wildcardDetected) {
               var hitCount = newDomains.length;
               if (hitCount > 2 && hitCount / tested > 0.8) {
                 wildcardDetected = true;
-                wildcardIp = result.remoteAddress;
                 newDomains = newDomains.slice(0, 2);
                 if (statusEl) statusEl.textContent = '检测到 DNS 通配符，停止枚举';
                 continue;
@@ -543,9 +555,16 @@ window.VulnKitSubdomain = (function () {
       lastSubdomains.sort(function (a, b) {
         return a.host.localeCompare(b.host);
       });
-      if (statusEl)
-        statusEl.textContent =
+      if (statusEl) {
+        var statusText =
           'DNS 枚举完成: 新增 ' + newDomains.length + '，共 ' + lastSubdomains.length + ' 个子域名';
+        if (newDomains.length === 0 && !wildcardDetected) {
+          statusText += ' — 未发现新子域名，可能目标站点子域名较少或网络连接异常';
+        } else if (wildcardDetected) {
+          statusText += ' — 检测到 DNS 通配符，已过滤泛解析结果';
+        }
+        statusEl.textContent = statusText;
+      }
     }
 
     dnsScanActive = false;

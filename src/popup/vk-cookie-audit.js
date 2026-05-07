@@ -55,45 +55,52 @@ window.VulnKitCookieAudit = (function () {
         return;
       }
 
-      chrome.cookies.getAll({ domain: domain }, function (cookies) {
-        if (!cookies || cookies.length === 0) {
-          if (statusEl) statusEl.textContent = '当前域名没有 Cookie';
-          if (resultsEl)
-            resultsEl.innerHTML = '<div class="cookie-no-cookies">当前域名没有 Cookie</div>';
-          if (copyBtn) copyBtn.style.display = 'none';
-          return;
-        }
+      // Get target page protocol from active tab, not popup's chrome-extension: protocol
+      utils.requireTabId().then(function (tab) {
+        var isHttpsSite = tab && tab.url && tab.url.indexOf('https://') === 0;
 
-        var results = cookies.map(analyzeCookie);
-        var SEV_ORDER = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
-        var severityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-        results.forEach(function (r) {
-          var max = r.issues.reduce(function (m, i) {
-            return Math.max(m, SEV_ORDER[i.severity] || 0);
-          }, 0);
-          r._maxSev = max;
-          var sevKey = Object.keys(SEV_ORDER).find(function (k) {
-            return SEV_ORDER[k] === max;
+        chrome.cookies.getAll({ domain: domain }, function (cookies) {
+          if (!cookies || cookies.length === 0) {
+            if (statusEl) statusEl.textContent = '当前域名没有 Cookie';
+            if (resultsEl)
+              resultsEl.innerHTML = '<div class="cookie-no-cookies">当前域名没有 Cookie</div>';
+            if (copyBtn) copyBtn.style.display = 'none';
+            return;
+          }
+
+          var results = cookies.map(function (c) {
+            return analyzeCookie(c, isHttpsSite);
           });
-          if (sevKey && severityCounts.hasOwnProperty(sevKey)) severityCounts[sevKey]++;
-        });
-        results.sort(function (a, b) {
-          return b._maxSev - a._maxSev;
-        });
+          var SEV_ORDER = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
+          var severityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+          results.forEach(function (r) {
+            var max = r.issues.reduce(function (m, i) {
+              return Math.max(m, SEV_ORDER[i.severity] || 0);
+            }, 0);
+            r._maxSev = max;
+            var sevKey = Object.keys(SEV_ORDER).find(function (k) {
+              return SEV_ORDER[k] === max;
+            });
+            if (sevKey && severityCounts.hasOwnProperty(sevKey)) severityCounts[sevKey]++;
+          });
+          results.sort(function (a, b) {
+            return b._maxSev - a._maxSev;
+          });
 
-        lastResult = results;
-        if (statusEl) statusEl.textContent = '审计完成: ' + cookies.length + ' 个 Cookie';
-        if (copyBtn) copyBtn.style.display = '';
+          lastResult = results;
+          if (statusEl) statusEl.textContent = '审计完成: ' + cookies.length + ' 个 Cookie';
+          if (copyBtn) copyBtn.style.display = '';
 
-        renderStats(severityCounts);
-        renderResults(results);
+          renderStats(severityCounts);
+          renderResults(results);
+        });
       });
     });
   }
 
-  function analyzeCookie(cookie) {
+  function analyzeCookie(cookie, isHttpsSite) {
     var issues = [];
-    var isHttps = cookie.secure || location.protocol === 'https:';
+    var isHttps = cookie.secure || isHttpsSite;
 
     if (!cookie.secure && isHttps) {
       issues.push({ severity: 'high', text: '缺少 Secure 标志 (HTTPS 域名下应启用)' });

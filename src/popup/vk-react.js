@@ -19,13 +19,9 @@ window.VulnKitReact = (function () {
         return;
       }
 
-      chrome.tabs.sendMessage(tab.id, { type: 'VK_REACT_DETECT' }, function (response) {
-        if (chrome.runtime.lastError) {
-          if (statusEl) statusEl.textContent = '检测失败: ' + chrome.runtime.lastError.message;
-          return;
-        }
-        if (!response) {
-          if (statusEl) statusEl.textContent = '检测失败: 无响应';
+      function handleMessage(response) {
+        if (chrome.runtime.lastError || !response) {
+          if (statusEl) statusEl.textContent = '检测失败: 请刷新目标网页后重试';
           return;
         }
 
@@ -38,6 +34,32 @@ window.VulnKitReact = (function () {
           if (copyBtn) copyBtn.style.display = 'none';
         }
         renderResult(response);
+      }
+
+      chrome.tabs.sendMessage(tab.id, { type: 'VK_REACT_DETECT' }, function (response) {
+        if (chrome.runtime.lastError || !response) {
+          chrome.runtime.lastError;
+          if (statusEl) statusEl.textContent = '正在注入检测脚本...';
+          chrome.scripting.executeScript(
+            {
+              target: { tabId: tab.id },
+              files: ['src/content/vk-content.js'],
+            },
+            function () {
+              if (chrome.runtime.lastError) {
+                if (statusEl)
+                  statusEl.textContent =
+                    '注入失败: ' + (chrome.runtime.lastError.message || '未知错误');
+                return;
+              }
+              setTimeout(function () {
+                chrome.tabs.sendMessage(tab.id, { type: 'VK_REACT_DETECT' }, handleMessage);
+              }, 200);
+            }
+          );
+          return;
+        }
+        handleMessage(response);
       });
     });
   }

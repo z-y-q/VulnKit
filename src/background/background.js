@@ -191,7 +191,7 @@ function isAllowedUrl(url) {
 }
 
 // ====== Fetch helpers ======
-async function fetchUrl(url, tailOnly) {
+async function fetchUrl(url, tailOnly, timeoutMs) {
   try {
     var opts = {};
     if (tailOnly) {
@@ -200,7 +200,7 @@ async function fetchUrl(url, tailOnly) {
     var controller = new AbortController();
     var timer = setTimeout(function () {
       controller.abort();
-    }, 10000);
+    }, timeoutMs || 10000);
     opts.signal = controller.signal;
     const resp = await fetch(url, opts);
     clearTimeout(timer);
@@ -357,7 +357,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (!isAllowedUrl(message.url)) {
         sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
       } else {
-        fetchUrl(message.url, message.tailOnly).then(result => {
+        fetchUrl(message.url, message.tailOnly, message.timeout).then(result => {
           sendResponse(result.success ? { data: result.data } : { error: result.error });
         });
       }
@@ -425,6 +425,142 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               } catch {
                 result.body = '';
               }
+            }
+            sendResponse(result);
+          })
+          .catch(e => {
+            clearTimeout(timer);
+            sendResponse({ error: e.message, status: 0 });
+          });
+      }
+      return true;
+
+    case 'FETCH_CORS_PROBE':
+      // CORS probe: background fetch can set Origin header (not forbidden in service worker)
+      {
+        let probeUrl;
+        try {
+          probeUrl = new URL(message.url);
+          if (probeUrl.protocol !== 'http:' && probeUrl.protocol !== 'https:') {
+            sendResponse({ error: 'Invalid protocol' });
+            return true;
+          }
+        } catch {
+          sendResponse({ error: 'Invalid URL' });
+          return true;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), message.timeout || 10000);
+        var corsHeaders = message.headers || {};
+        // In service worker fetch, Origin is not a forbidden header — browser allows it
+        fetch(probeUrl.href, {
+          method: message.method || 'GET',
+          redirect: 'follow',
+          signal: controller.signal,
+          headers: corsHeaders,
+          credentials: 'omit',
+        })
+          .then(async resp => {
+            clearTimeout(timer);
+            const hdrs = {};
+            resp.headers.forEach((v, k) => {
+              hdrs[k] = v;
+            });
+            const result = {
+              status: resp.status,
+              statusText: resp.statusText,
+              headers: hdrs,
+              type: resp.type,
+            };
+            try {
+              result.body = await resp.text();
+            } catch {
+              result.body = '';
+            }
+            sendResponse(result);
+          })
+          .catch(e => {
+            clearTimeout(timer);
+            sendResponse({ error: e.message, status: 0 });
+          });
+      }
+      return true;
+
+    case 'FETCH_DNS_PROBE':
+      // DNS subdomain probe: background fetch without CORS restrictions
+      {
+        let probeUrl;
+        try {
+          probeUrl = new URL(message.url);
+          if (probeUrl.protocol !== 'http:' && probeUrl.protocol !== 'https:') {
+            sendResponse({ error: 'Invalid protocol' });
+            return true;
+          }
+        } catch {
+          sendResponse({ error: 'Invalid URL' });
+          return true;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), message.timeout || 5000);
+        fetch(probeUrl.href, {
+          method: message.method || 'HEAD',
+          redirect: 'follow',
+          signal: controller.signal,
+          mode: 'no-cors',
+        })
+          .then(resp => {
+            clearTimeout(timer);
+            // no-cors mode: opaque response, status=0 means reachable, error means unreachable
+            sendResponse({ status: resp.type === 'opaque' ? 1 : resp.status, type: resp.type });
+          })
+          .catch(e => {
+            clearTimeout(timer);
+            sendResponse({ error: e.message, status: 0 });
+          });
+      }
+      return true;
+
+    case 'FETCH_WAF_PROBE':
+      // WAF probe: background fetch without cookies/session to trigger WAF blocks
+      {
+        let probeUrl;
+        try {
+          probeUrl = new URL(message.url);
+          if (probeUrl.protocol !== 'http:' && probeUrl.protocol !== 'https:') {
+            sendResponse({ error: 'Invalid protocol' });
+            return true;
+          }
+        } catch {
+          sendResponse({ error: 'Invalid URL' });
+          return true;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), message.timeout || 8000);
+        fetch(probeUrl.href, {
+          method: message.method || 'GET',
+          redirect: 'follow',
+          signal: controller.signal,
+          credentials: 'omit',
+          headers: message.headers || {},
+        })
+          .then(async resp => {
+            clearTimeout(timer);
+            const hdrs = {};
+            resp.headers.forEach((v, k) => {
+              hdrs[k] = v;
+            });
+            const result = {
+              status: resp.status,
+              statusText: resp.statusText,
+              headers: hdrs,
+              redirected: resp.redirected,
+              url: resp.url,
+            };
+            try {
+              var body = await resp.text();
+              result.body = body.length > 50000 ? body.substring(0, 50000) : body;
+            } catch {
+              result.body = '';
             }
             sendResponse(result);
           })
