@@ -381,8 +381,34 @@
       switchAssetSource(savedState['asset-source']);
     }
 
+    // Apply toolbar customization from settings
+    var toolbarConfig = utils.getSetting('toolbarConfig', null);
+    var tabGrid = utils.get('tab-grid');
+    if (toolbarConfig && Array.isArray(toolbarConfig) && tabGrid) {
+      var allBtns = Array.from(tabGrid.querySelectorAll('.tab-btn'));
+      var btnMap = {};
+      allBtns.forEach(function (btn) {
+        btnMap[btn.dataset.panel] = btn;
+      });
+      toolbarConfig.forEach(function (cfg) {
+        var btn = btnMap[cfg.id];
+        if (!btn) return;
+        if (cfg.visible === false) {
+          btn.classList.add('toolbar-hidden');
+        } else {
+          btn.classList.remove('toolbar-hidden');
+          tabGrid.appendChild(btn);
+        }
+      });
+      var activeTab = tabGrid.querySelector('.tab-btn.active');
+      if (activeTab && activeTab.classList.contains('toolbar-hidden')) {
+        var firstVisible = tabGrid.querySelector('.tab-btn:not(.toolbar-hidden)');
+        if (firstVisible) firstVisible.click();
+      }
+    }
+
     // Tab pagination (2 rows x 4 cols = 8 per page)
-    var tabBtns = Array.from(document.querySelectorAll('.tab-btn'));
+    var tabBtns = Array.from(document.querySelectorAll('.tab-btn:not(.toolbar-hidden)'));
     var tabsPerPage = 8;
     var totalTabs = tabBtns.length;
     var totalPages = Math.ceil(totalTabs / tabsPerPage);
@@ -1254,6 +1280,10 @@
     var themes = ['light', 'dark'];
     var savedTheme = localStorage.getItem('pentest-theme');
     if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+    utils.bindClick('settings-btn', () => {
+      chrome.runtime.openOptionsPage();
+    });
+
     utils.bindClick('theme-toggle', () => {
       var current = document.documentElement.getAttribute('data-theme') || 'light';
       var next = themes[(themes.indexOf(current) + 1) % themes.length];

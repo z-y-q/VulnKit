@@ -98,3 +98,57 @@ p { color: #666; transition: color 0.2s; }
 [data-theme='dark'] .success { background-color: #1a3a2a; color: #75d99a; }
 [data-theme='dark'] .error { background-color: #3a1a1a; color: #f87171; }
 [data-theme='dark'] .info { background-color: #1a2a3a; color: #7dd3fc; }
+
+/* Toolbar config */
+.toolbar-config-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    margin: 4px 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #f9fafb;
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+    cursor: grab;
+}
+.toolbar-config-item:hover {
+    background: #e6f0fa;
+    border-color: #c4ddef;
+}
+.toolbar-config-item.dragging {
+    opacity: 0.4;
+    background: #dbeafe;
+}
+.toolbar-drag-handle {
+    cursor: grab;
+    font-size: 16px;
+    color: #999;
+    flex-shrink: 0;
+}
+.toolbar-drag-handle:active { cursor: grabbing; }
+.toolbar-config-item label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-weight: normal;
+    font-size: 13px;
+    cursor: pointer;
+    flex: 1;
+}
+[data-theme='dark'] .toolbar-config-item {
+    background: #1a2744;
+    border-color: #2a3a5c;
+}
+[data-theme='dark'] .toolbar-config-item:hover {
+    background: #253352;
+    border-color: #4A90E2;
+}
+[data-theme='dark'] .toolbar-config-item.dragging {
+    background: rgba(74, 144, 226, 0.2);
+}
+[data-theme='dark'] .toolbar-drag-handle {
+    color: #8E8E9E;
+}

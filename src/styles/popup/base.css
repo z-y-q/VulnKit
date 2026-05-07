@@ -116,6 +116,9 @@ body {
 .tab-btn.hidden-tab {
   display: none;
 }
+.tab-btn.toolbar-hidden {
+  display: none !important;
+}
 
 /* Main Content */
 .app-main {
