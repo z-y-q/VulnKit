@@ -403,7 +403,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (sender.tab && sender.tab.url) {
           try {
             var senderOrigin = new URL(sender.tab.url).origin;
-            if (probeUrl.origin !== senderOrigin && probeUrl.hostname !== new URL(sender.tab.url).hostname) {
+            if (
+              probeUrl.origin !== senderOrigin &&
+              probeUrl.hostname !== new URL(sender.tab.url).hostname
+            ) {
               sendResponse({ error: 'Origin mismatch' });
               return true;
             }
@@ -730,7 +733,14 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (!tab?.id) return;
   switch (info.menuItemId) {
     case 'vulnkit-extract-links':
-      chrome.tabs.sendMessage(tab.id, { type: 'CONTEXT_EXTRACT_LINKS' }).catch(() => {});
+      chrome.tabs.sendMessage(tab.id, { type: 'CONTEXT_EXTRACT_LINKS' }).catch(function () {});
+      chrome.storage.local.set({ contextExtractUrl: tab.url || '' }, function () {
+        setTimeout(function () {
+          chrome.tabs.create({
+            url: chrome.runtime.getURL('src/extracted-links/extracted-links.html'),
+          });
+        }, 500);
+      });
       break;
     case 'vulnkit-encode':
     case 'vulnkit-decode':
@@ -742,7 +752,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         chrome.action.setBadgeText({ text: '↑' });
         chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
         if (typeof chrome.action.openPopup === 'function') {
-          try { chrome.action.openPopup({ windowId: tab.windowId }); } catch {}
+          try {
+            chrome.action.openPopup({ windowId: tab.windowId });
+          } catch {}
         }
       }
       break;

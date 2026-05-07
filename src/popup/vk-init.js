@@ -355,9 +355,13 @@
         var inputEl = utils.get('encoding-input');
         if (inputEl) inputEl.value = data.contextSelection;
         if (data.contextAction === 'decode') {
-          setTimeout(function () { handleDecode(); }, 100);
+          setTimeout(function () {
+            handleDecode();
+          }, 100);
         } else if (data.contextAction === 'encode') {
-          setTimeout(function () { handleEncode(); }, 100);
+          setTimeout(function () {
+            handleEncode();
+          }, 100);
         }
         chrome.storage.local.remove(['contextSelection', 'contextAction']);
         chrome.action.setBadgeText({ text: '' });
