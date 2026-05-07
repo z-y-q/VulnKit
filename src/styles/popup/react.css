@@ -1,12 +1,12 @@
 /* React Detection */
-.react-container {
-  padding: 10px;
+.react-module-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  margin-bottom: 8px;
+  line-height: 1.5;
 }
-.react-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
+[data-theme='dark'] .react-module-desc {
+  color: var(--text-secondary, #aaa);
 }
 .react-results {
   display: flex;
@@ -14,14 +14,14 @@
   gap: 8px;
 }
 .react-card {
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #e0e0e0);
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-color, #e0e0e0);
   border-radius: 8px;
   padding: 12px;
 }
-[data-theme="dark"] .react-card {
-  background: var(--surface, #1a1a2e);
-  border-color: var(--border, #333);
+[data-theme='dark'] .react-card {
+  background: var(--bg-card, #1a1a2e);
+  border-color: var(--border-color, #333);
 }
 .react-card-header {
   display: flex;
@@ -34,7 +34,7 @@
   font-weight: 600;
   color: var(--text-primary, #333);
 }
-[data-theme="dark"] .react-card-title {
+[data-theme='dark'] .react-card-title {
   color: var(--text-primary, #e0e0e0);
 }
 .react-badge {
@@ -64,24 +64,24 @@
   min-width: 80px;
   flex-shrink: 0;
 }
-[data-theme="dark"] .react-info-label {
+[data-theme='dark'] .react-info-label {
   color: var(--text-secondary, #aaa);
 }
 .react-info-value {
   color: var(--text-primary, #333);
   word-break: break-all;
 }
-[data-theme="dark"] .react-info-value {
+[data-theme='dark'] .react-info-value {
   color: var(--text-primary, #e0e0e0);
 }
 .react-info-value code {
-  background: var(--surface-alt, #f0f2f5);
+  background: var(--bg-tertiary, #f0f2f5);
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 11px;
 }
-[data-theme="dark"] .react-info-value code {
-  background: var(--surface-alt, #2a2a3e);
+[data-theme='dark'] .react-info-value code {
+  background: var(--bg-tertiary, #2a2a3e);
 }
 .react-route-list {
   list-style: none;
@@ -94,10 +94,10 @@
   gap: 6px;
   padding: 4px 8px;
   font-size: 12px;
-  border-bottom: 1px solid var(--border, #f0f0f0);
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
 }
-[data-theme="dark"] .react-route-item {
-  border-color: var(--border, #2a2a2a);
+[data-theme='dark'] .react-route-item {
+  border-color: var(--border-color, #2a2a2a);
 }
 .react-route-item:last-child {
   border-bottom: none;
@@ -111,11 +111,11 @@
   font-size: 10px;
   padding: 1px 4px;
   border-radius: 3px;
-  background: var(--surface-alt, #f0f2f5);
+  background: var(--bg-tertiary, #f0f2f5);
   color: var(--text-secondary, #666);
 }
-[data-theme="dark"] .react-route-method {
-  background: var(--surface-alt, #2a2a3e);
+[data-theme='dark'] .react-route-method {
+  background: var(--bg-tertiary, #2a2a3e);
   color: var(--text-secondary, #aaa);
 }
 .react-not-detected {
@@ -133,12 +133,12 @@
   display: inline-block;
   padding: 1px 6px;
   border-radius: 3px;
-  background: var(--surface-alt, #f0f2f5);
+  background: var(--bg-tertiary, #f0f2f5);
   color: var(--text-primary, #333);
   font-size: 11px;
   font-family: monospace;
 }
-[data-theme="dark"] .react-component-tag {
-  background: var(--surface-alt, #2a2a3e);
+[data-theme='dark'] .react-component-tag {
+  background: var(--bg-tertiary, #2a2a3e);
   color: var(--text-primary, #e0e0e0);
 }

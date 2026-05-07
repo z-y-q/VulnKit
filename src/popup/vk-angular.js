@@ -5,10 +5,27 @@ window.VulnKitAngular = (function () {
   var utils = window.VulnKitUtils.utilsProxy;
   var lastResult = null;
 
+  function exportResults() {
+    if (!lastResult) {
+      utils.showToast('没有可导出的结果', 'warning');
+      return;
+    }
+    var report = { timestamp: new Date().toISOString(), result: lastResult };
+    var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'angular-analysis-' + Date.now() + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    utils.showToast('已导出 JSON', 'success');
+  }
+
   function detectAngular() {
     var statusEl = utils.get('angular-status');
     var resultsEl = utils.get('angular-results');
     var copyBtn = utils.get('angular-copy-btn');
+    var exportBtn = utils.get('angular-export-btn');
 
     if (statusEl) statusEl.textContent = '正在检测 Angular...';
     if (resultsEl) resultsEl.innerHTML = '';
@@ -29,9 +46,11 @@ window.VulnKitAngular = (function () {
         if (response.detected) {
           if (statusEl) statusEl.textContent = '检测到 Angular';
           if (copyBtn) copyBtn.style.display = '';
+          if (exportBtn) exportBtn.style.display = '';
         } else {
           if (statusEl) statusEl.textContent = '未检测到 Angular';
           if (copyBtn) copyBtn.style.display = 'none';
+          if (exportBtn) exportBtn.style.display = 'none';
         }
         renderResult(response);
       }
@@ -185,6 +204,7 @@ window.VulnKitAngular = (function () {
   return {
     detectAngular: detectAngular,
     copyResults: copyResults,
+    exportResults: exportResults,
     get lastResult() {
       return lastResult;
     },

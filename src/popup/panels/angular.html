@@ -1,12 +1,16 @@
-<div class="panel" id="panel-angular">
-  <div class="angular-container">
-    <div class="angular-actions">
-      <button class="action-btn primary-btn" id="angular-detect-btn">检测 Angular</button>
-      <button class="action-btn" id="angular-copy-btn" style="display:none">复制结果</button>
+    <!-- Angular 分析面板 -->
+    <div id="panel-angular" class="panel">
+      <div class="content-card">
+        <div class="card-title">Angular 框架分析</div>
+        <div class="angular-module-desc">分析当前页面 Angular 框架版本、模块和路由信息</div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="angular-detect-btn">检测 Angular</button>
+          <button class="btn btn-outline" id="angular-copy-btn" style="display:none">复制结果</button>
+          <button class="btn btn-outline" id="angular-export-btn" style="display:none">导出 JSON</button>
+        </div>
+        <div class="status-bar" id="angular-status"></div>
+        <div class="angular-results" id="angular-results">
+          <div class="empty-state">点击「检测 Angular」分析当前页面的 Angular 框架信息</div>
+        </div>
+      </div>
     </div>
-    <div class="status-bar" id="angular-status"></div>
-    <div class="angular-results" id="angular-results">
-      <div class="empty-state">点击「检测 Angular」分析当前页面的 Angular 框架信息</div>
-    </div>
-  </div>
-</div>

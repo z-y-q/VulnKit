@@ -4,8 +4,12 @@ window.VulnKitWaf = (function () {
 
   var utils = window.VulnKitUtils.utilsProxy;
   var lastWafResult = null;
+  var lastHeaders = null;
   var wafScanActive = false;
   var wafScanAborted = false;
+  var currentFilter = 'all';
+  var currentSearch = '';
+  var scanStartTime = 0;
 
   var WAF_SIGNATURES = [
     {
@@ -343,6 +347,32 @@ window.VulnKitWaf = (function () {
     if (copyBtn) copyBtn.style.display = '';
     if (exportBtn) exportBtn.style.display = '';
     lastWafResult = detected;
+    lastHeaders = probeHeaders || null;
+  }
+
+  function filterByStatus(filter) {
+    currentFilter = filter;
+    applyFilter();
+  }
+
+  function searchResults(query) {
+    currentSearch = (query || '').toLowerCase();
+    applyFilter();
+  }
+
+  function applyFilter() {
+    if (!lastWafResult) return;
+    var filtered = lastWafResult.filter(function (d) {
+      if (currentFilter === 'detected') return true;
+      if (currentFilter === 'none') return false;
+      return true;
+    });
+    if (currentSearch) {
+      filtered = filtered.filter(function (d) {
+        return d.name.toLowerCase().indexOf(currentSearch) !== -1;
+      });
+    }
+    renderResults(filtered, lastHeaders);
   }
 
   async function scanWaf() {
@@ -363,6 +393,7 @@ window.VulnKitWaf = (function () {
 
     wafScanAborted = false;
     wafScanActive = true;
+    scanStartTime = Date.now();
     if (scanBtn) {
       scanBtn.disabled = true;
       scanBtn.textContent = '停止扫描';
@@ -395,8 +426,11 @@ window.VulnKitWaf = (function () {
       for (var i = 0; i < probePaths.length; i++) {
         if (wafScanAborted) break;
         var probe = probePaths[i];
-        if (statusEl)
-          statusEl.textContent = '探测中... (' + (i + 1) + '/' + probePaths.length + ')';
+        if (statusEl) {
+          var elapsed = ((Date.now() - scanStartTime) / 1000).toFixed(1);
+          statusEl.textContent =
+            '探测中... (' + (i + 1) + '/' + probePaths.length + ') ' + elapsed + 's';
+        }
         try {
           var parsedUrl = new URL(pageUrl);
           var probeUrl = parsedUrl.origin + probe.path;
@@ -552,6 +586,8 @@ window.VulnKitWaf = (function () {
     scanWaf: scanWaf,
     copyResults: copyResults,
     exportResults: exportResults,
+    filterByStatus: filterByStatus,
+    searchResults: searchResults,
     get lastWafResult() {
       return lastWafResult;
     },

@@ -259,23 +259,49 @@
 
   // ====== WAF Fingerprint (loaded from vk-waf.js) ======
   const waf = window.VulnKitWaf;
-  const { scanWaf, copyResults: wafCopyResults, exportResults: wafExportResults } = waf;
+  const {
+    scanWaf,
+    copyResults: wafCopyResults,
+    exportResults: wafExportResults,
+    filterByStatus: wafFilterByStatus,
+    searchResults: wafSearchResults,
+  } = waf;
 
   // ====== Cookie Security Audit (loaded from vk-cookie-audit.js) ======
   const cookieAudit = window.VulnKitCookieAudit;
-  const { auditCookies, copyResults: cookieAuditCopy } = cookieAudit;
+  const {
+    auditCookies,
+    copyResults: cookieAuditCopy,
+    exportResults: cookieAuditExport,
+    filterBySeverity: cookieFilterBySeverity,
+    searchResults: cookieSearchResults,
+  } = cookieAudit;
 
   // ====== React Detection (loaded from vk-react.js) ======
   const reactDetect = window.VulnKitReact;
-  const { detectReact, copyResults: reactCopyResults } = reactDetect;
+  const {
+    detectReact,
+    copyResults: reactCopyResults,
+    exportResults: reactExportResults,
+  } = reactDetect;
 
   // ====== Angular Detection (loaded from vk-angular.js) ======
   const angularDetect = window.VulnKitAngular;
-  const { detectAngular, copyResults: angularCopyResults } = angularDetect;
+  const {
+    detectAngular,
+    copyResults: angularCopyResults,
+    exportResults: angularExportResults,
+  } = angularDetect;
 
   // ====== CORS Detection (loaded from vk-cors.js) ======
   const corsDetect = window.VulnKitCors;
-  const { scanCors, copyResults: corsCopyResults, exportJson: corsExportJson } = corsDetect;
+  const {
+    scanCors,
+    copyResults: corsCopyResults,
+    exportJson: corsExportJson,
+    filterBySeverity: corsFilterBySeverity,
+    searchResults: corsSearchResults,
+  } = corsDetect;
 
   // ====== Subdomain Collection (loaded from vk-subdomain.js) ======
   const subdomain = window.VulnKitSubdomain;
@@ -285,6 +311,8 @@
     bruteForceDns,
     copyResults: subdomainCopyResults,
     exportResults: subdomainExportResults,
+    filterBySource: subdomainFilterBySource,
+    searchResults: subdomainSearchResults,
   } = subdomain;
 
   // ====== Webpack Module Mapping (Source Map Scan v2) ======
@@ -1023,23 +1051,62 @@
     utils.bindClick('waf-scan-btn', scanWaf);
     utils.bindClick('waf-copy-btn', wafCopyResults);
     utils.bindClick('waf-export-btn', wafExportResults);
+    utils.on('waf-search', 'input', function () {
+      wafSearchResults(this.value.trim());
+    });
+    document.querySelectorAll('[data-wfilter]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('[data-wfilter]').forEach(function (b) {
+          b.classList.remove('active');
+        });
+        btn.classList.add('active');
+        wafFilterByStatus(btn.dataset.wfilter);
+      });
+    });
 
     // Cookie Security Audit
     utils.bindClick('cookie-audit-btn', auditCookies);
     utils.bindClick('cookie-audit-copy-btn', cookieAuditCopy);
+    utils.bindClick('cookie-audit-export-btn', cookieAuditExport);
+    utils.on('cookie-audit-search', 'input', function () {
+      cookieSearchResults(this.value.trim());
+    });
+    document.querySelectorAll('[data-cafilter]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('[data-cafilter]').forEach(function (b) {
+          b.classList.remove('active');
+        });
+        btn.classList.add('active');
+        cookieFilterBySeverity(btn.dataset.cafilter);
+      });
+    });
 
     // React Detection
     utils.bindClick('react-detect-btn', detectReact);
     utils.bindClick('react-copy-btn', reactCopyResults);
+    utils.bindClick('react-export-btn', reactExportResults);
 
     // Angular Detection
     utils.bindClick('angular-detect-btn', detectAngular);
     utils.bindClick('angular-copy-btn', angularCopyResults);
+    utils.bindClick('angular-export-btn', angularExportResults);
 
     // CORS Detection
     utils.bindClick('cors-scan-btn', scanCors);
     utils.bindClick('cors-copy-btn', corsCopyResults);
     utils.bindClick('cors-export-btn', corsExportJson);
+    utils.on('cors-search', 'input', function () {
+      corsSearchResults(this.value.trim());
+    });
+    document.querySelectorAll('[data-cfilter]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('[data-cfilter]').forEach(function (b) {
+          b.classList.remove('active');
+        });
+        btn.classList.add('active');
+        corsFilterBySeverity(btn.dataset.cfilter);
+      });
+    });
 
     // Subdomain Collection
     utils.bindClick('subdomain-scan-btn', collectSubdomains);
@@ -1047,6 +1114,18 @@
     utils.bindClick('subdomain-dns-btn', bruteForceDns);
     utils.bindClick('subdomain-copy-btn', subdomainCopyResults);
     utils.bindClick('subdomain-export-btn', subdomainExportResults);
+    utils.on('subdomain-search', 'input', function () {
+      subdomainSearchResults(this.value.trim());
+    });
+    document.querySelectorAll('[data-sfilter]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('[data-sfilter]').forEach(function (b) {
+          b.classList.remove('active');
+        });
+        btn.classList.add('active');
+        subdomainFilterBySource(btn.dataset.sfilter);
+      });
+    });
 
     // MaR dynamic route loading
     utils.bindClick('mar-scan-btn', marScanDynamicRoutes);

@@ -1,23 +1,37 @@
-<div class="panel" id="panel-cors">
-  <div class="cors-container">
-    <div class="cors-config">
-      <div class="cors-input-group">
-        <label class="cors-input-label">自定义 Origin</label>
-        <input type="text" id="cors-custom-origin" class="cors-input" placeholder="例: https://attacker.com">
+    <!-- CORS 检测面板 -->
+    <div id="panel-cors" class="panel">
+      <div class="content-card">
+        <div class="card-title">CORS 跨域检测</div>
+        <div class="cors-module-desc">检测目标 API 端点的 CORS 跨域配置安全性</div>
+        <div class="cors-config">
+          <div class="cors-input-group">
+            <label class="cors-input-label">自定义 Origin</label>
+            <input type="text" id="cors-custom-origin" class="input" placeholder="例: https://attacker.com">
+          </div>
+          <div class="cors-input-group">
+            <label class="cors-input-label">自定义端点</label>
+            <input type="text" id="cors-custom-endpoint" class="input" placeholder="逗号分隔，例: api/data, api/admin">
+          </div>
+        </div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="cors-scan-btn">CORS 配置检测</button>
+          <button class="btn btn-outline" id="cors-copy-btn" style="display:none">复制结果</button>
+          <button class="btn btn-outline" id="cors-export-btn" style="display:none">导出 JSON</button>
+        </div>
+        <div class="status-bar" id="cors-status"></div>
+
+        <div class="cors-filter-row">
+          <span class="cors-filter-label">风险等级:</span>
+          <button class="cors-filter-btn active" data-cfilter="all">全部</button>
+          <button class="cors-filter-btn" data-cfilter="critical">高危</button>
+          <button class="cors-filter-btn" data-cfilter="warning">中危</button>
+          <button class="cors-filter-btn" data-cfilter="info">低危</button>
+          <button class="cors-filter-btn" data-cfilter="safe">安全</button>
+          <input type="text" id="cors-search" class="input" placeholder="搜索 URL..." style="margin-left:8px;max-width:160px;">
+        </div>
+
+        <div class="cors-results" id="cors-results">
+          <div class="empty-state">点击「CORS 配置检测」测试跨域资源共享配置</div>
+        </div>
       </div>
-      <div class="cors-input-group">
-        <label class="cors-input-label">自定义端点</label>
-        <input type="text" id="cors-custom-endpoint" class="cors-input" placeholder="逗号分隔，例: api/data, api/admin">
-      </div>
     </div>
-    <div class="cors-actions">
-      <button class="action-btn primary-btn" id="cors-scan-btn">CORS 配置检测</button>
-      <button class="action-btn" id="cors-copy-btn" style="display:none">复制结果</button>
-      <button class="action-btn" id="cors-export-btn" style="display:none">导出 JSON</button>
-    </div>
-    <div class="status-bar" id="cors-status"></div>
-    <div class="cors-results" id="cors-results">
-      <div class="empty-state">点击「CORS 配置检测」测试跨域资源共享配置</div>
-    </div>
-  </div>
-</div>

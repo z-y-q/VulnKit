@@ -6,6 +6,9 @@ window.VulnKitCors = (function () {
   var lastResult = null;
   var scanAborted = false;
   var scanActive = false;
+  var currentFilter = 'all';
+  var currentSearch = '';
+  var scanStartTime = 0;
 
   var PROBE_TIMEOUT_MS = 10000;
 
@@ -35,7 +38,12 @@ window.VulnKitCors = (function () {
         return s.trim().replace(/^\//, '');
       });
       parts.forEach(function (p) {
-        if (p && !endpoints.some(function (e) { return e.path === '/' + p; })) {
+        if (
+          p &&
+          !endpoints.some(function (e) {
+            return e.path === '/' + p;
+          })
+        ) {
           endpoints.push({ path: '/' + p, label: '/' + p });
         }
       });
@@ -99,6 +107,7 @@ window.VulnKitCors = (function () {
     if (resultsEl) resultsEl.innerHTML = '';
     scanAborted = false;
     scanActive = true;
+    scanStartTime = Date.now();
     if (scanBtn) scanBtn.textContent = '停止检测';
     if (copyBtn) copyBtn.style.display = 'none';
 
@@ -130,7 +139,9 @@ window.VulnKitCors = (function () {
           var resp = await sendCorsProbe(epUrl, 'GET', origin.value);
           completed++;
           if (statusEl) {
-            statusEl.textContent = '检测中... (' + completed + '/' + totalTasks + ')';
+            var elapsed1 = ((Date.now() - scanStartTime) / 1000).toFixed(1);
+            statusEl.textContent =
+              '检测中... (' + completed + '/' + totalTasks + ') ' + elapsed1 + 's';
           }
 
           if (resp && resp.error) {
@@ -154,7 +165,9 @@ window.VulnKitCors = (function () {
         var optionsResp = await sendCorsProbe(epUrl, 'OPTIONS', origins[0].value);
         completed++;
         if (statusEl) {
-          statusEl.textContent = '检测中... (' + completed + '/' + totalTasks + ')';
+          var elapsed2 = ((Date.now() - scanStartTime) / 1000).toFixed(1);
+          statusEl.textContent =
+            '检测中... (' + completed + '/' + totalTasks + ') ' + elapsed2 + 's';
         }
         if (!optionsResp || optionsResp.error) continue;
 
@@ -173,7 +186,10 @@ window.VulnKitCors = (function () {
         lastResult = analysis;
         renderResults(analysis);
         if (statusEl) {
-          statusEl.textContent = '检测完成: ' + completed + ' 个请求' +
+          statusEl.textContent =
+            '检测完成: ' +
+            completed +
+            ' 个请求' +
             (errors.length > 0 ? '，' + errors.length + ' 个失败' : '');
         }
         if (copyBtn) copyBtn.style.display = '';
@@ -290,6 +306,49 @@ window.VulnKitCors = (function () {
     return { issues: issues, safeCount: safeCount, total: results.length, errors: [] };
   }
 
+  var SEV_MAP = {
+    critical: 'critical',
+    danger: 'critical',
+    warning: 'warning',
+    safe: 'safe',
+    info: 'info',
+  };
+
+  function filterBySeverity(filter) {
+    currentFilter = filter;
+    applyCorsFilter();
+  }
+
+  function searchResults(query) {
+    currentSearch = (query || '').toLowerCase();
+    applyCorsFilter();
+  }
+
+  function applyCorsFilter() {
+    if (!lastResult) return;
+    var filtered = lastResult.issues.filter(function (issue) {
+      if (currentFilter !== 'all') {
+        var mappedSev = SEV_MAP[issue.severity] || issue.severity;
+        if (mappedSev !== currentFilter) return false;
+      }
+      if (currentSearch) {
+        var url = (issue.url || '').toLowerCase();
+        var origin = (issue.origin.value || '').toLowerCase();
+        if (url.indexOf(currentSearch) === -1 && origin.indexOf(currentSearch) === -1) return false;
+      }
+      return true;
+    });
+    var filteredAnalysis = {
+      issues: filtered,
+      safeCount: filtered.filter(function (i) {
+        return i.severity === 'safe';
+      }).length,
+      total: filtered.length,
+      errors: lastResult.errors,
+    };
+    renderResults(filteredAnalysis);
+  }
+
   function renderResults(analysis) {
     var resultsEl = utils.get('cors-results');
     if (!resultsEl) return;
@@ -308,7 +367,8 @@ window.VulnKitCors = (function () {
     html += '</div>';
 
     if (analysis.errors && analysis.errors.length > 0) {
-      html += '<div class="cors-error-info" style="color:#f39c12;font-size:11px;margin:4px 0 8px;padding:6px 8px;background:rgba(243,156,18,0.1);border-radius:4px">';
+      html +=
+        '<div class="cors-error-info" style="color:#f39c12;font-size:11px;margin:4px 0 8px;padding:6px 8px;background:rgba(243,156,18,0.1);border-radius:4px">';
       html += '部分请求失败 (网络错误/CORS 阻止)。跨域探测需要目标服务器响应不同 Origin 的请求。';
       html += '</div>';
     }
@@ -438,6 +498,8 @@ window.VulnKitCors = (function () {
     scanCors: scanCors,
     copyResults: copyResults,
     exportJson: exportJson,
+    filterBySeverity: filterBySeverity,
+    searchResults: searchResults,
     get lastResult() {
       return lastResult;
     },

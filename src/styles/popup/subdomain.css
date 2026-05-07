@@ -1,12 +1,43 @@
 /* Subdomain Collection */
-.subdomain-container {
-  padding: 10px;
+.subdomain-module-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  margin-bottom: 8px;
+  line-height: 1.5;
 }
-.subdomain-actions {
+[data-theme='dark'] .subdomain-module-desc {
+  color: var(--text-secondary, #aaa);
+}
+.subdomain-filter-row {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 10px;
   flex-wrap: wrap;
+}
+.subdomain-filter-label {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  flex-shrink: 0;
+}
+.subdomain-filter-btn {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  border: 1px solid var(--border-color, #ddd);
+  background: var(--bg-tertiary, #f5f5f5);
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.subdomain-filter-btn:hover {
+  border-color: var(--accent, #0066cc);
+  color: var(--accent, #0066cc);
+}
+.subdomain-filter-btn.active {
+  background: var(--accent, #0066cc);
+  border-color: var(--accent, #0066cc);
+  color: #fff;
 }
 .subdomain-results {
   max-height: 400px;
@@ -16,14 +47,14 @@
   display: flex;
   gap: 12px;
   padding: 8px 12px;
-  background: var(--surface-alt, #f0f2f5);
+  background: var(--bg-tertiary, #f0f2f5);
   border-radius: 6px;
   margin-bottom: 10px;
   font-size: 12px;
   flex-wrap: wrap;
 }
-[data-theme="dark"] .subdomain-stats {
-  background: var(--surface-alt, #1e1e2e);
+[data-theme='dark'] .subdomain-stats {
+  background: var(--bg-tertiary, #1e1e2e);
 }
 .subdomain-stat-item {
   display: flex;
@@ -45,17 +76,17 @@
   gap: 8px;
   padding: 5px 10px;
   font-size: 12px;
-  border-bottom: 1px solid var(--border, #f0f0f0);
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
   transition: background 0.1s;
 }
-[data-theme="dark"] .subdomain-item {
-  border-color: var(--border, #2a2a2a);
+[data-theme='dark'] .subdomain-item {
+  border-color: var(--border-color, #2a2a2a);
 }
 .subdomain-item:hover {
-  background: var(--surface-alt, #f8f9fa);
+  background: var(--bg-tertiary, #f8f9fa);
 }
-[data-theme="dark"] .subdomain-item:hover {
-  background: var(--surface-alt, #252540);
+[data-theme='dark'] .subdomain-item:hover {
+  background: var(--bg-tertiary, #252540);
 }
 .subdomain-item:last-child {
   border-bottom: none;
@@ -113,7 +144,7 @@
   display: inline-block;
   width: 16px;
   height: 16px;
-  border: 2px solid var(--border, #ddd);
+  border: 2px solid var(--border-color, #ddd);
   border-top-color: var(--accent, #0066cc);
   border-radius: 50%;
   animation: subdomain-spin 0.6s linear infinite;

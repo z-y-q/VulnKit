@@ -1,14 +1,26 @@
-<div class="panel" id="panel-waf">
-  <div class="waf-container">
-    <div class="waf-actions">
-      <button class="action-btn primary-btn" id="waf-scan-btn">WAF 指纹识别</button>
-      <button class="action-btn" id="waf-copy-btn" style="display:none">复制结果</button>
-      <button class="action-btn" id="waf-export-btn" style="display:none">导出报告</button>
+    <!-- WAF 指纹面板 -->
+    <div id="panel-waf" class="panel">
+      <div class="content-card">
+        <div class="card-title">WAF 指纹识别</div>
+        <div class="waf-module-desc">探测目标站点 WAF/CDN 防护指纹，支持 25+ 主流 WAF 识别</div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="waf-scan-btn">WAF 指纹识别</button>
+          <button class="btn btn-outline" id="waf-copy-btn" style="display:none">复制结果</button>
+          <button class="btn btn-outline" id="waf-export-btn" style="display:none">导出报告</button>
+        </div>
+        <div class="status-bar" id="waf-status"></div>
+        <div class="waf-probe-info" id="waf-probe-info" style="display:none"></div>
+
+        <div class="waf-filter-row">
+          <span class="waf-filter-label">状态筛选:</span>
+          <button class="waf-filter-btn active" data-wfilter="all">全部</button>
+          <button class="waf-filter-btn" data-wfilter="detected">已检测</button>
+          <button class="waf-filter-btn" data-wfilter="none">未检测</button>
+          <input type="text" id="waf-search" class="input" placeholder="搜索 WAF 名称..." style="margin-left:8px;max-width:160px;">
+        </div>
+
+        <div class="waf-results" id="waf-results">
+          <div class="empty-state">点击「WAF 指纹识别」对当前网站进行 WAF 检测</div>
+        </div>
+      </div>
     </div>
-    <div class="status-bar" id="waf-status"></div>
-    <div class="waf-probe-info" id="waf-probe-info" style="display:none"></div>
-    <div class="waf-results" id="waf-results">
-      <div class="empty-state">点击「WAF 指纹识别」对当前网站进行 WAF 检测</div>
-    </div>
-  </div>
-</div>

@@ -4,8 +4,12 @@ window.VulnKitSubdomain = (function () {
 
   var utils = window.VulnKitUtils.utilsProxy;
   var lastSubdomains = [];
+  var lastBaseDomain = '';
   var dnsScanActive = false;
   var dnsScanAborted = false;
+  var currentFilter = 'all';
+  var currentSearch = '';
+  var scanStartTime = 0;
   var CT_TIMEOUT_MS = 30000;
   var DNS_BATCH_SIZE = 10;
   var DNS_BATCH_DELAY_MS = 200;
@@ -147,6 +151,7 @@ window.VulnKitSubdomain = (function () {
       var baseDomain = extractBaseDomain(domain);
       var seen = {};
       lastSubdomains = [];
+      lastBaseDomain = baseDomain;
 
       // Method 1: Certificate Transparency via crt.sh
       var ctUrl = 'https://crt.sh/?q=%.' + encodeURIComponent(baseDomain) + '&output=json';
@@ -204,6 +209,7 @@ window.VulnKitSubdomain = (function () {
       }
 
       var baseDomain = extractBaseDomain(domain);
+      lastBaseDomain = baseDomain;
 
       utils.requireTabId().then(function (tab) {
         if (!tab) return;
@@ -344,6 +350,26 @@ window.VulnKitSubdomain = (function () {
     });
   }
 
+  function filterBySource(filter) {
+    currentFilter = filter;
+    applyFilter();
+  }
+
+  function searchResults(query) {
+    currentSearch = (query || '').toLowerCase();
+    applyFilter();
+  }
+
+  function applyFilter() {
+    if (lastSubdomains.length === 0) return;
+    var filtered = lastSubdomains.filter(function (s) {
+      if (currentFilter !== 'all' && s.source !== currentFilter) return false;
+      if (currentSearch && s.host.indexOf(currentSearch) === -1) return false;
+      return true;
+    });
+    renderSubdomains(filtered, lastBaseDomain);
+  }
+
   function renderSubdomains(subdomains, baseDomain) {
     var resultsEl = utils.get('subdomain-results');
     if (!resultsEl) return;
@@ -468,6 +494,8 @@ window.VulnKitSubdomain = (function () {
 
     dnsScanAborted = false;
     dnsScanActive = true;
+    scanStartTime = Date.now();
+    lastBaseDomain = baseDomain;
     if (statusEl) statusEl.textContent = 'DNS 暴力枚举中...';
 
     var seen = {};
@@ -494,7 +522,10 @@ window.VulnKitSubdomain = (function () {
           continue;
         }
         tested++;
-        if (statusEl) statusEl.textContent = 'DNS 枚举中... (' + tested + '/' + total + ')';
+        if (statusEl) {
+          var elapsed = ((Date.now() - scanStartTime) / 1000).toFixed(1);
+          statusEl.textContent = 'DNS 枚举中... (' + tested + '/' + total + ') ' + elapsed + 's';
+        }
 
         try {
           var result = await new Promise(function (resolve) {
@@ -556,8 +587,15 @@ window.VulnKitSubdomain = (function () {
         return a.host.localeCompare(b.host);
       });
       if (statusEl) {
+        var elapsed = ((Date.now() - scanStartTime) / 1000).toFixed(1);
         var statusText =
-          'DNS 枚举完成: 新增 ' + newDomains.length + '，共 ' + lastSubdomains.length + ' 个子域名';
+          'DNS 枚举完成 (' +
+          elapsed +
+          's): 新增 ' +
+          newDomains.length +
+          '，共 ' +
+          lastSubdomains.length +
+          ' 个子域名';
         if (newDomains.length === 0 && !wildcardDetected) {
           statusText += ' — 未发现新子域名，可能目标站点子域名较少或网络连接异常';
         } else if (wildcardDetected) {
@@ -579,6 +617,8 @@ window.VulnKitSubdomain = (function () {
     bruteForceDns: bruteForceDns,
     copyResults: copyResults,
     exportResults: exportResults,
+    filterBySource: filterBySource,
+    searchResults: searchResults,
     get lastSubdomains() {
       return lastSubdomains;
     },

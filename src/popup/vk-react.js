@@ -5,10 +5,27 @@ window.VulnKitReact = (function () {
   var utils = window.VulnKitUtils.utilsProxy;
   var lastResult = null;
 
+  function exportResults() {
+    if (!lastResult) {
+      utils.showToast('没有可导出的结果', 'warning');
+      return;
+    }
+    var report = { timestamp: new Date().toISOString(), result: lastResult };
+    var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'react-analysis-' + Date.now() + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    utils.showToast('已导出 JSON', 'success');
+  }
+
   function detectReact() {
     var statusEl = utils.get('react-status');
     var resultsEl = utils.get('react-results');
     var copyBtn = utils.get('react-copy-btn');
+    var exportBtn = utils.get('react-export-btn');
 
     if (statusEl) statusEl.textContent = '正在检测 React...';
     if (resultsEl) resultsEl.innerHTML = '';
@@ -29,9 +46,11 @@ window.VulnKitReact = (function () {
         if (response.detected) {
           if (statusEl) statusEl.textContent = '检测到 React';
           if (copyBtn) copyBtn.style.display = '';
+          if (exportBtn) exportBtn.style.display = '';
         } else {
           if (statusEl) statusEl.textContent = '未检测到 React';
           if (copyBtn) copyBtn.style.display = 'none';
+          if (exportBtn) exportBtn.style.display = 'none';
         }
         renderResult(response);
       }
@@ -184,6 +203,7 @@ window.VulnKitReact = (function () {
   return {
     detectReact: detectReact,
     copyResults: copyResults,
+    exportResults: exportResults,
     get lastResult() {
       return lastResult;
     },

@@ -4,6 +4,8 @@ window.VulnKitCookieAudit = (function () {
 
   var utils = window.VulnKitUtils.utilsProxy;
   var lastResult = null;
+  var currentFilter = 'all';
+  var currentSearch = '';
 
   var SENSITIVE_NAMES = [
     'session',
@@ -46,6 +48,7 @@ window.VulnKitCookieAudit = (function () {
     var statsEl = utils.get('cookie-audit-stats');
     var resultsEl = utils.get('cookie-audit-results');
     var copyBtn = utils.get('cookie-audit-copy-btn');
+    var exportBtn = utils.get('cookie-audit-export-btn');
 
     if (statusEl) statusEl.textContent = '正在审计 Cookie...';
 
@@ -65,6 +68,7 @@ window.VulnKitCookieAudit = (function () {
             if (resultsEl)
               resultsEl.innerHTML = '<div class="cookie-no-cookies">当前域名没有 Cookie</div>';
             if (copyBtn) copyBtn.style.display = 'none';
+            if (exportBtn) exportBtn.style.display = 'none';
             return;
           }
 
@@ -90,6 +94,7 @@ window.VulnKitCookieAudit = (function () {
           lastResult = results;
           if (statusEl) statusEl.textContent = '审计完成: ' + cookies.length + ' 个 Cookie';
           if (copyBtn) copyBtn.style.display = '';
+          if (exportBtn) exportBtn.style.display = '';
 
           renderStats(severityCounts);
           renderResults(results);
@@ -288,9 +293,73 @@ window.VulnKitCookieAudit = (function () {
     utils.copyAndToast(lines.join('\n'), '已复制 ' + lastResult.length + ' 条审计结果');
   }
 
+  function exportResults() {
+    if (!lastResult || lastResult.length === 0) {
+      utils.showToast('没有可导出的结果', 'warning');
+      return;
+    }
+    var report = {
+      timestamp: new Date().toISOString(),
+      cookies: lastResult.map(function (r) {
+        return {
+          name: r.cookie.name,
+          domain: r.cookie.domain,
+          path: r.cookie.path,
+          secure: r.cookie.secure,
+          httpOnly: r.cookie.httpOnly,
+          sameSite: r.cookie.sameSite,
+          issues: r.issues,
+        };
+      }),
+    };
+    var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'cookie-audit-' + Date.now() + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    utils.showToast('已导出 JSON', 'success');
+  }
+
+  var SEV_ORDER = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
+
+  function filterBySeverity(filter) {
+    currentFilter = filter;
+    applyFilter();
+  }
+
+  function searchResults(query) {
+    currentSearch = (query || '').toLowerCase();
+    applyFilter();
+  }
+
+  function applyFilter() {
+    if (!lastResult || lastResult.length === 0) return;
+    var filtered = lastResult.filter(function (r) {
+      if (currentFilter !== 'all') {
+        var sevKey = Object.keys(SEV_ORDER).find(function (k) {
+          return SEV_ORDER[k] === r._maxSev;
+        });
+        if (sevKey !== currentFilter) return false;
+      }
+      if (currentSearch) {
+        var name = (r.cookie.name || '').toLowerCase();
+        var domain = (r.cookie.domain || '').toLowerCase();
+        if (name.indexOf(currentSearch) === -1 && domain.indexOf(currentSearch) === -1)
+          return false;
+      }
+      return true;
+    });
+    renderResults(filtered);
+  }
+
   return {
     auditCookies: auditCookies,
     copyResults: copyResults,
+    exportResults: exportResults,
+    filterBySeverity: filterBySeverity,
+    searchResults: searchResults,
     get lastResult() {
       return lastResult;
     },

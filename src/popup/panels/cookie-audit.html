@@ -1,13 +1,28 @@
-<div class="panel" id="panel-cookie-audit">
-  <div class="cookie-audit-container">
-    <div class="cookie-audit-actions">
-      <button class="action-btn primary-btn" id="cookie-audit-btn">Cookie 安全审计</button>
-      <button class="action-btn" id="cookie-audit-copy-btn" style="display:none">复制结果</button>
+    <!-- Cookie 审计面板 -->
+    <div id="panel-cookie-audit" class="panel">
+      <div class="content-card">
+        <div class="card-title">Cookie 安全审计</div>
+        <div class="cookie-audit-module-desc">审计当前站点 Cookie 安全配置，检测缺失的安全标记</div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="cookie-audit-btn">Cookie 安全审计</button>
+          <button class="btn btn-outline" id="cookie-audit-copy-btn" style="display:none">复制结果</button>
+          <button class="btn btn-outline" id="cookie-audit-export-btn" style="display:none">导出 JSON</button>
+        </div>
+        <div class="status-bar" id="cookie-audit-status"></div>
+        <div class="cookie-audit-stats" id="cookie-audit-stats" style="display:none"></div>
+
+        <div class="cookie-audit-filter-row">
+          <span class="cookie-audit-filter-label">风险等级:</span>
+          <button class="cookie-audit-filter-btn active" data-cafilter="all">全部</button>
+          <button class="cookie-audit-filter-btn" data-cafilter="critical">高危</button>
+          <button class="cookie-audit-filter-btn" data-cafilter="high">中危</button>
+          <button class="cookie-audit-filter-btn" data-cafilter="medium">低危</button>
+          <button class="cookie-audit-filter-btn" data-cafilter="info">信息</button>
+          <input type="text" id="cookie-audit-search" class="input" placeholder="搜索 Cookie 名称..." style="margin-left:8px;max-width:160px;">
+        </div>
+
+        <div class="cookie-audit-results" id="cookie-audit-results">
+          <div class="empty-state">点击「Cookie 安全审计」检查当前域名的 Cookie 安全配置</div>
+        </div>
+      </div>
     </div>
-    <div class="status-bar" id="cookie-audit-status"></div>
-    <div class="cookie-audit-stats" id="cookie-audit-stats" style="display:none"></div>
-    <div class="cookie-audit-results" id="cookie-audit-results">
-      <div class="empty-state">点击「Cookie 安全审计」检查当前域名的 Cookie 安全配置</div>
-    </div>
-  </div>
-</div>

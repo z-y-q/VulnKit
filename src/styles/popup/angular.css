@@ -1,12 +1,12 @@
 /* Angular Detection */
-.angular-container {
-  padding: 10px;
+.angular-module-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  margin-bottom: 8px;
+  line-height: 1.5;
 }
-.angular-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
+[data-theme='dark'] .angular-module-desc {
+  color: var(--text-secondary, #aaa);
 }
 .angular-results {
   display: flex;
@@ -14,14 +14,14 @@
   gap: 8px;
 }
 .angular-card {
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #e0e0e0);
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-color, #e0e0e0);
   border-radius: 8px;
   padding: 12px;
 }
-[data-theme="dark"] .angular-card {
-  background: var(--surface, #1a1a2e);
-  border-color: var(--border, #333);
+[data-theme='dark'] .angular-card {
+  background: var(--bg-card, #1a1a2e);
+  border-color: var(--border-color, #333);
 }
 .angular-card-header {
   display: flex;
@@ -34,7 +34,7 @@
   font-weight: 600;
   color: var(--text-primary, #333);
 }
-[data-theme="dark"] .angular-card-title {
+[data-theme='dark'] .angular-card-title {
   color: var(--text-primary, #e0e0e0);
 }
 .angular-badge {
@@ -64,24 +64,24 @@
   min-width: 80px;
   flex-shrink: 0;
 }
-[data-theme="dark"] .angular-info-label {
+[data-theme='dark'] .angular-info-label {
   color: var(--text-secondary, #aaa);
 }
 .angular-info-value {
   color: var(--text-primary, #333);
   word-break: break-all;
 }
-[data-theme="dark"] .angular-info-value {
+[data-theme='dark'] .angular-info-value {
   color: var(--text-primary, #e0e0e0);
 }
 .angular-info-value code {
-  background: var(--surface-alt, #f0f2f5);
+  background: var(--bg-tertiary, #f0f2f5);
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 11px;
 }
-[data-theme="dark"] .angular-info-value code {
-  background: var(--surface-alt, #2a2a3e);
+[data-theme='dark'] .angular-info-value code {
+  background: var(--bg-tertiary, #2a2a3e);
 }
 .angular-route-list {
   list-style: none;
@@ -94,10 +94,10 @@
   gap: 6px;
   padding: 4px 8px;
   font-size: 12px;
-  border-bottom: 1px solid var(--border, #f0f0f0);
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
 }
-[data-theme="dark"] .angular-route-item {
-  border-color: var(--border, #2a2a2a);
+[data-theme='dark'] .angular-route-item {
+  border-color: var(--border-color, #2a2a2a);
 }
 .angular-route-item:last-child {
   border-bottom: none;
@@ -122,12 +122,12 @@
   display: inline-block;
   padding: 1px 6px;
   border-radius: 3px;
-  background: var(--surface-alt, #f0f2f5);
+  background: var(--bg-tertiary, #f0f2f5);
   color: var(--text-primary, #333);
   font-size: 11px;
   font-family: monospace;
 }
-[data-theme="dark"] .angular-module-tag {
-  background: var(--surface-alt, #2a2a3e);
+[data-theme='dark'] .angular-module-tag {
+  background: var(--bg-tertiary, #2a2a3e);
   color: var(--text-primary, #e0e0e0);
 }

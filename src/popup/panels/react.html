@@ -1,12 +1,16 @@
-<div class="panel" id="panel-react">
-  <div class="react-container">
-    <div class="react-actions">
-      <button class="action-btn primary-btn" id="react-detect-btn">检测 React</button>
-      <button class="action-btn" id="react-copy-btn" style="display:none">复制结果</button>
+    <!-- React 分析面板 -->
+    <div id="panel-react" class="panel">
+      <div class="content-card">
+        <div class="card-title">React 框架分析</div>
+        <div class="react-module-desc">分析当前页面 React 框架版本、组件结构和路由信息</div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="react-detect-btn">检测 React</button>
+          <button class="btn btn-outline" id="react-copy-btn" style="display:none">复制结果</button>
+          <button class="btn btn-outline" id="react-export-btn" style="display:none">导出 JSON</button>
+        </div>
+        <div class="status-bar" id="react-status"></div>
+        <div class="react-results" id="react-results">
+          <div class="empty-state">点击「检测 React」分析当前页面的 React 框架信息</div>
+        </div>
+      </div>
     </div>
-    <div class="status-bar" id="react-status"></div>
-    <div class="react-results" id="react-results">
-      <div class="empty-state">点击「检测 React」分析当前页面的 React 框架信息</div>
-    </div>
-  </div>
-</div>
