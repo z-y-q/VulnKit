@@ -25,6 +25,7 @@
     'angular.html',
     'cors.html',
     'subdomain.html',
+    'source-loader.html',
   ];
 
   var appMain = document.getElementById('app-main');

@@ -1,0 +1,17 @@
+    <!-- 源码加载面板 -->
+    <div id="panel-source-loader" class="panel">
+      <div class="content-card">
+        <div class="card-title">源码加载</div>
+        <div class="source-loader-module-desc">将远程 JS/CSS 资源注入当前页面并加载到 DevTools Sources 面板，方便调试和搜索</div>
+        <textarea id="source-loader-urls" class="input" rows="4" placeholder="输入远程资源 URL，每行一个&#10;例如: https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></textarea>
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="source-loader-load-btn">加载到 Sources</button>
+          <button class="btn btn-outline" id="source-loader-copy-btn" style="display:none">复制 URL</button>
+          <button class="btn btn-outline" id="source-loader-clear-btn">清空</button>
+        </div>
+        <div class="status-bar" id="source-loader-status"></div>
+        <div class="source-loader-results" id="source-loader-results">
+          <div class="empty-state">输入远程资源 URL，点击「加载到 Sources」注入到页面</div>
+        </div>
+      </div>
+    </div>

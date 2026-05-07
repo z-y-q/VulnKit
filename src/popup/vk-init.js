@@ -315,6 +315,13 @@
     searchResults: subdomainSearchResults,
   } = subdomain;
 
+  // ====== Source Loader (loaded from vk-source-loader.js) ======
+  const {
+    loadToSources,
+    copyResults: slCopyResults,
+    clearResults: slClearResults,
+  } = window.VulnKitSourceLoader;
+
   // ====== Webpack Module Mapping (Source Map Scan v2) ======
   // Loaded from vk-sourcemap.js
   const sourcemap = window.VulnKitSourcemap;
@@ -1126,6 +1133,11 @@
         subdomainFilterBySource(btn.dataset.sfilter);
       });
     });
+
+    // Source Loader
+    utils.bindClick('source-loader-load-btn', loadToSources);
+    utils.bindClick('source-loader-copy-btn', slCopyResults);
+    utils.bindClick('source-loader-clear-btn', slClearResults);
 
     // MaR dynamic route loading
     utils.bindClick('mar-scan-btn', marScanDynamicRoutes);
