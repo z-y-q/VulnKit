@@ -4,20 +4,129 @@ window.VulnKitSubdomain = (function () {
 
   var utils = window.VulnKitUtils.utilsProxy;
   var lastSubdomains = [];
+  var dnsScanActive = false;
+  var dnsScanAborted = false;
+  var CT_TIMEOUT_MS = 15000;
+  var DNS_BATCH_SIZE = 10;
+  var DNS_BATCH_DELAY_MS = 200;
 
   var COMMON_PREFIXES = [
-    'www','mail','ftp','localhost','admin','portal','api','dev','staging','test','uat','prod',
-    'vpn','cdn','static','assets','img','images','media','upload','app','m','mobile',
-    'blog','forum','wiki','docs','doc','help','support','crm','erp','oa','hr',
-    'git','svn','jenkins','ci','cd','monitor','grafana','prometheus','kibana','elasticsearch',
-    'redis','mongo','mysql','db','database','proxy','gateway','auth','sso','login','oauth',
-    'nas','backup','bak','old','new','v2','v3','api2','internal','intranet','demo',
-    'sandbox','preview','stg','pre','prod','release','master','alpha','beta','gamma',
-    'redis','mq','rabbitmq','kafka','zookeeper','consul','etcd','nacos',
-    'shop','store','pay','payment','order','user','member','search','notify','msg',
-    'log','logs','syslog','audit','trace','jaeger','zipkin',
-    'img','image','pic','photo','video','file','files','download','res','resource',
-    'ws','wss','socket','push','websocket',
+    'www',
+    'mail',
+    'ftp',
+    'localhost',
+    'admin',
+    'portal',
+    'api',
+    'dev',
+    'staging',
+    'test',
+    'uat',
+    'prod',
+    'vpn',
+    'cdn',
+    'static',
+    'assets',
+    'img',
+    'images',
+    'media',
+    'upload',
+    'app',
+    'm',
+    'mobile',
+    'blog',
+    'forum',
+    'wiki',
+    'docs',
+    'doc',
+    'help',
+    'support',
+    'crm',
+    'erp',
+    'oa',
+    'hr',
+    'git',
+    'svn',
+    'jenkins',
+    'ci',
+    'cd',
+    'monitor',
+    'grafana',
+    'prometheus',
+    'kibana',
+    'elasticsearch',
+    'redis',
+    'mongo',
+    'mysql',
+    'db',
+    'database',
+    'proxy',
+    'gateway',
+    'auth',
+    'sso',
+    'login',
+    'oauth',
+    'nas',
+    'backup',
+    'bak',
+    'old',
+    'new',
+    'v2',
+    'v3',
+    'api2',
+    'internal',
+    'intranet',
+    'demo',
+    'sandbox',
+    'preview',
+    'stg',
+    'pre',
+    'prod',
+    'release',
+    'master',
+    'alpha',
+    'beta',
+    'gamma',
+    'redis',
+    'mq',
+    'rabbitmq',
+    'kafka',
+    'zookeeper',
+    'consul',
+    'etcd',
+    'nacos',
+    'shop',
+    'store',
+    'pay',
+    'payment',
+    'order',
+    'user',
+    'member',
+    'search',
+    'notify',
+    'msg',
+    'log',
+    'logs',
+    'syslog',
+    'audit',
+    'trace',
+    'jaeger',
+    'zipkin',
+    'img',
+    'image',
+    'pic',
+    'photo',
+    'video',
+    'file',
+    'files',
+    'download',
+    'res',
+    'resource',
+    'ws',
+    'wss',
+    'socket',
+    'push',
+    'websocket',
   ];
 
   function collectSubdomains() {
@@ -41,7 +150,7 @@ window.VulnKitSubdomain = (function () {
 
       // Method 1: Certificate Transparency via crt.sh
       var ctUrl = 'https://crt.sh/?q=%.' + encodeURIComponent(baseDomain) + '&output=json';
-      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: ctUrl }, function (resp) {
+      fetchWithTimeout(ctUrl, CT_TIMEOUT_MS).then(function (resp) {
         if (resp && resp.body) {
           try {
             var entries = JSON.parse(resp.body);
@@ -50,16 +159,14 @@ window.VulnKitSubdomain = (function () {
                 var name = (entry.name_value || entry.name || '').trim();
                 name.split('\n').forEach(function (n) {
                   n = n.trim().toLowerCase().replace(/^\*\./, '');
-                  if (n && n.includes(baseDomain) && !seen[n]) {
+                  if (n && n.endsWith(baseDomain) && !seen[n]) {
                     seen[n] = true;
                     lastSubdomains.push({ host: n, source: 'ct' });
                   }
                 });
               });
             }
-          } catch (e) {
-            // parse error
-          }
+          } catch (e) {}
         }
 
         if (statusEl) statusEl.textContent = 'CT 收集完成: ' + lastSubdomains.length + ' 个子域名';
@@ -104,7 +211,11 @@ window.VulnKitSubdomain = (function () {
             links.forEach(function (link) {
               try {
                 var hostname = new URL(link.href, 'https://' + baseDomain).hostname.toLowerCase();
-                if (hostname !== baseDomain && hostname.endsWith('.' + baseDomain) && !seen[hostname]) {
+                if (
+                  hostname !== baseDomain &&
+                  hostname.endsWith('.' + baseDomain) &&
+                  !seen[hostname]
+                ) {
                   seen[hostname] = true;
                   pageSubdomains.push({ host: hostname, source: 'page' });
                 }
@@ -113,7 +224,9 @@ window.VulnKitSubdomain = (function () {
 
             // Merge with existing
             var existingMap = {};
-            lastSubdomains.forEach(function (s) { existingMap[s.host] = true; });
+            lastSubdomains.forEach(function (s) {
+              existingMap[s.host] = true;
+            });
             pageSubdomains.forEach(function (s) {
               if (!existingMap[s.host]) {
                 existingMap[s.host] = true;
@@ -121,8 +234,16 @@ window.VulnKitSubdomain = (function () {
               }
             });
 
-            lastSubdomains.sort(function (a, b) { return a.host.localeCompare(b.host); });
-            if (statusEl) statusEl.textContent = '页面提取完成: 新增 ' + pageSubdomains.length + '，共 ' + lastSubdomains.length + ' 个子域名';
+            lastSubdomains.sort(function (a, b) {
+              return a.host.localeCompare(b.host);
+            });
+            if (statusEl)
+              statusEl.textContent =
+                '页面提取完成: 新增 ' +
+                pageSubdomains.length +
+                '，共 ' +
+                lastSubdomains.length +
+                ' 个子域名';
             renderSubdomains(lastSubdomains, baseDomain);
             if (copyBtn) copyBtn.style.display = '';
             if (exportBtn) exportBtn.style.display = '';
@@ -132,11 +253,81 @@ window.VulnKitSubdomain = (function () {
     });
   }
 
+  var MULTI_PART_TLDS = [
+    'co.uk',
+    'com.cn',
+    'com.au',
+    'com.br',
+    'com.mx',
+    'co.jp',
+    'co.kr',
+    'co.in',
+    'co.nz',
+    'org.cn',
+    'net.cn',
+    'gov.cn',
+    'ac.uk',
+    'gov.uk',
+    'edu.uk',
+    'me.uk',
+    'com.tw',
+    'org.tw',
+    'net.tw',
+    'com.hk',
+    'org.hk',
+    'com.sg',
+    'com.my',
+    'co.za',
+    'co.id',
+    'co.th',
+    'co.il',
+    'com.ph',
+    'com.eg',
+    'co.ke',
+    'com.ar',
+    'com.ve',
+    'com.co',
+    'com.pe',
+    'com.cl',
+    'com.ec',
+    'ne.jp',
+    'or.jp',
+    'ac.jp',
+    'go.jp',
+    'co.za',
+    'org.za',
+    'edu.cn',
+    'mil.cn',
+    'nom.br',
+    'adm.br',
+    'gov.br',
+  ];
+
   function extractBaseDomain(domain) {
-    var parts = domain.toLowerCase().split('.');
-    if (parts.length <= 2) return domain;
-    // Simple heuristic: take last 2 parts (e.g. example.com)
+    var d = domain.toLowerCase();
+    for (var i = 0; i < MULTI_PART_TLDS.length; i++) {
+      var suffix = MULTI_PART_TLDS[i];
+      if (d.endsWith('.' + suffix)) {
+        var prefix = d.slice(0, -(suffix.length + 1));
+        var parts = prefix.split('.');
+        return parts[parts.length - 1] + '.' + suffix;
+      }
+    }
+    var parts = d.split('.');
+    if (parts.length <= 2) return d;
     return parts.slice(-2).join('.');
+  }
+
+  function fetchWithTimeout(url, timeoutMs) {
+    return new Promise(function (resolve) {
+      var timer = setTimeout(function () {
+        resolve(null);
+      }, timeoutMs || CT_TIMEOUT_MS);
+      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url }, function (resp) {
+        clearTimeout(timer);
+        resolve(resp || null);
+      });
+    });
   }
 
   function renderSubdomains(subdomains, baseDomain) {
@@ -144,16 +335,30 @@ window.VulnKitSubdomain = (function () {
     if (!resultsEl) return;
 
     var statsEl = utils.get('subdomain-stats');
-    var ctCount = subdomains.filter(function (s) { return s.source === 'ct'; }).length;
-    var pageCount = subdomains.filter(function (s) { return s.source === 'page'; }).length;
-    var dnsCount = subdomains.filter(function (s) { return s.source === 'dns'; }).length;
+    var ctCount = subdomains.filter(function (s) {
+      return s.source === 'ct';
+    }).length;
+    var pageCount = subdomains.filter(function (s) {
+      return s.source === 'page';
+    }).length;
+    var dnsCount = subdomains.filter(function (s) {
+      return s.source === 'dns';
+    }).length;
 
     if (statsEl) {
       statsEl.innerHTML =
-        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' + subdomains.length + '</span> 子域名</div>' +
-        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' + ctCount + '</span> CT</div>' +
-        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' + pageCount + '</span> 页面</div>' +
-        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' + dnsCount + '</span> DNS</div>';
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+        subdomains.length +
+        '</span> 子域名</div>' +
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+        ctCount +
+        '</span> CT</div>' +
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+        pageCount +
+        '</span> 页面</div>' +
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+        dnsCount +
+        '</span> DNS</div>';
       statsEl.style.display = '';
     }
 
@@ -165,8 +370,18 @@ window.VulnKitSubdomain = (function () {
     var html = '<div class="subdomain-list">';
     subdomains.forEach(function (s) {
       html += '<div class="subdomain-item">';
-      html += '<span class="subdomain-hostname" data-host="' + utils.escapeHtml(s.host) + '">' + utils.escapeHtml(s.host) + '</span>';
-      html += '<span class="subdomain-source-badge ' + s.source + '">' + sourceLabel(s.source) + '</span>';
+      html +=
+        '<span class="subdomain-hostname" data-host="' +
+        utils.escapeHtml(s.host) +
+        '">' +
+        utils.escapeHtml(s.host) +
+        '</span>';
+      html +=
+        '<span class="subdomain-source-badge ' +
+        s.source +
+        '">' +
+        sourceLabel(s.source) +
+        '</span>';
       html += '</div>';
     });
     html += '</div>';
@@ -191,7 +406,11 @@ window.VulnKitSubdomain = (function () {
       utils.showToast('没有结果', 'warning');
       return;
     }
-    var text = lastSubdomains.map(function (s) { return s.host; }).join('\n');
+    var text = lastSubdomains
+      .map(function (s) {
+        return s.host;
+      })
+      .join('\n');
     utils.copyAndToast(text, '已复制 ' + lastSubdomains.length + ' 个子域名');
   }
 
@@ -207,11 +426,142 @@ window.VulnKitSubdomain = (function () {
     utils.showToast('导出中...', 'info');
   }
 
+  function delay(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  async function bruteForceDns() {
+    var statusEl = utils.get('subdomain-status');
+    var copyBtn = utils.get('subdomain-copy-btn');
+    var exportBtn = utils.get('subdomain-export-btn');
+
+    if (dnsScanActive) {
+      dnsScanAborted = true;
+      return;
+    }
+
+    var domain = await utils.getCurrentDomain();
+    if (!domain) {
+      if (statusEl) statusEl.textContent = '无法获取当前域名';
+      return;
+    }
+
+    var baseDomain = extractBaseDomain(domain);
+    var tab = await utils.requireTabId();
+    if (!tab) return;
+
+    dnsScanAborted = false;
+    dnsScanActive = true;
+    if (statusEl) statusEl.textContent = 'DNS 暴力枚举中...';
+
+    var seen = {};
+    lastSubdomains.forEach(function (s) {
+      seen[s.host] = true;
+    });
+    var newDomains = [];
+    var resolvedIps = {};
+    var wildcardDetected = false;
+    var wildcardIp = null;
+    var tested = 0;
+    var total = COMMON_PREFIXES.length;
+
+    for (var i = 0; i < COMMON_PREFIXES.length; i += DNS_BATCH_SIZE) {
+      if (dnsScanAborted) break;
+      var batch = COMMON_PREFIXES.slice(i, Math.min(i + DNS_BATCH_SIZE, total));
+
+      for (var j = 0; j < batch.length; j++) {
+        if (dnsScanAborted) break;
+        var prefix = batch[j];
+        var host = prefix + '.' + baseDomain;
+        if (seen[host]) {
+          tested++;
+          continue;
+        }
+        tested++;
+        if (statusEl) statusEl.textContent = 'DNS 枚举中... (' + tested + '/' + total + ')';
+
+        try {
+          var result = await new Promise(function (resolve) {
+            var timer = setTimeout(function () {
+              resolve(null);
+            }, 5000);
+            chrome.tabs.sendMessage(
+              tab.id,
+              {
+                type: 'VK_WAF_PROBE',
+                url: 'https://' + host,
+                method: 'HEAD',
+                headers: {},
+                timeout: 5000,
+              },
+              function (resp) {
+                clearTimeout(timer);
+                if (chrome.runtime.lastError) {
+                  resolve(null);
+                  return;
+                }
+                resolve(resp || null);
+              }
+            );
+          });
+
+          if (result && result.status && result.status > 0 && result.status < 600) {
+            if (wildcardDetected && wildcardIp === result.remoteAddress) continue;
+            if (!wildcardDetected) {
+              var hitCount = newDomains.length;
+              if (hitCount > 2 && hitCount / tested > 0.8) {
+                wildcardDetected = true;
+                wildcardIp = result.remoteAddress;
+                newDomains = newDomains.slice(0, 2);
+                if (statusEl) statusEl.textContent = '检测到 DNS 通配符，停止枚举';
+                continue;
+              }
+            }
+            seen[host] = true;
+            newDomains.push({ host: host, source: 'dns', status: result.status });
+          }
+        } catch (e) {}
+      }
+
+      if (!dnsScanAborted && i + DNS_BATCH_SIZE < total) {
+        await delay(DNS_BATCH_DELAY_MS);
+      }
+    }
+
+    if (dnsScanAborted) {
+      if (statusEl) statusEl.textContent = 'DNS 枚举已取消';
+    } else {
+      var existingMap = {};
+      lastSubdomains.forEach(function (s) {
+        existingMap[s.host] = s;
+      });
+      newDomains.forEach(function (s) {
+        if (!existingMap[s.host]) lastSubdomains.push(s);
+      });
+      lastSubdomains.sort(function (a, b) {
+        return a.host.localeCompare(b.host);
+      });
+      if (statusEl)
+        statusEl.textContent =
+          'DNS 枚举完成: 新增 ' + newDomains.length + '，共 ' + lastSubdomains.length + ' 个子域名';
+    }
+
+    dnsScanActive = false;
+    renderSubdomains(lastSubdomains, baseDomain);
+    if (copyBtn) copyBtn.style.display = '';
+    if (exportBtn) exportBtn.style.display = '';
+  }
+
   return {
     collectSubdomains: collectSubdomains,
     extractFromPage: extractFromPage,
+    bruteForceDns: bruteForceDns,
     copyResults: copyResults,
     exportResults: exportResults,
-    get lastSubdomains() { return lastSubdomains; },
+    get lastSubdomains() {
+      return lastSubdomains;
+    },
   };
 })();

@@ -26,6 +26,10 @@ window.VulnKitGather = (function () {
 
   function getFilteredList() {
     var list = gatherData[currentGatherTab] || [];
+    var isApiTraffic = currentGatherTab === API_TRAFFIC_GROUP;
+    if (isApiTraffic) {
+      list = applyApiTrafficFilter(list);
+    }
     if (!searchFilter) return list;
     var lower = searchFilter.toLowerCase();
     return list.filter(function (item) {
@@ -52,6 +56,7 @@ window.VulnKitGather = (function () {
 
     updateSearchVisibility();
 
+    var isApiTraffic = currentGatherTab === API_TRAFFIC_GROUP;
     var fullList = gatherData[currentGatherTab] || [];
     if (fullList.length === 0) {
       utils.setEmpty('gather-results', '点击「收集当前页面」开始');
@@ -63,6 +68,9 @@ window.VulnKitGather = (function () {
     if (searchFilter && list.length !== fullList.length) {
       statusText += '（筛选: ' + list.length + '）';
     }
+    if (isApiTraffic && list.length !== fullList.length && !searchFilter) {
+      statusText += '（筛选: ' + list.length + '）';
+    }
     utils.setStatus('gather-status', statusText);
 
     if (list.length === 0) {
@@ -71,25 +79,102 @@ window.VulnKitGather = (function () {
     }
 
     var html = '';
-    list.forEach(function (item) {
-      html += '<div class="gather-item">';
-      html += '<span class="gather-item-type type-' + (item.color || item.type || 'gray') + '">';
-      html += utils.escapeHtml(item.name || item.type || '');
-      html += '</span>';
-      html += '<span class="gather-item-value" title="' + utils.escapeHtml(item.value) + '">';
-      html += utils.escapeHtml(item.value);
-      html += '</span>';
-      html +=
-        '<button class="gather-item-copy" data-copy="' +
-        utils.escapeHtml(item.value) +
-        '">复制</button>';
-      html += '</div>';
+    list.forEach(function (item, idx) {
+      var meta = item._meta || {};
+      if (isApiTraffic && meta.method) {
+        html += '<div class="gather-item gather-api-item" data-api-idx="' + idx + '">';
+        html += '<span class="gather-item-type type-' + (item.color || 'gray') + '">';
+        html += utils.escapeHtml(meta.method);
+        html += '</span>';
+        html += '<span class="gather-item-value" title="' + utils.escapeHtml(item.value) + '">';
+        html += utils.escapeHtml(item.value);
+        html += '</span>';
+        html += '<span class="api-duration">' + (meta.duration || 0) + 'ms</span>';
+        html +=
+          '<button class="gather-item-copy" data-copy="' +
+          utils.escapeHtml(item.value) +
+          '">复制</button>';
+        html += '</div>';
+        html += '<div class="gather-api-detail" id="api-detail-' + idx + '" style="display:none;">';
+        if (meta.contentType) {
+          html +=
+            '<div class="api-detail-row"><span class="api-detail-label">Content-Type</span><span class="api-detail-value">' +
+            utils.escapeHtml(meta.contentType) +
+            '</span></div>';
+        }
+        if (meta.status) {
+          html +=
+            '<div class="api-detail-row"><span class="api-detail-label">Status</span><span class="api-detail-value"><span class="api-status-badge ' +
+            (meta.status >= 200 && meta.status < 300
+              ? 'api-st-2xx'
+              : meta.status >= 400
+                ? 'api-st-err'
+                : 'api-st-warn') +
+            '">' +
+            meta.status +
+            '</span></span></div>';
+        }
+        var headers = meta.reqHeaders || {};
+        var headerKeys = Object.keys(headers);
+        if (headerKeys.length > 0) {
+          html +=
+            '<div class="api-detail-row"><span class="api-detail-label">Headers</span><span class="api-detail-value">';
+          headerKeys.forEach(function (k) {
+            html +=
+              '<div class="api-header-entry"><span class="api-header-key">' +
+              utils.escapeHtml(k) +
+              ':</span> ' +
+              utils.escapeHtml(headers[k]) +
+              '</div>';
+          });
+          html += '</span></div>';
+        }
+        if (meta.reqBody) {
+          html +=
+            '<div class="api-detail-row"><span class="api-detail-label">Request Body</span><span class="api-detail-value api-body-preview">' +
+            utils.escapeHtml(meta.reqBody) +
+            '</span></div>';
+        }
+        if (meta.resBody) {
+          html +=
+            '<div class="api-detail-row"><span class="api-detail-label">Response Body</span><span class="api-detail-value api-body-preview">' +
+            utils.escapeHtml(meta.resBody) +
+            '</span></div>';
+        }
+        html += '</div>';
+      } else {
+        html += '<div class="gather-item">';
+        html += '<span class="gather-item-type type-' + (item.color || item.type || 'gray') + '">';
+        html += utils.escapeHtml(item.name || item.type || '');
+        html += '</span>';
+        html += '<span class="gather-item-value" title="' + utils.escapeHtml(item.value) + '">';
+        html += utils.escapeHtml(item.value);
+        html += '</span>';
+        html +=
+          '<button class="gather-item-copy" data-copy="' +
+          utils.escapeHtml(item.value) +
+          '">复制</button>';
+        html += '</div>';
+      }
     });
     container.innerHTML = html;
 
     container.querySelectorAll('.gather-item-copy').forEach(function (btn) {
       btn.addEventListener('click', function () {
         utils.copyAndToast(btn.dataset.copy);
+      });
+    });
+
+    container.querySelectorAll('.gather-api-item').forEach(function (el) {
+      el.addEventListener('click', function (ev) {
+        if (ev.target.classList.contains('gather-item-copy')) return;
+        var idx = el.dataset.apiIdx;
+        var detail = document.getElementById('api-detail-' + idx);
+        if (detail) {
+          var shown = detail.style.display !== 'none';
+          detail.style.display = shown ? 'none' : '';
+          el.classList.toggle('gather-api-expanded', !shown);
+        }
       });
     });
   }
@@ -738,6 +823,28 @@ window.VulnKitGather = (function () {
     utils.showToast('API 流量监听已停止', 'info');
   }
 
+  var apiTrafficFilters = { method: 'ALL', status: 'ALL' };
+
+  function applyApiTrafficFilter(list) {
+    if (!list) return list;
+    return list.filter(function (item) {
+      var meta = item._meta || {};
+      if (apiTrafficFilters.method !== 'ALL') {
+        var itemMethod = (meta.method || item.name || '').toUpperCase();
+        if (itemMethod.indexOf(apiTrafficFilters.method) !== 0) return false;
+      }
+      if (apiTrafficFilters.status !== 'ALL') {
+        var code = meta.status || 0;
+        if (apiTrafficFilters.status === '2xx' && (code < 200 || code >= 300)) return false;
+        if (apiTrafficFilters.status === '3xx' && (code < 300 || code >= 400)) return false;
+        if (apiTrafficFilters.status === '4xx' && (code < 400 || code >= 500)) return false;
+        if (apiTrafficFilters.status === '5xx' && code < 500) return false;
+        if (apiTrafficFilters.status === 'err' && code >= 200 && code < 400) return false;
+      }
+      return true;
+    });
+  }
+
   async function collectApiTraffic() {
     var tab = await utils.requireTabId();
     if (!tab) return;
@@ -765,7 +872,15 @@ window.VulnKitGather = (function () {
         name: e.method + ' [' + e.status + ']',
         value: e.url,
         color: statusColor,
-        _meta: { contentType: e.contentType, duration: e.duration, status: e.status },
+        _meta: {
+          contentType: e.contentType,
+          duration: e.duration,
+          status: e.status,
+          method: e.method,
+          reqBody: e.reqBody || '',
+          reqHeaders: e.reqHeaders || {},
+          resBody: e.resBody || '',
+        },
       };
     });
     gatherData[API_TRAFFIC_GROUP] = (existing || []).concat(items);
@@ -787,6 +902,11 @@ window.VulnKitGather = (function () {
     }
   }
 
+  function setApiFilter(key, value) {
+    apiTrafficFilters[key] = value;
+    if (currentGatherTab === API_TRAFFIC_GROUP) renderGatherTab();
+  }
+
   return {
     init: init,
     gatherInfo: gatherInfo,
@@ -798,6 +918,7 @@ window.VulnKitGather = (function () {
     updateRules: updateRules,
     startApiTraffic: startApiTraffic,
     stopApiTraffic: stopApiTraffic,
+    setApiFilter: setApiFilter,
     get gatherData() {
       return gatherData;
     },

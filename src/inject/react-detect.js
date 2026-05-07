@@ -4,7 +4,16 @@
   if (window.__VK_REACT_DETECT_DONE__) return;
   window.__VK_REACT_DETECT_DONE__ = true;
 
-  var result = { detected: false, version: '', metaframework: '', signals: [] };
+  var result = {
+    detected: false,
+    version: '',
+    metaframework: '',
+    mode: '',
+    stateManager: '',
+    components: [],
+    routes: [],
+    signals: [],
+  };
 
   // React DevTools hook
   if (window.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
@@ -21,14 +30,21 @@
   }
 
   // React Fiber on root element
-  var rootEl = document.getElementById('root') || document.getElementById('app') || document.getElementById('__next');
+  var rootEl =
+    document.getElementById('root') ||
+    document.getElementById('app') ||
+    document.getElementById('__next');
   if (rootEl) {
-    var fiberKey = Object.keys(rootEl).find(function (k) { return k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'); });
+    var fiberKey = Object.keys(rootEl).find(function (k) {
+      return k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$');
+    });
     if (fiberKey) {
       result.detected = true;
       result.signals.push('React Fiber (' + fiberKey + ')');
     }
-    var propsKey = Object.keys(rootEl).find(function (k) { return k.startsWith('__reactProps$'); });
+    var propsKey = Object.keys(rootEl).find(function (k) {
+      return k.startsWith('__reactProps$');
+    });
     if (propsKey) {
       result.detected = true;
       result.signals.push('React Props');
@@ -50,7 +66,8 @@
     result.metaframework = 'Next.js';
     result.detected = true;
     result.signals.push('__NEXT_DATA__');
-    if (window.__NEXT_DATA__.buildId) result.signals.push('Next.js Build: ' + window.__NEXT_DATA__.buildId);
+    if (window.__NEXT_DATA__.buildId)
+      result.signals.push('Next.js Build: ' + window.__NEXT_DATA__.buildId);
     if (window.__NEXT_DATA__.runtimeConfig) result.signals.push('Next.js Runtime Config');
   }
   if (document.querySelector('#__next')) {
@@ -66,7 +83,9 @@
 
   // React Router
   var scripts = Array.from(document.querySelectorAll('script[src]'));
-  var hasReactRouter = scripts.some(function (s) { return /react-router/i.test(s.src); });
+  var hasReactRouter = scripts.some(function (s) {
+    return /react-router/i.test(s.src);
+  });
   if (hasReactRouter) {
     result.signals.push('React Router detected');
   }
@@ -94,6 +113,120 @@
   if (typeof ReactDOM !== 'undefined' && ReactDOM.version) {
     result.detected = true;
     if (!result.version) result.version = ReactDOM.version;
+  }
+
+  // Dev/Prod mode detection
+  var isDev = false;
+  if (typeof React !== 'undefined' && React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED) {
+    isDev = true;
+  }
+  scripts.forEach(function (s) {
+    if (/react\.development/i.test(s.src)) isDev = true;
+  });
+  if (
+    typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ !== 'undefined' &&
+    __REACT_DEVTOOLS_GLOBAL_HOOK__.renderers
+  ) {
+    try {
+      var fiberRoot = rootEl ? rootEl[fiberKey] : null;
+      if (fiberRoot && fiberRoot._debugInfo) isDev = true;
+      if (fiberRoot && fiberRoot.memoizedState && fiberRoot.memoizedState.queue) isDev = true;
+    } catch (e) {}
+  }
+  result.mode = isDev ? 'development' : 'production';
+  if (isDev) result.signals.push('Development mode (security risk: verbose errors, source maps)');
+
+  // State management detection
+  if (
+    typeof __REDUX_DEVTOOLS_EXTENSION__ !== 'undefined' ||
+    typeof window.__store__ !== 'undefined'
+  ) {
+    result.stateManager = 'Redux';
+    result.signals.push('Redux detected');
+  }
+  if (typeof window.__NEXT_REDUX_STORE__ !== 'undefined') {
+    result.stateManager = 'Redux';
+    result.signals.push('Redux (Next.js integration)');
+  }
+  if (typeof window.__ZUSTAND_DEVTOOLS__ !== 'undefined') {
+    result.stateManager = result.stateManager ? result.stateManager + ' + Zustand' : 'Zustand';
+    result.signals.push('Zustand detected');
+  }
+  if (typeof MobX !== 'undefined') {
+    result.stateManager = result.stateManager ? result.stateManager + ' + MobX' : 'MobX';
+    result.signals.push('MobX detected');
+  }
+  if (typeof Recoil !== 'undefined' || document.querySelector('[data-recoil-root]')) {
+    result.stateManager = result.stateManager ? result.stateManager + ' + Recoil' : 'Recoil';
+    result.signals.push('Recoil detected');
+  }
+  if (typeof jotai !== 'undefined' || typeof jotaiModule !== 'undefined') {
+    result.stateManager = result.stateManager ? result.stateManager + ' + Jotai' : 'Jotai';
+    result.signals.push('Jotai detected');
+  }
+
+  // Component tree extraction from Fiber
+  var componentNames = [];
+  function walkFiber(fiber, depth) {
+    if (!fiber || depth > 8) return;
+    var name = fiber.type
+      ? typeof fiber.type === 'function'
+        ? fiber.type.displayName || fiber.type.name
+        : fiber.type
+      : '';
+    if (
+      name &&
+      name !== '' &&
+      componentNames.indexOf(name) === -1 &&
+      name.charAt(0) === name.charAt(0).toUpperCase() &&
+      name.length > 1 &&
+      name.length < 40
+    ) {
+      componentNames.push(name);
+    }
+    if (fiber.child) walkFiber(fiber.child, depth + 1);
+    if (fiber.sibling) walkFiber(fiber.sibling, depth);
+  }
+  if (fiberKey && rootEl) {
+    try {
+      var fiberNode = rootEl[fiberKey];
+      if (fiberNode && fiberNode.stateNode) {
+        var _root = fiberNode.stateNode._reactRootContainer || fiberNode.stateNode;
+        if (_root && _root._internalRoot) walkFiber(_root._internalRoot.current, 0);
+      } else if (fiberNode) {
+        walkFiber(fiberNode, 0);
+      }
+    } catch (e) {}
+  }
+  result.components = componentNames.slice(0, 30);
+
+  // Next.js route extraction
+  if (window.__NEXT_DATA__ && window.__NEXT_DATA__.page) {
+    result.routes.push(window.__NEXT_DATA__.page);
+  }
+  if (window.__NEXT_DATA__ && window.__NEXT_DATA__.buildManifest) {
+    var pages = Object.keys(window.__NEXT_DATA__.buildManifest.pages || {});
+    pages.forEach(function (p) {
+      if (p.charAt(0) === '/' && result.routes.indexOf(p) === -1) result.routes.push(p);
+    });
+    if (result.routes.length > 50) result.routes = result.routes.slice(0, 50);
+  }
+  // React Router route detection via router context
+  if (typeof React !== 'undefined' && rootEl) {
+    try {
+      var allAnchors = document.querySelectorAll('a[href^="/"]');
+      var routeSet = {};
+      allAnchors.forEach(function (a) {
+        var href = a.getAttribute('href');
+        if (href && href.charAt(0) === '/' && href.length > 1 && !routeSet[href]) {
+          var cleanPath = href.split('?')[0];
+          if (cleanPath.length > 1 && !routeSet[cleanPath]) {
+            routeSet[cleanPath] = true;
+          }
+        }
+      });
+      result.routes = result.routes.concat(Object.keys(routeSet)).slice(0, 50);
+    } catch (e) {}
   }
 
   window.postMessage({ __vk_react_detect: true, result: result }, location.origin);

@@ -47,13 +47,19 @@ window.VulnKitAngular = (function () {
     if (!resultsEl) return;
 
     if (!data.detected && (!data.signals || data.signals.length === 0)) {
-      resultsEl.innerHTML = '<div class="angular-not-detected">未在当前页面检测到 Angular 框架</div>';
+      resultsEl.innerHTML =
+        '<div class="angular-not-detected">未在当前页面检测到 Angular 框架</div>';
       return;
     }
 
     var html = '<div class="angular-card">';
     html += '<div class="angular-card-header">';
-    html += '<span class="angular-badge ' + (data.detected ? 'detected' : 'not-detected') + '">' + (data.detected ? '已检测到' : '未检测到') + '</span>';
+    html +=
+      '<span class="angular-badge ' +
+      (data.detected ? 'detected' : 'not-detected') +
+      '">' +
+      (data.detected ? '已检测到' : '未检测到') +
+      '</span>';
     var title = 'Angular';
     if (data.variant) title = data.variant;
     if (data.version) title += ' ' + data.version;
@@ -61,14 +67,62 @@ window.VulnKitAngular = (function () {
     html += '</div>';
 
     if (data.variant) {
-      html += '<div class="angular-info-row"><span class="angular-info-label">框架变体</span><span class="angular-info-value"><span class="angular-badge info">' + utils.escapeHtml(data.variant) + '</span></span></div>';
+      html +=
+        '<div class="angular-info-row"><span class="angular-info-label">框架变体</span><span class="angular-info-value"><span class="angular-badge info">' +
+        utils.escapeHtml(data.variant) +
+        '</span></span></div>';
     }
     if (data.version) {
-      html += '<div class="angular-info-row"><span class="angular-info-label">版本</span><span class="angular-info-value">' + utils.escapeHtml(data.version) + '</span></div>';
+      html +=
+        '<div class="angular-info-row"><span class="angular-info-label">版本</span><span class="angular-info-value">' +
+        utils.escapeHtml(data.version) +
+        '</span></div>';
+    }
+
+    if (data.mode) {
+      var modeBadge = data.mode === 'development' ? 'warn' : 'ok';
+      html +=
+        '<div class="angular-info-row"><span class="angular-info-label">运行模式</span><span class="angular-info-value"><span class="angular-badge ' +
+        modeBadge +
+        '">' +
+        utils.escapeHtml(data.mode) +
+        '</span></span></div>';
+    }
+
+    if (data.modules && data.modules.length > 0) {
+      var moduleLabel = data.variant === 'Angular' ? '组件/模块' : '模块';
+      html +=
+        '<div class="angular-info-row"><span class="angular-info-label">' +
+        moduleLabel +
+        ' (' +
+        data.modules.length +
+        ')</span><span class="angular-info-value angular-modules">';
+      data.modules.forEach(function (m) {
+        html += '<span class="angular-module-tag">' + utils.escapeHtml(m) + '</span>';
+      });
+      html += '</span></div>';
+    }
+
+    if (data.routes && data.routes.length > 0) {
+      html +=
+        '<div class="angular-info-row"><span class="angular-info-label">路由 (' +
+        data.routes.length +
+        ')</span><span class="angular-info-value">';
+      data.routes.forEach(function (r) {
+        html += '<div class="angular-route-item">' + utils.escapeHtml(r) + '</div>';
+      });
+      html += '</span></div>';
     }
 
     if (data.signals && data.signals.length > 0) {
-      html += '<div class="angular-info-row"><span class="angular-info-label">检测信号</span><span class="angular-info-value">' + data.signals.map(function (s) { return '<div>' + utils.escapeHtml(s) + '</div>'; }).join('') + '</span></div>';
+      html +=
+        '<div class="angular-info-row"><span class="angular-info-label">检测信号</span><span class="angular-info-value">' +
+        data.signals
+          .map(function (s) {
+            return '<div>' + utils.escapeHtml(s) + '</div>';
+          })
+          .join('') +
+        '</span></div>';
     }
 
     html += '</div>';
@@ -84,15 +138,33 @@ window.VulnKitAngular = (function () {
     if (lastResult.detected) {
       var name = lastResult.variant || 'Angular';
       lines.push(name + ' Detected: ' + (lastResult.version || 'unknown'));
+      if (lastResult.mode) lines.push('Mode: ' + lastResult.mode);
     } else {
       lines.push('Angular: Not detected');
     }
+    if (lastResult.modules && lastResult.modules.length > 0) {
+      lines.push('Modules: ' + lastResult.modules.join(', '));
+    }
+    if (lastResult.routes && lastResult.routes.length > 0) {
+      lines.push('Routes:');
+      lastResult.routes.forEach(function (r) {
+        lines.push('  - ' + r);
+      });
+    }
     if (lastResult.signals && lastResult.signals.length > 0) {
       lines.push('Signals:');
-      lastResult.signals.forEach(function (s) { lines.push('  - ' + s); });
+      lastResult.signals.forEach(function (s) {
+        lines.push('  - ' + s);
+      });
     }
     utils.copyAndToast(lines.join('\n'));
   }
 
-  return { detectAngular: detectAngular, copyResults: copyResults, get lastResult() { return lastResult; } };
+  return {
+    detectAngular: detectAngular,
+    copyResults: copyResults,
+    get lastResult() {
+      return lastResult;
+    },
+  };
 })();

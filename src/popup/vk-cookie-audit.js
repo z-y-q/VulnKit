@@ -5,7 +5,41 @@ window.VulnKitCookieAudit = (function () {
   var utils = window.VulnKitUtils.utilsProxy;
   var lastResult = null;
 
-  var SENSITIVE_NAMES = ['session', 'token', 'auth', 'key', 'secret', 'admin', 'user', 'pass', 'jwt', 'sid', 'uid'];
+  var SENSITIVE_NAMES = [
+    'session',
+    'token',
+    'auth',
+    'key',
+    'secret',
+    'admin',
+    'user',
+    'pass',
+    'jwt',
+    'sid',
+    'uid',
+    'csrf',
+    'xsrf',
+    'oauth',
+    'refresh',
+    'access',
+    'id_token',
+    'connect',
+  ];
+
+  var FIX_RECOMMENDATIONS = {
+    '缺少 Secure 标志': '添加 Secure; 属性 — 仅通过 HTTPS 传输',
+    '缺少 HttpOnly 标志': '添加 HttpOnly; 属性 — 防止 JavaScript 访问',
+    'SameSite=None 但缺少 Secure': 'SameSite=None 必须搭配 Secure; 属性',
+    'SameSite=None': '考虑改为 SameSite=Lax 或 SameSite=Strict 减少跨站风险',
+    'SameSite 未设置': '显式设置 SameSite=Lax 或 SameSite=Strict',
+    '敏感 Cookie': '敏感 Cookie 应同时设置 Secure + HttpOnly',
+    '过期时间超过 1 年': '缩短有效期，敏感 Cookie 使用会话模式',
+    通配符域名: '限制 domain 到具体子域名而非通配符',
+    '__Host- 前缀缺少 Secure': '__Host- 前缀要求 Secure 属性',
+    '__Host- 前缀 Path 非 /': '__Host- 前缀要求 Path=/',
+    '__Host- 前缀设置了 Domain': '__Host- 前缀禁止设置 Domain 属性',
+    '__Secure- 前缀缺少 Secure': '__Secure- 前缀要求 Secure 属性',
+  };
 
   function auditCookies() {
     var statusEl = utils.get('cookie-audit-status');
@@ -24,20 +58,27 @@ window.VulnKitCookieAudit = (function () {
       chrome.cookies.getAll({ domain: domain }, function (cookies) {
         if (!cookies || cookies.length === 0) {
           if (statusEl) statusEl.textContent = '当前域名没有 Cookie';
-          if (resultsEl) resultsEl.innerHTML = '<div class="cookie-no-cookies">当前域名没有 Cookie</div>';
+          if (resultsEl)
+            resultsEl.innerHTML = '<div class="cookie-no-cookies">当前域名没有 Cookie</div>';
           if (copyBtn) copyBtn.style.display = 'none';
           return;
         }
 
         var results = cookies.map(analyzeCookie);
+        var SEV_ORDER = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
         var severityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
         results.forEach(function (r) {
           var max = r.issues.reduce(function (m, i) {
-            var order = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
-            return Math.max(m, order[i.severity] || 0);
+            return Math.max(m, SEV_ORDER[i.severity] || 0);
           }, 0);
-          var sev = ['', 'info', 'low', 'medium', 'high', 'critical'][max];
-          if (sev && severityCounts.hasOwnProperty(sev)) severityCounts[sev]++;
+          r._maxSev = max;
+          var sevKey = Object.keys(SEV_ORDER).find(function (k) {
+            return SEV_ORDER[k] === max;
+          });
+          if (sevKey && severityCounts.hasOwnProperty(sevKey)) severityCounts[sevKey]++;
+        });
+        results.sort(function (a, b) {
+          return b._maxSev - a._maxSev;
         });
 
         lastResult = results;
@@ -52,7 +93,7 @@ window.VulnKitCookieAudit = (function () {
 
   function analyzeCookie(cookie) {
     var issues = [];
-    var isHttps = cookie.secure || (location.protocol === 'https:');
+    var isHttps = cookie.secure || location.protocol === 'https:';
 
     if (!cookie.secure && isHttps) {
       issues.push({ severity: 'high', text: '缺少 Secure 标志 (HTTPS 域名下应启用)' });
@@ -76,10 +117,16 @@ window.VulnKitCookieAudit = (function () {
     });
     if (hasSensitiveKeyword) {
       if (!cookie.secure) {
-        issues.push({ severity: 'critical', text: '敏感 Cookie (' + cookie.name + ') 未设置 Secure' });
+        issues.push({
+          severity: 'critical',
+          text: '敏感 Cookie (' + cookie.name + ') 未设置 Secure',
+        });
       }
       if (!cookie.httpOnly) {
-        issues.push({ severity: 'high', text: '敏感 Cookie (' + cookie.name + ') 未设置 HttpOnly' });
+        issues.push({
+          severity: 'high',
+          text: '敏感 Cookie (' + cookie.name + ') 未设置 HttpOnly',
+        });
       }
     }
 
@@ -87,7 +134,13 @@ window.VulnKitCookieAudit = (function () {
       var now = Date.now() / 1000;
       var oneYear = 365 * 24 * 60 * 60;
       if (cookie.expirationDate - now > oneYear) {
-        issues.push({ severity: 'low', text: '过期时间超过 1 年 (' + new Date(cookie.expirationDate * 1000).toLocaleDateString() + ')' });
+        issues.push({
+          severity: 'low',
+          text:
+            '过期时间超过 1 年 (' +
+            new Date(cookie.expirationDate * 1000).toLocaleDateString() +
+            ')',
+        });
       }
     } else if (cookie.session) {
       issues.push({ severity: 'info', text: '会话 Cookie (关闭浏览器后失效)' });
@@ -101,6 +154,26 @@ window.VulnKitCookieAudit = (function () {
       issues.push({ severity: 'low', text: '通配符域名 ' + cookie.domain + ' (子域名共享)' });
     }
 
+    var rawName = cookie.name || '';
+    if (rawName.indexOf('__Host-') === 0) {
+      if (!cookie.secure) {
+        issues.push({ severity: 'high', text: '__Host- 前缀缺少 Secure' });
+      }
+      if (cookie.path !== '/') {
+        issues.push({
+          severity: 'high',
+          text: '__Host- 前缀 Path 非 / (当前: ' + (cookie.path || '/') + ')',
+        });
+      }
+      if (cookie.domain) {
+        issues.push({ severity: 'high', text: '__Host- 前缀设置了 Domain (应省略)' });
+      }
+    } else if (rawName.indexOf('__Secure-') === 0) {
+      if (!cookie.secure) {
+        issues.push({ severity: 'high', text: '__Secure- 前缀缺少 Secure' });
+      }
+    }
+
     return { cookie: cookie, issues: issues };
   }
 
@@ -111,11 +184,28 @@ window.VulnKitCookieAudit = (function () {
     var labels = { critical: '严重', high: '高危', medium: '中危', low: '低危', info: '信息' };
     Object.keys(counts).forEach(function (sev) {
       if (counts[sev] > 0) {
-        html += '<div class="cookie-audit-stat"><span class="cookie-audit-stat-badge ' + sev + '">' + counts[sev] + '</span><span class="cookie-audit-stat-label">' + labels[sev] + '</span></div>';
+        html +=
+          '<div class="cookie-audit-stat"><span class="cookie-audit-stat-badge ' +
+          sev +
+          '">' +
+          counts[sev] +
+          '</span><span class="cookie-audit-stat-label">' +
+          labels[sev] +
+          '</span></div>';
       }
     });
     statsEl.innerHTML = html;
     statsEl.style.display = '';
+  }
+
+  function getFixRecommendation(issueText) {
+    var keys = Object.keys(FIX_RECOMMENDATIONS);
+    for (var i = 0; i < keys.length; i++) {
+      if (issueText.indexOf(keys[i]) !== -1) {
+        return FIX_RECOMMENDATIONS[keys[i]];
+      }
+    }
+    return null;
   }
 
   function renderResults(results) {
@@ -133,14 +223,31 @@ window.VulnKitCookieAudit = (function () {
       html += '<div class="cookie-flags">';
       html += '<span class="cookie-flag ' + (c.secure ? 'ok' : 'warn') + '">Secure</span>';
       html += '<span class="cookie-flag ' + (c.httpOnly ? 'ok' : 'warn') + '">HttpOnly</span>';
-      html += '<span class="cookie-flag ' + (c.sameSite && c.sameSite !== 'unspecified' ? 'ok' : 'warn') + '">SameSite: ' + utils.escapeHtml(c.sameSite || '未设置') + '</span>';
-      html += '<span class="cookie-flag ' + (c.path ? 'ok' : 'warn') + '">Path: ' + utils.escapeHtml(c.path || '/') + '</span>';
+      html +=
+        '<span class="cookie-flag ' +
+        (c.sameSite && c.sameSite !== 'unspecified' ? 'ok' : 'warn') +
+        '">SameSite: ' +
+        utils.escapeHtml(c.sameSite || '未设置') +
+        '</span>';
+      html +=
+        '<span class="cookie-flag ' +
+        (c.path ? 'ok' : 'warn') +
+        '">Path: ' +
+        utils.escapeHtml(c.path || '/') +
+        '</span>';
       html += '</div>';
 
       if (r.issues.length > 0) {
         html += '<div class="cookie-issues">';
         r.issues.forEach(function (issue) {
-          html += '<div class="cookie-issue"><span class="cookie-issue-severity ' + issue.severity + '"></span>' + utils.escapeHtml(issue.text) + '</div>';
+          var fix = getFixRecommendation(issue.text);
+          html += '<div class="cookie-issue">';
+          html += '<span class="cookie-issue-severity ' + issue.severity + '"></span>';
+          html += '<span class="cookie-issue-text">' + utils.escapeHtml(issue.text) + '</span>';
+          if (fix) {
+            html += '<span class="cookie-issue-fix">💡 ' + utils.escapeHtml(fix) + '</span>';
+          }
+          html += '</div>';
         });
         html += '</div>';
       }
@@ -161,12 +268,24 @@ window.VulnKitCookieAudit = (function () {
       line += ' HttpOnly:' + (c.httpOnly ? 'Y' : 'N');
       line += ' SameSite:' + (c.sameSite || 'none');
       if (r.issues.length > 0) {
-        line += ' | Issues: ' + r.issues.map(function (i) { return '[' + i.severity.toUpperCase() + '] ' + i.text; }).join('; ');
+        line +=
+          ' | Issues: ' +
+          r.issues
+            .map(function (i) {
+              return '[' + i.severity.toUpperCase() + '] ' + i.text;
+            })
+            .join('; ');
       }
       return line;
     });
     utils.copyAndToast(lines.join('\n'), '已复制 ' + lastResult.length + ' 条审计结果');
   }
 
-  return { auditCookies: auditCookies, copyResults: copyResults, get lastResult() { return lastResult; } };
+  return {
+    auditCookies: auditCookies,
+    copyResults: copyResults,
+    get lastResult() {
+      return lastResult;
+    },
+  };
 })();

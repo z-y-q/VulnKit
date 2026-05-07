@@ -4,7 +4,15 @@
   if (window.__VK_ANGULAR_DETECT_DONE__) return;
   window.__VK_ANGULAR_DETECT_DONE__ = true;
 
-  var result = { detected: false, version: '', variant: '', signals: [] };
+  var result = {
+    detected: false,
+    version: '',
+    variant: '',
+    mode: '',
+    modules: [],
+    routes: [],
+    signals: [],
+  };
 
   // Angular 2+ (ng-version attribute)
   var ngApp = document.querySelector('[ng-version]');
@@ -42,7 +50,9 @@
   }
 
   // ng-controller, ng-model, ng-repeat
-  var ngDirectives = document.querySelectorAll('[ng-controller], [ng-model], [ng-repeat], [ng-click], [ng-init]');
+  var ngDirectives = document.querySelectorAll(
+    '[ng-controller], [ng-model], [ng-repeat], [ng-click], [ng-init]'
+  );
   if (ngDirectives.length > 0) {
     result.detected = true;
     result.variant = result.variant || 'AngularJS';
@@ -88,5 +98,92 @@
     }
   });
 
+  // Dev/Prod mode detection
+  var isDev = false;
+  scripts.forEach(function (s) {
+    if (/angular\.development/i.test(s.src) || /zone\.js\/dist\/zone-evergreen\.js/i.test(s.src))
+      isDev = true;
+  });
+  if (typeof ng !== 'undefined' && ng.probe) isDev = true;
+  result.mode = isDev ? 'development' : 'production';
+  if (isDev) result.signals.push('Development mode detected');
+
+  // AngularJS module extraction
+  if (window.angular && window.angular.module) {
+    try {
+      var injector = angular.element(document).injector();
+      if (injector) {
+        var loadedMods = [];
+        if (typeof injector.modules === 'function') {
+          Object.keys(injector.modules()).forEach(function (m) {
+            if (m.indexOf('ng') === 0 || m === 'ngLocale') return;
+            loadedMods.push(m);
+          });
+        }
+        if (loadedMods.length === 0) {
+          try {
+            var _ngAppEl = document.querySelector('[ng-app]');
+            if (_ngAppEl) {
+              var _app = angular.element(_ngAppEl);
+              if (_app.injector) {
+                var _inj = _app.injector();
+                if (_inj && _inj.modules) {
+                  Object.keys(_inj.modules()).forEach(function (m) {
+                    if (m.indexOf('ng') === 0 || m === 'ngLocale') return;
+                    loadedMods.push(m);
+                  });
+                }
+              }
+            }
+          } catch (e) {}
+        }
+        result.modules = loadedMods.slice(0, 30);
+        if (loadedMods.length > 0) result.signals.push(loadedMods.length + ' modules loaded');
+      }
+    } catch (e) {}
+  }
+
+  // Angular 2+ component extraction from DOM
+  if (result.variant === 'Angular') {
+    var customElements = document.querySelectorAll('*');
+    var componentSet = {};
+    customElements.forEach(function (el) {
+      var tag = el.tagName.toLowerCase();
+      if (tag.indexOf('app-') === 0 || tag.indexOf('ngx-') === 0 || tag.indexOf('mat-') === 0) {
+        componentSet[tag] = true;
+      }
+      if (el.hasAttribute('_ngcontent') || el.hasAttribute('_nghost')) {
+        var cls = el.className || '';
+        if (typeof cls === 'string') {
+          cls.split(/\s+/).forEach(function (c) {
+            if (
+              c.length > 2 &&
+              c.charAt(0) === c.charAt(0).toUpperCase() &&
+              componentSet[c] === undefined
+            ) {
+              componentSet[c] = true;
+            }
+          });
+        }
+      }
+    });
+    result.modules = Object.keys(componentSet).slice(0, 30);
+  }
+
+  // Route extraction
+  var routeSet = {};
+  document.querySelectorAll('a[href^="/"]').forEach(function (a) {
+    var href = a.getAttribute('href');
+    if (href && href.charAt(0) === '/' && href.length > 1) {
+      var cleanPath = href.split('?')[0].split('#')[0];
+      if (cleanPath.length > 1 && !routeSet[cleanPath]) {
+        routeSet[cleanPath] = true;
+      }
+    }
+  });
+  if (document.querySelector('router-outlet, [router-outlet], app-router-outlet')) {
+    result.signals.push('Angular Router detected (<router-outlet>)');
+  }
+  result.routes = Object.keys(routeSet).slice(0, 50);
   window.postMessage({ __vk_angular_detect: true, result: result }, location.origin);
 })();

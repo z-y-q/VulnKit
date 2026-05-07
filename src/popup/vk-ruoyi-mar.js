@@ -51,6 +51,7 @@ window.VulnKitRuoYiMar = (function () {
     { path: '/actuator/health', title: '健康检查', component: '' },
     { path: '/actuator/info', title: '应用信息', component: '' },
     { path: '/actuator/env', title: '环境变量', component: '' },
+    { path: '/actuator/env/{name}', title: '环境变量详情', component: '' },
     { path: '/actuator/beans', title: 'Bean列表', component: '' },
     { path: '/actuator/mappings', title: '请求映射', component: '' },
     { path: '/actuator/gateway/routes', title: 'Gateway路由', component: '' },
@@ -58,13 +59,23 @@ window.VulnKitRuoYiMar = (function () {
     { path: '/actuator/metrics', title: '指标', component: '' },
     { path: '/actuator/trace', title: '链路追踪', component: '' },
     { path: '/actuator/loggers', title: '日志级别', component: '' },
+    { path: '/actuator/scheduledtasks', title: '定时任务', component: '' },
+    { path: '/actuator/threaddump', title: '线程转储', component: '' },
+    { path: '/actuator/heapdump', title: '堆转储', component: '' },
+    { path: '/actuator/prometheus', title: 'Prometheus', component: '' },
+    { path: '/actuator/service-registry', title: '服务注册', component: '' },
     { path: '/nacos', title: 'Nacos', component: '' },
     { path: '/nacos/v1/ns/service/list', title: 'Nacos服务列表', component: '' },
+    { path: '/nacos/v1/ns/instance/list', title: 'Nacos实例列表', component: '' },
     { path: '/nacos/v1/cs/configs', title: 'Nacos配置', component: '' },
+    { path: '/nacos/v1/cs/configs?dataId=&group=&tenant=', title: 'Nacos配置查询', component: '' },
+    { path: '/sentinel/dashboard', title: 'Sentinel控制台', component: '' },
     { path: '/swagger-ui.html', title: 'Swagger UI', component: '' },
     { path: '/v3/api-docs', title: 'OpenAPI 3', component: '' },
     { path: '/v2/api-docs', title: 'Swagger 2', component: '' },
+    { path: '/v3/api-docs/swagger-config', title: 'Swagger配置', component: '' },
     { path: '/doc.html', title: 'Knife4j', component: '' },
+    { path: '/seata', title: 'Seata', component: '' },
   ];
 
   // ====== MaR Dynamic Route Scan ======
@@ -297,9 +308,19 @@ window.VulnKitRuoYiMar = (function () {
       });
 
       // Step 5b: Detect cloud variant and merge cloud routes
-      var isCloudVariant = state && state.capturedRouterData && false;
       var detectedVariant = state ? state.detectedVariant : null;
-      if (detectedVariant === 'cloud' || detectedVariant === 'microservice') {
+      var hasGatewayRoutes =
+        state && state.capturedGatewayRoutes && state.capturedGatewayRoutes.length > 0;
+      var hasNacosServices = state && state.nacosServices && state.nacosServices.length > 0;
+      if (
+        detectedVariant === 'cloud' ||
+        detectedVariant === 'microservice' ||
+        hasGatewayRoutes ||
+        hasNacosServices
+      ) {
+        if (!detectedVariant && (hasGatewayRoutes || hasNacosServices)) {
+          if (state) state.detectedVariant = 'cloud';
+        }
         CLOUD_KNOWN_ROUTES.forEach(function (cr) {
           if (!seenPaths[cr.path]) {
             seenPaths[cr.path] = true;

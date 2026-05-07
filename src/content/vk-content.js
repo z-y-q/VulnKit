@@ -271,28 +271,107 @@
           return url;
         }
       }
+      function extractReqHeaders(init) {
+        if (!init || !init.headers) return {};
+        var h = init.headers;
+        var out = {};
+        var keys = [
+          'content-type',
+          'authorization',
+          'cookie',
+          'x-csrf-token',
+          'x-xsrf-token',
+          'x-requested-with',
+        ];
+        if (typeof Headers !== 'undefined' && h instanceof Headers) {
+          keys.forEach(function (k) {
+            var v = h.get(k);
+            if (v) out[k] = v.length > 200 ? v.substring(0, 200) + '...' : v;
+          });
+        } else if (typeof h === 'object') {
+          keys.forEach(function (k) {
+            var lk = k.toLowerCase();
+            Object.keys(h).forEach(function (hk) {
+              if (hk.toLowerCase() === lk) {
+                var v = String(h[hk]);
+                out[k] = v.length > 200 ? v.substring(0, 200) + '...' : v;
+              }
+            });
+          });
+        }
+        return out;
+      }
+      function truncateBody(body, max) {
+        if (!body) return '';
+        var s =
+          typeof body === 'string'
+            ? body
+            : typeof body === 'object'
+              ? JSON.stringify(body)
+              : String(body);
+        return s.length > max ? s.substring(0, max) + '...' : s;
+      }
+      function pushApiEntry(entry) {
+        window.__VK_API_TRAFFIC_DATA__.push(entry);
+        if (window.__VK_API_TRAFFIC_DATA__.length > 200) {
+          window.__VK_API_TRAFFIC_DATA__ = window.__VK_API_TRAFFIC_DATA__.slice(-150);
+        }
+      }
       window.fetch = function (input, init) {
         var url =
           typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
         var method = ((init && init.method) || 'GET').toUpperCase();
         var start = Date.now();
+        var reqBody = '';
+        var reqHeaders = {};
+        if (init) {
+          reqBody = truncateBody(init.body, 3000);
+          reqHeaders = extractReqHeaders(init);
+        }
+        var capturedCt = '';
+        var capturedStatus = 0;
         return apiOrigFetch
           .apply(this, arguments)
           .then(function (resp) {
-            var ct = (resp.headers.get('content-type') || '').split(';')[0];
-            window.__VK_API_TRAFFIC_DATA__.push({
-              url: stripApiUrl(url),
-              method: method,
-              status: resp.status,
-              contentType: ct,
-              duration: Date.now() - start,
-            });
-            if (window.__VK_API_TRAFFIC_DATA__.length > 200) {
-              window.__VK_API_TRAFFIC_DATA__ = window.__VK_API_TRAFFIC_DATA__.slice(-150);
+            capturedCt = (resp.headers.get('content-type') || '').split(';')[0];
+            capturedStatus = resp.status;
+            var clone = resp.clone();
+            var bodyPromise = Promise.resolve('');
+            if (
+              capturedCt &&
+              (capturedCt.indexOf('json') !== -1 ||
+                capturedCt.indexOf('text') !== -1 ||
+                capturedCt.indexOf('xml') !== -1 ||
+                capturedCt.indexOf('html') !== -1)
+            ) {
+              bodyPromise = clone.text().catch(function () {
+                return '';
+              });
             }
-            return resp;
+            return bodyPromise.then(function (body) {
+              pushApiEntry({
+                url: stripApiUrl(url),
+                method: method,
+                status: capturedStatus,
+                contentType: capturedCt,
+                duration: Date.now() - start,
+                reqBody: reqBody,
+                reqHeaders: reqHeaders,
+                resBody: truncateBody(body, 2000),
+              });
+            });
           })
           .catch(function () {
+            pushApiEntry({
+              url: stripApiUrl(url),
+              method: method,
+              status: 0,
+              contentType: '',
+              duration: Date.now() - start,
+              reqBody: reqBody,
+              reqHeaders: reqHeaders,
+              resBody: '',
+            });
             throw arguments[0];
           });
       };
@@ -300,22 +379,54 @@
         this.__vk_method = method;
         this.__vk_url = stripApiUrl(url);
         this.__vk_start = Date.now();
+        this.__vk_reqHeaders = {};
+        var origSetHeader = this.setRequestHeader;
+        var capturedHeaders = this.__vk_reqHeaders;
+        var headerKeys = [
+          'content-type',
+          'authorization',
+          'cookie',
+          'x-csrf-token',
+          'x-xsrf-token',
+          'x-requested-with',
+        ];
+        this.setRequestHeader = function (name, value) {
+          var ln = (name || '').toLowerCase();
+          if (headerKeys.indexOf(ln) !== -1) {
+            var v = String(value || '');
+            capturedHeaders[ln] = v.length > 200 ? v.substring(0, 200) + '...' : v;
+          }
+          return origSetHeader.apply(this, arguments);
+        };
         return apiOrigXhrOpen.apply(this, arguments);
       };
       XMLHttpRequest.prototype.send = function () {
         var xhr = this;
+        var sentBody = arguments[0] != null ? truncateBody(arguments[0], 3000) : '';
         xhr.addEventListener('load', function () {
           var ct = (xhr.getResponseHeader('content-type') || '').split(';')[0];
-          window.__VK_API_TRAFFIC_DATA__.push({
+          var resBody = '';
+          if (
+            ct &&
+            (ct.indexOf('json') !== -1 ||
+              ct.indexOf('text') !== -1 ||
+              ct.indexOf('xml') !== -1 ||
+              ct.indexOf('html') !== -1)
+          ) {
+            try {
+              resBody = truncateBody(xhr.responseText, 2000);
+            } catch (e) {}
+          }
+          pushApiEntry({
             url: xhr.__vk_url || location.href,
             method: xhr.__vk_method || 'GET',
             status: xhr.status,
             contentType: ct,
             duration: Date.now() - (xhr.__vk_start || Date.now()),
+            reqBody: sentBody,
+            reqHeaders: xhr.__vk_reqHeaders || {},
+            resBody: resBody,
           });
-          if (window.__VK_API_TRAFFIC_DATA__.length > 200) {
-            window.__VK_API_TRAFFIC_DATA__ = window.__VK_API_TRAFFIC_DATA__.slice(-150);
-          }
         });
         return apiOrigXhrSend.apply(this, arguments);
       };

@@ -121,3 +121,77 @@
 @keyframes cors-spin {
   to { transform: rotate(360deg); }
 }
+.cors-config {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.cors-input-group {
+  flex: 1;
+  min-width: 180px;
+}
+.cors-input-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  margin-bottom: 4px;
+}
+[data-theme="dark"] .cors-input-label {
+  color: var(--text-secondary, #aaa);
+}
+.cors-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: monospace;
+  background: var(--surface, #fff);
+  color: var(--text-primary, #333);
+  outline: none;
+  transition: border-color 0.2s;
+}
+[data-theme="dark"] .cors-input {
+  background: var(--surface, #1a1a2e);
+  border-color: var(--border, #444);
+  color: var(--text-primary, #e0e0e0);
+}
+.cors-input:focus {
+  border-color: var(--accent, #0066cc);
+}
+.cors-input::placeholder {
+  color: var(--text-secondary, #aaa);
+}
+.cors-method-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--surface-alt, #e8ecf0);
+  color: var(--text-secondary, #555);
+  white-space: nowrap;
+}
+[data-theme="dark"] .cors-method-tag {
+  background: var(--surface-alt, #2a2a3e);
+  color: var(--text-secondary, #aaa);
+}
+.cors-origin-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: monospace;
+  background: #fff3cd;
+  color: #856404;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-theme="dark"] .cors-origin-tag {
+  background: #3d3000;
+  color: #ffc107;
+}

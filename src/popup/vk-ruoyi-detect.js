@@ -178,6 +178,7 @@ window.VulnKitRuoYiDetect = (function () {
 
         // --- Cloud-specific signals ---
         var pageText = document.documentElement.innerText || '';
+        var pageSource = document.documentElement.outerHTML || '';
         if (/actuator\/gateway/i.test(pageText) || /Spring Cloud Gateway/i.test(pageText)) {
           if (evidence.indexOf('cloud:gateway') === -1) {
             evidence.push('cloud:gateway');
@@ -190,12 +191,30 @@ window.VulnKitRuoYiDetect = (function () {
             variant = variant || 'cloud';
           }
         }
-        if (/sentinel/i.test(pageText)) {
+        if (/sentinel/i.test(pageText) || /X-Sentinel/i.test(pageSource)) {
           if (evidence.indexOf('cloud:sentinel') === -1) evidence.push('cloud:sentinel');
         }
-        if (/spring-cloud/i.test(pageText) || /SpringCloud/i.test(pageText)) {
+        if (/spring-cloud/i.test(pageText) || /SpringCloud/i.test(pageSource)) {
           if (evidence.indexOf('cloud:spring-cloud') === -1) {
             evidence.push('cloud:spring-cloud');
+            variant = variant || 'cloud';
+          }
+        }
+        if (/@FeignClient/i.test(pageSource) || /feign\.client/i.test(pageSource)) {
+          if (evidence.indexOf('cloud:feign') === -1) {
+            evidence.push('cloud:feign');
+            variant = variant || 'cloud';
+          }
+        }
+        if (/kubernetes|k8s/i.test(pageText) || /docker/i.test(pageSource)) {
+          if (evidence.indexOf('cloud:container') === -1) {
+            evidence.push('cloud:container');
+            variant = variant || 'cloud';
+          }
+        }
+        if (/seata/i.test(pageText) || /spring-cloud-alibaba/i.test(pageSource)) {
+          if (evidence.indexOf('cloud:alibaba') === -1) {
+            evidence.push('cloud:alibaba');
             variant = variant || 'cloud';
           }
         }
@@ -206,6 +225,13 @@ window.VulnKitRuoYiDetect = (function () {
           if (/gateway/i.test(src) && evidence.indexOf('cloud:gateway-script') === -1) {
             evidence.push('cloud:gateway-script');
             variant = variant || 'cloud';
+          }
+          if (/nacos/i.test(src) && evidence.indexOf('cloud:nacos-script') === -1) {
+            evidence.push('cloud:nacos-script');
+            variant = variant || 'cloud';
+          }
+          if (/sentinel/i.test(src) && evidence.indexOf('cloud:sentinel-script') === -1) {
+            evidence.push('cloud:sentinel-script');
           }
         });
 
@@ -383,34 +409,144 @@ window.VulnKitRuoYiDetect = (function () {
               var routeList = Array.isArray(gwRoutes) ? gwRoutes : [];
               if (routeList.length > 0) {
                 var cloudRoutes = routeList.map(function (r) {
+                  var rd = r.route_definition || r;
                   return {
-                    path: r.route_definition
-                      ? r.route_definition.uri || r.route_id
-                      : r.uri || r.route_id || '',
-                    predicate: r.route_definition
-                      ? r.route_definition.predicates
-                      : r.predicates || '',
-                    filters: r.route_definition ? r.route_definition.filters : r.filters || [],
-                    id: r.route_id || r.route_id || '',
+                    path: rd.uri || r.route_id || r.route_name || '',
+                    predicate: Array.isArray(rd.predicates)
+                      ? rd.predicates
+                          .map(function (p) {
+                            return p._genkey_ || p;
+                          })
+                          .join(', ')
+                      : rd.predicate || '',
+                    filters: Array.isArray(rd.filters)
+                      ? rd.filters
+                          .map(function (f) {
+                            return f._genkey_ || f.name || f;
+                          })
+                          .join(', ')
+                      : rd.filters || '',
+                    id: r.route_id || r.route_name || '',
+                    order: typeof rd.order === 'number' ? rd.order : r.order || 0,
+                    enabled: typeof rd.enabled === 'boolean' ? rd.enabled : true,
                   };
                 });
+                var backendUris = cloudRoutes
+                  .map(function (cr) {
+                    return cr.path;
+                  })
+                  .filter(function (u) {
+                    return u && u.startsWith('lb://');
+                  })
+                  .map(function (u) {
+                    return u.replace('lb://', '');
+                  })
+                  .filter(function (u, i, arr) {
+                    return arr.indexOf(u) === i;
+                  });
                 if (state) state.capturedGatewayRoutes = cloudRoutes;
+                if (state) state.cloudBackendServices = backendUris;
                 if (panelEl) {
                   var gwHtml = '<div class="ruoyi-detect-extra">';
                   gwHtml +=
                     '<span class="ruoyi-detect-tag tag-token">Gateway Routes (' +
                     cloudRoutes.length +
                     ')</span>';
+                  if (backendUris.length > 0) {
+                    gwHtml +=
+                      '<span class="ruoyi-detect-tag tag-version">后端服务: ' +
+                      backendUris.join(', ') +
+                      '</span>';
+                  }
                   gwHtml += '</div>';
                   panelEl.innerHTML += gwHtml;
                 }
                 utils.setStatus(
                   'ruoyi-hook-status',
-                  '发现 ' + cloudRoutes.length + ' 条 Gateway 路由'
+                  '发现 ' +
+                    cloudRoutes.length +
+                    ' 条 Gateway 路由' +
+                    (backendUris.length > 0 ? '，' + backendUris.length + ' 个后端服务' : '')
                 );
                 utils.showToast('发现 Gateway 路由: ' + cloudRoutes.length + ' 条', 'success');
               }
             } catch (e) {}
+
+            // Cloud: probe Nacos service discovery
+            var nacosPaths = [
+              '/nacos/v1/ns/service/list?pageNo=1&pageSize=100',
+              '/nacos/v1/ns/instance/list?serviceName=ruoyi-gateway',
+            ];
+            var discoveredServices = [];
+            for (var ni = 0; ni < nacosPaths.length; ni++) {
+              var nacosUrl = origin + nacosPaths[ni];
+              var nacosResp = await chrome.runtime
+                .sendMessage({
+                  type: 'FETCH_PROBE',
+                  url: nacosUrl,
+                  method: 'GET',
+                  timeout: 6000,
+                  followRedirect: false,
+                  includeBody: true,
+                  headers: {},
+                })
+                .catch(function () {
+                  return null;
+                });
+
+              if (nacosResp && nacosResp.status === 200 && nacosResp.body) {
+                try {
+                  var nacosData = JSON.parse(nacosResp.body);
+                  if (nacosResp.url.indexOf('/service/list') !== -1 && nacosData.count > 0) {
+                    var serviceNames =
+                      typeof nacosData.domains === 'string'
+                        ? nacosData.domains.split(',').filter(function (s) {
+                            return s.length > 0;
+                          })
+                        : Array.isArray(nacosData.domains)
+                          ? nacosData.domains
+                          : [];
+                    discoveredServices = discoveredServices.concat(serviceNames);
+                  }
+                  if (nacosData.hosts && Array.isArray(nacosData.hosts)) {
+                    var instances = nacosData.hosts.map(function (h) {
+                      return {
+                        ip: h.ip || '',
+                        port: h.port || 0,
+                        serviceName: h.serviceName || '',
+                        enabled: h.enabled !== false,
+                        healthy: h.healthy !== false,
+                        metadata: h.metadata || {},
+                      };
+                    });
+                    if (instances.length > 0 && state) {
+                      state.nacosInstances = (state.nacosInstances || []).concat(instances);
+                    }
+                  }
+                } catch (e) {}
+              }
+            }
+
+            if (discoveredServices.length > 0) {
+              if (state) state.nacosServices = discoveredServices;
+              if (panelEl) {
+                var nacosHtml = '<div class="ruoyi-detect-extra">';
+                nacosHtml +=
+                  '<span class="ruoyi-detect-tag tag-token">Nacos 服务 (' +
+                  discoveredServices.length +
+                  '): ' +
+                  discoveredServices.slice(0, 8).join(', ') +
+                  (discoveredServices.length > 8 ? '...' : '') +
+                  '</span>';
+                nacosHtml += '</div>';
+                panelEl.innerHTML += nacosHtml;
+              }
+              utils.setStatus(
+                'ruoyi-hook-status',
+                '发现 ' + discoveredServices.length + ' 个 Nacos 服务'
+              );
+              utils.showToast('发现 Nacos 服务: ' + discoveredServices.length + ' 个', 'success');
+            }
           }
         }
       }

@@ -507,13 +507,17 @@
       // Build tool detection
       statusEl.textContent = '检测构建工具...';
       U.smUpdateProgress(25, 1);
+      var buildFeatures = [];
       try {
         var btResult = await chrome.tabs.sendMessage(tab.id, { type: 'VK_SOURCEMAP_DETECT' });
         if (btResult && btResult.tool) {
           buildTool = btResult.tool;
+          buildFeatures = btResult.features || [];
           var toolHints = (btResult.hints || []).join('; ');
-          statusEl.textContent =
-            '构建工具: ' + buildTool.toUpperCase() + (toolHints ? ' (' + toolHints + ')' : '');
+          var toolLabel = buildTool.toUpperCase();
+          if (btResult.version) toolLabel += ' v' + btResult.version;
+          if (buildFeatures.length > 0) toolLabel += ' [' + buildFeatures.join(', ') + ']';
+          statusEl.textContent = toolLabel + (toolHints ? ' (' + toolHints + ')' : '');
         }
       } catch (e) {
         // content script may not be ready, continue
@@ -678,6 +682,33 @@
         scriptUrls.forEach(function (sUrl) {
           var guessMap = sUrl + '.map';
           if (sourceMapUrls.indexOf(guessMap) === -1) sourceMapUrls.push(guessMap);
+        });
+      }
+
+      // Turbopack-specific: Next.js _next/static/chunks with turbopack
+      if (buildTool === 'turbopack' && scriptUrls.length > 0) {
+        statusEl.textContent = 'Phase 2.5: Turbopack — 探测 Source Map...';
+        U.smUpdateProgress(40, 2);
+        scriptUrls.forEach(function (sUrl) {
+          if (/_next\/static\/chunks\//.test(sUrl) || /_next\/static\/[a-z]+\//.test(sUrl)) {
+            var guessMap = sUrl + '.map';
+            if (sourceMapUrls.indexOf(guessMap) === -1) sourceMapUrls.push(guessMap);
+          }
+        });
+      }
+
+      // Nuxt.js: look for _nuxt/*.js.map patterns
+      if (
+        buildFeatures.indexOf('nuxt-payload') !== -1 ||
+        buildFeatures.indexOf('nuxt-public-config') !== -1
+      ) {
+        statusEl.textContent = 'Phase 2.5: Nuxt — 探测 Source Map...';
+        U.smUpdateProgress(40, 2);
+        scriptUrls.forEach(function (sUrl) {
+          if (/_nuxt\//.test(sUrl)) {
+            var guessMap = sUrl + '.map';
+            if (sourceMapUrls.indexOf(guessMap) === -1) sourceMapUrls.push(guessMap);
+          }
         });
       }
 
@@ -916,6 +947,9 @@
               /(?:\/[a-zA-Z_][\w.-]*(?:\/[a-zA-Z_][\w.-]*)*)(?:\.vue|\.jsx|\.tsx|\.ts|\.js|\.css|\.scss)/g;
           } else if (buildTool === 'rollup' || buildTool === 'esbuild') {
             pathRegex = /(?:\/src\/[^\s"'`]+)(?:\.vue|\.jsx|\.tsx|\.ts|\.js|\.css)/g;
+          } else if (buildTool === 'turbopack') {
+            pathRegex =
+              /(?:\.\/[^\s"'`]+)(?:\.(?:tsx|ts|jsx|js|css|module\.css))|turbopack:\/\/[^\s"']+/g;
           } else {
             pathRegex =
               /webpack:\/\/[^\s"']+|\.[\/]?[a-zA-Z_][\w.\/-]*(?:\.vue|\.js|\.ts|\.jsx|\.tsx)/g;

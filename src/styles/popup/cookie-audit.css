@@ -106,11 +106,26 @@
   font-size: 12px;
   color: var(--text-secondary, #666);
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
 }
 [data-theme="dark"] .cookie-issue {
   color: var(--text-secondary, #aaa);
+}
+.cookie-issue-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cookie-issue-fix {
+  font-size: 11px;
+  color: #27ae60;
+  padding-left: 10px;
+  line-height: 1.4;
+}
+[data-theme="dark"] .cookie-issue-fix {
+  color: #2ecc71;
 }
 .cookie-issue-severity {
   display: inline-block;

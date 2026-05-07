@@ -57,7 +57,26 @@
           <button class="btn btn-secondary" id="gather-api-start-btn">启动监听</button>
           <button class="btn btn-outline" id="gather-api-stop-btn" disabled>停止监听</button>
         </div>
+        <div class="api-filter-bar" id="api-filter-bar">
+          <select class="api-filter-select" id="api-filter-method">
+            <option value="ALL">All Methods</option>
+            <option value="GET">GET</option>
+            <option value="POST">POST</option>
+            <option value="PUT">PUT</option>
+            <option value="DELETE">DELETE</option>
+            <option value="PATCH">PATCH</option>
+            <option value="OPTIONS">OPTIONS</option>
+          </select>
+          <select class="api-filter-select" id="api-filter-status">
+            <option value="ALL">All Status</option>
+            <option value="2xx">2xx Success</option>
+            <option value="3xx">3xx Redirect</option>
+            <option value="4xx">4xx Client Error</option>
+            <option value="5xx">5xx Server Error</option>
+            <option value="err">Error / 0</option>
+          </select>
+        </div>
         <div class="gather-status" id="gather-api-status">未启动监听</div>
-        <div style="font-size:11px;color:#999;">捕获页面中的 XHR/Fetch 请求，结果将显示在「信息收集」的 API Traffic 子标签中</div>
+        <div style="font-size:11px;color:#999;">捕获页面中的 XHR/Fetch 请求，点击条目展开详情（请求头/请求体/响应体）</div>
       </div>
     </div>

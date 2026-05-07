@@ -1,8 +1,19 @@
 <div class="panel" id="panel-cors">
   <div class="cors-container">
+    <div class="cors-config">
+      <div class="cors-input-group">
+        <label class="cors-input-label">自定义 Origin</label>
+        <input type="text" id="cors-custom-origin" class="cors-input" placeholder="例: https://attacker.com">
+      </div>
+      <div class="cors-input-group">
+        <label class="cors-input-label">自定义端点</label>
+        <input type="text" id="cors-custom-endpoint" class="cors-input" placeholder="逗号分隔，例: api/data, api/admin">
+      </div>
+    </div>
     <div class="cors-actions">
       <button class="action-btn primary-btn" id="cors-scan-btn">CORS 配置检测</button>
       <button class="action-btn" id="cors-copy-btn" style="display:none">复制结果</button>
+      <button class="action-btn" id="cors-export-btn" style="display:none">导出 JSON</button>
     </div>
     <div class="status-bar" id="cors-status"></div>
     <div class="cors-results" id="cors-results">

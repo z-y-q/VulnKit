@@ -82,6 +82,21 @@ window.VulnKitXss = (function () {
       '" onmouseover=alert(1) "',
     ],
     url: ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>'],
+    insertAdjacentHTML: [
+      '<img src=x onerror=alert(1)>',
+      '<svg onload=alert(1)>',
+      '<details open ontoggle=alert(1)>',
+    ],
+    createContextualFragment: [
+      '<img src=x onerror=alert(1)>',
+      '<svg onload=alert(1)>',
+      '<details open ontoggle=alert(1)>',
+    ],
+    scriptSrc: ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>'],
+    iframeWrite: [
+      '<script>alert(parent.document.cookie)</script>',
+      '<img src=x onerror=alert(parent.document.cookie)>',
+    ],
   };
 
   const SINK_PATTERNS = [
@@ -115,11 +130,47 @@ window.VulnKitXss = (function () {
         /(?:insertAdjacentHTML|\.append|\.before|\.after|\.insertBefore|\.replaceChildren)\s*\(/g,
       severity: 'medium',
     },
+    {
+      context: 'insertAdjacentHTML',
+      regex: /insertAdjacentHTML\s*\(\s*['"`]/g,
+      severity: 'high',
+    },
+    {
+      context: 'createContextualFragment',
+      regex: /createContextualFragment\s*\(/g,
+      severity: 'high',
+    },
+    {
+      context: 'scriptSrc',
+      regex: /\.src\s*=\s*(?:location|document\.URL|window\.location|[^"'\s]*\+[^"'\s]*)/g,
+      severity: 'critical',
+    },
+    {
+      context: 'iframeWrite',
+      regex: /(?:contentDocument|contentWindow\.document)\.write\s*\(/g,
+      severity: 'critical',
+    },
+    {
+      context: 'eval',
+      regex: /(?:chrome\.runtime\.sendMessage|browser\.runtime\.sendMessage)\s*\(\s*\[\s*['"`]/g,
+      severity: 'medium',
+    },
+    {
+      context: 'location',
+      regex: /(?:window\.)?open\s*\(\s*(?:location|document\.URL|window\.location)/g,
+      severity: 'high',
+    },
+    {
+      context: 'eval',
+      regex: /import\s*\(\s*(?:location|document\.URL|\+)/g,
+      severity: 'high',
+    },
   ];
 
   const SANITIZER_PATTERNS = [
     { name: 'DOMPurify', regex: /DOMPurify\.sanitize/i, reduction: 5 },
-    { name: 'escapeHtml', regex: /escapeHtml|escapeXML|htmlEncode/i, reduction: 3 },
+    { name: 'Trusted Types', regex: /createPolicy|trustedTypes/i, reduction: 6 },
+    { name: 'escapeHtml', regex: /escapeHtml|escapeXML|htmlEncode|sanitizeHtml/i, reduction: 3 },
     { name: 'textContent', regex: /\.textContent\s*=/, reduction: 4 },
     { name: 'innerText', regex: /\.innerText\s*=/, reduction: 3 },
     { name: 'encodeURIComponent', regex: /encodeURIComponent/i, reduction: 2 },
@@ -131,6 +182,13 @@ window.VulnKitXss = (function () {
     { name: 'CSP nonce', regex: /nonce[=:_-]/i, reduction: 3 },
     { name: 'Angular sanitization', regex: /\$sce|DomSanitizer|sanitize\.html/i, reduction: 5 },
     { name: 'Vue v-html', regex: /v-html/i, reduction: -2 },
+    { name: 'Sanitizer API', regex: /new\s+Sanitizer\b/i, reduction: 4 },
+    { name: 'URL validation', regex: /(?:new\s+URL|isURL|isValidUrl)\s*\(/, reduction: 2 },
+    {
+      name: 'innerHTML forbidden',
+      regex: /trusted-types\s+[^\s;]*\s+[^;]*innerHTML/i,
+      reduction: 5,
+    },
   ];
 
   const SEVERITY_CONFIG = {

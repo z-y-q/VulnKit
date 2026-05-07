@@ -275,13 +275,14 @@
 
   // ====== CORS Detection (loaded from vk-cors.js) ======
   const corsDetect = window.VulnKitCors;
-  const { scanCors, copyResults: corsCopyResults } = corsDetect;
+  const { scanCors, copyResults: corsCopyResults, exportJson: corsExportJson } = corsDetect;
 
   // ====== Subdomain Collection (loaded from vk-subdomain.js) ======
   const subdomain = window.VulnKitSubdomain;
   const {
     collectSubdomains,
     extractFromPage,
+    bruteForceDns,
     copyResults: subdomainCopyResults,
     exportResults: subdomainExportResults,
   } = subdomain;
@@ -544,6 +545,19 @@
     // API Traffic
     utils.bindClick('gather-api-start-btn', gatherStartApiTraffic);
     utils.bindClick('gather-api-stop-btn', gatherStopApiTraffic);
+
+    var apiFilterMethod = utils.get('api-filter-method');
+    var apiFilterStatus = utils.get('api-filter-status');
+    if (apiFilterMethod) {
+      apiFilterMethod.addEventListener('change', function () {
+        gather.setApiFilter('method', this.value);
+      });
+    }
+    if (apiFilterStatus) {
+      apiFilterStatus.addEventListener('change', function () {
+        gather.setApiFilter('status', this.value);
+      });
+    }
 
     // Rules management
     const rulesBtn = utils.get('gather-rules-btn');
@@ -1025,10 +1039,12 @@
     // CORS Detection
     utils.bindClick('cors-scan-btn', scanCors);
     utils.bindClick('cors-copy-btn', corsCopyResults);
+    utils.bindClick('cors-export-btn', corsExportJson);
 
     // Subdomain Collection
     utils.bindClick('subdomain-scan-btn', collectSubdomains);
     utils.bindClick('subdomain-page-btn', extractFromPage);
+    utils.bindClick('subdomain-dns-btn', bruteForceDns);
     utils.bindClick('subdomain-copy-btn', subdomainCopyResults);
     utils.bindClick('subdomain-export-btn', subdomainExportResults);
 

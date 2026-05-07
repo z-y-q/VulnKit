@@ -49,6 +49,8 @@
 .react-badge.not-detected { background: #95a5a6; }
 .react-badge.warning { background: #f39c12; }
 .react-badge.info { background: #3498db; }
+.react-badge.warn { background: #e67e22; }
+.react-badge.ok { background: #27ae60; }
 .react-info-row {
   display: flex;
   align-items: baseline;
@@ -121,4 +123,22 @@
   padding: 24px;
   color: var(--text-secondary, #888);
   font-size: 13px;
+}
+.react-components {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.react-component-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--surface-alt, #f0f2f5);
+  color: var(--text-primary, #333);
+  font-size: 11px;
+  font-family: monospace;
+}
+[data-theme="dark"] .react-component-tag {
+  background: var(--surface-alt, #2a2a3e);
+  color: var(--text-primary, #e0e0e0);
 }

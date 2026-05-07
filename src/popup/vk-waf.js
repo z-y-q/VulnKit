@@ -4,6 +4,8 @@ window.VulnKitWaf = (function () {
 
   var utils = window.VulnKitUtils.utilsProxy;
   var lastWafResult = null;
+  var wafScanActive = false;
+  var wafScanAborted = false;
 
   var WAF_SIGNATURES = [
     {
@@ -209,14 +211,22 @@ window.VulnKitWaf = (function () {
     if (headers) {
       for (var k in headers) {
         if (headers.hasOwnProperty(k)) {
-          headerStr += k + ': ' + headers[k] + '\n';
+          var val = headers[k];
+          if (Array.isArray(val)) {
+            val = val.join('\n');
+          }
+          headerStr += k + ': ' + val + '\n';
         }
       }
     }
     var cookieStr = '';
     if (headers) {
       var setCookie = headers['set-cookie'] || headers['Set-Cookie'] || '';
-      cookieStr = setCookie;
+      if (Array.isArray(setCookie)) {
+        cookieStr = setCookie.join('\n');
+      } else {
+        cookieStr = setCookie;
+      }
     }
     var bodyStr = typeof body === 'string' ? body : '';
 
@@ -340,12 +350,22 @@ window.VulnKitWaf = (function () {
     var probeInfoEl = utils.get('waf-probe-info');
     if (!statusEl) return;
 
+    if (wafScanActive) {
+      wafScanAborted = true;
+      return;
+    }
+
     if (!utils.getActiveTab) {
       utils.showToast('无法获取当前标签页', 'error');
       return;
     }
 
-    if (scanBtn) scanBtn.disabled = true;
+    wafScanAborted = false;
+    wafScanActive = true;
+    if (scanBtn) {
+      scanBtn.disabled = true;
+      scanBtn.textContent = '停止扫描';
+    }
     statusEl.textContent = '扫描中...';
     if (probeInfoEl) probeInfoEl.style.display = 'none';
     var resultsEl = utils.get('waf-results');
@@ -357,12 +377,11 @@ window.VulnKitWaf = (function () {
       var tab = await utils.requireTabId();
       if (!tab || !tab.url || tab.url.startsWith('chrome')) {
         statusEl.textContent = '无法扫描此页面';
-        if (scanBtn) scanBtn.disabled = false;
         return;
       }
 
       var pageUrl = tab.url;
-      var allDetected = [];
+      var detectedMap = {};
       var lastHeaders = null;
 
       var probePaths = [
@@ -373,11 +392,17 @@ window.VulnKitWaf = (function () {
       ];
 
       for (var i = 0; i < probePaths.length; i++) {
+        if (wafScanAborted) break;
         var probe = probePaths[i];
+        if (statusEl)
+          statusEl.textContent = '探测中... (' + (i + 1) + '/' + probePaths.length + ')';
         try {
           var parsedUrl = new URL(pageUrl);
           var probeUrl = parsedUrl.origin + probe.path;
           var probeResult = await new Promise(function (resolve) {
+            var timer = setTimeout(function () {
+              resolve(null);
+            }, 8000);
             chrome.tabs.sendMessage(
               tab.id,
               {
@@ -389,6 +414,7 @@ window.VulnKitWaf = (function () {
                 },
               },
               function (response) {
+                clearTimeout(timer);
                 if (chrome.runtime.lastError) {
                   resolve(null);
                   return;
@@ -396,25 +422,36 @@ window.VulnKitWaf = (function () {
                 resolve(response || null);
               }
             );
-            setTimeout(function () {
-              resolve(null);
-            }, 8000);
           });
 
           if (probeResult && probeResult.headers) {
             lastHeaders = probeResult.headers;
-            var detected = analyzeResponse(probeResult.headers, probeResult.body || '');
-            for (var d = 0; d < detected.length; d++) {
-              var exists = false;
-              for (var e = 0; e < allDetected.length; e++) {
-                if (allDetected[e].name === detected[d].name) {
-                  exists = true;
-                  break;
+            var found = analyzeResponse(probeResult.headers, probeResult.body || '');
+            for (var d = 0; d < found.length; d++) {
+              var name = found[d].name;
+              if (detectedMap[name]) {
+                var existingEvidence = detectedMap[name].evidence;
+                for (var ev = 0; ev < found[d].evidence.length; ev++) {
+                  var evVal = found[d].evidence[ev].value;
+                  var alreadySeen = false;
+                  for (var ex = 0; ex < existingEvidence.length; ex++) {
+                    if (existingEvidence[ex].value === evVal) {
+                      alreadySeen = true;
+                      break;
+                    }
+                  }
+                  if (!alreadySeen) {
+                    existingEvidence.push(found[d].evidence[ev]);
+                  }
                 }
-              }
-              if (!exists) {
-                detected[d]._probe = probe.desc;
-                allDetected.push(detected[d]);
+                var sevOrder = { high: 3, medium: 2, low: 1 };
+                if (
+                  (sevOrder[found[d].severity] || 0) > (sevOrder[detectedMap[name].severity] || 0)
+                ) {
+                  detectedMap[name].severity = found[d].severity;
+                }
+              } else {
+                detectedMap[name] = Object.assign({}, found[d], { _probe: probe.desc });
               }
             }
           }
@@ -423,22 +460,35 @@ window.VulnKitWaf = (function () {
         }
       }
 
-      if (probeInfoEl) {
-        var domain = new URL(pageUrl).hostname;
-        probeInfoEl.style.display = '';
-        probeInfoEl.innerHTML =
-          '<strong>目标:</strong> <span class="probe-url">' +
-          utils.escapeHtml(domain) +
-          '</span>' +
-          '<br><strong>探测次数:</strong> ' +
-          probePaths.length +
-          '<br><strong>检测结果:</strong> ' +
-          (allDetected.length > 0 ? allDetected.length + ' 个 WAF' : '未检测到 WAF');
+      var allDetected = Object.values(detectedMap);
+      allDetected.sort(function (a, b) {
+        var sevOrder = { high: 3, medium: 2, low: 1 };
+        return (sevOrder[b.severity] || 0) - (sevOrder[a.severity] || 0);
+      });
+      for (var s = 0; s < allDetected.length; s++) {
+        var evCount = allDetected[s].evidence.length;
+        allDetected[s].confidence = evCount >= 3 ? 'high' : evCount >= 2 ? 'medium' : 'low';
       }
 
-      renderResults(allDetected, lastHeaders, pageUrl);
-      statusEl.textContent =
-        allDetected.length > 0 ? '检测到 ' + allDetected.length + ' 个 WAF' : '未检测到 WAF';
+      if (wafScanAborted) {
+        statusEl.textContent = '扫描已取消';
+      } else {
+        if (probeInfoEl) {
+          var domain = new URL(pageUrl).hostname;
+          probeInfoEl.style.display = '';
+          probeInfoEl.innerHTML =
+            '<strong>目标:</strong> <span class="probe-url">' +
+            utils.escapeHtml(domain) +
+            '</span>' +
+            '<br><strong>探测次数:</strong> ' +
+            probePaths.length +
+            '<br><strong>检测结果:</strong> ' +
+            (allDetected.length > 0 ? allDetected.length + ' 个 WAF' : '未检测到 WAF');
+        }
+        renderResults(allDetected, lastHeaders, pageUrl);
+        statusEl.textContent =
+          allDetected.length > 0 ? '检测到 ' + allDetected.length + ' 个 WAF' : '未检测到 WAF';
+      }
     } catch (err) {
       statusEl.textContent = '扫描失败: ' + (err.message || '未知错误');
       if (resultsEl) {
@@ -446,7 +496,11 @@ window.VulnKitWaf = (function () {
           '<div class="empty-state">扫描出错: ' + utils.escapeHtml(err.message || '') + '</div>';
       }
     } finally {
-      if (scanBtn) scanBtn.disabled = false;
+      wafScanActive = false;
+      if (scanBtn) {
+        scanBtn.disabled = false;
+        scanBtn.textContent = 'WAF 指纹检测';
+      }
     }
   }
 

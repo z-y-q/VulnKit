@@ -53,7 +53,12 @@ window.VulnKitReact = (function () {
 
     var html = '<div class="react-card">';
     html += '<div class="react-card-header">';
-    html += '<span class="react-badge ' + (data.detected ? 'detected' : 'not-detected') + '">' + (data.detected ? '已检测到' : '未检测到') + '</span>';
+    html +=
+      '<span class="react-badge ' +
+      (data.detected ? 'detected' : 'not-detected') +
+      '">' +
+      (data.detected ? '已检测到' : '未检测到') +
+      '</span>';
     if (data.version) {
       html += '<span class="react-card-title">React ' + utils.escapeHtml(data.version) + '</span>';
     } else {
@@ -61,12 +66,61 @@ window.VulnKitReact = (function () {
     }
     html += '</div>';
 
+    if (data.mode) {
+      var modeBadge = data.mode === 'development' ? 'warn' : 'ok';
+      html +=
+        '<div class="react-info-row"><span class="react-info-label">运行模式</span><span class="react-info-value"><span class="react-badge ' +
+        modeBadge +
+        '">' +
+        utils.escapeHtml(data.mode) +
+        '</span></span></div>';
+    }
+
     if (data.metaframework) {
-      html += '<div class="react-info-row"><span class="react-info-label">元框架</span><span class="react-info-value"><span class="react-badge info">' + utils.escapeHtml(data.metaframework) + '</span></span></div>';
+      html +=
+        '<div class="react-info-row"><span class="react-info-label">元框架</span><span class="react-info-value"><span class="react-badge info">' +
+        utils.escapeHtml(data.metaframework) +
+        '</span></span></div>';
+    }
+
+    if (data.stateManager) {
+      html +=
+        '<div class="react-info-row"><span class="react-info-label">状态管理</span><span class="react-info-value">' +
+        utils.escapeHtml(data.stateManager) +
+        '</span></div>';
+    }
+
+    if (data.components && data.components.length > 0) {
+      html +=
+        '<div class="react-info-row"><span class="react-info-label">组件树 (' +
+        data.components.length +
+        ')</span><span class="react-info-value react-components">';
+      data.components.forEach(function (c) {
+        html += '<span class="react-component-tag">' + utils.escapeHtml(c) + '</span>';
+      });
+      html += '</span></div>';
+    }
+
+    if (data.routes && data.routes.length > 0) {
+      html +=
+        '<div class="react-info-row"><span class="react-info-label">路由 (' +
+        data.routes.length +
+        ')</span><span class="react-info-value">';
+      data.routes.forEach(function (r) {
+        html += '<div class="react-route-item">' + utils.escapeHtml(r) + '</div>';
+      });
+      html += '</span></div>';
     }
 
     if (data.signals && data.signals.length > 0) {
-      html += '<div class="react-info-row"><span class="react-info-label">检测信号</span><span class="react-info-value">' + data.signals.map(function (s) { return '<div>' + utils.escapeHtml(s) + '</div>'; }).join('') + '</span></div>';
+      html +=
+        '<div class="react-info-row"><span class="react-info-label">检测信号</span><span class="react-info-value">' +
+        data.signals
+          .map(function (s) {
+            return '<div>' + utils.escapeHtml(s) + '</div>';
+          })
+          .join('') +
+        '</span></div>';
     }
 
     html += '</div>';
@@ -81,16 +135,35 @@ window.VulnKitReact = (function () {
     var lines = [];
     if (lastResult.detected) {
       lines.push('React Detected: ' + (lastResult.version || 'unknown'));
+      if (lastResult.mode) lines.push('Mode: ' + lastResult.mode);
       if (lastResult.metaframework) lines.push('Meta-framework: ' + lastResult.metaframework);
+      if (lastResult.stateManager) lines.push('State: ' + lastResult.stateManager);
     } else {
       lines.push('React: Not detected');
     }
+    if (lastResult.components && lastResult.components.length > 0) {
+      lines.push('Components: ' + lastResult.components.join(', '));
+    }
+    if (lastResult.routes && lastResult.routes.length > 0) {
+      lines.push('Routes:');
+      lastResult.routes.forEach(function (r) {
+        lines.push('  - ' + r);
+      });
+    }
     if (lastResult.signals && lastResult.signals.length > 0) {
       lines.push('Signals:');
-      lastResult.signals.forEach(function (s) { lines.push('  - ' + s); });
+      lastResult.signals.forEach(function (s) {
+        lines.push('  - ' + s);
+      });
     }
     utils.copyAndToast(lines.join('\n'));
   }
 
-  return { detectReact: detectReact, copyResults: copyResults, get lastResult() { return lastResult; } };
+  return {
+    detectReact: detectReact,
+    copyResults: copyResults,
+    get lastResult() {
+      return lastResult;
+    },
+  };
 })();
