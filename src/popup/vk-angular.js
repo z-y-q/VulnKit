@@ -57,7 +57,7 @@ window.VulnKitAngular = (function () {
 
       chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_DETECT' }, function (response) {
         if (chrome.runtime.lastError || !response) {
-          chrome.runtime.lastError;
+
           if (statusEl) statusEl.textContent = '正在注入检测脚本...';
           chrome.scripting.executeScript(
             {

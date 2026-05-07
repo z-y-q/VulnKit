@@ -455,7 +455,7 @@ window.VulnKitRuoYiDetect = (function () {
                   if (backendUris.length > 0) {
                     gwHtml +=
                       '<span class="ruoyi-detect-tag tag-version">后端服务: ' +
-                      backendUris.join(', ') +
+                      backendUris.map(function(u) { return utils.escapeHtml(u); }).join(', ') +
                       '</span>';
                   }
                   gwHtml += '</div>';
@@ -535,7 +535,7 @@ window.VulnKitRuoYiDetect = (function () {
                   '<span class="ruoyi-detect-tag tag-token">Nacos 服务 (' +
                   discoveredServices.length +
                   '): ' +
-                  discoveredServices.slice(0, 8).join(', ') +
+                  discoveredServices.slice(0, 8).map(function(s) { return utils.escapeHtml(s); }).join(', ') +
                   (discoveredServices.length > 8 ? '...' : '') +
                   '</span>';
                 nacosHtml += '</div>';

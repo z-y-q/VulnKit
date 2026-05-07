@@ -4,7 +4,6 @@ window.VulnKitWaf = (function () {
 
   var utils = window.VulnKitUtils.utilsProxy;
   var lastWafResult = null;
-  var lastHeaders = null;
   var wafScanActive = false;
   var wafScanAborted = false;
   var currentFilter = 'all';
@@ -391,6 +390,10 @@ window.VulnKitWaf = (function () {
       return;
     }
 
+    if (!confirm('WAF 扫描将向目标发送攻击载荷（SQL注入/XSS/路径穿越等），是否继续？')) {
+      return;
+    }
+
     wafScanAborted = false;
     wafScanActive = true;
     scanStartTime = Date.now();
@@ -414,7 +417,6 @@ window.VulnKitWaf = (function () {
 
       var pageUrl = tab.url;
       var detectedMap = {};
-      var lastHeaders = null;
 
       var probePaths = [
         { path: '', desc: '正常请求' },

@@ -181,8 +181,16 @@ function isAllowedUrl(url) {
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
     const hostname = parsed.hostname.toLowerCase();
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') return false;
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '[::1]' ||
+      hostname === '[::ffff:127.0.0.1]'
+    )
+      return false;
     if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|127\.)/.test(hostname)) return false;
+    if (/\[::ffff:(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.)/.test(hostname)) return false;
+    if (/^\d+$/.test(hostname)) return false;
     if (hostname.endsWith('.local') || hostname.endsWith('.internal')) return false;
     return true;
   } catch {
@@ -392,7 +400,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (sender.tab && sender.tab.url) {
           try {
             var senderOrigin = new URL(sender.tab.url).origin;
-            if (probeUrl.origin !== senderOrigin && probeUrl.hostname !== sender.tab.url) {
+            if (probeUrl.origin !== senderOrigin && probeUrl.hostname !== new URL(sender.tab.url).hostname) {
               sendResponse({ error: 'Origin mismatch' });
               return true;
             }
@@ -449,6 +457,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ error: 'Invalid URL' });
           return true;
         }
+        if (!isAllowedUrl(probeUrl.href)) {
+          sendResponse({ error: 'URL not allowed (no private IPs)' });
+          return true;
+        }
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), message.timeout || 10000);
         var corsHeaders = message.headers || {};
@@ -500,6 +512,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ error: 'Invalid URL' });
           return true;
         }
+        if (!isAllowedUrl(probeUrl.href)) {
+          sendResponse({ error: 'URL not allowed (no private IPs)' });
+          return true;
+        }
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), message.timeout || 5000);
         fetch(probeUrl.href, {
@@ -532,6 +548,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
         } catch {
           sendResponse({ error: 'Invalid URL' });
+          return true;
+        }
+        if (!isAllowedUrl(probeUrl.href)) {
+          sendResponse({ error: 'URL not allowed (no private IPs)' });
           return true;
         }
         const controller = new AbortController();
@@ -712,7 +732,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     case 'vulnkit-encode':
     case 'vulnkit-decode':
       if (info.selectionText) {
-        chrome.storage.local.set({ contextSelection: info.selectionText });
+        chrome.storage.local.set({
+          contextSelection: info.selectionText,
+          contextAction: info.menuItemId === 'vulnkit-encode' ? 'encode' : 'decode',
+        });
+        chrome.action.setBadgeText({ text: '↑' });
+        chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
+        if (typeof chrome.action.openPopup === 'function') {
+          try { chrome.action.openPopup({ windowId: tab.windowId }); } catch {}
+        }
       }
       break;
   }

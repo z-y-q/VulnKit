@@ -5,7 +5,6 @@
   if (window.__VK_CONTENT_BRIDGE__) return;
   window.__VK_CONTENT_BRIDGE__ = true;
 
-  var extId = chrome.runtime.id;
   var pendingResolve = null;
   var storeExploreResolve = null;
   var detecting = false;
@@ -14,11 +13,10 @@
   var angularDetectResolve = null;
   var sourcemapDetectResolve = null;
 
-  // Vue detect response relay
+  // Window message relay
   window.addEventListener('message', function (e) {
     if (e.origin !== location.origin) return;
 
-    // Vue detection result
     if (e.data && e.data.__vk_detect && pendingResolve) {
       pendingResolve(e.data.result);
       pendingResolve = null;
@@ -26,28 +24,24 @@
       return;
     }
 
-    // React detection result
     if (e.data && e.data.__vk_react_detect && reactDetectResolve) {
       reactDetectResolve(e.data.result);
       reactDetectResolve = null;
       return;
     }
 
-    // Angular detection result
     if (e.data && e.data.__vk_angular_detect && angularDetectResolve) {
       angularDetectResolve(e.data.result);
       angularDetectResolve = null;
       return;
     }
 
-    // Sourcemap build tool detection result
     if (e.data && e.data.__vk_sourcemap_detect && sourcemapDetectResolve) {
       sourcemapDetectResolve(e.data.result);
       sourcemapDetectResolve = null;
       return;
     }
 
-    // RuoYi hook events → forward to popup
     if (e.data && e.data.__vk_ruoyi_hook && e.data.event) {
       chrome.runtime
         .sendMessage({
@@ -60,7 +54,6 @@
       return;
     }
 
-    // Vue store explorer result
     if (e.data && e.data.__vk_vue_store && storeExploreResolve) {
       storeExploreResolve(e.data.result);
       storeExploreResolve = null;
@@ -73,12 +66,10 @@
     detecting = true;
     return new Promise(function (resolve) {
       pendingResolve = resolve;
-
       var script = document.createElement('script');
       script.src = chrome.runtime.getURL('src/inject/vue-detect.js');
       script.onload = function () {
         script.remove();
-        // Timeout fallback in case postMessage doesn't fire
         setTimeout(function () {
           if (pendingResolve) {
             pendingResolve(null);
@@ -124,6 +115,203 @@
     });
   }
 
+  // ====== API Traffic Monitoring (shared helpers) ======
+
+  var apiTrafficActive = false;
+  var apiTrafficData = [];
+  var apiOrigFetch = null;
+  var apiOrigXhrOpen = null;
+  var apiOrigXhrSend = null;
+
+  function stripApiUrl(url) {
+    try {
+      var u = new URL(url, location.href);
+      return u.origin + u.pathname + u.search;
+    } catch (e) {
+      return url;
+    }
+  }
+
+  function extractReqHeaders(init) {
+    if (!init || !init.headers) return {};
+    var h = init.headers;
+    var out = {};
+    var keys = [
+      'content-type',
+      'authorization',
+      'cookie',
+      'x-csrf-token',
+      'x-xsrf-token',
+      'x-requested-with',
+    ];
+    if (typeof Headers !== 'undefined' && h instanceof Headers) {
+      keys.forEach(function (k) {
+        var v = h.get(k);
+        if (v) out[k] = v.length > 200 ? v.substring(0, 200) + '...' : v;
+      });
+    } else if (typeof h === 'object') {
+      keys.forEach(function (k) {
+        var lk = k.toLowerCase();
+        Object.keys(h).forEach(function (hk) {
+          if (hk.toLowerCase() === lk) {
+            var v = String(h[hk]);
+            out[k] = v.length > 200 ? v.substring(0, 200) + '...' : v;
+          }
+        });
+      });
+    }
+    return out;
+  }
+
+  function truncateBody(body, max) {
+    if (!body) return '';
+    var s =
+      typeof body === 'string'
+        ? body
+        : typeof body === 'object'
+          ? JSON.stringify(body)
+          : String(body);
+    return s.length > max ? s.substring(0, max) + '...' : s;
+  }
+
+  function pushApiEntry(entry) {
+    apiTrafficData.push(entry);
+    if (apiTrafficData.length > 200) {
+      apiTrafficData = apiTrafficData.slice(-150);
+    }
+  }
+
+  function startApiMonitoring() {
+    if (apiTrafficActive) return;
+    apiTrafficActive = true;
+    apiTrafficData = [];
+    apiOrigFetch = window.fetch;
+    apiOrigXhrOpen = XMLHttpRequest.prototype.open;
+    apiOrigXhrSend = XMLHttpRequest.prototype.send;
+
+    window.fetch = function (input, init) {
+      var url =
+        typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
+      var method = ((init && init.method) || 'GET').toUpperCase();
+      var start = Date.now();
+      var reqBody = '';
+      var reqHeaders = {};
+      if (init) {
+        reqBody = truncateBody(init.body, 3000);
+        reqHeaders = extractReqHeaders(init);
+      }
+      var capturedCt = '';
+      var capturedStatus = 0;
+      return apiOrigFetch
+        .apply(this, arguments)
+        .then(function (resp) {
+          capturedCt = (resp.headers.get('content-type') || '').split(';')[0];
+          capturedStatus = resp.status;
+          var clone = resp.clone();
+          var bodyPromise = Promise.resolve('');
+          if (
+            capturedCt &&
+            (capturedCt.indexOf('json') !== -1 ||
+              capturedCt.indexOf('text') !== -1 ||
+              capturedCt.indexOf('xml') !== -1 ||
+              capturedCt.indexOf('html') !== -1)
+          ) {
+            bodyPromise = clone.text().catch(function () {
+              return '';
+            });
+          }
+          return bodyPromise.then(function (body) {
+            pushApiEntry({
+              url: stripApiUrl(url),
+              method: method,
+              status: capturedStatus,
+              contentType: capturedCt,
+              duration: Date.now() - start,
+              reqBody: reqBody,
+              reqHeaders: reqHeaders,
+              resBody: truncateBody(body, 2000),
+            });
+          });
+        })
+        .catch(function () {
+          pushApiEntry({
+            url: stripApiUrl(url),
+            method: method,
+            status: 0,
+            contentType: '',
+            duration: Date.now() - start,
+            reqBody: reqBody,
+            reqHeaders: reqHeaders,
+            resBody: '',
+          });
+          throw arguments[0];
+        });
+    };
+
+    XMLHttpRequest.prototype.open = function (method, url) {
+      this._vkM = method;
+      this._vkU = stripApiUrl(url);
+      this._vkS = Date.now();
+      this._vkH = {};
+      var origSetHeader = this.setRequestHeader;
+      var capturedHeaders = this._vkH;
+      var headerKeys = [
+        'content-type',
+        'authorization',
+        'cookie',
+        'x-csrf-token',
+        'x-xsrf-token',
+        'x-requested-with',
+      ];
+      this.setRequestHeader = function (name, value) {
+        var ln = (name || '').toLowerCase();
+        if (headerKeys.indexOf(ln) !== -1) {
+          var v = String(value || '');
+          capturedHeaders[ln] = v.length > 200 ? v.substring(0, 200) + '...' : v;
+        }
+        return origSetHeader.apply(this, arguments);
+      };
+      return apiOrigXhrOpen.apply(this, arguments);
+    };
+
+    XMLHttpRequest.prototype.send = function () {
+      var xhr = this;
+      var sentBody = arguments[0] != null ? truncateBody(arguments[0], 3000) : '';
+      xhr.addEventListener('load', function () {
+        var ct = (xhr.getResponseHeader('content-type') || '').split(';')[0];
+        var resBody = '';
+        if (
+          ct &&
+          (ct.indexOf('json') !== -1 ||
+            ct.indexOf('text') !== -1 ||
+            ct.indexOf('xml') !== -1 ||
+            ct.indexOf('html') !== -1)
+        ) {
+          try {
+            resBody = truncateBody(xhr.responseText, 2000);
+          } catch (e) {}
+        }
+        pushApiEntry({
+          url: xhr._vkU || location.href,
+          method: xhr._vkM || 'GET',
+          status: xhr.status,
+          contentType: ct,
+          duration: Date.now() - (xhr._vkS || Date.now()),
+          reqBody: sentBody,
+          reqHeaders: xhr._vkH || {},
+          resBody: resBody,
+        });
+      });
+      return apiOrigXhrSend.apply(this, arguments);
+    };
+  }
+
+  function stopApiMonitoring() {
+    apiTrafficActive = false;
+  }
+
+  // ====== Message handlers ======
+
   chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     if (message.type === 'VK_VUE_DETECT') {
       injectAndDetect().then(function (result) {
@@ -133,7 +321,6 @@
     }
     if (message.type === 'CONTEXT_EXTRACT_LINKS') {
       var pageUrl = location.href;
-      var pageDomain = location.hostname;
       var links = [];
       var seen = {};
       function addLink(href, text, tag) {
@@ -254,379 +441,22 @@
       return true;
     }
     if (message.type === 'VK_API_TRAFFIC_START') {
-      if (window.__VK_API_TRAFFIC__) {
-        sendResponse({ status: 'already_running' });
-        return true;
-      }
-      window.__VK_API_TRAFFIC__ = true;
-      window.__VK_API_TRAFFIC_DATA__ = [];
-      var apiOrigFetch = window.fetch;
-      var apiOrigXhrOpen = XMLHttpRequest.prototype.open;
-      var apiOrigXhrSend = XMLHttpRequest.prototype.send;
-      function stripApiUrl(url) {
-        try {
-          var u = new URL(url, location.href);
-          return u.origin + u.pathname + u.search;
-        } catch (e) {
-          return url;
-        }
-      }
-      function extractReqHeaders(init) {
-        if (!init || !init.headers) return {};
-        var h = init.headers;
-        var out = {};
-        var keys = [
-          'content-type',
-          'authorization',
-          'cookie',
-          'x-csrf-token',
-          'x-xsrf-token',
-          'x-requested-with',
-        ];
-        if (typeof Headers !== 'undefined' && h instanceof Headers) {
-          keys.forEach(function (k) {
-            var v = h.get(k);
-            if (v) out[k] = v.length > 200 ? v.substring(0, 200) + '...' : v;
-          });
-        } else if (typeof h === 'object') {
-          keys.forEach(function (k) {
-            var lk = k.toLowerCase();
-            Object.keys(h).forEach(function (hk) {
-              if (hk.toLowerCase() === lk) {
-                var v = String(h[hk]);
-                out[k] = v.length > 200 ? v.substring(0, 200) + '...' : v;
-              }
-            });
-          });
-        }
-        return out;
-      }
-      function truncateBody(body, max) {
-        if (!body) return '';
-        var s =
-          typeof body === 'string'
-            ? body
-            : typeof body === 'object'
-              ? JSON.stringify(body)
-              : String(body);
-        return s.length > max ? s.substring(0, max) + '...' : s;
-      }
-      function pushApiEntry(entry) {
-        window.__VK_API_TRAFFIC_DATA__.push(entry);
-        if (window.__VK_API_TRAFFIC_DATA__.length > 200) {
-          window.__VK_API_TRAFFIC_DATA__ = window.__VK_API_TRAFFIC_DATA__.slice(-150);
-        }
-      }
-      window.fetch = function (input, init) {
-        var url =
-          typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-        var method = ((init && init.method) || 'GET').toUpperCase();
-        var start = Date.now();
-        var reqBody = '';
-        var reqHeaders = {};
-        if (init) {
-          reqBody = truncateBody(init.body, 3000);
-          reqHeaders = extractReqHeaders(init);
-        }
-        var capturedCt = '';
-        var capturedStatus = 0;
-        return apiOrigFetch
-          .apply(this, arguments)
-          .then(function (resp) {
-            capturedCt = (resp.headers.get('content-type') || '').split(';')[0];
-            capturedStatus = resp.status;
-            var clone = resp.clone();
-            var bodyPromise = Promise.resolve('');
-            if (
-              capturedCt &&
-              (capturedCt.indexOf('json') !== -1 ||
-                capturedCt.indexOf('text') !== -1 ||
-                capturedCt.indexOf('xml') !== -1 ||
-                capturedCt.indexOf('html') !== -1)
-            ) {
-              bodyPromise = clone.text().catch(function () {
-                return '';
-              });
-            }
-            return bodyPromise.then(function (body) {
-              pushApiEntry({
-                url: stripApiUrl(url),
-                method: method,
-                status: capturedStatus,
-                contentType: capturedCt,
-                duration: Date.now() - start,
-                reqBody: reqBody,
-                reqHeaders: reqHeaders,
-                resBody: truncateBody(body, 2000),
-              });
-            });
-          })
-          .catch(function () {
-            pushApiEntry({
-              url: stripApiUrl(url),
-              method: method,
-              status: 0,
-              contentType: '',
-              duration: Date.now() - start,
-              reqBody: reqBody,
-              reqHeaders: reqHeaders,
-              resBody: '',
-            });
-            throw arguments[0];
-          });
-      };
-      XMLHttpRequest.prototype.open = function (method, url) {
-        this.__vk_method = method;
-        this.__vk_url = stripApiUrl(url);
-        this.__vk_start = Date.now();
-        this.__vk_reqHeaders = {};
-        var origSetHeader = this.setRequestHeader;
-        var capturedHeaders = this.__vk_reqHeaders;
-        var headerKeys = [
-          'content-type',
-          'authorization',
-          'cookie',
-          'x-csrf-token',
-          'x-xsrf-token',
-          'x-requested-with',
-        ];
-        this.setRequestHeader = function (name, value) {
-          var ln = (name || '').toLowerCase();
-          if (headerKeys.indexOf(ln) !== -1) {
-            var v = String(value || '');
-            capturedHeaders[ln] = v.length > 200 ? v.substring(0, 200) + '...' : v;
-          }
-          return origSetHeader.apply(this, arguments);
-        };
-        return apiOrigXhrOpen.apply(this, arguments);
-      };
-      XMLHttpRequest.prototype.send = function () {
-        var xhr = this;
-        var sentBody = arguments[0] != null ? truncateBody(arguments[0], 3000) : '';
-        xhr.addEventListener('load', function () {
-          var ct = (xhr.getResponseHeader('content-type') || '').split(';')[0];
-          var resBody = '';
-          if (
-            ct &&
-            (ct.indexOf('json') !== -1 ||
-              ct.indexOf('text') !== -1 ||
-              ct.indexOf('xml') !== -1 ||
-              ct.indexOf('html') !== -1)
-          ) {
-            try {
-              resBody = truncateBody(xhr.responseText, 2000);
-            } catch (e) {}
-          }
-          pushApiEntry({
-            url: xhr.__vk_url || location.href,
-            method: xhr.__vk_method || 'GET',
-            status: xhr.status,
-            contentType: ct,
-            duration: Date.now() - (xhr.__vk_start || Date.now()),
-            reqBody: sentBody,
-            reqHeaders: xhr.__vk_reqHeaders || {},
-            resBody: resBody,
-          });
-        });
-        return apiOrigXhrSend.apply(this, arguments);
-      };
+      startApiMonitoring();
       sendResponse({ status: 'started' });
       return true;
     }
     if (message.type === 'VK_API_TRAFFIC_STOP') {
-      if (!window.__VK_API_TRAFFIC__) {
-        sendResponse({ status: 'not_running' });
-        return true;
-      }
-      delete window.__VK_API_TRAFFIC__;
+      stopApiMonitoring();
       sendResponse({ status: 'stopped' });
       return true;
     }
     if (message.type === 'VK_API_TRAFFIC_COLLECT') {
-      // Auto-start monitoring on first collect if not already running
-      if (!window.__VK_API_TRAFFIC__) {
-        var startMsg = { type: 'VK_API_TRAFFIC_START' };
-        // Replay start logic inline
-        window.__VK_API_TRAFFIC__ = true;
-        window.__VK_API_TRAFFIC_DATA__ = [];
-        var apiOrigFetch = window.fetch;
-        var apiOrigXhrOpen = XMLHttpRequest.prototype.open;
-        var apiOrigXhrSend = XMLHttpRequest.prototype.send;
-        function stripApiUrl(url) {
-          try {
-            var u = new URL(url, location.href);
-            return u.origin + u.pathname + u.search;
-          } catch (e) {
-            return url;
-          }
-        }
-        function extractReqHeaders(init) {
-          if (!init || !init.headers) return {};
-          var h = init.headers;
-          var out = {};
-          var keys = [
-            'content-type',
-            'authorization',
-            'cookie',
-            'x-csrf-token',
-            'x-xsrf-token',
-            'x-requested-with',
-          ];
-          if (typeof Headers !== 'undefined' && h instanceof Headers) {
-            keys.forEach(function (k) {
-              var v = h.get(k);
-              if (v) out[k] = v.length > 200 ? v.substring(0, 200) + '...' : v;
-            });
-          } else if (typeof h === 'object') {
-            keys.forEach(function (k) {
-              var lk = k.toLowerCase();
-              Object.keys(h).forEach(function (hk) {
-                if (hk.toLowerCase() === lk) {
-                  var v = String(h[hk]);
-                  out[k] = v.length > 200 ? v.substring(0, 200) + '...' : v;
-                }
-              });
-            });
-          }
-          return out;
-        }
-        function truncateBody(body, max) {
-          if (!body) return '';
-          var s =
-            typeof body === 'string'
-              ? body
-              : typeof body === 'object'
-                ? JSON.stringify(body)
-                : String(body);
-          return s.length > max ? s.substring(0, max) + '...' : s;
-        }
-        function pushApiEntry(entry) {
-          window.__VK_API_TRAFFIC_DATA__.push(entry);
-          if (window.__VK_API_TRAFFIC_DATA__.length > 200) {
-            window.__VK_API_TRAFFIC_DATA__ = window.__VK_API_TRAFFIC_DATA__.slice(-150);
-          }
-        }
-        window.fetch = function (input, init) {
-          var url =
-            typeof input === 'string'
-              ? input
-              : input instanceof Request
-                ? input.url
-                : String(input);
-          var method = ((init && init.method) || 'GET').toUpperCase();
-          var start = Date.now();
-          var reqBody = '';
-          var reqHeaders = {};
-          if (init) {
-            reqBody = truncateBody(init.body, 3000);
-            reqHeaders = extractReqHeaders(init);
-          }
-          var capturedCt = '';
-          var capturedStatus = 0;
-          return apiOrigFetch
-            .apply(this, arguments)
-            .then(function (resp) {
-              capturedCt = (resp.headers.get('content-type') || '').split(';')[0];
-              capturedStatus = resp.status;
-              var clone = resp.clone();
-              var bodyPromise = Promise.resolve('');
-              if (
-                capturedCt &&
-                (capturedCt.indexOf('json') !== -1 ||
-                  capturedCt.indexOf('text') !== -1 ||
-                  capturedCt.indexOf('xml') !== -1 ||
-                  capturedCt.indexOf('html') !== -1)
-              ) {
-                bodyPromise = clone.text().catch(function () {
-                  return '';
-                });
-              }
-              return bodyPromise.then(function (body) {
-                pushApiEntry({
-                  url: stripApiUrl(url),
-                  method: method,
-                  status: capturedStatus,
-                  contentType: capturedCt,
-                  duration: Date.now() - start,
-                  reqBody: reqBody,
-                  reqHeaders: reqHeaders,
-                  resBody: truncateBody(body, 2000),
-                });
-              });
-            })
-            .catch(function () {
-              pushApiEntry({
-                url: stripApiUrl(url),
-                method: method,
-                status: 0,
-                contentType: '',
-                duration: Date.now() - start,
-                reqBody: reqBody,
-                reqHeaders: reqHeaders,
-                resBody: '',
-              });
-              throw arguments[0];
-            });
-        };
-        XMLHttpRequest.prototype.open = function (method, url) {
-          this.__vk_method = method;
-          this.__vk_url = stripApiUrl(url);
-          this.__vk_start = Date.now();
-          this.__vk_reqHeaders = {};
-          var origSetHeader = this.setRequestHeader;
-          var capturedHeaders = this.__vk_reqHeaders;
-          var headerKeys = [
-            'content-type',
-            'authorization',
-            'cookie',
-            'x-csrf-token',
-            'x-xsrf-token',
-            'x-requested-with',
-          ];
-          this.setRequestHeader = function (name, value) {
-            var ln = (name || '').toLowerCase();
-            if (headerKeys.indexOf(ln) !== -1) {
-              var v = String(value || '');
-              capturedHeaders[ln] = v.length > 200 ? v.substring(0, 200) + '...' : v;
-            }
-            return origSetHeader.apply(this, arguments);
-          };
-          return apiOrigXhrOpen.apply(this, arguments);
-        };
-        XMLHttpRequest.prototype.send = function () {
-          var xhr = this;
-          var sentBody = arguments[0] != null ? truncateBody(arguments[0], 3000) : '';
-          xhr.addEventListener('load', function () {
-            var ct = (xhr.getResponseHeader('content-type') || '').split(';')[0];
-            var resBody = '';
-            if (
-              ct &&
-              (ct.indexOf('json') !== -1 ||
-                ct.indexOf('text') !== -1 ||
-                ct.indexOf('xml') !== -1 ||
-                ct.indexOf('html') !== -1)
-            ) {
-              try {
-                resBody = truncateBody(xhr.responseText, 2000);
-              } catch (e) {}
-            }
-            pushApiEntry({
-              url: xhr.__vk_url || location.href,
-              method: xhr.__vk_method || 'GET',
-              status: xhr.status,
-              contentType: ct,
-              duration: Date.now() - (xhr.__vk_start || Date.now()),
-              reqBody: sentBody,
-              reqHeaders: xhr.__vk_reqHeaders || {},
-              resBody: resBody,
-            });
-          });
-          return apiOrigXhrSend.apply(this, arguments);
-        };
+      if (!apiTrafficActive) {
+        startApiMonitoring();
       }
-      var data = window.__VK_API_TRAFFIC_DATA__ || [];
-      window.__VK_API_TRAFFIC_DATA__ = [];
-      sendResponse({ entries: data, running: !!window.__VK_API_TRAFFIC__ });
+      var data = apiTrafficData;
+      apiTrafficData = [];
+      sendResponse({ entries: data, running: apiTrafficActive });
       return true;
     }
   });

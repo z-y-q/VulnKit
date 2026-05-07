@@ -85,13 +85,11 @@ window.VulnKitSubdomain = (function () {
     'preview',
     'stg',
     'pre',
-    'prod',
     'release',
     'master',
     'alpha',
     'beta',
     'gamma',
-    'redis',
     'mq',
     'rabbitmq',
     'kafka',
@@ -116,7 +114,6 @@ window.VulnKitSubdomain = (function () {
     'trace',
     'jaeger',
     'zipkin',
-    'img',
     'image',
     'pic',
     'photo',
@@ -311,7 +308,6 @@ window.VulnKitSubdomain = (function () {
     'or.jp',
     'ac.jp',
     'go.jp',
-    'co.za',
     'org.za',
     'edu.cn',
     'mil.cn',
@@ -390,13 +386,10 @@ window.VulnKitSubdomain = (function () {
         '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
         subdomains.length +
         '</span> 子域名</div>' +
-        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
         ctCount +
         '</span> CT</div>' +
-        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
         pageCount +
         '</span> 页面</div>' +
-        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
         dnsCount +
         '</span> DNS</div>';
       statsEl.style.display = '';
@@ -503,9 +496,7 @@ window.VulnKitSubdomain = (function () {
       seen[s.host] = true;
     });
     var newDomains = [];
-    var resolvedIps = {};
     var wildcardDetected = false;
-    var wildcardIp = null;
     var tested = 0;
     var total = COMMON_PREFIXES.length;
 

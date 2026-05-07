@@ -453,7 +453,7 @@
         utils.loadLibs._pending[src] = true;
         var s = document.createElement('script');
         s.src = src;
-        s.onload = s.onerror = function () {
+        s.onload = function () {
           delete utils.loadLibs._pending[src];
           if (!failed) {
             count--;
@@ -463,6 +463,11 @@
               resolve();
             }
           }
+        };
+        s.onerror = function () {
+          delete utils.loadLibs._pending[src];
+          failed = true;
+          reject(new Error('加载失败: ' + src));
         };
         (document.head || document.documentElement).appendChild(s);
       });

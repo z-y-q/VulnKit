@@ -364,7 +364,12 @@ window.VulnKitCrypto = (function () {
         );
       })
       .then(function (buf) {
-        return btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+        var bytes = new Uint8Array(buf);
+        var chunks = [];
+        for (var i = 0; i < bytes.length; i += 8192) {
+          chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
+        }
+        return btoa(chunks.join(''));
       });
   }
 

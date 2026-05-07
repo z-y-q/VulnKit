@@ -349,6 +349,21 @@
     // Load options settings so showToast gating and defaults work
     await utils.loadSettings();
 
+    // Load context menu selection (right-click encode/decode)
+    chrome.storage.local.get(['contextSelection', 'contextAction'], function (data) {
+      if (data.contextSelection) {
+        var inputEl = utils.get('encoding-input');
+        if (inputEl) inputEl.value = data.contextSelection;
+        if (data.contextAction === 'decode') {
+          setTimeout(function () { handleDecode(); }, 100);
+        } else if (data.contextAction === 'encode') {
+          setTimeout(function () { handleEncode(); }, 100);
+        }
+        chrome.storage.local.remove(['contextSelection', 'contextAction']);
+        chrome.action.setBadgeText({ text: '' });
+      }
+    });
+
     // Restore persisted UI state
     var savedState = await utils.restoreUIState();
 
