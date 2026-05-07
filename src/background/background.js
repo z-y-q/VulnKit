@@ -237,7 +237,10 @@ async function fetchImage(url) {
     const buf = await resp.arrayBuffer();
     const bytes = new Uint8Array(buf);
     var binary = '';
-    for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    for (var i = 0; i < bytes.length; i += 8192) {
+      var chunk = bytes.subarray(i, Math.min(i + 8192, bytes.length));
+      binary += String.fromCharCode.apply(null, chunk);
+    }
     var b64 = btoa(binary);
     var mime = resp.headers.get('content-type') || 'image/jpeg';
     return { success: true, data: 'data:' + mime + ';base64,' + b64 };

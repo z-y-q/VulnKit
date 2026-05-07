@@ -9,6 +9,7 @@ window.VulnKitWaf = (function () {
   var currentFilter = 'all';
   var currentSearch = '';
   var scanStartTime = 0;
+  var lastHeaders = null;
 
   var WAF_SIGNATURES = [
     {

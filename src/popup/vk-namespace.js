@@ -436,7 +436,7 @@
     if (utils.loadLibs._loaded && utils.loadLibs._loaded[key]) {
       return Promise.resolve();
     }
-    return new Promise(function (resolve) {
+    return new Promise(function (resolve, reject) {
       var remaining = srcs.filter(function (src) {
         return !utils.loadLibs._pending || !utils.loadLibs._pending[src];
       });

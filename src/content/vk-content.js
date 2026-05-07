@@ -308,6 +308,12 @@
 
   function stopApiMonitoring() {
     apiTrafficActive = false;
+    if (apiOrigFetch) window.fetch = apiOrigFetch;
+    if (apiOrigXhrOpen) XMLHttpRequest.prototype.open = apiOrigXhrOpen;
+    if (apiOrigXhrSend) XMLHttpRequest.prototype.send = apiOrigXhrSend;
+    apiOrigFetch = null;
+    apiOrigXhrOpen = null;
+    apiOrigXhrSend = null;
   }
 
   // ====== Message handlers ======

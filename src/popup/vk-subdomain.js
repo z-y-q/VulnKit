@@ -386,11 +386,11 @@ window.VulnKitSubdomain = (function () {
         '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
         subdomains.length +
         '</span> 子域名</div>' +
-        ctCount +
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' + ctCount +
         '</span> CT</div>' +
-        pageCount +
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' + pageCount +
         '</span> 页面</div>' +
-        dnsCount +
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' + dnsCount +
         '</span> DNS</div>';
       statsEl.style.display = '';
     }
