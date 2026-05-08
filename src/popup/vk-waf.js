@@ -151,9 +151,9 @@ window.VulnKitWaf = (function () {
     {
       name: 'Oracle (Barracuda)',
       severity: 'medium',
-      headerMatch: [/bnmsg/i, /barraudacuda/i, /x-barracuda/i],
+      headerMatch: [/bnmsg/i, /barracuda/i, /x-barracuda/i],
       bodyMatch: [/barracuda/i, /blocked by barracuda/i],
-      cookieMatch: [/barrafacuda/i, /bnmsg/i],
+      cookieMatch: [/barracuda/i, /bnmsg/i],
     },
     {
       name: 'Radware AppWall',

@@ -17,7 +17,7 @@
           <button class="xssscan-filter-btn" data-xfilter="form">表单</button>
           <button class="xssscan-filter-btn" data-xfilter="url">URL</button>
           <button class="xssscan-filter-btn" data-xfilter="ajax">AJAX</button>
-          <input type="text" id="xssscan-search" class="input" placeholder="搜索URL/参数..." style="margin-left:8px;max-width:160px;">
+          <input type="text" id="xssscan-search" class="input xssscan-filter-search" placeholder="搜索URL/参数...">
         </div>
         <div class="xssscan-count" id="xssscan-count"></div>
         <div class="xssscan-results" id="xssscan-results">
@@ -50,9 +50,16 @@
           <div class="xssscan-batch-actions">
             <button class="btn btn-sm btn-outline" id="xssscan-selectall-btn">全选</button>
             <button class="btn btn-sm btn-primary" id="xssscan-batchopen-btn">批量打开</button>
+            <button class="btn btn-sm btn-secondary" id="xssscan-verify-btn">验证反射</button>
             <button class="btn btn-sm btn-outline" id="xssscan-copyall-btn">复制所有URL</button>
             <button class="btn btn-sm btn-outline" id="xssscan-export-btn">导出</button>
           </div>
+        </div>
+
+        <div class="xssscan-verify-results" id="xssscan-verify-results" style="display:none">
+          <div class="card-title">反射验证结果</div>
+          <div id="xssscan-verify-list"></div>
+        </div>
         </div>
       </div>
 
@@ -63,7 +70,7 @@
           <button class="btn btn-outline" id="xssscan-sink-clear-btn">清空</button>
         </div>
         <div class="xssscan-status" id="xssscan-sink-status">点击「分析 DOM 汇点」扫描页面中的危险 Sink</div>
-        <div class="xssscan-results" id="xssscan-sink-results" style="max-height:320px;">
+        <div class="xssscan-results xssscan-sink-results" id="xssscan-sink-results">
           <div class="empty-state">暂无分析结果</div>
         </div>
       </div>

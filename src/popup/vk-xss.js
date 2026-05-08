@@ -217,7 +217,8 @@ window.VulnKitXss = (function () {
             let fullUrl;
             try {
               fullUrl = new URL(url, pageUrl).href;
-            } catch {
+            } catch (_) {
+              /* invalid URL */
               return;
             }
             const key = fullUrl + '|' + param + '|' + method;
@@ -233,7 +234,9 @@ window.VulnKitXss = (function () {
               href.searchParams.forEach((_, key) => {
                 addPoint('link', href.pathname + href.search, key, 'GET');
               });
-            } catch {}
+            } catch (_) {
+              /* malformed link href */
+            }
           });
 
           document.querySelectorAll('form').forEach(form => {
@@ -251,7 +254,9 @@ window.VulnKitXss = (function () {
             currentUrl.searchParams.forEach((_, key) => {
               addPoint('url', currentUrl.pathname + currentUrl.search, key, 'GET');
             });
-          } catch {}
+          } catch (_) {
+            /* malformed current page URL */
+          }
 
           return collected;
         },
@@ -551,7 +556,9 @@ window.VulnKitXss = (function () {
               window.__XSS_INTERCEPT__.push({ url: urlBase, param: k, method: method });
             }
           });
-        } catch (e) {}
+        } catch (e) {
+          /* JSON parse failure in response body */
+        }
       }
       function collectQueryParams(rawUrl, method) {
         try {
@@ -563,7 +570,9 @@ window.VulnKitXss = (function () {
               method: method,
             });
           });
-        } catch {}
+        } catch (_) {
+          /* network request interception failed */
+        }
       }
       function collectBodyParams(body, rawUrl, method) {
         try {
@@ -576,9 +585,13 @@ window.VulnKitXss = (function () {
                 param: k,
                 method: method,
               });
-            } catch {}
+            } catch (_) {
+              /* URL construction failed */
+            }
           });
-        } catch {}
+        } catch (_) {
+          /* response param iteration failed */
+        }
       }
       function processRequest(rawUrl, method, body) {
         collectQueryParams(rawUrl, method);
@@ -587,7 +600,9 @@ window.VulnKitXss = (function () {
           try {
             var u = new URL(rawUrl, location.href);
             extractJsonParams(body, u.origin + u.pathname, method);
-          } catch (e) {}
+          } catch (e) {
+            /* malformed AJAX URL */
+          }
         }
       }
       const origOpen = window.__XSS_ORIGINAL__.xhrOpen;
@@ -637,7 +652,9 @@ window.VulnKitXss = (function () {
             renderXssPoints();
           }
         }
-      } catch {}
+      } catch (_) {
+        /* interceptor setup failed */
+      }
     }, 2000);
   }
 
@@ -798,7 +815,8 @@ window.VulnKitXss = (function () {
         return { url: url.href, method: 'POST', param: point.param, payload: payload };
       }
       return url.href;
-    } catch {
+    } catch (_) {
+      /* URL construction failed */
       return null;
     }
   }
@@ -906,7 +924,8 @@ window.VulnKitXss = (function () {
             { world: 'ISOLATED', args: [targetUrl, point.param, payload] }
           );
           opened++;
-        } catch {
+        } catch (_) {
+          /* tab creation failed, try blob fallback */
           try {
             const escAttr = s =>
               s
@@ -925,8 +944,8 @@ window.VulnKitXss = (function () {
             const blobUrl = URL.createObjectURL(new Blob([formHtml], { type: 'text/html' }));
             chrome.tabs.create({ url: blobUrl, active: false });
             opened++;
-          } catch {
-            /* skip */
+          } catch (_) {
+            /* blob URL fallback also failed */
           }
         }
       }
@@ -934,6 +953,193 @@ window.VulnKitXss = (function () {
 
     const methodInfo = postPoints.length > 0 ? '（POST 通过页面内表单提交）' : '';
     utils.showToast('已打开 ' + opened + ' 个测试页面' + methodInfo, 'success');
+  }
+
+  function fetchWithTimeout(url, timeout) {
+    return new Promise(function (resolve) {
+      var timer = setTimeout(function () {
+        resolve(null);
+      }, timeout);
+      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url, timeout: timeout }, function (r) {
+        clearTimeout(timer);
+        resolve(r || null);
+      });
+    });
+  }
+
+  function buildTestUrl(point, payload) {
+    if (point.method === 'POST') return null;
+    try {
+      var urlObj = new URL(point.url);
+      urlObj.searchParams.set(point.param, payload);
+      return urlObj.href;
+    } catch (_) {
+      /* malformed URL */
+    }
+    return null;
+  }
+
+  function buildPostBody(point, payload) {
+    if (point.method !== 'POST') return null;
+    return JSON.stringify({ param: point.param, payload: payload });
+  }
+
+  async function verifySinglePoint(point, payload, rawPayload) {
+    var testUrl = buildTestUrl(point, payload);
+    if (!testUrl) {
+      var postBody = buildPostBody(point, payload);
+      if (postBody) {
+        try {
+          var resp = await fetchWithTimeout(point.url, 10000);
+          if (resp && !resp.error) {
+            var body = resp.body || '';
+            if (body.indexOf(rawPayload) !== -1) {
+              return {
+                point: point,
+                status: 'reflected',
+                detail: 'Payload 在 POST 响应中出现',
+                context: analyzeReflectionContext(body, rawPayload),
+                testUrl: point.url + ' [POST]',
+              };
+            }
+            return {
+              point: point,
+              status: 'safe',
+              detail: 'Payload 未在 POST 响应中出现',
+              testUrl: point.url + ' [POST]',
+            };
+          }
+          return { point: point, status: 'error', detail: (resp && resp.error) || 'POST 请求失败' };
+        } catch (e) {
+          return { point: point, status: 'error', detail: e.message };
+        }
+      }
+      return { point: point, status: 'skip', detail: '不支持的请求方法' };
+    }
+
+    try {
+      var resp = await fetchWithTimeout(testUrl, 10000);
+      if (!resp || resp.error) {
+        return { point: point, status: 'error', detail: (resp && resp.error) || '请求失败' };
+      }
+      var body = resp.body || '';
+      if (body.indexOf(rawPayload) !== -1) {
+        return {
+          point: point,
+          status: 'reflected',
+          detail: 'Payload 在响应中出现',
+          context: analyzeReflectionContext(body, rawPayload),
+          testUrl: testUrl,
+        };
+      }
+      return { point: point, status: 'safe', detail: 'Payload 未在响应中出现', testUrl: testUrl };
+    } catch (e) {
+      return { point: point, status: 'error', detail: e.message };
+    }
+  }
+
+  var VERIFY_BADGES = { reflected: '反射', safe: '安全', skip: '跳过', error: '错误' };
+
+  function renderVerifyResult(r) {
+    var badge = VERIFY_BADGES[r.status] || '错误';
+    var html = '<div class="xss-verify-item ' + r.status + '">';
+    html += '<span class="xss-verify-badge ' + r.status + '">[' + badge + ']</span> ';
+    html += utils.escapeHtml(r.point.param) + ' @ ' + utils.escapeHtml(truncateUrl(r.point.url));
+    html += '<div class="xss-verify-detail">' + utils.escapeHtml(r.detail) + '</div>';
+    if (r.context) {
+      html += '<div class="xss-verify-context">上下文: ' + utils.escapeHtml(r.context) + '</div>';
+    }
+    if (r.testUrl && /^https?:/.test(r.testUrl)) {
+      html +=
+        '<div class="xss-verify-link"><a href="' +
+        utils.escapeHtml(r.testUrl) +
+        '" target="_blank">打开测试 URL</a></div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderVerifyResults(results, verifyList) {
+    if (!verifyList) return;
+    verifyList.innerHTML = results.map(renderVerifyResult).join('');
+  }
+
+  function updateVerifyStatus(results, statusEl) {
+    if (!statusEl) return;
+    var reflected = results.filter(function (r) {
+      return r.status === 'reflected';
+    }).length;
+    var safe = results.filter(function (r) {
+      return r.status === 'safe';
+    }).length;
+    var other = results.length - reflected - safe;
+    statusEl.textContent =
+      '反射验证完成: ' + reflected + ' 反射 / ' + safe + ' 安全 / ' + other + ' 其他';
+    statusEl.style.color = reflected > 0 ? '#e74c3c' : '#27ae60';
+    if (reflected > 0) {
+      utils.showToast('发现 ' + reflected + ' 个反射点!', 'error');
+    } else {
+      utils.showToast('验证完成，未发现反射', 'success');
+    }
+  }
+
+  async function handleVerifyReflection() {
+    var selected = getSelectedXssPoints();
+    if (selected.length === 0) {
+      utils.showToast('没有选中的注入点', 'warning');
+      return;
+    }
+
+    var payload = getEncodedPayload();
+    var rawPayload = getSelectedPayload();
+    var statusEl = utils.get('xssscan-status');
+    var verifyPanel = utils.get('xssscan-verify-results');
+    var verifyList = utils.get('xssscan-verify-list');
+
+    if (statusEl) {
+      statusEl.textContent = '正在验证反射...';
+      statusEl.style.color = '#4A90E2';
+    }
+    if (verifyPanel) verifyPanel.style.display = '';
+
+    var results = [];
+    for (var i = 0; i < selected.length; i++) {
+      if (statusEl)
+        statusEl.textContent = '验证反射中... (' + (i + 1) + '/' + selected.length + ')';
+      results.push(await verifySinglePoint(selected[i], payload, rawPayload));
+    }
+
+    renderVerifyResults(results, verifyList);
+    updateVerifyStatus(results, statusEl);
+  }
+
+  function truncateUrl(url) {
+    if (url.length > 60) return url.substring(0, 57) + '...';
+    return url;
+  }
+
+  function analyzeReflectionContext(body, needle) {
+    var idx = body.indexOf(needle);
+    if (idx === -1) return 'unknown';
+
+    var start = Math.max(0, idx - 40);
+    var end = Math.min(body.length, idx + needle.length + 40);
+    var before = body.substring(start, idx);
+    var after = body.substring(idx + needle.length, end);
+
+    if (/<script[^>]*>[\s\S]*$/i.test(before) && /^[\s\S]*<\/script>/i.test(after)) {
+      return 'in <script> tag — high risk';
+    }
+    if (/<\w+[^>]*$/i.test(before)) {
+      return 'in HTML tag attribute — possible attribute injection';
+    }
+    if (/["'][^"'>]*$/i.test(before)) {
+      return 'in attribute value — check for quote breakout';
+    }
+    if (/<[^>]*$/.test(before)) {
+      return 'in HTML tag context — possible tag injection';
+    }
+    return 'in HTML text context';
   }
 
   function handleCopyXssUrls() {
@@ -1014,6 +1220,7 @@ window.VulnKitXss = (function () {
     renderXssPoints: renderXssPoints,
     handleXssHarvest: handleXssHarvest,
     handleBatchOpenXss: handleBatchOpenXss,
+    handleVerifyReflection: handleVerifyReflection,
     handleCopyXssUrls: handleCopyXssUrls,
     initXssScanPayloadSelect: initXssScanPayloadSelect,
     clearResults: clearResults,

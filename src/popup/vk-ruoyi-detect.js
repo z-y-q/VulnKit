@@ -455,7 +455,11 @@ window.VulnKitRuoYiDetect = (function () {
                   if (backendUris.length > 0) {
                     gwHtml +=
                       '<span class="ruoyi-detect-tag tag-version">后端服务: ' +
-                      backendUris.map(function(u) { return utils.escapeHtml(u); }).join(', ') +
+                      backendUris
+                        .map(function (u) {
+                          return utils.escapeHtml(u);
+                        })
+                        .join(', ') +
                       '</span>';
                   }
                   gwHtml += '</div>';
@@ -535,7 +539,12 @@ window.VulnKitRuoYiDetect = (function () {
                   '<span class="ruoyi-detect-tag tag-token">Nacos 服务 (' +
                   discoveredServices.length +
                   '): ' +
-                  discoveredServices.slice(0, 8).map(function(s) { return utils.escapeHtml(s); }).join(', ') +
+                  discoveredServices
+                    .slice(0, 8)
+                    .map(function (s) {
+                      return utils.escapeHtml(s);
+                    })
+                    .join(', ') +
                   (discoveredServices.length > 8 ? '...' : '') +
                   '</span>';
                 nacosHtml += '</div>';
@@ -572,12 +581,76 @@ window.VulnKitRuoYiDetect = (function () {
   function lookupCve(version) {
     version = utils.requireInput(version, '未检测到版本信息');
     if (!version) return;
-    var query = 'RuoYi ' + version;
-    var url =
+
+    var resultsEl = utils.get('ruoyi-results');
+    var db = window.VulnKitRuoYiCveDb;
+    var matches = db ? db.searchByVersion(version) : [];
+
+    if (matches.length === 0) {
+      matches = db ? db.searchCve('RuoYi') : [];
+    }
+
+    var html = '<div class="ruoyi-cve-panel">';
+    html +=
+      '<div class="ruoyi-cve-header">RuoYi ' +
+      utils.escapeHtml(version) +
+      ' CVE 数据库 (' +
+      matches.length +
+      ' 条)</div>';
+
+    if (matches.length === 0) {
+      html += '<div class="ruoyi-cve-empty">未找到匹配的已知漏洞</div>';
+    } else {
+      var severityOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+      matches.sort(function (a, b) {
+        return (severityOrder[a.severity] || 5) - (severityOrder[b.severity] || 5);
+      });
+      matches.forEach(function (cve) {
+        html += '<div class="ruoyi-cve-item ruoyi-cve-' + cve.severity + '">';
+        html +=
+          '<div class="ruoyi-cve-title"><span class="ruoyi-cve-severity ' +
+          cve.severity +
+          '">' +
+          cve.severity.toUpperCase() +
+          '</span> ' +
+          utils.escapeHtml(cve.id) +
+          '</div>';
+        html += '<div class="ruoyi-cve-desc">' + utils.escapeHtml(cve.title) + '</div>';
+        html += '<div class="ruoyi-cve-detail">' + utils.escapeHtml(cve.description) + '</div>';
+        html +=
+          '<div class="ruoyi-cve-affected">影响版本: ' +
+          cve.affected
+            .map(function (a) {
+              return utils.escapeHtml(a);
+            })
+            .join(', ') +
+          '</div>';
+        if (cve.refs && cve.refs.length > 0) {
+          html += '<div class="ruoyi-cve-refs">';
+          cve.refs.forEach(function (ref) {
+            html +=
+              '<a href="' +
+              utils.escapeHtml(ref) +
+              '" target="_blank" class="ruoyi-cve-link">NVD 详情</a>';
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+      });
+    }
+
+    var nvdUrl =
       'https://nvd.nist.gov/vuln/search/results?query=' +
-      encodeURIComponent(query) +
+      encodeURIComponent('RuoYi ' + version) +
       '&results_type=overview';
-    window.open(url, '_blank');
+    html +=
+      '<div class="ruoyi-cve-footer"><a href="' +
+      nvdUrl +
+      '" target="_blank" class="ruoyi-cve-link">在 NVD 中搜索更多</a></div>';
+    html += '</div>';
+
+    if (resultsEl) resultsEl.innerHTML = html;
+    utils.setStatus('ruoyi-status', 'CVE 查询完成: ' + matches.length + ' 条结果');
   }
 
   // ====== Fetch Captured Routes (shared with hook module) ======

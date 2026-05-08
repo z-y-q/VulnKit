@@ -184,8 +184,8 @@ window.VulnKitSubdomain = (function () {
         }
         if (statusEl) statusEl.textContent = statusText;
         renderSubdomains(lastSubdomains, baseDomain);
-        if (copyBtn) copyBtn.style.display = '';
-        if (exportBtn) exportBtn.style.display = '';
+        if (copyBtn) copyBtn.hidden = false;
+        if (exportBtn) exportBtn.hidden = false;
       });
     });
   }
@@ -233,7 +233,9 @@ window.VulnKitSubdomain = (function () {
                   seen[hostname] = true;
                   pageSubdomains.push({ host: hostname, source: 'page' });
                 }
-              } catch (e) {}
+              } catch (_) {
+                /* malformed link href */
+              }
             });
 
             // Merge with existing
@@ -259,8 +261,8 @@ window.VulnKitSubdomain = (function () {
                 lastSubdomains.length +
                 ' 个子域名';
             renderSubdomains(lastSubdomains, baseDomain);
-            if (copyBtn) copyBtn.style.display = '';
-            if (exportBtn) exportBtn.style.display = '';
+            if (copyBtn) copyBtn.hidden = false;
+            if (exportBtn) exportBtn.hidden = false;
           });
         });
       });
@@ -377,6 +379,9 @@ window.VulnKitSubdomain = (function () {
     var pageCount = subdomains.filter(function (s) {
       return s.source === 'page';
     }).length;
+    var httpCount = subdomains.filter(function (s) {
+      return s.source === 'http';
+    }).length;
     var dnsCount = subdomains.filter(function (s) {
       return s.source === 'dns';
     }).length;
@@ -386,13 +391,21 @@ window.VulnKitSubdomain = (function () {
         '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
         subdomains.length +
         '</span> 子域名</div>' +
-        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' + ctCount +
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+        ctCount +
         '</span> CT</div>' +
-        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' + pageCount +
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+        pageCount +
         '</span> 页面</div>' +
-        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' + dnsCount +
-        '</span> DNS</div>';
-      statsEl.style.display = '';
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+        httpCount +
+        '</span> HTTP</div>' +
+        (dnsCount > 0
+          ? '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+            dnsCount +
+            '</span> DNS</div>'
+          : '');
+      statsEl.hidden = false;
     }
 
     if (subdomains.length === 0) {
@@ -430,7 +443,7 @@ window.VulnKitSubdomain = (function () {
   }
 
   function sourceLabel(src) {
-    var labels = { ct: 'CT', page: '页面', dns: 'DNS' };
+    var labels = { ct: 'CT', page: '页面', http: 'HTTP', dns: 'DNS' };
     return labels[src] || src;
   }
 
@@ -465,7 +478,134 @@ window.VulnKitSubdomain = (function () {
     });
   }
 
-  async function bruteForceDns() {
+  function dnsResolve(hostname) {
+    return new Promise(function (resolve) {
+      chrome.runtime.sendMessage(
+        { type: 'FETCH_DNS_RESOLVE', hostname: hostname },
+        function (resp) {
+          if (chrome.runtime.lastError || !resp || resp.error) {
+            resolve(null);
+            return;
+          }
+          resolve(resp);
+        }
+      );
+    });
+  }
+
+  function httpProbe(hostname) {
+    return new Promise(function (resolve) {
+      var timer = setTimeout(function () {
+        resolve(null);
+      }, 5000);
+      chrome.runtime.sendMessage(
+        { type: 'FETCH_DNS_PROBE', url: 'https://' + hostname, method: 'HEAD', timeout: 5000 },
+        function (resp) {
+          clearTimeout(timer);
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(resp || null);
+        }
+      );
+    });
+  }
+
+  async function detectWildcard(baseDomain, statusEl) {
+    if (statusEl) statusEl.textContent = '检测泛解析...';
+    var probes = [
+      'rnd' + Math.random().toString(36).slice(2, 8),
+      'rnd' + Math.random().toString(36).slice(2, 8),
+      'rnd' + Math.random().toString(36).slice(2, 8),
+    ];
+    for (var i = 0; i < probes.length; i++) {
+      var result = await dnsResolve(probes[i] + '.' + baseDomain);
+      if (result && result.addresses && result.addresses.length > 0) {
+        if (statusEl) statusEl.textContent = '检测到泛解析 (wildcard)，将改为 HTTP 探测';
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async function resolveDnsPrefixes(baseDomain, seen, statusEl) {
+    var resolved = [];
+    var newDns = [];
+    var total = COMMON_PREFIXES.length;
+    var tested = 0;
+    for (var i = 0; i < total; i += DNS_BATCH_SIZE) {
+      if (dnsScanAborted) break;
+      var batch = COMMON_PREFIXES.slice(i, Math.min(i + DNS_BATCH_SIZE, total));
+      for (var j = 0; j < batch.length; j++) {
+        if (dnsScanAborted) break;
+        var host = batch[j] + '.' + baseDomain;
+        tested++;
+        if (seen[host]) continue;
+        if (statusEl) {
+          var elapsed = ((Date.now() - scanStartTime) / 1000).toFixed(1);
+          statusEl.textContent = 'DNS 解析中... (' + tested + '/' + total + ') ' + elapsed + 's';
+        }
+        var result = await dnsResolve(host);
+        if (result && result.addresses && result.addresses.length > 0) {
+          seen[host] = true;
+          resolved.push({ host: host, addresses: result.addresses });
+          newDns.push({ host: host, source: 'dns' });
+        }
+      }
+      if (!dnsScanAborted && i + DNS_BATCH_SIZE < total) await delay(DNS_BATCH_DELAY_MS);
+    }
+    return { resolved: resolved, newDns: newDns };
+  }
+
+  async function probeHttpTargets(targets, seen, wildcardDetected, statusEl) {
+    var results = [];
+    var wildcardConfirmed = false;
+    for (var k = 0; k < targets.length; k++) {
+      if (dnsScanAborted) break;
+      var host = targets[k];
+      if (statusEl) {
+        var elapsed = ((Date.now() - scanStartTime) / 1000).toFixed(1);
+        statusEl.textContent =
+          'HTTP 探测中... (' + (k + 1) + '/' + targets.length + ') ' + elapsed + 's';
+      }
+      try {
+        var probeResult = await httpProbe(host);
+        if (probeResult && !probeResult.error && probeResult.status > 0) {
+          if (wildcardDetected && !wildcardConfirmed) {
+            var httpHits = results.length;
+            if (httpHits > 2 && httpHits / (k + 1) > 0.8) {
+              wildcardConfirmed = true;
+              results = results.slice(0, 2);
+              continue;
+            }
+          }
+          if (!seen[host]) {
+            seen[host] = true;
+            results.push({ host: host, source: 'http', status: probeResult.status });
+          }
+        }
+      } catch (e) {
+        /* network failure expected for unreachable hosts */
+      }
+    }
+    return results;
+  }
+
+  function mergeScanResults(newDomains) {
+    var existingMap = {};
+    lastSubdomains.forEach(function (s) {
+      existingMap[s.host] = s;
+    });
+    newDomains.forEach(function (s) {
+      if (!existingMap[s.host]) lastSubdomains.push(s);
+    });
+    lastSubdomains.sort(function (a, b) {
+      return a.host.localeCompare(b.host);
+    });
+  }
+
+  async function bruteForceHttpProbe() {
     var statusEl = utils.get('subdomain-status');
     var copyBtn = utils.get('subdomain-copy-btn');
     var exportBtn = utils.get('subdomain-export-btn');
@@ -482,130 +622,74 @@ window.VulnKitSubdomain = (function () {
     }
 
     var baseDomain = extractBaseDomain(domain);
-    var tab = await utils.requireTabId();
-    if (!tab) return;
-
     dnsScanAborted = false;
     dnsScanActive = true;
     scanStartTime = Date.now();
     lastBaseDomain = baseDomain;
-    if (statusEl) statusEl.textContent = 'DNS 暴力枚举中...';
+    if (statusEl) statusEl.textContent = '正在探测...';
 
     var seen = {};
     lastSubdomains.forEach(function (s) {
       seen[s.host] = true;
     });
+
+    // Phase 1: Wildcard detection
+    var wildcardDetected = await detectWildcard(baseDomain, statusEl);
+
+    // Phase 2: DNS resolution
     var newDomains = [];
-    var wildcardDetected = false;
-    var tested = 0;
-    var total = COMMON_PREFIXES.length;
-
-    for (var i = 0; i < COMMON_PREFIXES.length; i += DNS_BATCH_SIZE) {
-      if (dnsScanAborted) break;
-      var batch = COMMON_PREFIXES.slice(i, Math.min(i + DNS_BATCH_SIZE, total));
-
-      for (var j = 0; j < batch.length; j++) {
-        if (dnsScanAborted) break;
-        var prefix = batch[j];
-        var host = prefix + '.' + baseDomain;
-        if (seen[host]) {
-          tested++;
-          continue;
-        }
-        tested++;
-        if (statusEl) {
-          var elapsed = ((Date.now() - scanStartTime) / 1000).toFixed(1);
-          statusEl.textContent = 'DNS 枚举中... (' + tested + '/' + total + ') ' + elapsed + 's';
-        }
-
-        try {
-          var result = await new Promise(function (resolve) {
-            var timer = setTimeout(function () {
-              resolve(null);
-            }, 5000);
-            chrome.runtime.sendMessage(
-              {
-                type: 'FETCH_DNS_PROBE',
-                url: 'https://' + host,
-                method: 'HEAD',
-                timeout: 5000,
-              },
-              function (resp) {
-                clearTimeout(timer);
-                if (chrome.runtime.lastError) {
-                  resolve(null);
-                  return;
-                }
-                resolve(resp || null);
-              }
-            );
-          });
-
-          // no-cors mode: status=1 means opaque response (reachable), status>0 means connected
-          if (result && !result.error && result.status > 0) {
-            if (wildcardDetected) continue;
-            if (!wildcardDetected) {
-              var hitCount = newDomains.length;
-              if (hitCount > 2 && hitCount / tested > 0.8) {
-                wildcardDetected = true;
-                newDomains = newDomains.slice(0, 2);
-                if (statusEl) statusEl.textContent = '检测到 DNS 通配符，停止枚举';
-                continue;
-              }
-            }
-            seen[host] = true;
-            newDomains.push({ host: host, source: 'dns', status: result.status });
-          }
-        } catch (e) {}
-      }
-
-      if (!dnsScanAborted && i + DNS_BATCH_SIZE < total) {
-        await delay(DNS_BATCH_DELAY_MS);
-      }
+    var dnsResolved = [];
+    if (!wildcardDetected) {
+      var dnsResult = await resolveDnsPrefixes(baseDomain, seen, statusEl);
+      dnsResolved = dnsResult.resolved;
+      newDomains = newDomains.concat(dnsResult.newDns);
     }
 
+    // Phase 3: HTTP probe
+    var httpTargets = wildcardDetected
+      ? COMMON_PREFIXES.map(function (p) {
+          return p + '.' + baseDomain;
+        }).filter(function (h) {
+          return !seen[h];
+        })
+      : dnsResolved.map(function (d) {
+          return d.host;
+        });
+    var httpResults = await probeHttpTargets(httpTargets, seen, wildcardDetected, statusEl);
+    newDomains = newDomains.concat(httpResults);
+
+    // Finalize
     if (dnsScanAborted) {
-      if (statusEl) statusEl.textContent = 'DNS 枚举已取消';
+      if (statusEl) statusEl.textContent = '探测已取消';
     } else {
-      var existingMap = {};
-      lastSubdomains.forEach(function (s) {
-        existingMap[s.host] = s;
-      });
-      newDomains.forEach(function (s) {
-        if (!existingMap[s.host]) lastSubdomains.push(s);
-      });
-      lastSubdomains.sort(function (a, b) {
-        return a.host.localeCompare(b.host);
-      });
+      mergeScanResults(newDomains);
       if (statusEl) {
         var elapsed = ((Date.now() - scanStartTime) / 1000).toFixed(1);
         var statusText =
-          'DNS 枚举完成 (' +
+          '探测完成 (' +
           elapsed +
           's): 新增 ' +
           newDomains.length +
           '，共 ' +
           lastSubdomains.length +
           ' 个子域名';
-        if (newDomains.length === 0 && !wildcardDetected) {
-          statusText += ' — 未发现新子域名，可能目标站点子域名较少或网络连接异常';
-        } else if (wildcardDetected) {
-          statusText += ' — 检测到 DNS 通配符，已过滤泛解析结果';
-        }
+        if (newDomains.length === 0 && !wildcardDetected) statusText += ' — 未发现新子域名';
+        else if (wildcardDetected) statusText += ' — 检测到泛解析，已过滤';
         statusEl.textContent = statusText;
       }
     }
 
     dnsScanActive = false;
     renderSubdomains(lastSubdomains, baseDomain);
-    if (copyBtn) copyBtn.style.display = '';
-    if (exportBtn) exportBtn.style.display = '';
+    if (copyBtn) copyBtn.hidden = false;
+    if (exportBtn) exportBtn.hidden = false;
   }
 
   return {
     collectSubdomains: collectSubdomains,
     extractFromPage: extractFromPage,
-    bruteForceDns: bruteForceDns,
+    bruteForceDns: bruteForceHttpProbe,
+    bruteForceHttpProbe: bruteForceHttpProbe,
     copyResults: copyResults,
     exportResults: exportResults,
     filterBySource: filterBySource,

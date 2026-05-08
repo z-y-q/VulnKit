@@ -11,7 +11,8 @@
     "contextMenus",
     "declarativeNetRequestWithHostAccess",
     "cookies",
-    "downloads"
+    "downloads",
+    "dns"
   ],
   "host_permissions": [
     "<all_urls>"

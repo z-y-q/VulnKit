@@ -504,6 +504,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       return true;
 
+    case 'FETCH_DNS_RESOLVE':
+      {
+        const hostname = message.hostname;
+        if (!hostname || typeof hostname !== 'string') {
+          sendResponse({ error: 'Invalid hostname' });
+          return true;
+        }
+        try {
+          chrome.dns.resolve(hostname, result => {
+            if (chrome.runtime.lastError) {
+              sendResponse({ error: chrome.runtime.lastError.message, addresses: [] });
+            } else {
+              sendResponse({ addresses: result.addresses || [], resultCode: result.resultCode });
+            }
+          });
+        } catch (e) {
+          sendResponse({ error: e.message, addresses: [] });
+        }
+      }
+      return true;
+
     case 'FETCH_DNS_PROBE':
       // DNS subdomain probe: background fetch without CORS restrictions
       {

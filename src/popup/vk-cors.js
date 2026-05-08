@@ -18,7 +18,22 @@ window.VulnKitCors = (function () {
     { value: 'https://evil.com', label: '跨域恶意' },
   ];
 
-  var METHOD_VARIANTS = ['GET', 'POST', 'PUT', 'DELETE'];
+  var METHOD_OPTIONS = [
+    { id: 'cors-method-get', value: 'GET' },
+    { id: 'cors-method-post', value: 'POST' },
+    { id: 'cors-method-put', value: 'PUT' },
+    { id: 'cors-method-delete', value: 'DELETE' },
+  ];
+
+  function getSelectedMethods() {
+    var methods = METHOD_OPTIONS.filter(function (m) {
+      var cb = utils.get(m.id);
+      return cb && cb.checked;
+    }).map(function (m) {
+      return m.value;
+    });
+    return methods.length > 0 ? methods : ['GET'];
+  }
 
   var DEFAULT_ENDPOINTS = [
     { path: '/', label: '根路径' },
@@ -92,6 +107,61 @@ window.VulnKitCors = (function () {
     });
   }
 
+  function updateScanStatus(statusEl, completed, totalTasks) {
+    if (!statusEl) return;
+    var elapsed = ((Date.now() - scanStartTime) / 1000).toFixed(1);
+    statusEl.textContent = '检测中... (' + completed + '/' + totalTasks + ') ' + elapsed + 's';
+  }
+
+  async function probeEndpointMethods(ep, epUrl, methods, origins, ctx) {
+    for (var mi = 0; mi < methods.length; mi++) {
+      if (scanAborted) break;
+      var method = methods[mi];
+      for (var oi = 0; oi < origins.length; oi++) {
+        if (scanAborted) break;
+        var origin = origins[oi];
+        var resp = await sendCorsProbe(epUrl, method, origin.value);
+        ctx.completed++;
+        updateScanStatus(ctx.statusEl, ctx.completed, ctx.totalTasks);
+        if (resp && resp.error) {
+          if (resp.error !== 'timeout') {
+            ctx.errors.push({
+              url: epUrl,
+              origin: origin.value,
+              method: method,
+              error: resp.error,
+            });
+          }
+          continue;
+        }
+        ctx.allResults.push({
+          endpoint: ep,
+          url: epUrl,
+          origin: origin,
+          method: method,
+          response: resp,
+        });
+      }
+    }
+  }
+
+  async function probeEndpointOptions(ep, epUrl, origins, ctx) {
+    for (var i = 0; i < origins.length; i++) {
+      if (scanAborted) break;
+      var resp = await sendCorsProbe(epUrl, 'OPTIONS', origins[i].value);
+      ctx.completed++;
+      updateScanStatus(ctx.statusEl, ctx.completed, ctx.totalTasks);
+      if (!resp || resp.error) continue;
+      ctx.allResults.push({
+        endpoint: ep,
+        url: epUrl,
+        origin: origins[i],
+        method: 'OPTIONS',
+        response: resp,
+      });
+    }
+  }
+
   async function scanCors() {
     if (scanActive) {
       scanAborted = true;
@@ -101,6 +171,7 @@ window.VulnKitCors = (function () {
     var statusEl = utils.get('cors-status');
     var resultsEl = utils.get('cors-results');
     var copyBtn = utils.get('cors-copy-btn');
+    var exportBtn = utils.get('cors-export-btn');
     var scanBtn = utils.get('cors-scan-btn');
 
     if (statusEl) statusEl.textContent = '正在检测 CORS 配置...';
@@ -109,7 +180,8 @@ window.VulnKitCors = (function () {
     scanActive = true;
     scanStartTime = Date.now();
     if (scanBtn) scanBtn.textContent = '停止检测';
-    if (copyBtn) copyBtn.style.display = 'none';
+    if (copyBtn) copyBtn.hidden = true;
+    if (exportBtn) exportBtn.hidden = true;
 
     try {
       var tab = await utils.requireTabId();
@@ -121,78 +193,41 @@ window.VulnKitCors = (function () {
       var baseUrl = new URL(tab.url).origin;
       var endpoints = getAllEndpoints();
       var origins = getSelectedOrigins();
+      var methods = getSelectedMethods();
+      var totalTasks =
+        endpoints.length * origins.length * methods.length + endpoints.length * origins.length;
 
-      var totalTasks = endpoints.length * origins.length + endpoints.length;
-      var completed = 0;
-      var allResults = [];
-      var errors = [];
+      var ctx = {
+        statusEl: statusEl,
+        completed: 0,
+        totalTasks: totalTasks,
+        allResults: [],
+        errors: [],
+      };
 
       for (var ei = 0; ei < endpoints.length; ei++) {
         if (scanAborted) break;
         var ep = endpoints[ei];
         var epUrl = baseUrl + ep.path;
-
-        for (var oi = 0; oi < origins.length; oi++) {
-          if (scanAborted) break;
-          var origin = origins[oi];
-
-          var resp = await sendCorsProbe(epUrl, 'GET', origin.value);
-          completed++;
-          if (statusEl) {
-            var elapsed1 = ((Date.now() - scanStartTime) / 1000).toFixed(1);
-            statusEl.textContent =
-              '检测中... (' + completed + '/' + totalTasks + ') ' + elapsed1 + 's';
-          }
-
-          if (resp && resp.error) {
-            if (resp.error !== 'timeout') {
-              errors.push({ url: epUrl, origin: origin.value, error: resp.error });
-            }
-            continue;
-          }
-
-          allResults.push({
-            endpoint: ep,
-            url: epUrl,
-            origin: origin,
-            method: 'GET',
-            response: resp,
-          });
-        }
-
+        await probeEndpointMethods(ep, epUrl, methods, origins, ctx);
         if (scanAborted) break;
-
-        var optionsResp = await sendCorsProbe(epUrl, 'OPTIONS', origins[0].value);
-        completed++;
-        if (statusEl) {
-          var elapsed2 = ((Date.now() - scanStartTime) / 1000).toFixed(1);
-          statusEl.textContent =
-            '检测中... (' + completed + '/' + totalTasks + ') ' + elapsed2 + 's';
-        }
-        if (!optionsResp || optionsResp.error) continue;
-
-        allResults.push({
-          endpoint: ep,
-          url: epUrl,
-          origin: origins[0],
-          method: 'OPTIONS',
-          response: optionsResp,
-        });
+        await probeEndpointOptions(ep, epUrl, origins, ctx);
       }
 
       if (!scanAborted) {
-        var analysis = analyzeResults(allResults);
-        analysis.errors = errors;
+        var analysis = analyzeResults(ctx.allResults);
+        analysis.errors = ctx.errors;
         lastResult = analysis;
         renderResults(analysis);
         if (statusEl) {
           statusEl.textContent =
             '检测完成: ' +
-            completed +
+            ctx.completed +
             ' 个请求' +
-            (errors.length > 0 ? '，' + errors.length + ' 个失败' : '');
+            (ctx.errors.length > 0 ? '，' + ctx.errors.length + ' 个失败' : '');
         }
-        if (copyBtn) copyBtn.style.display = '';
+        if (copyBtn) copyBtn.hidden = false;
+        if (exportBtn) exportBtn.hidden = false;
       } else {
         if (statusEl) statusEl.textContent = '检测已取消';
       }
@@ -308,7 +343,7 @@ window.VulnKitCors = (function () {
 
   var SEV_MAP = {
     critical: 'critical',
-    danger: 'critical',
+    danger: 'danger',
     warning: 'warning',
     safe: 'safe',
     info: 'info',

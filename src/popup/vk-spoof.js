@@ -228,9 +228,6 @@ window.VulnKitSpoof = (function () {
         return;
       }
 
-      if (!spoofState.ua.enabled) {
-        spoofState.ua.original = navigator.userAgent;
-      }
       spoofState.ua.enabled = true;
       spoofState.ua.current = ua;
 

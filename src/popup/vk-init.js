@@ -232,6 +232,7 @@
     renderXssPoints,
     handleXssHarvest,
     handleBatchOpenXss,
+    handleVerifyReflection,
     handleCopyXssUrls,
     initXssScanPayloadSelect,
     clearResults: xssClearResults,
@@ -1359,6 +1360,7 @@
       });
     });
     utils.bindClick('xssscan-batchopen-btn', handleBatchOpenXss);
+    utils.bindClick('xssscan-verify-btn', handleVerifyReflection);
     utils.bindClick('xssscan-copyall-btn', handleCopyXssUrls);
     utils.bindClick('xssscan-export-btn', xssExportData);
     utils.bindClick('xssscan-sink-btn', analyzeDomSinks);

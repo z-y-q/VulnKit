@@ -130,13 +130,7 @@ window.VulnKitEncoding = (function () {
       if (!switchEncodingTab._cryptoLoaded) {
         switchEncodingTab._cryptoLoaded = true;
         utils
-          .loadLibs([
-            'lib/crypto-js.min.js',
-            'lib/jsrsasign.min.js',
-            'lib/sm2.js',
-            'lib/sm4.js',
-            'lib/bcrypt.min.js',
-          ])
+          .loadLibs(['lib/crypto-js.min.js', 'lib/sm2.js', 'lib/sm4.js', 'lib/bcrypt.min.js'])
           .catch(function () {});
       }
     } else if (type === 'jwt') {

@@ -20,6 +20,10 @@
   color: var(--text-secondary, #888);
   flex-shrink: 0;
 }
+.subdomain-filter-search {
+  margin-left: 8px;
+  max-width: 160px;
+}
 .subdomain-filter-btn {
   padding: 3px 10px;
   border-radius: 4px;
