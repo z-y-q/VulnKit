@@ -6,24 +6,24 @@
 
   if (window.__VK_RUOYI_HOOK__) return;
 
-  var defaultRouterUrls = [/\/getRouters/i, /\/getRoutes/i, /\/system\/menu\/getRouters/i];
+  let defaultRouterUrls = [/\/getRouters/i, /\/getRoutes/i, /\/system\/menu\/getRouters/i];
 
-  var userInfoUrls = [/\/getUserInfo/i, /\/getInfo/i];
+  let userInfoUrls = [/\/getUserInfo/i, /\/getInfo/i];
 
   // Read persisted config from localStorage (survives page refresh)
-  var savedConfig = null;
+  let savedConfig = null;
   try {
-    var raw = localStorage.getItem('__vk_ruoyi_hook_config');
+    let raw = localStorage.getItem('__vk_ruoyi_hook_config');
     if (raw) savedConfig = JSON.parse(raw);
   } catch (e) {
     savedConfig = null;
   }
 
   // Only restore if saved for this origin (security check)
-  var configEnabled = false;
-  var configAugmentMode = 'auto';
-  var configExtraRoutes = [];
-  var configCustomUrls = [];
+  let configEnabled = false;
+  let configAugmentMode = 'auto';
+  let configExtraRoutes = [];
+  let configCustomUrls = [];
 
   if (savedConfig && savedConfig.origin === location.origin) {
     configEnabled = true;
@@ -47,25 +47,19 @@
   };
 
   function getTime() {
-    var d = new Date();
-    return (
-      String(d.getHours()).padStart(2, '0') +
-      ':' +
-      String(d.getMinutes()).padStart(2, '0') +
-      ':' +
-      String(d.getSeconds()).padStart(2, '0')
-    );
+    let d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
   }
 
-  var _cachedCustomUrls = '';
-  var _cachedPatterns = null;
-  var _quickSkipRe = /(?:getRouters?|getUserInfo|getInfo)\b/i;
-  var _quickApiSkipRe =
+  let _cachedCustomUrls = '';
+  let _cachedPatterns = null;
+  let _quickSkipRe = /(?:getRouters?|getUserInfo|getInfo)\b/i;
+  let _quickApiSkipRe =
     /\b(?:api|admin|system|monitor|tool|gen|auth|login|logout|captcha|code|user|role|menu|dept|post|dict|config|notice|log)\b|\.(?:json|xml)\b/i;
 
   function isRouterUrl(url) {
-    var hook = window.__VK_RUOYI_HOOK__;
-    var customKey = (hook.customRouterUrls || []).join('|');
+    let hook = window.__VK_RUOYI_HOOK__;
+    let customKey = (hook.customRouterUrls || []).join('|');
     if (customKey !== _cachedCustomUrls) {
       _cachedCustomUrls = customKey;
       _cachedPatterns = defaultRouterUrls.slice();
@@ -90,7 +84,7 @@
 
   function isApiUrl(url) {
     try {
-      var pathname = new URL(url, location.origin).pathname;
+      let pathname = new URL(url, location.origin).pathname;
       return (
         /^\/(api|admin|system|monitor|tool|gen|auth|login|logout|captcha|code|user|role|menu|dept|post|dict|config|notice|log)\b/i.test(
           pathname
@@ -106,7 +100,7 @@
   }
 
   function logApiRequest(url, method, status, body) {
-    var hook = window.__VK_RUOYI_HOOK__;
+    let hook = window.__VK_RUOYI_HOOK__;
     if (!hook) return;
     if (!hook.apiLog) hook.apiLog = [];
     hook.apiLog.push({
@@ -120,9 +114,9 @@
   }
 
   function logRequest(type, url, status, method) {
-    var hook = window.__VK_RUOYI_HOOK__;
+    let hook = window.__VK_RUOYI_HOOK__;
     if (!hook) return;
-    var entry = {
+    let entry = {
       type: type,
       url: url,
       status: status || '',
@@ -135,10 +129,10 @@
   }
 
   function findParentByPath(routes, parentPath) {
-    for (var i = 0; i < routes.length; i++) {
+    for (let i = 0; i < routes.length; i++) {
       if (routes[i].path === parentPath) return routes[i];
       if (routes[i].children) {
-        var found = findParentByPath(routes[i].children, parentPath);
+        let found = findParentByPath(routes[i].children, parentPath);
         if (found) return found;
       }
     }
@@ -146,9 +140,9 @@
   }
 
   function ensureParent(routeArray, parentPath) {
-    var existing = findParentByPath(routeArray, parentPath);
+    let existing = findParentByPath(routeArray, parentPath);
     if (existing) return existing;
-    var parent = {
+    let parent = {
       name: parentPath.replace(/\//g, '') || 'Root',
       path: parentPath,
       hidden: false,
@@ -161,14 +155,14 @@
   }
 
   function mergeExtraRoutes(raw) {
-    var config = window.__VK_RUOYI_HOOK__;
+    let config = window.__VK_RUOYI_HOOK__;
     if (!config.extraRoutes || config.extraRoutes.length === 0) return raw;
     try {
-      var data = typeof raw === 'string' ? JSON.parse(raw) : JSON.parse(JSON.stringify(raw));
-      var routeArray = data.data;
+      let data = typeof raw === 'string' ? JSON.parse(raw) : JSON.parse(JSON.stringify(raw));
+      let routeArray = data.data;
       if (!Array.isArray(routeArray)) return raw;
 
-      var existing = {};
+      let existing = {};
       (function collect(routes) {
         routes.forEach(function (r) {
           if (r.path) existing[r.path] = true;
@@ -176,12 +170,12 @@
         });
       })(routeArray);
 
-      var injected = 0;
+      let injected = 0;
       config.extraRoutes.forEach(function (extra) {
         if (existing[extra.path]) return;
 
-        var segments = extra.path.replace(/^\/+/, '').split('/');
-        var childNode = {
+        let segments = extra.path.replace(/^\/+/, '').split('/');
+        let childNode = {
           name: extra.name || segments.join('') || extra.path,
           path: extra.childPath || (segments.length > 1 ? segments.slice(1).join('/') : 'index'),
           hidden: false,
@@ -194,8 +188,8 @@
         };
 
         if (segments.length > 1) {
-          var parentPath = '/' + segments[0];
-          var parent = ensureParent(routeArray, parentPath);
+          let parentPath = `/${segments[0]}`;
+          let parent = ensureParent(routeArray, parentPath);
           if (!parent.children) parent.children = [];
           parent.children.push(childNode);
           existing[extra.path] = true;
@@ -214,7 +208,7 @@
         }
       });
 
-      var modified = JSON.stringify(data);
+      let modified = JSON.stringify(data);
       return { body: modified, injected: injected };
     } catch (e) {
       return raw;
@@ -223,16 +217,16 @@
 
   // Fetch hook — ALWAYS captures router/userinfo data regardless of enabled flag.
   // enabled only controls augmentation (injecting extra routes) and API traffic logging.
-  var origFetch = window.fetch;
+  let origFetch = window.fetch;
   window.fetch = function () {
-    var args = arguments;
-    var url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
-    var fetchOpts = args[1] && typeof args[1] === 'object' ? args[1] : {};
-    var fetchMethod = (fetchOpts.method || 'GET').toUpperCase();
-    var isRouter = _quickSkipRe.test(url);
-    var isUserInfo = !isRouter && /(?:getUserInfo|getInfo)\b/i.test(url);
+    let args = arguments;
+    let url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+    let fetchOpts = args[1] && typeof args[1] === 'object' ? args[1] : {};
+    let fetchMethod = (fetchOpts.method || 'GET').toUpperCase();
+    let isRouter = _quickSkipRe.test(url);
+    let isUserInfo = !isRouter && /(?:getUserInfo|getInfo)\b/i.test(url);
     return origFetch.apply(this, args).then(function (response) {
-      var config = window.__VK_RUOYI_HOOK__;
+      let config = window.__VK_RUOYI_HOOK__;
 
       // ALWAYS capture /getRouters responses (passive, no modification)
       if (isRouter) {
@@ -254,9 +248,9 @@
               config.augmentMode !== 'off' &&
               config.extraRoutes.length > 0
             ) {
-              var result = mergeExtraRoutes(body);
+              let result = mergeExtraRoutes(body);
               if (typeof result === 'object' && result.body) {
-                logRequest('augment', url, 'injected:' + (result.injected || 0), fetchMethod);
+                logRequest('augment', url, `injected:${result.injected || 0}`, fetchMethod);
                 window.postMessage(
                   {
                     __vk_ruoyi_hook: true,
@@ -316,19 +310,19 @@
   };
 
   // XHR hook
-  var origOpen = XMLHttpRequest.prototype.open;
-  var origSend = XMLHttpRequest.prototype.send;
+  let origOpen = XMLHttpRequest.prototype.open;
+  let origSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function (method, reqUrl) {
     this.__vk_ruoyi_url = reqUrl;
     this.__vk_ruoyi_method = method;
     return origOpen.apply(this, arguments);
   };
   XMLHttpRequest.prototype.send = function () {
-    var self = this;
-    var config = window.__VK_RUOYI_HOOK__;
-    var reqUrl = this.__vk_ruoyi_url;
-    var xhrIsRouter = reqUrl ? _quickSkipRe.test(reqUrl) : false;
-    var xhrIsUserInfo = !xhrIsRouter && reqUrl ? /(?:getUserInfo|getInfo)\b/i.test(reqUrl) : false;
+    let self = this;
+    let config = window.__VK_RUOYI_HOOK__;
+    let reqUrl = this.__vk_ruoyi_url;
+    let xhrIsRouter = reqUrl ? _quickSkipRe.test(reqUrl) : false;
+    let xhrIsUserInfo = !xhrIsRouter && reqUrl ? /(?:getUserInfo|getInfo)\b/i.test(reqUrl) : false;
 
     // ALWAYS capture router responses (passive)
     if (xhrIsRouter) {
@@ -338,7 +332,7 @@
             logRequest('router-error', self.__vk_ruoyi_url, self.status, self.__vk_ruoyi_method);
             return;
           }
-          var original = self.responseText;
+          let original = self.responseText;
           logRequest('router', self.__vk_ruoyi_url, self.status, self.__vk_ruoyi_method);
           if (config) config.capturedRouters = original;
 
@@ -349,7 +343,7 @@
             config.augmentMode !== 'off' &&
             config.extraRoutes.length > 0
           ) {
-            var result = mergeExtraRoutes(original);
+            let result = mergeExtraRoutes(original);
             if (typeof result === 'object' && result.body) {
               Object.defineProperty(self, 'responseText', {
                 value: result.body,
@@ -357,7 +351,7 @@
                 configurable: true,
               });
               try {
-                var parsed = JSON.parse(result.body);
+                let parsed = JSON.parse(result.body);
                 Object.defineProperty(self, 'response', {
                   value: parsed,
                   writable: true,
@@ -410,19 +404,19 @@
 
   // JS route discovery helper
   window.__VK_RUOYI_HOOK__.discoverRoutesFromJs = function () {
-    var discovered = [];
-    var seen = {};
-    var routePattern = /path\s*:\s*['"`](\/[a-zA-Z0-9_\-\/]+)['"`]/g;
-    var compPattern = /component\s*:\s*['"`]((?:views|pages|src)\/[^'"`]+?)['"`]/gi;
-    var pathPattern = /['"`](\/[a-zA-Z0-9_\-]+(?:\/[a-zA-Z0-9_\-]+){1,})['"`]/g;
-    var skipRe = /\/api\/|\.js$|\.css$|\.(png|jpg|svg|ico|woff|ttf)|\/login$|\/index$/i;
+    let discovered = [];
+    let seen = {};
+    let routePattern = /path\s*:\s*['"`](\/[a-zA-Z0-9_\-\/]+)['"`]/g;
+    let compPattern = /component\s*:\s*['"`]((?:views|pages|src)\/[^'"`]+?)['"`]/gi;
+    let pathPattern = /['"`](\/[a-zA-Z0-9_\-]+(?:\/[a-zA-Z0-9_\-]+){1,})['"`]/g;
+    let skipRe = /\/api\/|\.js$|\.css$|\.(png|jpg|svg|ico|woff|ttf)|\/login$|\/index$/i;
 
     function scanText(text, source) {
-      var m;
+      let m;
       // Route definitions: path: '/xxx'
       routePattern.lastIndex = 0;
       while ((m = routePattern.exec(text)) !== null) {
-        var path = m[1];
+        let path = m[1];
         if (skipRe.test(path) || path.length < 4) continue;
         if (!seen[path]) {
           seen[path] = true;
@@ -433,7 +427,7 @@
       // Component references: component: 'views/xxx'
       compPattern.lastIndex = 0;
       while ((m = compPattern.exec(text)) !== null) {
-        var comp = m[1];
+        let comp = m[1];
         if (!seen[comp]) {
           seen[comp] = true;
           discovered.push({ path: '', source: source, type: 'component-ref', component: comp });
@@ -443,7 +437,7 @@
       // Generic path strings
       pathPattern.lastIndex = 0;
       while ((m = pathPattern.exec(text)) !== null) {
-        var p = m[1];
+        let p = m[1];
         if (skipRe.test(p) || p.length < 5 || seen[p]) continue;
         seen[p] = true;
         discovered.push({ path: p, source: source, type: 'path-string' });
@@ -451,12 +445,12 @@
     }
 
     document.querySelectorAll('script:not([src])').forEach(function (s, i) {
-      var text = s.textContent || '';
+      let text = s.textContent || '';
       if (text.length > 500000) return;
-      scanText(text, 'inline#' + (i + 1));
+      scanText(text, `inline#${i + 1}`);
     });
 
-    var extUrls = [];
+    let extUrls = [];
     document.querySelectorAll('script[src]').forEach(function (s) {
       extUrls.push(s.src);
     });
@@ -495,12 +489,12 @@
   // ====== Vue Router Injection (MaR-style dynamic route loading) ======
 
   function findVueRouter() {
-    var router = null;
+    let router = null;
 
     // Vue 3: check __vue_app__
     if (window.__vue_app__) {
       try {
-        var cfg = window.__vue_app__.config;
+        let cfg = window.__vue_app__.config;
         if (cfg && cfg.globalProperties && cfg.globalProperties.$router) {
           return cfg.globalProperties.$router;
         }
@@ -510,11 +504,11 @@
     }
 
     // Search DOM elements for Vue instances
-    var selectors = ['#app', '[data-v-app]', '.app-wrapper', '#app-main'];
-    for (var si = 0; si < selectors.length && !router; si++) {
-      var els = document.querySelectorAll(selectors[si]);
-      for (var ei = 0; ei < els.length && !router; ei++) {
-        var el = els[ei];
+    let selectors = ['#app', '[data-v-app]', '.app-wrapper', '#app-main'];
+    for (let si = 0; si < selectors.length && !router; si++) {
+      let els = document.querySelectorAll(selectors[si]);
+      for (let ei = 0; ei < els.length && !router; ei++) {
+        let el = els[ei];
         // Vue 3 app instance
         if (el.__vue_app__) {
           try {
@@ -532,9 +526,9 @@
 
     // Deep scan for Vue 2 instances on all elements
     if (!router) {
-      var allEls = document.querySelectorAll('*');
-      for (var ai = 0; ai < allEls.length && !router; ai++) {
-        var ael = allEls[ai];
+      let allEls = document.querySelectorAll('*');
+      for (let ai = 0; ai < allEls.length && !router; ai++) {
+        let ael = allEls[ai];
         if (ael.__vue__ && ael.__vue__.$router) {
           router = ael.__vue__.$router;
         } else if (ael.__vue__ && ael.__vue__.$root && ael.__vue__.$root.$router) {
@@ -549,11 +543,11 @@
   window.__VK_RUOYI_HOOK__.findVueRouter = findVueRouter;
 
   window.__VK_RUOYI_HOOK__.getRouterInfo = function () {
-    var router = findVueRouter();
+    let router = findVueRouter();
     if (!router) return { found: false, routes: [], currentRoutes: [] };
-    var currentRoutes = [];
+    let currentRoutes = [];
     try {
-      var rawRoutes = router.getRoutes
+      let rawRoutes = router.getRoutes
         ? router.getRoutes()
         : (router.options && router.options.routes) || [];
       rawRoutes.forEach(function (r) {
@@ -571,8 +565,8 @@
   };
 
   window.__VK_RUOYI_HOOK__.injectRoutesToVueRouter = function (routes) {
-    var result = { injected: 0, skipped: 0, errors: [], routerFound: false, routerMode: '' };
-    var router = findVueRouter();
+    let result = { injected: 0, skipped: 0, errors: [], routerFound: false, routerMode: '' };
+    let router = findVueRouter();
 
     if (!router) {
       result.errors.push('Vue Router 实例未找到');
@@ -583,7 +577,7 @@
     result.routerMode = router.mode || 'unknown';
 
     // Try to find RuoYi's loadView function for component resolution
-    var loadView = null;
+    let loadView = null;
     try {
       // Check global scope or common RuoYi patterns
       if (typeof window.loadView === 'function') loadView = window.loadView;
@@ -593,9 +587,9 @@
     }
 
     // Get current route paths for dedup
-    var existingPaths = {};
+    let existingPaths = {};
     try {
-      var currentRoutes = router.getRoutes ? router.getRoutes() : [];
+      let currentRoutes = router.getRoutes ? router.getRoutes() : [];
       currentRoutes.forEach(function (r) {
         if (r.path) existingPaths[r.path] = true;
       });
@@ -605,7 +599,7 @@
 
     routes.forEach(function (route) {
       try {
-        var path = route.path;
+        let path = route.path;
         if (!path) {
           result.skipped++;
           return;
@@ -616,7 +610,7 @@
         }
 
         // Build a proper route object with component resolution
-        var routeObj = {
+        let routeObj = {
           path: path,
           name: route.name || path.replace(/^\/+/, '').replace(/\//g, '-'),
           meta: route.meta || {},
@@ -629,14 +623,14 @@
               routeObj.component = loadView(route.component);
             } catch (e) {
               // loadView failed — use a placeholder component
-              routeObj.component = { template: '<div>Loading: ' + path + '</div>' };
+              routeObj.component = { template: `<div>Loading: ${path}</div>` };
             }
           } else {
             // No loadView — try webpack dynamic import pattern
             try {
-              var viewPath = route.component;
+              let viewPath = route.component;
               if (!/^views\//i.test(viewPath) && !/^\//i.test(viewPath)) {
-                viewPath = 'views/' + viewPath;
+                viewPath = `views/${viewPath}`;
               }
               routeObj.component = function () {
                 return import(
@@ -644,14 +638,14 @@
                 );
               };
             } catch (e) {
-              routeObj.component = { template: '<div>Loading: ' + path + '</div>' };
+              routeObj.component = { template: `<div>Loading: ${path}</div>` };
             }
           }
         } else if (route.component) {
           routeObj.component = route.component;
         } else {
           // No component specified — use placeholder
-          routeObj.component = { template: '<div>Route: ' + path + '</div>' };
+          routeObj.component = { template: `<div>Route: ${path}</div>` };
         }
 
         if (typeof router.addRoute === 'function') {
@@ -667,7 +661,7 @@
         result.injected++;
         existingPaths[path] = true;
       } catch (e) {
-        result.errors.push((route.path || '?') + ': ' + e.message);
+        result.errors.push(`${route.path || '?'}: ${e.message}`);
       }
     });
 

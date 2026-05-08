@@ -4,7 +4,7 @@ function $(id) {
 
 // ====== Toolbar Configuration ======
 
-var DEFAULT_TABS = [
+const DEFAULT_TABS = [
   { id: 'encoding', label: '编码工具' },
   { id: 'favicon', label: '图标识别' },
   { id: 'gather', label: '信息收集' },
@@ -30,16 +30,16 @@ var DEFAULT_TABS = [
 ];
 
 function getToolbarConfig(settings) {
-  var saved = settings.toolbarConfig;
+  const saved = settings.toolbarConfig;
   if (!saved || !Array.isArray(saved)) {
     return DEFAULT_TABS.map(function (t) {
       return { id: t.id, label: t.label, visible: true };
     });
   }
-  var seenIds = {};
-  var result = [];
+  const seenIds = {};
+  let result = [];
   saved.forEach(function (t) {
-    var def = DEFAULT_TABS.find(function (d) {
+    const def = DEFAULT_TABS.find(function (d) {
       return d.id === t.id;
     });
     if (def) {
@@ -56,12 +56,12 @@ function getToolbarConfig(settings) {
 }
 
 function saveToolbarConfigFromDOM() {
-  var container = $('toolbar-config-list');
+  let container = $('toolbar-config-list');
   if (!container) return;
-  var items = container.querySelectorAll('.toolbar-config-item');
-  var config = [];
+  const items = container.querySelectorAll('.toolbar-config-item');
+  let config = [];
   items.forEach(function (item) {
-    var cb = item.querySelector('input[type="checkbox"]');
+    const cb = item.querySelector('input[type="checkbox"]');
     config.push({
       id: item.dataset.id,
       label: item.querySelector('label').textContent.trim(),
@@ -69,7 +69,7 @@ function saveToolbarConfigFromDOM() {
     });
   });
   chrome.storage.local.get(['pentestSettings'], function (result) {
-    var settings = result.pentestSettings || {};
+    let settings = result.pentestSettings || {};
     settings.toolbarConfig = config;
     chrome.storage.local.set({ pentestSettings: settings }, function () {
       showStatus('工具栏配置已保存', 'success');
@@ -78,9 +78,9 @@ function saveToolbarConfigFromDOM() {
 }
 
 function initToolbarDragDrop(container) {
-  var dragSrc = null;
+  let dragSrc = null;
   container.addEventListener('dragstart', function (e) {
-    var item = e.target.closest('.toolbar-config-item');
+    let item = e.target.closest('.toolbar-config-item');
     if (!item) return;
     dragSrc = item;
     item.classList.add('dragging');
@@ -90,10 +90,10 @@ function initToolbarDragDrop(container) {
   container.addEventListener('dragover', function (e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    var item = e.target.closest('.toolbar-config-item');
+    let item = e.target.closest('.toolbar-config-item');
     if (!item || item === dragSrc) return;
-    var rect = item.getBoundingClientRect();
-    var midY = rect.top + rect.height / 2;
+    const rect = item.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
     if (e.clientY < midY) {
       container.insertBefore(dragSrc, item);
     } else {
@@ -112,13 +112,13 @@ function initToolbarDragDrop(container) {
 
 function renderToolbarConfig() {
   chrome.storage.local.get(['pentestSettings'], function (result) {
-    var settings = result.pentestSettings || {};
-    var config = getToolbarConfig(settings);
-    var container = $('toolbar-config-list');
+    let settings = result.pentestSettings || {};
+    const config = getToolbarConfig(settings);
+    const container = $('toolbar-config-list');
     if (!container) return;
     container.innerHTML = '';
     config.forEach(function (tab) {
-      var item = document.createElement('div');
+      const item = document.createElement('div');
       item.className = 'toolbar-config-item';
       item.draggable = true;
       item.dataset.id = tab.id;
@@ -134,7 +134,7 @@ function renderToolbarConfig() {
     initToolbarDragDrop(container);
     container.addEventListener('change', function (e) {
       if (e.target.type !== 'checkbox') return;
-      var checkedCount = container.querySelectorAll('input[type="checkbox"]:checked').length;
+      let checkedCount = container.querySelectorAll('input[type="checkbox"]:checked').length;
       if (checkedCount === 0) {
         e.target.checked = true;
         showStatus('至少保留一个可见工具', 'error');
@@ -148,7 +148,7 @@ function renderToolbarConfig() {
 // ====== End Toolbar Configuration ======
 
 function saveSettings() {
-  var el;
+  let el;
   const settings = {
     enableNotifications: (el = $('enableNotifications')) ? el.checked : true,
     enableContextMenu: (el = $('enableContextMenu')) ? el.checked : true,
@@ -171,7 +171,7 @@ function saveSettings() {
 function loadSettings() {
   chrome.storage.local.get(['pentestSettings'], result => {
     const settings = result.pentestSettings || {};
-    var el;
+    let el;
     if ((el = $('enableNotifications'))) el.checked = settings.enableNotifications !== false;
     if ((el = $('enableContextMenu'))) el.checked = settings.enableContextMenu !== false;
     if ((el = $('theme'))) el.value = settings.theme || 'auto';
@@ -225,7 +225,7 @@ function importSettings() {
           showStatus('设置格式错误：需要 JSON 对象', 'error');
           return;
         }
-        var knownKeys = {
+        const knownKeys = {
           enableNotifications: 'boolean',
           enableContextMenu: 'boolean',
           theme: 'string',
@@ -235,9 +235,9 @@ function importSettings() {
           defaultHash: 'string',
           toolbarConfig: 'object',
         };
-        var cleaned = {};
-        var skipped = 0;
-        for (var key in data) {
+        const cleaned = {};
+        let skipped = 0;
+        for (let key in data) {
           if (!data.hasOwnProperty(key)) continue;
           if (!knownKeys[key]) {
             skipped++;
@@ -259,7 +259,7 @@ function importSettings() {
             return;
           }
           loadSettings();
-          var msg = '设置已导入';
+          let msg = '设置已导入';
           if (skipped > 0) msg += '（跳过 ' + skipped + ' 个无效字段）';
           showStatus(msg, 'success');
         });
@@ -302,14 +302,14 @@ function resetSettings() {
 
 document.addEventListener('DOMContentLoaded', () => {
   // Sync theme from popup's localStorage preference
-  var savedTheme = localStorage.getItem('pentest-theme');
+  const savedTheme = localStorage.getItem('pentest-theme');
   if (savedTheme && savedTheme !== 'light') {
     document.documentElement.setAttribute('data-theme', savedTheme);
   }
   // Listen for theme changes from popup (same origin localStorage)
   window.addEventListener('storage', function (e) {
     if (e.key === 'pentest-theme') {
-      var theme = e.newValue || 'light';
+      let theme = e.newValue || 'light';
       document.documentElement.setAttribute('data-theme', theme);
     }
   });
@@ -321,14 +321,14 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
   renderToolbarConfig();
 
-  var btn;
+  let btn;
   if ((btn = $('toolbar-reset-order')))
     btn.addEventListener('click', function () {
-      var defaultConfig = DEFAULT_TABS.map(function (t) {
+      const defaultConfig = DEFAULT_TABS.map(function (t) {
         return { id: t.id, label: t.label, visible: true };
       });
       chrome.storage.local.get(['pentestSettings'], function (result) {
-        var settings = result.pentestSettings || {};
+        const settings = result.pentestSettings || {};
         settings.toolbarConfig = defaultConfig;
         chrome.storage.local.set({ pentestSettings: settings }, function () {
           renderToolbarConfig();
@@ -346,10 +346,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Theme select also syncs to localStorage so popup picks it up
-  var themeSelect = $('theme');
+  const themeSelect = $('theme');
   if (themeSelect) {
     themeSelect.addEventListener('change', function () {
-      var theme =
+      const theme =
         this.value === 'auto'
           ? window.matchMedia('(prefers-color-scheme: dark)').matches
             ? 'dark'

@@ -76,11 +76,7 @@ const CONTEXT_PAYLOADS = {
   ],
   setTimeout: ['alert(1)', 'document.cookie', "eval('alert(1)')"],
   srcdoc: ['<script>alert(1)</script>', '<img src=x onerror=alert(1)>'],
-  attribute: [
-    '" onerror=alert(1) ',
-    '" onfocus=alert(1) autofocus="',
-    '" onmouseover=alert(1) "',
-  ],
+  attribute: ['" onerror=alert(1) ', '" onfocus=alert(1) autofocus="', '" onmouseover=alert(1) "'],
   url: ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>'],
   insertAdjacentHTML: [
     '<img src=x onerror=alert(1)>',
@@ -1133,6 +1129,15 @@ function exportData() {
   utils.buildCsv(['Source', 'URL', 'Param', 'Method'], rows, `lingmou-xss-${Date.now()}.csv`);
 }
 
+function setXssFilterType(v) {
+  xssFilterType = v;
+}
+
+function setXssSearchText(v) {
+  xssSearchText = v;
+  renderXssPoints();
+}
+
 export {
   startXssIntercept,
   stopXssIntercept,
@@ -1149,7 +1154,6 @@ export {
   xssPoints,
   xssFilterType,
   xssSearchText,
+  setXssFilterType,
+  setXssSearchText,
 };
-
-// Getter/setter for xssPoints and xssFilterType are handled via the exported variable references
-// setXssSearchText is handled by importing xssSearchText and calling renderXssPoints from the consumer

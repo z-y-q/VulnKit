@@ -3,8 +3,8 @@
 (function () {
   'use strict';
 
-  var PANEL_DIR = 'panels/';
-  var PANEL_FILES = [
+  const PANEL_DIR = 'panels/';
+  const PANEL_FILES = [
     'encoding.html',
     'favicon-gather.html',
     'rules-modal.html',
@@ -28,8 +28,8 @@
     'source-loader.html',
   ];
 
-  var appMain = document.getElementById('app-main');
-  var resolve;
+  const appMain = document.getElementById('app-main');
+  let resolve;
   window._panelsReady = new Promise(function (r) {
     resolve = r;
   });
@@ -44,8 +44,8 @@
   )
     .then(function (htmls) {
       htmls.forEach(function (html) {
-        var doc = new DOMParser().parseFromString(html, 'text/html');
-        var frag = document.createDocumentFragment();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const frag = document.createDocumentFragment();
         while (doc.body.firstChild) {
           frag.appendChild(doc.body.firstChild);
         }

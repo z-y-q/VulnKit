@@ -115,9 +115,9 @@ async function removeUaRule() {
 
 async function addHeaderRules(tabId, url, headers) {
   const requestHeaders = [];
-  var urlFilter;
+  let urlFilter;
   try {
-    var parsed = new URL(url);
+    let parsed = new URL(url);
     urlFilter = parsed.hostname + '/*';
   } catch {
     urlFilter = '*';
@@ -201,19 +201,19 @@ function isAllowedUrl(url) {
 // ====== Fetch helpers ======
 async function fetchUrl(url, tailOnly, timeoutMs) {
   try {
-    var opts = {};
+    const opts = {};
     if (tailOnly) {
       opts.headers = { Range: 'bytes=-500' };
     }
-    var controller = new AbortController();
-    var timer = setTimeout(function () {
+    let controller = new AbortController();
+    let timer = setTimeout(function () {
       controller.abort();
     }, timeoutMs || 10000);
     opts.signal = controller.signal;
     const resp = await fetch(url, opts);
     clearTimeout(timer);
     if (!resp.ok && resp.status !== 206) {
-      var body = await resp.text().catch(function () {
+      let body = await resp.text().catch(function () {
         return '';
       });
       throw new Error('HTTP ' + resp.status + (body ? ': ' + body.slice(0, 200) : ''));
@@ -228,7 +228,7 @@ async function fetchUrl(url, tailOnly, timeoutMs) {
 async function fetchImage(url) {
   try {
     const controller = new AbortController();
-    var timer = setTimeout(function () {
+    const timer = setTimeout(function () {
       controller.abort();
     }, 15000);
     const resp = await fetch(url, { signal: controller.signal });
@@ -236,62 +236,62 @@ async function fetchImage(url) {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const buf = await resp.arrayBuffer();
     const bytes = new Uint8Array(buf);
-    var binary = '';
-    for (var i = 0; i < bytes.length; i += 8192) {
-      var chunk = bytes.subarray(i, Math.min(i + 8192, bytes.length));
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+      const chunk = bytes.subarray(i, Math.min(i + 8192, bytes.length));
       binary += String.fromCharCode.apply(null, chunk);
     }
-    var b64 = btoa(binary);
-    var mime = resp.headers.get('content-type') || 'image/jpeg';
+    const b64 = btoa(binary);
+    const mime = resp.headers.get('content-type') || 'image/jpeg';
     return { success: true, data: 'data:' + mime + ';base64,' + b64 };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-var zoomEyeTokenCache = { token: null, expiresAt: 0 };
+let zoomEyeTokenCache = { token: null, expiresAt: 0 };
 
 async function fetchZoomEyeAuth(url, apiKey) {
   try {
-    var now = Date.now();
+    const now = Date.now();
     if (zoomEyeTokenCache.token && zoomEyeTokenCache.expiresAt > now) {
-      var resp = await fetch(url, {
+      const resp = await fetch(url, {
         headers: { Authorization: 'JWT ' + zoomEyeTokenCache.token },
         signal: AbortSignal.timeout(15000),
       });
       if (!resp.ok) {
-        var body = await resp.text().catch(function () {
+        const body = await resp.text().catch(function () {
           return '';
         });
         if (resp.status === 401) zoomEyeTokenCache = { token: null, expiresAt: 0 };
         throw new Error('HTTP ' + resp.status + (body ? ': ' + body.slice(0, 200) : ''));
       }
-      var data = await resp.text();
+      const data = await resp.text();
       return { success: true, data: data };
     }
 
-    var loginResp = await fetch('https://api.zoomeye.org/user/login', {
+    const loginResp = await fetch('https://api.zoomeye.org/user/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: apiKey }),
       signal: AbortSignal.timeout(15000),
     });
     if (!loginResp.ok) throw new Error('ZoomEye login failed: HTTP ' + loginResp.status);
-    var loginData = await loginResp.json();
+    const loginData = await loginResp.json();
     if (!loginData.access_token) throw new Error('ZoomEye login failed: no access_token');
     zoomEyeTokenCache = { token: loginData.access_token, expiresAt: now + 3600000 };
 
-    var apiResp = await fetch(url, {
+    const apiResp = await fetch(url, {
       headers: { Authorization: 'JWT ' + loginData.access_token },
       signal: AbortSignal.timeout(15000),
     });
     if (!apiResp.ok) {
-      var apiBody = await apiResp.text().catch(function () {
+      const apiBody = await apiResp.text().catch(function () {
         return '';
       });
       throw new Error('HTTP ' + apiResp.status + (apiBody ? ': ' + apiBody.slice(0, 200) : ''));
     }
-    var apiData = await apiResp.text();
+    const apiData = await apiResp.text();
     return { success: true, data: apiData };
   } catch (e) {
     return { success: false, error: e.message || '请求超时' };
@@ -402,7 +402,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         if (sender.tab && sender.tab.url) {
           try {
-            var senderOrigin = new URL(sender.tab.url).origin;
+            const senderOrigin = new URL(sender.tab.url).origin;
             if (
               probeUrl.origin !== senderOrigin &&
               probeUrl.hostname !== new URL(sender.tab.url).hostname
@@ -469,7 +469,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), message.timeout || 10000);
-        var corsHeaders = message.headers || {};
+        const corsHeaders = message.headers || {};
         // In service worker fetch, Origin is not a forbidden header — browser allows it
         fetch(probeUrl.href, {
           method: message.method || 'GET',
@@ -604,7 +604,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               url: resp.url,
             };
             try {
-              var body = await resp.text();
+              const body = await resp.text();
               result.body = body.length > 50000 ? body.substring(0, 50000) : body;
             } catch {
               result.body = '';
@@ -708,7 +708,7 @@ chrome.tabs.onRemoved.addListener(function (tabId) {
 // ====== Context menus ======
 function createContextMenus() {
   chrome.storage.local.get(['pentestSettings'], result => {
-    var settings = result.pentestSettings || {};
+    const settings = result.pentestSettings || {};
     if (settings.enableContextMenu === false) {
       chrome.contextMenus.removeAll().catch(() => {});
       return;

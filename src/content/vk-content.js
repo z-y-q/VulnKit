@@ -5,13 +5,13 @@
   if (window.__VK_CONTENT_BRIDGE__) return;
   window.__VK_CONTENT_BRIDGE__ = true;
 
-  var pendingResolve = null;
-  var storeExploreResolve = null;
-  var detecting = false;
+  let pendingResolve = null;
+  let storeExploreResolve = null;
+  let detecting = false;
 
-  var reactDetectResolve = null;
-  var angularDetectResolve = null;
-  var sourcemapDetectResolve = null;
+  let reactDetectResolve = null;
+  let angularDetectResolve = null;
+  let sourcemapDetectResolve = null;
 
   // Window message relay
   window.addEventListener('message', function (e) {
@@ -66,7 +66,7 @@
     detecting = true;
     return new Promise(function (resolve) {
       pendingResolve = resolve;
-      var script = document.createElement('script');
+      let script = document.createElement('script');
       script.src = chrome.runtime.getURL('src/inject/vue-detect.js');
       script.onload = function () {
         script.remove();
@@ -92,16 +92,16 @@
 
   function injectScript(url, resultVarSetter, timeoutMs) {
     return new Promise(function (resolve) {
-      var timer = setTimeout(function () {
+      const timer = setTimeout(function () {
         resultVarSetter(null);
         resolve(null);
       }, timeoutMs || 3000);
-      var innerResolve = function (result) {
+      const innerResolve = function (result) {
         clearTimeout(timer);
         resolve(result);
       };
       resultVarSetter(innerResolve);
-      var script = document.createElement('script');
+      const script = document.createElement('script');
       script.src = chrome.runtime.getURL(url);
       script.onload = function () {
         script.remove();
@@ -117,15 +117,15 @@
 
   // ====== API Traffic Monitoring (shared helpers) ======
 
-  var apiTrafficActive = false;
-  var apiTrafficData = [];
-  var apiOrigFetch = null;
-  var apiOrigXhrOpen = null;
-  var apiOrigXhrSend = null;
+  let apiTrafficActive = false;
+  let apiTrafficData = [];
+  let apiOrigFetch = null;
+  let apiOrigXhrOpen = null;
+  let apiOrigXhrSend = null;
 
   function stripApiUrl(url) {
     try {
-      var u = new URL(url, location.href);
+      const u = new URL(url, location.href);
       return u.origin + u.pathname + u.search;
     } catch (e) {
       return url;
@@ -134,9 +134,9 @@
 
   function extractReqHeaders(init) {
     if (!init || !init.headers) return {};
-    var h = init.headers;
-    var out = {};
-    var keys = [
+    let h = init.headers;
+    const out = {};
+    const keys = [
       'content-type',
       'authorization',
       'cookie',
@@ -146,15 +146,15 @@
     ];
     if (typeof Headers !== 'undefined' && h instanceof Headers) {
       keys.forEach(function (k) {
-        var v = h.get(k);
+        let v = h.get(k);
         if (v) out[k] = v.length > 200 ? v.substring(0, 200) + '...' : v;
       });
     } else if (typeof h === 'object') {
       keys.forEach(function (k) {
-        var lk = k.toLowerCase();
+        const lk = k.toLowerCase();
         Object.keys(h).forEach(function (hk) {
           if (hk.toLowerCase() === lk) {
-            var v = String(h[hk]);
+            let v = String(h[hk]);
             out[k] = v.length > 200 ? v.substring(0, 200) + '...' : v;
           }
         });
@@ -165,7 +165,7 @@
 
   function truncateBody(body, max) {
     if (!body) return '';
-    var s =
+    const s =
       typeof body === 'string'
         ? body
         : typeof body === 'object'
@@ -190,25 +190,25 @@
     apiOrigXhrSend = XMLHttpRequest.prototype.send;
 
     window.fetch = function (input, init) {
-      var url =
+      const url =
         typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-      var method = ((init && init.method) || 'GET').toUpperCase();
-      var start = Date.now();
-      var reqBody = '';
-      var reqHeaders = {};
+      const method = ((init && init.method) || 'GET').toUpperCase();
+      const start = Date.now();
+      let reqBody = '';
+      let reqHeaders = {};
       if (init) {
         reqBody = truncateBody(init.body, 3000);
         reqHeaders = extractReqHeaders(init);
       }
-      var capturedCt = '';
-      var capturedStatus = 0;
+      let capturedCt = '';
+      let capturedStatus = 0;
       return apiOrigFetch
         .apply(this, arguments)
         .then(function (resp) {
           capturedCt = (resp.headers.get('content-type') || '').split(';')[0];
           capturedStatus = resp.status;
-          var clone = resp.clone();
-          var bodyPromise = Promise.resolve('');
+          const clone = resp.clone();
+          let bodyPromise = Promise.resolve('');
           if (
             capturedCt &&
             (capturedCt.indexOf('json') !== -1 ||
@@ -253,9 +253,9 @@
       this._vkU = stripApiUrl(url);
       this._vkS = Date.now();
       this._vkH = {};
-      var origSetHeader = this.setRequestHeader;
-      var capturedHeaders = this._vkH;
-      var headerKeys = [
+      const origSetHeader = this.setRequestHeader;
+      const capturedHeaders = this._vkH;
+      const headerKeys = [
         'content-type',
         'authorization',
         'cookie',
@@ -264,9 +264,9 @@
         'x-requested-with',
       ];
       this.setRequestHeader = function (name, value) {
-        var ln = (name || '').toLowerCase();
+        const ln = (name || '').toLowerCase();
         if (headerKeys.indexOf(ln) !== -1) {
-          var v = String(value || '');
+          const v = String(value || '');
           capturedHeaders[ln] = v.length > 200 ? v.substring(0, 200) + '...' : v;
         }
         return origSetHeader.apply(this, arguments);
@@ -275,11 +275,11 @@
     };
 
     XMLHttpRequest.prototype.send = function () {
-      var xhr = this;
-      var sentBody = arguments[0] != null ? truncateBody(arguments[0], 3000) : '';
+      const xhr = this;
+      const sentBody = arguments[0] != null ? truncateBody(arguments[0], 3000) : '';
       xhr.addEventListener('load', function () {
-        var ct = (xhr.getResponseHeader('content-type') || '').split(';')[0];
-        var resBody = '';
+        const ct = (xhr.getResponseHeader('content-type') || '').split(';')[0];
+        let resBody = '';
         if (
           ct &&
           (ct.indexOf('json') !== -1 ||
@@ -328,13 +328,13 @@
       return true;
     }
     if (message.type === 'CONTEXT_EXTRACT_LINKS') {
-      var pageUrl = location.href;
-      var links = [];
-      var seen = {};
+      const pageUrl = location.href;
+      const links = [];
+      const seen = {};
       function addLink(href, text, tag) {
         if (!href || href === '#' || href.startsWith('javascript:') || seen[href]) return;
         seen[href] = true;
-        var domain = '';
+        let domain = '';
         try {
           domain = new URL(href, pageUrl).hostname;
         } catch (e) {
@@ -379,13 +379,13 @@
       return true;
     }
     if (message.type === 'VK_WAF_PROBE') {
-      var probeUrl = message.url;
+      const probeUrl = message.url;
       if (!probeUrl) {
         sendResponse({ error: 'Missing url' });
         return true;
       }
-      var controller = new AbortController();
-      var timer = setTimeout(function () {
+      const controller = new AbortController();
+      const timer = setTimeout(function () {
         controller.abort();
       }, message.timeout || 5000);
       fetch(probeUrl, {
@@ -396,7 +396,7 @@
       })
         .then(function (resp) {
           clearTimeout(timer);
-          var hdrs = {};
+          const hdrs = {};
           resp.headers.forEach(function (v, k) {
             hdrs[k] = v;
           });
@@ -414,7 +414,7 @@
       storeExploreResolve = null;
       new Promise(function (resolve) {
         storeExploreResolve = resolve;
-        var script = document.createElement('script');
+        const script = document.createElement('script');
         script.src = chrome.runtime.getURL('src/inject/vue-store-explorer.js');
         script.onload = function () {
           script.remove();
@@ -464,7 +464,7 @@
       if (!apiTrafficActive) {
         startApiMonitoring();
       }
-      var data = apiTrafficData;
+      const data = apiTrafficData;
       apiTrafficData = [];
       sendResponse({ entries: data, running: apiTrafficActive });
       return true;

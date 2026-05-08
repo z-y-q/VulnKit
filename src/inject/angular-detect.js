@@ -4,7 +4,7 @@
   if (window.__VK_ANGULAR_DETECT_DONE__) return;
   window.__VK_ANGULAR_DETECT_DONE__ = true;
 
-  var result = {
+  const result = {
     detected: false,
     version: '',
     variant: '',
@@ -15,12 +15,12 @@
   };
 
   // Angular 2+ (ng-version attribute)
-  var ngApp = document.querySelector('[ng-version]');
+  const ngApp = document.querySelector('[ng-version]');
   if (ngApp) {
     result.detected = true;
     result.version = ngApp.getAttribute('ng-version');
     result.variant = 'Angular';
-    result.signals.push('ng-version="' + result.version + '"');
+    result.signals.push(`ng-version="${result.version}"`);
   }
 
   // Angular Material
@@ -34,29 +34,29 @@
     result.variant = result.variant || 'AngularJS';
     if (angular.version && angular.version.full) {
       result.version = angular.version.full;
-      result.signals.push('window.angular v' + result.version);
+      result.signals.push(`window.angular v${result.version}`);
     } else {
       result.signals.push('window.angular (version unknown)');
     }
   }
 
   // ng-app directive (AngularJS)
-  var ngAppEl = document.querySelector('[ng-app], .ng-app');
+  const ngAppEl = document.querySelector('[ng-app], .ng-app');
   if (ngAppEl) {
     result.detected = true;
     result.variant = result.variant || 'AngularJS';
-    var appName = ngAppEl.getAttribute('ng-app') || '';
-    result.signals.push('ng-app directive' + (appName ? '="' + appName + '"' : ''));
+    const appName = ngAppEl.getAttribute('ng-app') || '';
+    result.signals.push(`ng-app directive${appName ? `="${appName}"` : ''}`);
   }
 
   // ng-controller, ng-model, ng-repeat
-  var ngDirectives = document.querySelectorAll(
+  const ngDirectives = document.querySelectorAll(
     '[ng-controller], [ng-model], [ng-repeat], [ng-click], [ng-init]'
   );
   if (ngDirectives.length > 0) {
     result.detected = true;
     result.variant = result.variant || 'AngularJS';
-    result.signals.push('ng directives found (' + ngDirectives.length + ' elements)');
+    result.signals.push(`ng directives found (${ngDirectives.length} elements)`);
   }
 
   // Angular 2+ zone.js
@@ -67,19 +67,19 @@
   }
 
   // Angular router base href
-  var baseHref = document.querySelector('base[href][app-base-href]');
+  const baseHref = document.querySelector('base[href][app-base-href]');
   if (baseHref) {
     result.detected = true;
     result.variant = result.variant || 'Angular';
-    result.signals.push('app-base-href="' + baseHref.getAttribute('href') + '"');
+    result.signals.push(`app-base-href="${baseHref.getAttribute('href')}"`);
   }
 
   // Angular CLI / Webpack marker
-  var scripts = Array.from(document.querySelectorAll('script[src]'));
+  const scripts = Array.from(document.querySelectorAll('script[src]'));
   scripts.forEach(function (s) {
     if (/angular/i.test(s.src)) {
       result.detected = true;
-      result.signals.push('Angular script: ' + s.src.split('/').pop());
+      result.signals.push(`Angular script: ${s.src.split('/').pop()}`);
     }
     if (/zone\.js/i.test(s.src)) {
       result.signals.push('zone.js loaded');
@@ -87,7 +87,7 @@
   });
 
   // Angular specific meta tags or comments
-  var metas = document.querySelectorAll('meta[name]');
+  const metas = document.querySelectorAll('meta[name]');
   metas.forEach(function (m) {
     if (m.getAttribute('name') === 'ng-version') {
       result.detected = true;
@@ -99,7 +99,7 @@
   });
 
   // Dev/Prod mode detection
-  var isDev = false;
+  let isDev = false;
   scripts.forEach(function (s) {
     if (/angular\.development/i.test(s.src) || /zone\.js\/dist\/zone-evergreen\.js/i.test(s.src))
       isDev = true;
@@ -111,9 +111,9 @@
   // AngularJS module extraction
   if (window.angular && window.angular.module) {
     try {
-      var injector = angular.element(document).injector();
+      const injector = angular.element(document).injector();
       if (injector) {
-        var loadedMods = [];
+        const loadedMods = [];
         if (typeof injector.modules === 'function') {
           Object.keys(injector.modules()).forEach(function (m) {
             if (m.indexOf('ng') === 0 || m === 'ngLocale') return;
@@ -122,11 +122,11 @@
         }
         if (loadedMods.length === 0) {
           try {
-            var _ngAppEl = document.querySelector('[ng-app]');
+            const _ngAppEl = document.querySelector('[ng-app]');
             if (_ngAppEl) {
-              var _app = angular.element(_ngAppEl);
+              const _app = angular.element(_ngAppEl);
               if (_app.injector) {
-                var _inj = _app.injector();
+                const _inj = _app.injector();
                 if (_inj && _inj.modules) {
                   Object.keys(_inj.modules()).forEach(function (m) {
                     if (m.indexOf('ng') === 0 || m === 'ngLocale') return;
@@ -140,7 +140,7 @@
           }
         }
         result.modules = loadedMods.slice(0, 30);
-        if (loadedMods.length > 0) result.signals.push(loadedMods.length + ' modules loaded');
+        if (loadedMods.length > 0) result.signals.push(`${loadedMods.length} modules loaded`);
       }
     } catch (e) {
       /* ignore */
@@ -149,15 +149,15 @@
 
   // Angular 2+ component extraction from DOM
   if (result.variant === 'Angular') {
-    var customElements = document.querySelectorAll('*');
-    var componentSet = {};
+    const customElements = document.querySelectorAll('*');
+    const componentSet = {};
     customElements.forEach(function (el) {
-      var tag = el.tagName.toLowerCase();
+      const tag = el.tagName.toLowerCase();
       if (tag.indexOf('app-') === 0 || tag.indexOf('ngx-') === 0 || tag.indexOf('mat-') === 0) {
         componentSet[tag] = true;
       }
       if (el.hasAttribute('_ngcontent') || el.hasAttribute('_nghost')) {
-        var cls = el.className || '';
+        let cls = el.className || '';
         if (typeof cls === 'string') {
           cls.split(/\s+/).forEach(function (c) {
             if (
@@ -175,11 +175,11 @@
   }
 
   // Route extraction
-  var routeSet = {};
+  const routeSet = {};
   document.querySelectorAll('a[href^="/"]').forEach(function (a) {
-    var href = a.getAttribute('href');
+    const href = a.getAttribute('href');
     if (href && href.charAt(0) === '/' && href.length > 1) {
-      var cleanPath = href.split('?')[0].split('#')[0];
+      const cleanPath = href.split('?')[0].split('#')[0];
       if (cleanPath.length > 1 && !routeSet[cleanPath]) {
         routeSet[cleanPath] = true;
       }

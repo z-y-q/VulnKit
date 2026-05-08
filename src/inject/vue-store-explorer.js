@@ -4,17 +4,17 @@
   'use strict';
 
   function exploreStore() {
-    var result = { stores: {}, frameworks: [], errors: [] };
+    let result = { stores: {}, frameworks: [], errors: [] };
 
     // --- Vuex ---
     try {
-      var vuexKeys = Object.keys(window).filter(function (k) {
+      const vuexKeys = Object.keys(window).filter(function (k) {
         return k.indexOf('Vuex') !== -1 || k.indexOf('vuex') !== -1;
       });
       if (vuexKeys.length > 0) result.frameworks.push('Vuex (global)');
 
       // Find Vue instances and their $store
-      var vueRoot = null;
+      let vueRoot = null;
       if (window.__VUE__) vueRoot = window.__VUE__;
       if (!vueRoot && document.querySelector('[data-v-app]')) {
         vueRoot =
@@ -24,16 +24,16 @@
       // Vue 3 app
       if (vueRoot && vueRoot.config && vueRoot.config.globalProperties) {
         result.frameworks.push('Vue 3');
-        var store = vueRoot.config.globalProperties.$store;
+        let store = vueRoot.config.globalProperties.$store;
         if (store) {
           result.stores.root = extractVuexStore(store);
         }
       }
       // Vue 2 instance
       if (!vueRoot || !result.stores.root) {
-        var allEls = document.querySelectorAll('*');
-        for (var i = 0; i < allEls.length; i++) {
-          var el = allEls[i];
+        let allEls = document.querySelectorAll('*');
+        for (let i = 0; i < allEls.length; i++) {
+          const el = allEls[i];
           if (el.__vue__ && el.__vue__.$store) {
             result.frameworks.push('Vue 2');
             result.stores.root = extractVuexStore(el.__vue__.$store);
@@ -42,15 +42,15 @@
         }
       }
     } catch (e) {
-      result.errors.push('Vuex: ' + e.message);
+      result.errors.push(`Vuex: `);
     }
 
     // --- Pinia ---
     try {
       if (window.pinia || window.__pinia__) {
         result.frameworks.push('Pinia');
-        var piniaInstance = window.pinia || window.__pinia__;
-        var state =
+        const piniaInstance = window.pinia || window.__pinia__;
+        const state =
           piniaInstance.state && piniaInstance.state.value ? piniaInstance.state.value : {};
         Object.keys(state).forEach(function (storeId) {
           result.stores[storeId] = {
@@ -60,18 +60,18 @@
         });
       }
     } catch (e) {
-      result.errors.push('Pinia: ' + e.message);
+      result.errors.push(`Pinia: `);
     }
 
     return result;
   }
 
   function extractVuexStore(store) {
-    var data = { state: {}, getters: [], mutations: [], actions: [], type: 'vuex' };
+    const data = { state: {}, getters: [], mutations: [], actions: [], type: 'vuex' };
     try {
       data.state = safeClone(store.state || {});
       if (store._vm) {
-        var computed = store._vm.$options.computed || {};
+        const computed = store._vm.$options.computed || {};
         data.getters = Object.keys(computed);
       }
       if (store._mutations) data.mutations = Object.keys(store._mutations);
@@ -89,9 +89,9 @@
       return JSON.parse(
         JSON.stringify(obj, function (key, value) {
           if (typeof value === 'function') return '[Function]';
-          if (value instanceof HTMLElement) return '[HTMLElement:' + value.tagName + ']';
+          if (value instanceof HTMLElement) return `[HTMLElement:]`;
           if (value instanceof Window) return '[Window]';
-          if (value instanceof Error) return '[Error: ' + value.message + ']';
+          if (value instanceof Error) return `[Error: ]`;
           if (typeof value === 'symbol') return value.toString();
           return value;
         })
@@ -102,11 +102,11 @@
   }
 
   function exploreActionsGetters() {
-    var result = { apiEndpoints: [], actionNames: [], getterNames: [] };
+    const result = { apiEndpoints: [], actionNames: [], getterNames: [] };
     try {
       // Search Vue instances for store
-      var store = null;
-      var vueRoot = null;
+      let store = null;
+      let vueRoot = null;
       if (window.__VUE__) vueRoot = window.__VUE__;
       if (!vueRoot && document.querySelector('[data-v-app]')) {
         vueRoot =
@@ -117,8 +117,8 @@
         store = vueRoot.config.globalProperties.$store;
       }
       if (!store) {
-        var allEls = document.querySelectorAll('*');
-        for (var i = 0; i < allEls.length; i++) {
+        let allEls = document.querySelectorAll('*');
+        for (let i = 0; i < allEls.length; i++) {
           if (allEls[i].__vue__ && allEls[i].__vue__.$store) {
             store = allEls[i].__vue__.$store;
             break;
@@ -135,10 +135,10 @@
       }
 
       // Extract API endpoints from action source code
-      var actionSrc = [];
+      const actionSrc = [];
       if (store._actions) {
         Object.keys(store._actions).forEach(function (name) {
-          var fns = store._actions[name];
+          let fns = store._actions[name];
           if (Array.isArray(fns)) {
             fns.forEach(function (fn) {
               if (typeof fn === 'function') actionSrc.push(fn.toString());
@@ -149,14 +149,14 @@
         });
       }
 
-      var urlPattern =
+      const urlPattern =
         /['"`](\/(?:api|v[0-9]+|admin|system|user|auth|login|query|search|list|get|post|put|delete)\/[^\s'"`)]{2,})['"`]/gi;
-      var seen = {};
+      const seen = {};
       actionSrc.forEach(function (src) {
-        var match;
+        let match;
         urlPattern.lastIndex = 0;
         while ((match = urlPattern.exec(src)) !== null) {
-          var url = match[1];
+          const url = match[1];
           if (!seen[url]) {
             seen[url] = true;
             result.apiEndpoints.push(url);
@@ -170,8 +170,8 @@
   }
 
   function scanDirectives() {
-    var directives = [];
-    var knownDirectives = [
+    const directives = [];
+    const knownDirectives = [
       'v-permission',
       'v-auth',
       'v-hasPermi',
@@ -186,13 +186,13 @@
       'v-slot',
       'v-for',
     ];
-    var customAttrs = {};
-    var allEls = document.querySelectorAll('*');
-    for (var i = 0; i < allEls.length; i++) {
-      var el = allEls[i];
-      var attrs = el.attributes;
-      for (var j = 0; j < attrs.length; j++) {
-        var name = attrs[j].name;
+    const customAttrs = {};
+    const allEls = document.querySelectorAll('*');
+    for (let i = 0; i < allEls.length; i++) {
+      const el = allEls[i];
+      const attrs = el.attributes;
+      for (let j = 0; j < attrs.length; j++) {
+        const name = attrs[j].name;
         if (
           name.indexOf('v-') === 0 ||
           (name.indexOf('data-v-') === -1 && name.indexOf(':') !== -1)
@@ -202,7 +202,7 @@
             knownDirectives.indexOf(name.split('=')[0].split(':')[0]) === -1
           ) {
             // Custom directive
-            var dirName = name.split('=')[0].split(':')[0];
+            const dirName = name.split('=')[0].split(':')[0];
             if (!customAttrs[dirName]) {
               customAttrs[dirName] = { count: 0, examples: [] };
             }
@@ -228,9 +228,9 @@
   }
 
   // Execute and return results via postMessage
-  var storeData = exploreStore();
-  var actionsData = exploreActionsGetters();
-  var directivesData = scanDirectives();
+  const storeData = exploreStore();
+  const actionsData = exploreActionsGetters();
+  const directivesData = scanDirectives();
 
   window.postMessage(
     {

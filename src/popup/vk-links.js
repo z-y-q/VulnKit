@@ -297,6 +297,10 @@ function sendToMultiUrl() {
   }
 }
 
+function setAllLinks(v) {
+  allLinks = v;
+}
+
 export {
   extractLinks,
   getFilteredLinks,
@@ -305,4 +309,5 @@ export {
   exportLinks,
   sendToMultiUrl,
   allLinks,
+  setAllLinks,
 };

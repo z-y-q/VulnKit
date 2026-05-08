@@ -1,10 +1,8 @@
 // vk-vue-store.js -- 灵眸 Chrome Extension
 // Store Explorer: explore, render, copy
+'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
-import { vueState } from './vk-vue-state.js';
-
-const S = vueState;
 
 async function exploreVueStore() {
   const statusEl = utils.get('vue-store-status');
@@ -56,15 +54,15 @@ async function exploreVueStore() {
       storeKeys.forEach(function (storeId) {
         const storeData = storeInfo.stores[storeId];
         html += `<div class="vue-store-card">
-            <div class="vue-store-header">
-              <span class="vue-store-name">${utils.escapeHtml(storeId)}</span>
-              <span class="vue-store-type">${utils.escapeHtml(storeData.type || 'unknown')}</span>
-            </div>
-            ${renderStoreTree(storeData.state, '', 0)}
-            ${renderTagList(storeData.getters, 'vue-store-tag', 'Getters')}
-            ${renderTagList(storeData.mutations, 'vue-store-tag vue-store-tag-mut', 'Mutations')}
-            ${renderTagList(storeData.actions, 'vue-store-tag vue-store-tag-act', 'Actions')}
-          </div>`;
+          <div class="vue-store-header">
+            <span class="vue-store-name">${utils.escapeHtml(storeId)}</span>
+            <span class="vue-store-type">${utils.escapeHtml(storeData.type || 'unknown')}</span>
+          </div>
+          ${renderStoreTree(storeData.state, '', 0)}
+          ${renderTagList(storeData.getters, 'vue-store-tag', 'Getters')}
+          ${renderTagList(storeData.mutations, 'vue-store-tag vue-store-tag-mut', 'Mutations')}
+          ${renderTagList(storeData.actions, 'vue-store-tag vue-store-tag-act', 'Actions')}
+        </div>`;
       });
     }
     resultsEl.innerHTML = html;
@@ -82,14 +80,14 @@ async function exploreVueStore() {
           let epItems = '';
           apiEndpoints.forEach(function (ep) {
             epItems += `<div class="vue-store-api-item" data-url="${utils.escapeHtml(ep)}">
-                <code>${utils.escapeHtml(ep)}</code>
-                <button class="btn btn-sm btn-outline vue-api-copy-btn" data-url="${utils.escapeHtml(ep)}">复制</button>
-              </div>`;
+              <code>${utils.escapeHtml(ep)}</code>
+              <button class="btn btn-sm btn-outline vue-api-copy-btn" data-url="${utils.escapeHtml(ep)}">复制</button>
+            </div>`;
           });
           actionHtml += `<div class="vue-store-section">
-              <div class="vue-store-section-title">API 端点 (${apiEndpoints.length})</div>
-              <div class="vue-store-api-list">${epItems}</div>
-            </div>`;
+            <div class="vue-store-section-title">API 端点 (${apiEndpoints.length})</div>
+            <div class="vue-store-api-list">${epItems}</div>
+          </div>`;
         }
         if (actionNames.length > 0) {
           actionHtml += renderTagList(actionNames, 'vue-store-tag vue-store-tag-act', 'Actions');
@@ -122,10 +120,10 @@ async function exploreVueStore() {
             });
           }
           dirHtml += `<div class="vue-dir-item">
-              <span class="vue-dir-name">${utils.escapeHtml(d.name)}</span>
-              <span class="vue-dir-count">${d.count} 次</span>
-              ${exHtml ? `<div class="vue-dir-examples">${exHtml}</div>` : ''}
-            </div>`;
+            <span class="vue-dir-name">${utils.escapeHtml(d.name)}</span>
+            <span class="vue-dir-count">${d.count} 次</span>
+            ${exHtml ? `<div class="vue-dir-examples">${exHtml}</div>` : ''}
+          </div>`;
         });
       }
       directivesEl.innerHTML = dirHtml;
@@ -148,9 +146,9 @@ function renderTagList(items, tagClass, label) {
     tags += `<span class="${tagClass}">${utils.escapeHtml(item)}</span>`;
   });
   return `<div class="vue-store-section">
-      <div class="vue-store-section-title">${label} (${items.length})</div>
-      <div class="vue-store-tags">${tags}</div>
-    </div>`;
+    <div class="vue-store-section-title">${label} (${items.length})</div>
+    <div class="vue-store-tags">${tags}</div>
+  </div>`;
 }
 
 function renderStoreTree(obj, prefix, depth) {
@@ -169,7 +167,10 @@ function renderStoreTree(obj, prefix, depth) {
     let val = obj[key];
     const path = prefix ? `${prefix}.${key}` : key;
     const isExpandable =
-      val !== null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0;
+      val !== null &&
+      typeof val === 'object' &&
+      !Array.isArray(val) &&
+      Object.keys(val).length > 0;
     const isArr = Array.isArray(val);
 
     const toggleIcon = isExpandable
@@ -192,13 +193,13 @@ function renderStoreTree(obj, prefix, depth) {
       : '';
 
     html += `<div class="vue-store-node">
-        <div class="vue-store-key-row" data-path="${utils.escapeHtml(path)}">
-          ${toggleIcon}
-          <span class="vue-store-key">${utils.escapeHtml(key)}</span>
-          ${valHtml}
-        </div>
-        ${childrenHtml}
-      </div>`;
+      <div class="vue-store-key-row" data-path="${utils.escapeHtml(path)}">
+        ${toggleIcon}
+        <span class="vue-store-key">${utils.escapeHtml(key)}</span>
+        ${valHtml}
+      </div>
+      ${childrenHtml}
+    </div>`;
   });
 
   if (keys.length > maxShow) {
@@ -244,11 +245,5 @@ function initStoreExplorerEvents() {
     }
   });
 }
-
-S.Store = {
-  exploreVueStore: exploreVueStore,
-  copyFullStoreJson: copyFullStoreJson,
-  initStoreExplorerEvents: initStoreExplorerEvents,
-};
 
 export { exploreVueStore, copyFullStoreJson, initStoreExplorerEvents };

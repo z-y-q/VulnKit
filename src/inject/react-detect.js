@@ -4,7 +4,7 @@
   if (window.__VK_REACT_DETECT_DONE__) return;
   window.__VK_REACT_DETECT_DONE__ = true;
 
-  var result = {
+  const result = {
     detected: false,
     version: '',
     metaframework: '',
@@ -19,9 +19,9 @@
   if (window.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
     result.detected = true;
     result.signals.push('React DevTools Global Hook');
-    var renderers = window.__REACT_DEVTOOLS_GLOBAL_HOOK__.renderers;
+    const renderers = window.__REACT_DEVTOOLS_GLOBAL_HOOK__.renderers;
     if (renderers) {
-      var versions = [];
+      const versions = [];
       renderers.forEach(function (r, id) {
         if (r && r.version) versions.push(r.version);
       });
@@ -30,19 +30,19 @@
   }
 
   // React Fiber on root element
-  var rootEl =
+  const rootEl =
     document.getElementById('root') ||
     document.getElementById('app') ||
     document.getElementById('__next');
   if (rootEl) {
-    var fiberKey = Object.keys(rootEl).find(function (k) {
+    const fiberKey = Object.keys(rootEl).find(function (k) {
       return k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$');
     });
     if (fiberKey) {
       result.detected = true;
-      result.signals.push('React Fiber (' + fiberKey + ')');
+      result.signals.push(`React Fiber (${fiberKey})`);
     }
-    var propsKey = Object.keys(rootEl).find(function (k) {
+    const propsKey = Object.keys(rootEl).find(function (k) {
       return k.startsWith('__reactProps$');
     });
     if (propsKey) {
@@ -67,7 +67,7 @@
     result.detected = true;
     result.signals.push('__NEXT_DATA__');
     if (window.__NEXT_DATA__.buildId)
-      result.signals.push('Next.js Build: ' + window.__NEXT_DATA__.buildId);
+      result.signals.push(`Next.js Build: ${window.__NEXT_DATA__.buildId}`);
     if (window.__NEXT_DATA__.runtimeConfig) result.signals.push('Next.js Runtime Config');
   }
   if (document.querySelector('#__next')) {
@@ -82,8 +82,8 @@
   }
 
   // React Router
-  var scripts = Array.from(document.querySelectorAll('script[src]'));
-  var hasReactRouter = scripts.some(function (s) {
+  const scripts = Array.from(document.querySelectorAll('script[src]'));
+  const hasReactRouter = scripts.some(function (s) {
     return /react-router/i.test(s.src);
   });
   if (hasReactRouter) {
@@ -93,12 +93,12 @@
   // ReactDOM from script tags
   scripts.forEach(function (s) {
     if (/react-dom/i.test(s.src) && /(\d+\.\d+\.\d+)/.test(s.src)) {
-      var m = s.src.match(/(\d+\.\d+\.\d+)/);
+      const m = s.src.match(/(\d+\.\d+\.\d+)/);
       if (m && !result.version) result.version = m[1];
     }
     if (/react\.production/i.test(s.src) || /react\.development/i.test(s.src)) {
       if (!result.version) {
-        var m2 = s.src.match(/(\d+\.\d+\.\d+)/);
+        const m2 = s.src.match(/(\d+\.\d+\.\d+)/);
         if (m2) result.version = m2[1];
       }
     }
@@ -108,7 +108,7 @@
   if (typeof React !== 'undefined' && React.version) {
     result.detected = true;
     if (!result.version) result.version = React.version;
-    result.signals.push('Global React object v' + React.version);
+    result.signals.push(`Global React object v${React.version}`);
   }
   if (typeof ReactDOM !== 'undefined' && ReactDOM.version) {
     result.detected = true;
@@ -116,7 +116,7 @@
   }
 
   // Dev/Prod mode detection
-  var isDev = false;
+  let isDev = false;
   if (typeof React !== 'undefined' && React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED) {
     isDev = true;
   }
@@ -128,7 +128,7 @@
     __REACT_DEVTOOLS_GLOBAL_HOOK__.renderers
   ) {
     try {
-      var fiberRoot = rootEl ? rootEl[fiberKey] : null;
+      const fiberRoot = rootEl ? rootEl[fiberKey] : null;
       if (fiberRoot && fiberRoot._debugInfo) isDev = true;
       if (fiberRoot && fiberRoot.memoizedState && fiberRoot.memoizedState.queue) isDev = true;
     } catch (e) {
@@ -151,27 +151,27 @@
     result.signals.push('Redux (Next.js integration)');
   }
   if (typeof window.__ZUSTAND_DEVTOOLS__ !== 'undefined') {
-    result.stateManager = result.stateManager ? result.stateManager + ' + Zustand' : 'Zustand';
+    result.stateManager = result.stateManager ? `${result.stateManager} + Zustand` : 'Zustand';
     result.signals.push('Zustand detected');
   }
   if (typeof MobX !== 'undefined') {
-    result.stateManager = result.stateManager ? result.stateManager + ' + MobX' : 'MobX';
+    result.stateManager = result.stateManager ? `${result.stateManager} + MobX` : 'MobX';
     result.signals.push('MobX detected');
   }
   if (typeof Recoil !== 'undefined' || document.querySelector('[data-recoil-root]')) {
-    result.stateManager = result.stateManager ? result.stateManager + ' + Recoil' : 'Recoil';
+    result.stateManager = result.stateManager ? `${result.stateManager} + Recoil` : 'Recoil';
     result.signals.push('Recoil detected');
   }
   if (typeof jotai !== 'undefined' || typeof jotaiModule !== 'undefined') {
-    result.stateManager = result.stateManager ? result.stateManager + ' + Jotai' : 'Jotai';
+    result.stateManager = result.stateManager ? `${result.stateManager} + Jotai` : 'Jotai';
     result.signals.push('Jotai detected');
   }
 
   // Component tree extraction from Fiber
-  var componentNames = [];
+  const componentNames = [];
   function walkFiber(fiber, depth) {
     if (!fiber || depth > 8) return;
-    var name = fiber.type
+    const name = fiber.type
       ? typeof fiber.type === 'function'
         ? fiber.type.displayName || fiber.type.name
         : fiber.type
@@ -191,9 +191,9 @@
   }
   if (fiberKey && rootEl) {
     try {
-      var fiberNode = rootEl[fiberKey];
+      const fiberNode = rootEl[fiberKey];
       if (fiberNode && fiberNode.stateNode) {
-        var _root = fiberNode.stateNode._reactRootContainer || fiberNode.stateNode;
+        const _root = fiberNode.stateNode._reactRootContainer || fiberNode.stateNode;
         if (_root && _root._internalRoot) walkFiber(_root._internalRoot.current, 0);
       } else if (fiberNode) {
         walkFiber(fiberNode, 0);
@@ -209,7 +209,7 @@
     result.routes.push(window.__NEXT_DATA__.page);
   }
   if (window.__NEXT_DATA__ && window.__NEXT_DATA__.buildManifest) {
-    var pages = Object.keys(window.__NEXT_DATA__.buildManifest.pages || {});
+    const pages = Object.keys(window.__NEXT_DATA__.buildManifest.pages || {});
     pages.forEach(function (p) {
       if (p.charAt(0) === '/' && result.routes.indexOf(p) === -1) result.routes.push(p);
     });
@@ -218,12 +218,12 @@
   // React Router route detection via router context
   if (typeof React !== 'undefined' && rootEl) {
     try {
-      var allAnchors = document.querySelectorAll('a[href^="/"]');
-      var routeSet = {};
+      const allAnchors = document.querySelectorAll('a[href^="/"]');
+      const routeSet = {};
       allAnchors.forEach(function (a) {
-        var href = a.getAttribute('href');
+        const href = a.getAttribute('href');
         if (href && href.charAt(0) === '/' && href.length > 1 && !routeSet[href]) {
-          var cleanPath = href.split('?')[0];
+          const cleanPath = href.split('?')[0];
           if (cleanPath.length > 1 && !routeSet[cleanPath]) {
             routeSet[cleanPath] = true;
           }

@@ -122,21 +122,9 @@ async function scanAntiDebug() {
 
         let inlinePats = [
           [/debugger/, 'debugger语句', '检测到 inline script 中的 debugger 语句'],
-          [
-            /outerWidth\s*-\s*innerWidth\s*>\s*\d+/,
-            'DevTools检测',
-            '通过窗口尺寸差检测开发者工具',
-          ],
-          [
-            /Firebug|firebug|chrome\.devtools/,
-            'DevTools检测',
-            '检测到 Firebug/DevTools 探测代码',
-          ],
-          [
-            /new\s+Image.*onerror.*devtools/i,
-            'DevTools检测',
-            '通过 Image.onerror 检测开发者工具',
-          ],
+          [/outerWidth\s*-\s*innerWidth\s*>\s*\d+/, 'DevTools检测', '通过窗口尺寸差检测开发者工具'],
+          [/Firebug|firebug|chrome\.devtools/, 'DevTools检测', '检测到 Firebug/DevTools 探测代码'],
+          [/new\s+Image.*onerror.*devtools/i, 'DevTools检测', '通过 Image.onerror 检测开发者工具'],
         ];
         let foundPat = {};
         let scripts = document.querySelectorAll('script');
@@ -478,10 +466,7 @@ async function removeCopyRestrictions() {
             s.getPropertyValue('opacity') === '0' ||
             s.getPropertyValue('background') === 'rgba(0, 0, 0, 0)' ||
             s.backgroundColor === 'transparent';
-          if (
-            isTransparent &&
-            (tag === 'div' || tag === 'span' || tag === 'a' || tag === 'img')
-          ) {
+          if (isTransparent && (tag === 'div' || tag === 'span' || tag === 'a' || tag === 'img')) {
             allEls[k].classList.add('__vk-hidden');
             pointerCount++;
           }
@@ -538,6 +523,10 @@ async function removeCopyRestrictions() {
   }
 }
 
+function setJsBlocked(v) {
+  jsBlocked = v;
+}
+
 export {
   switchJsCtrlTab,
   updateJsToggleStatus,
@@ -549,4 +538,5 @@ export {
   clearScriptBlock,
   removeCopyRestrictions,
   updateUncopyIndicator,
+  setJsBlocked,
 };

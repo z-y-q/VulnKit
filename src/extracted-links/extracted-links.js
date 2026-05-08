@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var TAG_LABELS = {
+  const TAG_LABELS = {
     a: '链接',
     img: '图片',
     script: '脚本',
@@ -9,9 +9,9 @@
     iframe: '框架',
     form: '表单',
   };
-  var allLinks = [];
-  var sourceUrl = '';
-  var loadAttempts = 0;
+  let allLinks = [];
+  let sourceUrl = '';
+  let loadAttempts = 0;
 
   function tryLoadData() {
     chrome.storage.local.get(['contextExtractedLinks', 'contextExtractedUrl'], function (data) {
@@ -33,11 +33,11 @@
 
   tryLoadData();
 
-  var searchEl = document.getElementById('search');
-  var filterEl = document.getElementById('filter-tag');
-  var tbody = document.getElementById('tbody');
-  var statsEl = document.getElementById('stats');
-  var sourceEl = document.getElementById('source-url');
+  const searchEl = document.getElementById('search');
+  const filterEl = document.getElementById('filter-tag');
+  const tbody = document.getElementById('tbody');
+  const statsEl = document.getElementById('stats');
+  const sourceEl = document.getElementById('source-url');
 
   searchEl.addEventListener('input', render);
   filterEl.addEventListener('change', render);
@@ -45,15 +45,15 @@
   document.getElementById('export-json').addEventListener('click', exportJson);
 
   function esc(s) {
-    var d = document.createElement('div');
+    const d = document.createElement('div');
     d.textContent = s;
     return d.innerHTML;
   }
 
   function render() {
-    var q = (searchEl.value || '').toLowerCase();
-    var tag = filterEl.value;
-    var filtered = allLinks.filter(function (l) {
+    const q = (searchEl.value || '').toLowerCase();
+    const tag = filterEl.value;
+    const filtered = allLinks.filter(function (l) {
       if (tag !== 'all' && l.tag !== tag) return false;
       if (
         q &&
@@ -66,11 +66,11 @@
 
     if (sourceEl) sourceEl.textContent = sourceUrl ? '来源: ' + sourceUrl : '';
 
-    var counts = {};
+    const counts = {};
     allLinks.forEach(function (l) {
       counts[l.tag] = (counts[l.tag] || 0) + 1;
     });
-    var parts = Object.keys(counts).map(function (k) {
+    const parts = Object.keys(counts).map(function (k) {
       return (TAG_LABELS[k] || k) + ': ' + counts[k];
     });
     if (statsEl)
@@ -85,7 +85,7 @@
       return;
     }
 
-    var html = '';
+    let html = '';
     filtered.forEach(function (l, i) {
       html += '<tr>';
       html += '<td>' + (i + 1) + '</td>';
@@ -111,7 +111,7 @@
   }
 
   function copyAll() {
-    var urls = allLinks
+    const urls = allLinks
       .map(function (l) {
         return l.href;
       })
@@ -125,8 +125,8 @@
   }
 
   function exportJson() {
-    var blob = new Blob([JSON.stringify(allLinks, null, 2)], { type: 'application/json' });
-    var url = URL.createObjectURL(blob);
+    const blob = new Blob([JSON.stringify(allLinks, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     chrome.downloads.download({ url: url, filename: 'extracted-links.json', saveAs: true });
   }
 })();

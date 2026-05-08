@@ -85,60 +85,10 @@
     </div>
   </div>
 </div>
-<!-- Panel loader (must load before vk-init.js) -->
+<!-- Panel loader (classic, synchronous — must load first) -->
 <script src="panel-loader.js"></script>
 <!-- Lazy-loaded on first use: crypto-js, sm2, sm4, bcrypt, exifr -->
-<!-- Core -->
-<script src="vk-namespace.js"></script>
-<script src="vk-encoding.js"></script>
-<script src="vk-jwt.js"></script>
-<script src="vk-crypto.js"></script>
-<script src="vk-favicon.js"></script>
-<!-- Features -->
-<script src="vk-hae-rules.js"></script>
-<script src="vk-gather.js"></script>
-<script src="vk-asset.js"></script>
-<script src="vk-links.js"></script>
-<script src="vk-multiurl.js"></script>
-<script src="vk-tabsave.js"></script>
-<script src="vk-exif.js"></script>
-<script src="vk-history.js"></script>
-<script src="vk-spoof.js"></script>
-<script src="vk-payload.js"></script>
-<script src="vk-xss.js"></script>
-<!-- Source Map (split: state → utils → scanner → render → analysis → actions → re-exporter) -->
-<script src="vk-sourcemap-state.js"></script>
-<script src="vk-sourcemap-utils.js"></script>
-<script src="vk-sourcemap-scanner.js"></script>
-<script src="vk-sourcemap-render.js"></script>
-<script src="vk-sourcemap-analysis.js"></script>
-<script src="vk-sourcemap-actions.js"></script>
-<script src="vk-sourcemap.js"></script>
-<!-- Vue Analysis (split: state → sub-modules → re-exporter) -->
-<script src="vk-vue-state.js"></script>
-<script src="vk-vue-detect.js"></script>
-<script src="vk-vue-perm-inject.js"></script>
-<script src="vk-vue-perm.js"></script>
-<script src="vk-vue-jssearch.js"></script>
-<script src="vk-vue-compare.js"></script>
-<script src="vk-vue-store.js"></script>
-<script src="vk-vue.js"></script>
-<script src="vk-ruoyi-common.js"></script>
-<script src="vk-ruoyi-cve-db.js"></script>
-<script src="vk-ruoyi-detect.js"></script>
-<script src="vk-ruoyi-hook.js"></script>
-<script src="vk-ruoyi-mar.js"></script>
-<script src="vk-ruoyi.js"></script>
-<script src="vk-jsctrl.js"></script>
-<!-- WAF / Cookie Audit / React / Angular / CORS / Subdomain -->
-<script src="vk-waf.js"></script>
-<script src="vk-cookie-audit.js"></script>
-<script src="vk-react.js"></script>
-<script src="vk-angular.js"></script>
-<script src="vk-cors.js"></script>
-<script src="vk-subdomain.js"></script>
-<script src="vk-source-loader.js"></script>
-<!-- Init (must load last) -->
-<script src="vk-init.js"></script>
+<!-- Module entry point — all vk-*.js loaded via ES module imports -->
+<script type="module" src="vk-init.js"></script>
 </body>
 </html>
