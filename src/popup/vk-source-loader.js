@@ -27,21 +27,6 @@ window.VulnKitSourceLoader = (function () {
     return filename.slice(idx).toLowerCase();
   }
 
-  function fetchWithTimeout(url, timeoutMs) {
-    return new Promise(function (resolve) {
-      var timer = setTimeout(function () {
-        resolve(null);
-      }, timeoutMs || 30000);
-      chrome.runtime.sendMessage(
-        { type: 'FETCH_URL', url: url, timeout: timeoutMs },
-        function (resp) {
-          clearTimeout(timer);
-          resolve(resp || null);
-        }
-      );
-    });
-  }
-
   async function loadToSources() {
     var urlsEl = utils.get('source-loader-urls');
     var statusEl = utils.get('source-loader-status');
@@ -88,7 +73,7 @@ window.VulnKitSourceLoader = (function () {
       renderResults([item]);
 
       try {
-        var resp = await fetchWithTimeout(url, 30000);
+        var resp = await utils.fetchWithTimeout(url, 30000);
         if (!resp || resp.error) {
           item.status = 'error';
           item.error = resp && resp.error ? resp.error : '请求失败或超时';

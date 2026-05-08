@@ -474,7 +474,9 @@ window.VulnKitRuoYiDetect = (function () {
                 );
                 utils.showToast('发现 Gateway 路由: ' + cloudRoutes.length + ' 条', 'success');
               }
-            } catch (e) {}
+            } catch (e) {
+              /* ignore */
+            }
 
             // Cloud: probe Nacos service discovery
             var nacosPaths = [
@@ -527,7 +529,9 @@ window.VulnKitRuoYiDetect = (function () {
                       state.nacosInstances = (state.nacosInstances || []).concat(instances);
                     }
                   }
-                } catch (e) {}
+                } catch (e) {
+                  /* ignore */
+                }
               }
             }
 

@@ -135,12 +135,16 @@
                 }
               }
             }
-          } catch (e) {}
+          } catch (e) {
+            /* ignore */
+          }
         }
         result.modules = loadedMods.slice(0, 30);
         if (loadedMods.length > 0) result.signals.push(loadedMods.length + ' modules loaded');
       }
-    } catch (e) {}
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   // Angular 2+ component extraction from DOM

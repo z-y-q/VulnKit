@@ -1,6 +1,6 @@
 {
   "name": "lingmou-chrome-extension",
-  "version": "3.0.0",
+  "version": "5.0.0",
   "description": "Professional penetration testing and security analysis Chrome extension",
   "main": "src/background/background.ts",
   "scripts": {

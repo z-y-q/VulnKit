@@ -29,7 +29,9 @@
   }
 
   function sleep(ms) {
-    return new Promise(function (r) { setTimeout(r, ms); });
+    return new Promise(function (r) {
+      setTimeout(r, ms);
+    });
   }
 
   async function detectWithRetry(tabId) {
@@ -222,9 +224,7 @@
           }
           return router.options ? safeSerialize(router.options.routes) || null : null;
         }
-        var appEl = document.querySelector(
-          '#app,[data-v-app],[id^="app"],#root,#application,#main'
-        );
+        var appEl = document.querySelector(S.VUE_ROOT_SELECTOR);
         if (appEl && appEl.__vue_app__) {
           var r = getRoutes(appEl.__vue_app__.config.globalProperties.$router);
           if (r) return r;
@@ -263,9 +263,7 @@
 
     try {
       var result = await utils.execInTabData(tab.id, function () {
-        var appEl = document.querySelector(
-          '#app,[data-v-app],[id^="app"],#root,#application,#main'
-        );
+        var appEl = document.querySelector(S.VUE_ROOT_SELECTOR);
         if (appEl && appEl.__vue_app__) {
           var router = appEl.__vue_app__.config.globalProperties.$router;
           if (router) {
@@ -317,7 +315,12 @@
     try {
       var result = await utils.execInTabData(tab.id, function () {
         var authKeys = [
-          'auth', 'requireAuth', 'requiresAuth', 'login', 'needLogin', 'requiresLogin',
+          'auth',
+          'requireAuth',
+          'requiresAuth',
+          'login',
+          'needLogin',
+          'requiresLogin',
         ];
         var changed = 0;
 
@@ -337,15 +340,17 @@
           }
         }
 
-        var appEl = document.querySelector(
-          '#app,[data-v-app],[id^="app"],#root,#application,#main'
-        );
+        var appEl = document.querySelector(S.VUE_ROOT_SELECTOR);
         if (appEl && appEl.__vue_app__) {
           var router = appEl.__vue_app__.config.globalProperties.$router;
           if (router) {
             if (router.options && router.options.routes) clearAuthMeta(router.options.routes, 0);
             var flatRoutes;
-            try { flatRoutes = router.getRoutes(); } catch (e) {}
+            try {
+              flatRoutes = router.getRoutes();
+            } catch (e) {
+              /* ignore */
+            }
             if (flatRoutes) {
               for (var k = 0; k < flatRoutes.length; k++) {
                 if (flatRoutes[k].meta && typeof flatRoutes[k].meta === 'object') {
@@ -380,7 +385,11 @@
       }
       if (result.changed > 0) {
         utils.showToast(
-          '已修改 ' + result.changed + ' 条路由 auth (Vue ' + (result.version === 'vue3' ? '3' : '2') + ')',
+          '已修改 ' +
+            result.changed +
+            ' 条路由 auth (Vue ' +
+            (result.version === 'vue3' ? '3' : '2') +
+            ')',
           'success'
         );
       } else {

@@ -131,7 +131,9 @@
       var fiberRoot = rootEl ? rootEl[fiberKey] : null;
       if (fiberRoot && fiberRoot._debugInfo) isDev = true;
       if (fiberRoot && fiberRoot.memoizedState && fiberRoot.memoizedState.queue) isDev = true;
-    } catch (e) {}
+    } catch (e) {
+      /* ignore */
+    }
   }
   result.mode = isDev ? 'development' : 'production';
   if (isDev) result.signals.push('Development mode (security risk: verbose errors, source maps)');
@@ -196,7 +198,9 @@
       } else if (fiberNode) {
         walkFiber(fiberNode, 0);
       }
-    } catch (e) {}
+    } catch (e) {
+      /* ignore */
+    }
   }
   result.components = componentNames.slice(0, 30);
 
@@ -226,7 +230,9 @@
         }
       });
       result.routes = result.routes.concat(Object.keys(routeSet)).slice(0, 50);
-    } catch (e) {}
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   window.postMessage({ __vk_react_detect: true, result: result }, location.origin);

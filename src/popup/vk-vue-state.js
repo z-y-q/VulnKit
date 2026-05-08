@@ -5,6 +5,7 @@ window.VulnKitVueState = (function () {
 
   var utils = window.VulnKitUtils.utilsProxy;
   var ROLE_VALS_RE = /^(admin|superadmin|user|vip|normal|guest|member|manager)$/i;
+  var VUE_ROOT_SELECTOR = '#app,[data-v-app],[id^="app"],#root,#application,#main';
   var MENU_KEYWORDS = [
     'menu',
     'menulist',
@@ -48,27 +49,68 @@ window.VulnKitVueState = (function () {
     utils: utils,
     ROLE_VALS_RE: ROLE_VALS_RE,
     MENU_KEYWORDS: MENU_KEYWORDS,
+    VUE_ROOT_SELECTOR: VUE_ROOT_SELECTOR,
     switchVueSubTab: switchVueSubTab,
-    get lastVueResult() { return lastVueResult; },
-    set lastVueResult(v) { lastVueResult = v; },
-    get permInterceptActive() { return permInterceptActive; },
-    set permInterceptActive(v) { permInterceptActive = v; },
-    get permCapturedData() { return permCapturedData; },
-    set permCapturedData(v) { permCapturedData = v; },
-    get permSelectedIndex() { return permSelectedIndex; },
-    set permSelectedIndex(v) { permSelectedIndex = v; },
-    get permViewMode() { return permViewMode; },
-    set permViewMode(v) { permViewMode = v; },
-    get permRefreshTimer() { return permRefreshTimer; },
-    set permRefreshTimer(v) { permRefreshTimer = v; },
-    get permCapturedLength() { return permCapturedLength; },
-    set permCapturedLength(v) { permCapturedLength = v; },
-    get lastCompareHiddenRoutes() { return lastCompareHiddenRoutes; },
-    set lastCompareHiddenRoutes(v) { lastCompareHiddenRoutes = v; },
-    get lastJsMatchContexts() { return lastJsMatchContexts; },
-    set lastJsMatchContexts(v) { lastJsMatchContexts = v; },
-    get jsSearchFoundPaths() { return jsSearchFoundPaths; },
-    set jsSearchFoundPaths(v) { jsSearchFoundPaths = v; },
+    get lastVueResult() {
+      return lastVueResult;
+    },
+    set lastVueResult(v) {
+      lastVueResult = v;
+    },
+    get permInterceptActive() {
+      return permInterceptActive;
+    },
+    set permInterceptActive(v) {
+      permInterceptActive = v;
+    },
+    get permCapturedData() {
+      return permCapturedData;
+    },
+    set permCapturedData(v) {
+      permCapturedData = v;
+    },
+    get permSelectedIndex() {
+      return permSelectedIndex;
+    },
+    set permSelectedIndex(v) {
+      permSelectedIndex = v;
+    },
+    get permViewMode() {
+      return permViewMode;
+    },
+    set permViewMode(v) {
+      permViewMode = v;
+    },
+    get permRefreshTimer() {
+      return permRefreshTimer;
+    },
+    set permRefreshTimer(v) {
+      permRefreshTimer = v;
+    },
+    get permCapturedLength() {
+      return permCapturedLength;
+    },
+    set permCapturedLength(v) {
+      permCapturedLength = v;
+    },
+    get lastCompareHiddenRoutes() {
+      return lastCompareHiddenRoutes;
+    },
+    set lastCompareHiddenRoutes(v) {
+      lastCompareHiddenRoutes = v;
+    },
+    get lastJsMatchContexts() {
+      return lastJsMatchContexts;
+    },
+    set lastJsMatchContexts(v) {
+      lastJsMatchContexts = v;
+    },
+    get jsSearchFoundPaths() {
+      return jsSearchFoundPaths;
+    },
+    set jsSearchFoundPaths(v) {
+      jsSearchFoundPaths = v;
+    },
     Detect: null,
     PermInject: null,
     Perm: null,

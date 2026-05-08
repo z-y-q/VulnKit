@@ -507,7 +507,9 @@ window.VulnKitGather = (function () {
             if (action) {
               try {
                 addDom('form', new URL(action, pageUrl).href + ' [' + method + ']');
-              } catch (e) {}
+              } catch (e) {
+                /* ignore */
+              }
             }
           });
 
@@ -526,21 +528,27 @@ window.VulnKitGather = (function () {
             try {
               var url = new URL(el.href, pageUrl);
               if (url.hostname !== location.hostname) addDom('domain', url.hostname);
-            } catch (e) {}
+            } catch (e) {
+              /* ignore */
+            }
           });
 
           document.querySelectorAll('[src]').forEach(function (el) {
             try {
               var url = new URL(el.src, pageUrl);
               if (url.hostname !== location.hostname) addDom('domain', url.hostname);
-            } catch (e) {}
+            } catch (e) {
+              /* ignore */
+            }
           });
 
           document.querySelectorAll('iframe[src],frame[src]').forEach(function (el) {
             try {
               var url = new URL(el.src, pageUrl);
               addDom('frame', url.hostname);
-            } catch (e) {}
+            } catch (e) {
+              /* ignore */
+            }
           });
 
           document.querySelectorAll('meta[name="generator"]').forEach(function (m) {
@@ -553,7 +561,9 @@ window.VulnKitGather = (function () {
               var name = c.split('=')[0].trim();
               if (name) addDom('cookie', name);
             });
-          } catch (e) {}
+          } catch (e) {
+            /* ignore */
+          }
 
           // localStorage
           try {
@@ -563,7 +573,9 @@ window.VulnKitGather = (function () {
                 addDom('storage', key);
               }
             }
-          } catch (e) {}
+          } catch (e) {
+            /* ignore */
+          }
 
           // Cloud hints
           var cloudPatterns = [
@@ -619,7 +631,9 @@ window.VulnKitGather = (function () {
                     try {
                       var sFlags = rule.sensitive ? '' : 'i';
                       if (!new RegExp(rule.s_regex, sFlags).test(match[0])) continue;
-                    } catch (e) {}
+                    } catch (e) {
+                      /* ignore */
+                    }
                   }
 
                   var rKey = rule.name + '::' + value;
@@ -632,7 +646,9 @@ window.VulnKitGather = (function () {
                     color: rule.color || 'gray',
                   });
                 }
-              } catch (e) {}
+              } catch (e) {
+                /* ignore */
+              }
             });
 
             if (groupResults.length > 0) {

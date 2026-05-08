@@ -51,7 +51,9 @@
       utils.showToast('拦截已启动，请操作页面或刷新页面', 'success');
       try {
         await utils.execInTab(tab.id, S.PermInject.permStoreReaderFunc, { args: [MENU_KEYWORDS] });
-      } catch (e) {}
+      } catch (e) {
+        /* ignore */
+      }
       renderPermList();
       startPermAutoRefresh();
     } catch (e) {
@@ -526,12 +528,16 @@
                 if (typeof state.__ob__ === 'object' && state.__ob__) {
                   try {
                     state[key].splice(0, state[key].length);
-                  } catch (e) {}
+                  } catch (e) {
+                    /* ignore */
+                  }
                   try {
                     override.forEach(function (item) {
                       state[key].push(item);
                     });
-                  } catch (e) {}
+                  } catch (e) {
+                    /* ignore */
+                  }
                 } else {
                   state[key] = override;
                 }
@@ -544,9 +550,7 @@
             return false;
           }
 
-          var appEl = document.querySelector(
-            '#app,[data-v-app],[id^="app"],#root,#application,#main'
-          );
+          var appEl = document.querySelector(S.VUE_ROOT_SELECTOR);
           if (appEl && appEl.__vue_app__) {
             var pinia = appEl.__vue_app__.config.globalProperties.$pinia;
             if (pinia && pinia._s) {
@@ -624,9 +628,13 @@
                       storagePatchCount++;
                     }
                   }
-                } catch (e) {}
+                } catch (e) {
+                  /* ignore */
+                }
               }
-            } catch (e) {}
+            } catch (e) {
+              /* ignore */
+            }
           }
           return { success: true, storagePatchCount: storagePatchCount };
         },

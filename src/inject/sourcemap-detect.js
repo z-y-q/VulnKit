@@ -26,7 +26,7 @@
         result.tool = 'turbopack';
         result.hints.push('__turbopack_load__ global found');
       }
-    } catch (e) {}
+    } catch (e) { /* ignore */ }
     if (!result.tool) {
       var tpScripts = document.querySelectorAll('script[src]');
       tpScripts.forEach(function (s) {
@@ -87,7 +87,7 @@
           result.hints.push('vite base: ' + import.meta.env.BASE_URL);
         }
       }
-    } catch (e) {}
+    } catch (e) { /* ignore */ }
   }
 
   // Rollup
@@ -97,7 +97,7 @@
         result.tool = 'rollup';
         result.hints.push('__ROLLUP__ global found');
       }
-    } catch (e) {}
+    } catch (e) { /* ignore */ }
     if (!result.tool) {
       var inlineScripts = document.querySelectorAll('script:not([src])');
       var rollupPattern = /Object\.defineProperty\(exports,\s*"__esModule"/;
@@ -131,7 +131,7 @@
     var nextScript = document.querySelector('script[id="__NEXT_DATA__"]');
     if (nextScript) {
       var ver = nextScript.getAttribute('data-Next-Version') || '';
-      try { ver = ver || (window.__NEXT_DATA__ || {}).runtimeConfig || ''; } catch (e) {}
+      try { ver = ver || (window.__NEXT_DATA__ || {}).runtimeConfig || ''; } catch (e) { /* ignore */ }
     }
     if (!result.tool && document.querySelector('meta[name="next-version"]')) {
       var nextVer = document.querySelector('meta[name="next-version"]').getAttribute('content') || '';
@@ -154,7 +154,7 @@
     try {
       var nuxtEl = document.getElementById('__NUXT_DATA__') || document.querySelector('script[id="__NUXT_DATA__"]');
       if (nuxtEl) result.features.push('nuxt-payload');
-    } catch (e) {}
+    } catch (e) { /* ignore */ }
   }
 
   // Generic build hints (even if tool is unknown)

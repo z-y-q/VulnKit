@@ -115,7 +115,9 @@
               }
               if (capturedWpRequire) break;
             }
-          } catch (e) {}
+          } catch (e) {
+            /* ignore */
+          }
 
           // Webpack 4: __webpack_require__.c (module cache)
           if (typeof __webpack_require__ !== 'undefined' && __webpack_require__.c) {
@@ -220,7 +222,9 @@
                 try {
                   var filename = wpRequire.u(id);
                   if (filename && filename.length > 0) chunkFilenames[id] = filename;
-                } catch (e) {}
+                } catch (e) {
+                  /* ignore */
+                }
               });
 
               if (Object.keys(chunkFilenames).length === 0 && allChunkIds.length > 0) {
@@ -240,7 +244,9 @@
                         chunkFilenames[String(pid)] = pfn;
                       }
                     }
-                  } catch (e) {}
+                  } catch (e) {
+                    /* ignore */
+                  }
                 }
               }
 
@@ -248,7 +254,9 @@
                 chunkInfo = { chunkFilenames: chunkFilenames };
               }
             }
-          } catch (e) {}
+          } catch (e) {
+            /* ignore */
+          }
 
           // Strategy 0C: Decode obfuscated .u() via globally-accessible string decoder
           if (!chunkInfo && hasWebpack) {
@@ -338,10 +346,14 @@
                   _suffix = '';
                 try {
                   if (_oIdxs.length >= 1) _prefix = _dec(_oIdxs[0]) || '';
-                } catch (e) {}
+                } catch (e) {
+                  /* ignore */
+                }
                 try {
                   if (_oIdxs.length >= 2) _suffix = _dec(_oIdxs[_oIdxs.length - 1]) || '';
-                } catch (e) {}
+                } catch (e) {
+                  /* ignore */
+                }
 
                 var _decodedChunks = {};
                 var _pr = /0x([0-9a-f]+)\s*:\s*\w+\((0x[0-9a-f]+)\)/;
@@ -357,7 +369,9 @@
                     if (_pm) {
                       try {
                         _map2[parseInt(_pm[1], 16)] = _dec(parseInt(_pm[2], 16));
-                      } catch (e) {}
+                      } catch (e) {
+                        /* ignore */
+                      }
                     }
                   }
                   _mapR.lastIndex = 0;
@@ -371,7 +385,9 @@
                           _ext = _map2[_cid] || '';
                         if (_name && _ext)
                           _decodedChunks[String(_cid)] = _prefix + _name + '.' + _ext + _suffix;
-                      } catch (e) {}
+                      } catch (e) {
+                        /* ignore */
+                      }
                     }
                   }
                 }
@@ -389,7 +405,9 @@
                         var _hash = _dec(parseInt(_pm[2], 16));
                         if (_hash)
                           _decodedChunks[String(_cid)] = _prefix + _cid + '.' + _hash + _suffix;
-                      } catch (e) {}
+                      } catch (e) {
+                        /* ignore */
+                      }
                     }
                   }
                 }
@@ -405,7 +423,9 @@
                   if (_ppMatch) _wpPp = _ppMatch[1];
                   chunkInfo = { chunkFilenames: _decodedChunks, publicPath: _wpPp };
                 }
-              } catch (e) {}
+              } catch (e) {
+                /* ignore */
+              }
             })();
           }
 
@@ -436,7 +456,9 @@
                   ) {
                     window.__vulnkitScriptObserver.push(url);
                   }
-                } catch (e) {}
+                } catch (e) {
+                  /* ignore */
+                }
                 return _origFetch.apply(this, arguments);
               };
 
@@ -451,18 +473,24 @@
                   ) {
                     window.__vulnkitScriptObserver.push(url);
                   }
-                } catch (e) {}
+                } catch (e) {
+                  /* ignore */
+                }
                 return _origXhrOpen.apply(this, arguments);
               };
             }
-          } catch (e) {}
+          } catch (e) {
+            /* ignore */
+          }
 
           var monitoredScripts = [];
           try {
             if (window.__vulnkitScriptObserver) {
               monitoredScripts = window.__vulnkitScriptObserver.slice();
             }
-          } catch (e) {}
+          } catch (e) {
+            /* ignore */
+          }
 
           var wpPublicPath = '';
           try {
@@ -470,7 +498,9 @@
               capturedWpRequire ||
               (typeof __webpack_require__ !== 'undefined' ? __webpack_require__ : null);
             if (_wpR && _wpR.p) wpPublicPath = _wpR.p;
-          } catch (e) {}
+          } catch (e) {
+            /* ignore */
+          }
 
           return {
             modules: modules,
@@ -782,7 +812,9 @@
                   var baseInfo1 = U.smResolveWebpackBase(rc, rcBase, tab.url);
                   U.smRegisterChunkUrls(chunkIdToHash, baseInfo1, discoveredChunkUrls, scriptUrls);
                 }
-              } catch (e) {}
+              } catch (e) {
+                /* ignore */
+              }
             }
 
             if (discoveredChunkUrls.length === 0) {
@@ -1045,7 +1077,9 @@
             statusArea.parentNode.insertBefore(hookHint, statusArea.nextSibling);
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        /* ignore */
+      }
     } catch (err) {
       statusEl.textContent = '扫描失败: ' + (err.message || '未知错误');
     } finally {

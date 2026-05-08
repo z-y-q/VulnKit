@@ -54,15 +54,19 @@
       var keys = Object.keys(data);
       for (var i = 0; i < keys.length; i++) {
         if (
-          Array.isArray(data[keys[i]]) && data[keys[i]].length > 0 &&
-          typeof data[keys[i]][0] === 'object' && data[keys[i]][0] !== null
+          Array.isArray(data[keys[i]]) &&
+          data[keys[i]].length > 0 &&
+          typeof data[keys[i]][0] === 'object' &&
+          data[keys[i]][0] !== null
         ) {
           return data[keys[i]];
         }
       }
       for (var j = 0; j < keys.length; j++) {
         if (
-          typeof data[keys[j]] === 'object' && data[keys[j]] !== null && !Array.isArray(data[keys[j]])
+          typeof data[keys[j]] === 'object' &&
+          data[keys[j]] !== null &&
+          !Array.isArray(data[keys[j]])
         ) {
           var found = findMenuArray(data[keys[j]], depth + 1);
           if (found) return found;
@@ -84,7 +88,13 @@
 
   function constructMenuItemFromRoute(route, templateItem) {
     if (!templateItem || typeof templateItem !== 'object') {
-      return { path: route.path, name: route.name || route.path, title: route.name || route.path, isshow: '1', status: 1 };
+      return {
+        path: route.path,
+        name: route.name || route.path,
+        title: route.name || route.path,
+        isshow: '1',
+        status: 1,
+      };
     }
     var item = {};
     for (var k in templateItem) {
@@ -105,7 +115,13 @@
         item[k] = true;
       } else if (k === 'status') {
         item[k] = 1;
-      } else if (k === 'children' || k === 'child' || k === 'subList' || k === 'childList' || k === 'items') {
+      } else if (
+        k === 'children' ||
+        k === 'child' ||
+        k === 'subList' ||
+        k === 'childList' ||
+        k === 'items'
+      ) {
         item[k] = [];
       } else if (k === 'meta' || k === 'component') {
         continue;
@@ -166,9 +182,17 @@
     var div = document.createElement('div');
     div.className = 'traverse-log-entry';
     div.innerHTML =
-      '<span class="log-idx">' + idx + '</span>' +
-      '<span class="log-path">' + utils.escapeHtml(path) + '</span>' +
-      '<span class="' + statusClass + '">' + statusText + '</span>';
+      '<span class="log-idx">' +
+      idx +
+      '</span>' +
+      '<span class="log-path">' +
+      utils.escapeHtml(path) +
+      '</span>' +
+      '<span class="' +
+      statusClass +
+      '">' +
+      statusText +
+      '</span>';
     logEl.appendChild(div);
     logEl.scrollTop = logEl.scrollHeight;
   }
@@ -187,7 +211,11 @@
     }
     utils.requireTabId().then(function (tab) {
       if (!tab) return;
-      utils.execInTab(tab.id, function () { window.__VULN_TRAVERSE_ACTIVE__ = false; }).catch(function () {});
+      utils
+        .execInTab(tab.id, function () {
+          window.__VULN_TRAVERSE_ACTIVE__ = false;
+        })
+        .catch(function () {});
     });
   }
 
@@ -205,11 +233,16 @@
         utils.showToast('没有隐藏路由，请先执行「路由对比」', 'warning');
         return;
       }
-      routes = S.lastCompareHiddenRoutes.map(function (r) { return r.path; });
+      routes = S.lastCompareHiddenRoutes.map(function (r) {
+        return r.path;
+      });
     } else {
       try {
         var tab = await utils.requireTabId();
-        if (!tab) { utils.showToast('无法获取当前标签页', 'error'); return; }
+        if (!tab) {
+          utils.showToast('无法获取当前标签页', 'error');
+          return;
+        }
         routes =
           (await utils.execInTabData(tab.id, function () {
             var routes = [];
@@ -228,13 +261,14 @@
                 if (r.children) extract(r.children, path === '/' ? '/' : path);
               });
             }
-            var appEl = document.querySelector('#app,[data-v-app],[id^="app"],#root,#application,#main');
+            var appEl = document.querySelector(S.VUE_ROOT_SELECTOR);
             if (appEl && appEl.__vue_app__) {
               var router = appEl.__vue_app__.config.globalProperties.$router;
               if (router && typeof router.getRoutes === 'function') {
                 router.getRoutes().forEach(function (r) {
                   if (r.path && r.path !== '*' && !seen[r.path]) {
-                    seen[r.path] = true; routes.push(r.path);
+                    seen[r.path] = true;
+                    routes.push(r.path);
                   }
                 });
               } else if (router && router.options && router.options.routes) {
@@ -249,7 +283,8 @@
                     if (typeof vm.$router.getRoutes === 'function') {
                       vm.$router.getRoutes().forEach(function (r) {
                         if (r.path && r.path !== '*' && !seen[r.path]) {
-                          seen[r.path] = true; routes.push(r.path);
+                          seen[r.path] = true;
+                          routes.push(r.path);
                         }
                       });
                     } else if (vm.$router.options && vm.$router.options.routes) {
@@ -279,7 +314,11 @@
     updateTraverseProgress(0, routes.length, '准备中...');
 
     var tab = await utils.requireTabId();
-    if (!tab) { stopTraverse(); utils.showToast('无法获取当前标签页', 'error'); return; }
+    if (!tab) {
+      stopTraverse();
+      utils.showToast('无法获取当前标签页', 'error');
+      return;
+    }
 
     var tabId = tab.id;
     var currentIdx = 0;
@@ -300,44 +339,52 @@
       var path = routes[currentIdx];
       updateTraverseProgress(currentIdx + 1, total, path);
 
-      utils.execInTabData(
-        tabId,
-        function (p) {
-          var router = null;
-          var appEl = document.querySelector('#app,[data-v-app],[id^="app"],#root,#application,#main');
-          if (appEl && appEl.__vue_app__) {
-            router = appEl.__vue_app__.config.globalProperties.$router;
-          } else {
-            var els = document.querySelectorAll('*');
-            for (var i = 0; i < els.length; i++) {
-              if (els[i].__vue__) {
-                var vm = els[i].__vue__.$root || els[i].__vue__;
-                if (vm.$router) { router = vm.$router; break; }
+      utils
+        .execInTabData(
+          tabId,
+          function (p) {
+            var router = null;
+            var appEl = document.querySelector(S.VUE_ROOT_SELECTOR);
+            if (appEl && appEl.__vue_app__) {
+              router = appEl.__vue_app__.config.globalProperties.$router;
+            } else {
+              var els = document.querySelectorAll('*');
+              for (var i = 0; i < els.length; i++) {
+                if (els[i].__vue__) {
+                  var vm = els[i].__vue__.$root || els[i].__vue__;
+                  if (vm.$router) {
+                    router = vm.$router;
+                    break;
+                  }
+                }
               }
             }
+            if (router) {
+              try {
+                router.push(p);
+                return { path: p, ok: true };
+              } catch (e) {
+                return { path: p, ok: false, error: e.message };
+              }
+            }
+            return { path: p, ok: false, error: 'no router' };
+          },
+          { args: [path] }
+        )
+        .then(function (res) {
+          if (res && res.ok) {
+            addTraverseLog(currentIdx + 1, path, 'ok');
+          } else {
+            addTraverseLog(currentIdx + 1, path, res && res.error ? 'fail' : 'fail');
           }
-          if (router) {
-            try { router.push(p); return { path: p, ok: true }; }
-            catch (e) { return { path: p, ok: false, error: e.message }; }
-          }
-          return { path: p, ok: false, error: 'no router' };
-        },
-        { args: [path] }
-      )
-      .then(function (res) {
-        if (res && res.ok) {
-          addTraverseLog(currentIdx + 1, path, 'ok');
-        } else {
-          addTraverseLog(currentIdx + 1, path, res && res.error ? 'fail' : 'fail');
-        }
-        currentIdx++;
-        if (traverseActive) setTimeout(navigateNext, delay);
-      })
-      .catch(function (err) {
-        addTraverseLog(currentIdx + 1, path, 'fail');
-        currentIdx++;
-        if (traverseActive) setTimeout(navigateNext, delay);
-      });
+          currentIdx++;
+          if (traverseActive) setTimeout(navigateNext, delay);
+        })
+        .catch(function (err) {
+          addTraverseLog(currentIdx + 1, path, 'fail');
+          currentIdx++;
+          if (traverseActive) setTimeout(navigateNext, delay);
+        });
     }
 
     navigateNext();
@@ -389,7 +436,7 @@
               extract(router.options.routes, '');
             }
           }
-          var appEl = document.querySelector('#app,[data-v-app],[id^="app"],#root,#application,#main');
+          var appEl = document.querySelector(S.VUE_ROOT_SELECTOR);
           if (appEl && appEl.__vue_app__) {
             getAndExtract(appEl.__vue_app__.config.globalProperties.$router);
           } else {
@@ -436,25 +483,37 @@
         var h = '<div class="compare-section-title">' + label + ' - ' + routes.length + ' 条</div>';
         for (var i = 0; i < routes.length; i++) {
           h += '<div class="compare-route-item">';
-          h += '<span class="' + cssClass + '">[' + (cssClass.indexOf('hidden') !== -1 ? '隐藏' : '显示') + ']</span> ';
+          h +=
+            '<span class="' +
+            cssClass +
+            '">[' +
+            (cssClass.indexOf('hidden') !== -1 ? '隐藏' : '显示') +
+            ']</span> ';
           h += '<span class="compare-route-path">' + utils.escapeHtml(routes[i].path) + '</span>';
           if (routes[i].name)
-            h += '<span class="compare-route-status">' + utils.escapeHtml(routes[i].name) + '</span>';
+            h +=
+              '<span class="compare-route-status">' + utils.escapeHtml(routes[i].name) + '</span>';
           h += '</div>';
         }
         return h;
       }
 
       var html = '';
-      html += renderCompareSection(hiddenRoutes, 'compare-route-hidden', '隐藏路由 (路由存在但菜单中未显示)');
+      html += renderCompareSection(
+        hiddenRoutes,
+        'compare-route-hidden',
+        '隐藏路由 (路由存在但菜单中未显示)'
+      );
       html += renderCompareSection(visibleRoutes, 'compare-route-visible', '已显示路由');
       if (captured.length === 0) {
         html += '<div class="compare-section-title compare-hint-title">提示</div>';
-        html += '<div class="compare-route-item compare-hint-text">未捕获菜单数据。请先在「权限菜单」标签中开始拦截，然后刷新页面。</div>';
+        html +=
+          '<div class="compare-route-item compare-hint-text">未捕获菜单数据。请先在「权限菜单」标签中开始拦截，然后刷新页面。</div>';
       }
 
       if (statusEl)
-        statusEl.textContent = '路由 ' + routeList.length + ' 条，隐藏 ' + hiddenRoutes.length + ' 条';
+        statusEl.textContent =
+          '路由 ' + routeList.length + ' 条，隐藏 ' + hiddenRoutes.length + ' 条';
       resultsEl.innerHTML = html;
     } catch (e) {
       if (statusEl) statusEl.textContent = '对比出错';

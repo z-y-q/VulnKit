@@ -32,13 +32,34 @@
       }
       if (typeof obj === 'object') {
         var skipKeys = {
-          component: 1, _Ctor: 1, _compiled: 1, _scopeId: 1,
-          staticRenderFns: 1, render: 1, beforeCreate: 1, created: 1,
-          beforeMount: 1, mounted: 1, beforeUpdate: 1, updated: 1,
-          beforeDestroy: 1, destroyed: 1, activated: 1, deactivated: 1,
-          mixins: 1, extends: 1, directives: 1, filters: 1,
-          _ssrRegister: 1, __file: 1, _functional: 1, _inject: 1,
-          _provided: 1, model: 1, inheritAttrs: 1, comments: 1,
+          component: 1,
+          _Ctor: 1,
+          _compiled: 1,
+          _scopeId: 1,
+          staticRenderFns: 1,
+          render: 1,
+          beforeCreate: 1,
+          created: 1,
+          beforeMount: 1,
+          mounted: 1,
+          beforeUpdate: 1,
+          updated: 1,
+          beforeDestroy: 1,
+          destroyed: 1,
+          activated: 1,
+          deactivated: 1,
+          mixins: 1,
+          extends: 1,
+          directives: 1,
+          filters: 1,
+          _ssrRegister: 1,
+          __file: 1,
+          _functional: 1,
+          _inject: 1,
+          _provided: 1,
+          model: 1,
+          inheritAttrs: 1,
+          comments: 1,
         };
         var result = {};
         try {
@@ -75,12 +96,18 @@
       var type = classifyStr(str, url);
       if (type !== 'other') {
         cap.push({
-          url: url, type: type, subtype: null, data: clean,
-          rawText: str, size: str.length, timestamp: Date.now(), method: 'store-read',
+          url: url,
+          type: type,
+          subtype: null,
+          data: clean,
+          rawText: str,
+          size: str.length,
+          timestamp: Date.now(),
+          method: 'store-read',
         });
       }
     }
-    var appEl = document.querySelector('#app,[data-v-app],[id^="app"],#root,#application,#main');
+    var appEl = document.querySelector(S.VUE_ROOT_SELECTOR);
     if (appEl && appEl.__vue_app__) {
       var pinia = appEl.__vue_app__.config.globalProperties.$pinia;
       if (pinia && pinia._s) {
@@ -124,7 +151,9 @@
             try {
               var parsed = JSON.parse(localStorage.getItem(storageKey));
               tryAdd(parsed, 'localStorage://' + storageKey);
-            } catch (e) {}
+            } catch (e) {
+              /* ignore */
+            }
             break;
           }
         }
@@ -139,10 +168,17 @@
     }
 
     var URL_MENU_PATTERNS = [
-      /\/api\/.*menu/i, /\/api\/.*permission/i, /\/api\/.*role/i,
-      /\/api\/.*user.*info/i, /\/api\/.*auth/i, /\/api\/.*nav/i,
-      /\/menu(?:\/|$|[?#])/i, /\/permission(?:\/|$|[?#])/i,
-      /\/getMenu/i, /\/getUserInfo/i, /\/getRouters/i,
+      /\/api\/.*menu/i,
+      /\/api\/.*permission/i,
+      /\/api\/.*role/i,
+      /\/api\/.*user.*info/i,
+      /\/api\/.*auth/i,
+      /\/api\/.*nav/i,
+      /\/menu(?:\/|$|[?#])/i,
+      /\/permission(?:\/|$|[?#])/i,
+      /\/getMenu/i,
+      /\/getUserInfo/i,
+      /\/getRouters/i,
       /\/getRoutes(?:\/|$|[?#])/i,
     ];
 
@@ -167,7 +203,9 @@
             }
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        /* ignore */
+      }
       if (/permission/i.test(urlLower)) return { type: 'permission', subtype: null };
       if (/role/i.test(urlLower)) return { type: 'role', subtype: null };
       if (/menu/i.test(urlLower)) return { type: 'menu', subtype: null };
@@ -192,8 +230,14 @@
     var captured = [];
     function pushCap(url, type, subtype, data, rawText, method) {
       captured.push({
-        url: url, type: type, subtype: subtype, data: data,
-        rawText: rawText, size: rawText.length, timestamp: Date.now(), method: method,
+        url: url,
+        type: type,
+        subtype: subtype,
+        data: data,
+        rawText: rawText,
+        size: rawText.length,
+        timestamp: Date.now(),
+        method: method,
       });
     }
 
@@ -205,7 +249,9 @@
         .then(function (response) {
           if (window.__PERM_INTERCEPTOR__ && window.__PERM_INTERCEPTOR__.active) {
             var url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
-            var isMenuApi = URL_MENU_PATTERNS.some(function (p) { return p.test(url); });
+            var isMenuApi = URL_MENU_PATTERNS.some(function (p) {
+              return p.test(url);
+            });
             if (isMenuApi) {
               var override = window.__PERM_INTERCEPTOR__._overrideData;
               if (override !== null && override !== undefined) {
@@ -215,7 +261,9 @@
                   if (info.type !== 'other') {
                     pushCap(url, info.type, info.subtype, override, overrideBody, 'fetch-override');
                   }
-                } catch (e) {}
+                } catch (e) {
+                  /* ignore */
+                }
                 return new Response(overrideBody, {
                   status: response.status,
                   statusText: response.statusText,
@@ -232,7 +280,9 @@
                       if (info.type !== 'other') {
                         pushCap(url, info.type, info.subtype, parsed, text, 'fetch');
                       }
-                    } catch (e) {}
+                    } catch (e) {
+                      /* ignore */
+                    }
                   })
                   .catch(function () {});
               }
@@ -240,7 +290,9 @@
           }
           return response;
         })
-        .catch(function (err) { throw err; });
+        .catch(function (err) {
+          throw err;
+        });
     };
 
     var origOpen = XMLHttpRequest.prototype.open;
@@ -253,7 +305,9 @@
       var self = this;
       if (window.__PERM_INTERCEPTOR__ && window.__PERM_INTERCEPTOR__.active && this.__perm_url) {
         var url = this.__perm_url;
-        var isMenuApi = URL_MENU_PATTERNS.some(function (p) { return p.test(url); });
+        var isMenuApi = URL_MENU_PATTERNS.some(function (p) {
+          return p.test(url);
+        });
         if (isMenuApi) {
           this.addEventListener('readystatechange', function () {
             if (self.readyState === 4) {
@@ -263,12 +317,18 @@
                 try {
                   var overrideBody = JSON.stringify(override);
                   Object.defineProperty(self, 'responseText', {
-                    value: overrideBody, writable: true, configurable: true,
+                    value: overrideBody,
+                    writable: true,
+                    configurable: true,
                   });
                   Object.defineProperty(self, 'response', {
-                    value: overrideBody, writable: true, configurable: true,
+                    value: overrideBody,
+                    writable: true,
+                    configurable: true,
                   });
-                } catch (e) {}
+                } catch (e) {
+                  /* ignore */
+                }
               }
               try {
                 var text =
@@ -279,10 +339,18 @@
                 var parsed = parseBody(text);
                 var info = classifyResponse(parsed, url);
                 if (info.type !== 'other') {
-                  pushCap(url, info.type, info.subtype, parsed, text,
-                    override != null ? 'xhr-override' : 'xhr');
+                  pushCap(
+                    url,
+                    info.type,
+                    info.subtype,
+                    parsed,
+                    text,
+                    override != null ? 'xhr-override' : 'xhr'
+                  );
                 }
-              } catch (e) {}
+              } catch (e) {
+                /* ignore */
+              }
             }
           });
         }
@@ -293,13 +361,25 @@
     window.__PERM_INTERCEPTOR__ = {
       active: true,
       captured: captured,
-      getCaptured: function () { return captured; },
-      clear: function () { captured.length = 0; },
-      stop: function () { this.active = false; },
-      start: function () { this.active = true; },
+      getCaptured: function () {
+        return captured;
+      },
+      clear: function () {
+        captured.length = 0;
+      },
+      stop: function () {
+        this.active = false;
+      },
+      start: function () {
+        this.active = true;
+      },
       _overrideData: null,
-      getOverride: function () { return this._overrideData; },
-      setOverride: function (d) { this._overrideData = d; },
+      getOverride: function () {
+        return this._overrideData;
+      },
+      setOverride: function (d) {
+        this._overrideData = d;
+      },
     };
     return 'injected';
   };

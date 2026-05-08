@@ -152,7 +152,7 @@ window.VulnKitSubdomain = (function () {
 
       // Method 1: Certificate Transparency via crt.sh
       var ctUrl = 'https://crt.sh/?q=%.' + encodeURIComponent(baseDomain) + '&output=json';
-      fetchWithTimeout(ctUrl, CT_TIMEOUT_MS).then(function (resp) {
+      utils.fetchWithTimeout(ctUrl, CT_TIMEOUT_MS).then(function (resp) {
         var ctFailed = false;
         if (resp && resp.body) {
           try {
@@ -331,21 +331,6 @@ window.VulnKitSubdomain = (function () {
     var parts = d.split('.');
     if (parts.length <= 2) return d;
     return parts.slice(-2).join('.');
-  }
-
-  function fetchWithTimeout(url, timeoutMs) {
-    return new Promise(function (resolve) {
-      var timer = setTimeout(function () {
-        resolve(null);
-      }, timeoutMs || CT_TIMEOUT_MS);
-      chrome.runtime.sendMessage(
-        { type: 'FETCH_URL', url: url, timeout: timeoutMs },
-        function (resp) {
-          clearTimeout(timer);
-          resolve(resp || null);
-        }
-      );
-    });
   }
 
   function filterBySource(filter) {

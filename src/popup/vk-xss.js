@@ -955,18 +955,6 @@ window.VulnKitXss = (function () {
     utils.showToast('已打开 ' + opened + ' 个测试页面' + methodInfo, 'success');
   }
 
-  function fetchWithTimeout(url, timeout) {
-    return new Promise(function (resolve) {
-      var timer = setTimeout(function () {
-        resolve(null);
-      }, timeout);
-      chrome.runtime.sendMessage({ type: 'FETCH_URL', url: url, timeout: timeout }, function (r) {
-        clearTimeout(timer);
-        resolve(r || null);
-      });
-    });
-  }
-
   function buildTestUrl(point, payload) {
     if (point.method === 'POST') return null;
     try {
@@ -990,7 +978,7 @@ window.VulnKitXss = (function () {
       var postBody = buildPostBody(point, payload);
       if (postBody) {
         try {
-          var resp = await fetchWithTimeout(point.url, 10000);
+          var resp = await utils.fetchWithTimeout(point.url, 10000);
           if (resp && !resp.error) {
             var body = resp.body || '';
             if (body.indexOf(rawPayload) !== -1) {
@@ -1018,7 +1006,7 @@ window.VulnKitXss = (function () {
     }
 
     try {
-      var resp = await fetchWithTimeout(testUrl, 10000);
+      var resp = await utils.fetchWithTimeout(testUrl, 10000);
       if (!resp || resp.error) {
         return { point: point, status: 'error', detail: (resp && resp.error) || '请求失败' };
       }

@@ -289,7 +289,9 @@
         ) {
           try {
             resBody = truncateBody(xhr.responseText, 2000);
-          } catch (e) {}
+          } catch (e) {
+            /* ignore */
+          }
         }
         pushApiEntry({
           url: xhr._vkU || location.href,
@@ -335,7 +337,9 @@
         var domain = '';
         try {
           domain = new URL(href, pageUrl).hostname;
-        } catch (e) {}
+        } catch (e) {
+          /* ignore */
+        }
         links.push({ href: href, text: text || '', tag: tag, domain: domain });
       }
       document.querySelectorAll('a[href]').forEach(function (el) {

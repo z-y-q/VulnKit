@@ -83,7 +83,9 @@
             return r.record || r;
           })
         );
-      } catch (e) {}
+      } catch (e) {
+        /* ignore */
+      }
     }
     return tree;
   }
@@ -94,7 +96,9 @@
     var mode = 'history';
     try {
       base = router.options && router.options.base ? router.options.base : base;
-    } catch (e) {}
+    } catch (e) {
+      /* ignore */
+    }
     try {
       if (router.mode === 'hash' || router.mode === 'abstract') mode = router.mode;
       else if (
@@ -108,9 +112,13 @@
           var testA = document.createElement('a');
           testA.href = '/#/test';
           if (testA.hash) mode = 'hash';
-        } catch (e) {}
+        } catch (e) {
+          /* ignore */
+        }
       }
-    } catch (e) {}
+    } catch (e) {
+      /* ignore */
+    }
     return { base: base, mode: mode };
   }
 
@@ -130,7 +138,9 @@
         if (Array.isArray(matcherRoutes)) {
           addFlatRoutes(tree, matcherRoutes);
         }
-      } catch (e) {}
+      } catch (e) {
+        /* ignore */
+      }
     }
     // Vue Router 2.x fallback: history.current.matched
     if (tree.length === 0 && router.history && router.history.current) {
@@ -142,7 +152,9 @@
             return r.record || r;
           })
         );
-      } catch (e) {}
+      } catch (e) {
+        /* ignore */
+      }
     }
     return tree;
   }

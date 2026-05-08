@@ -474,6 +474,21 @@
     });
   };
 
+  utils.fetchWithTimeout = function (url, timeoutMs) {
+    return new Promise(function (resolve) {
+      var timer = setTimeout(function () {
+        resolve(null);
+      }, timeoutMs || 15000);
+      chrome.runtime.sendMessage(
+        { type: 'FETCH_URL', url: url, timeout: timeoutMs },
+        function (resp) {
+          clearTimeout(timer);
+          resolve(resp || null);
+        }
+      );
+    });
+  };
+
   var utilsProxy = {};
   Object.keys(utils)
     .filter(function (k) {
