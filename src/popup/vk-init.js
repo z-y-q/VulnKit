@@ -52,7 +52,7 @@
   exposeGlobal('currentCryptoAlgo', crypto, 'currentCryptoAlgo');
 
   // ====== Favicon (loaded from vk-favicon.js) ======
-  const { extractFavicon, copyFaviconUrl } = window.VulnKitFavicon;
+  const { extractFavicon, copyFaviconUrl, copyFaviconHash } = window.VulnKitFavicon;
 
   // ====== Asset Mapping (loaded from vk-asset.js) ======
   const {
@@ -560,14 +560,7 @@
     utils.bindClick('extract-favicon-btn', extractFavicon);
     utils.bindClick('copy-favicon-url-btn', copyFaviconUrl);
 
-    utils.bindClick('copy-favicon-hash-btn', () => {
-      const hash = utils.get('favicon-hash').textContent;
-      if (hash === '-') {
-        utils.showToast('请先提取图标', 'warning');
-        return;
-      }
-      utils.copyAndToast(hash, '已复制 Hash');
-    });
+    utils.bindClick('copy-favicon-hash-btn', copyFaviconHash);
 
     utils.bindTabSwitch('source-btn', 'source', switchAssetSource);
     chrome.storage.local.get(['pentest_ui_state'], function (r) {
