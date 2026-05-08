@@ -345,12 +345,28 @@
   exposeGlobal('sourcemapSearchTerm', sourcemap, 'sourcemapSearchTerm');
   exposeGlobal('sourcemapCurrentModule', sourcemap, 'sourcemapCurrentModule');
 
-  // ====== Init ======
-  async function initApp() {
-    // Load options settings so showToast gating and defaults work
-    await utils.loadSettings();
+  // ====== Shared pagination state ======
+  let tabBtns, tabsPerPage, totalPages, currentPage;
+  let scrollLeftBtn, scrollRightBtn;
 
-    // Load context menu selection (right-click encode/decode)
+  function showTabPage(page) {
+    currentPage = page;
+    tabBtns.forEach((btn, i) => {
+      if (i >= page * tabsPerPage && i < (page + 1) * tabsPerPage) {
+        btn.classList.remove('hidden-tab');
+      } else {
+        btn.classList.add('hidden-tab');
+      }
+    });
+    if (scrollLeftBtn) scrollLeftBtn.disabled = page === 0;
+    if (scrollRightBtn) scrollRightBtn.disabled = page >= totalPages - 1;
+    var pageIndicator = utils.get('tab-page-indicator');
+    if (pageIndicator) pageIndicator.textContent = page + 1 + '/' + totalPages;
+  }
+
+  // ====== Panel init functions ======
+
+  function initContextMenu() {
     chrome.storage.local.get(['contextSelection', 'contextAction'], function (data) {
       if (data.contextSelection) {
         var inputEl = utils.get('encoding-input');
@@ -368,21 +384,16 @@
         chrome.action.setBadgeText({ text: '' });
       }
     });
+  }
 
-    // Restore persisted UI state
-    var savedState = await utils.restoreUIState();
-
-    // Restore encoding sub-tab if persisted
+  function initSettings(savedState) {
     if (savedState && savedState['encoding-subtab']) {
       switchEncodingTab(savedState['encoding-subtab']);
     }
-
-    // Restore asset source if persisted
     if (savedState && savedState['asset-source']) {
       switchAssetSource(savedState['asset-source']);
     }
 
-    // Apply toolbar customization from settings
     var toolbarConfig = utils.getSetting('toolbarConfig', null);
     var tabGrid = utils.get('tab-grid');
     if (toolbarConfig && Array.isArray(toolbarConfig) && tabGrid) {
@@ -407,42 +418,30 @@
         if (firstVisible) firstVisible.click();
       }
     }
+  }
 
-    // Tab pagination (2 rows x 4 cols = 8 per page)
-    var tabBtns = Array.from(document.querySelectorAll('.tab-btn:not(.toolbar-hidden)'));
-    var tabsPerPage = 8;
+  function initTabPagination() {
+    tabBtns = Array.from(document.querySelectorAll('.tab-btn:not(.toolbar-hidden)'));
+    tabsPerPage = 8;
     var totalTabs = tabBtns.length;
-    var totalPages = Math.ceil(totalTabs / tabsPerPage);
-    var currentPage = 0;
+    totalPages = Math.ceil(totalTabs / tabsPerPage);
+    currentPage = 0;
 
     var pageIndicator = utils.get('tab-page-indicator');
     if (totalPages <= 1) {
       if (pageIndicator) pageIndicator.style.display = 'none';
     }
 
-    function showTabPage(page) {
-      currentPage = page;
-      tabBtns.forEach((btn, i) => {
-        if (i >= page * tabsPerPage && i < (page + 1) * tabsPerPage) {
-          btn.classList.remove('hidden-tab');
-        } else {
-          btn.classList.add('hidden-tab');
-        }
-      });
-      if (scrollLeftBtn) scrollLeftBtn.disabled = page === 0;
-      if (scrollRightBtn) scrollRightBtn.disabled = page >= totalPages - 1;
-      if (pageIndicator) pageIndicator.textContent = page + 1 + '/' + totalPages;
-    }
-
-    var scrollLeftBtn = utils.bindClick('tab-scroll-left', function () {
+    scrollLeftBtn = utils.bindClick('tab-scroll-left', function () {
       if (currentPage > 0) showTabPage(currentPage - 1);
     });
-    var scrollRightBtn = utils.bindClick('tab-scroll-right', function () {
+    scrollRightBtn = utils.bindClick('tab-scroll-right', function () {
       if (currentPage < totalPages - 1) showTabPage(currentPage + 1);
     });
     showTabPage(0);
+  }
 
-    // Main panel tabs
+  function initMainTabs() {
     var onTabClick = function onTabClick() {
       const panel = this.dataset.panel;
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -452,7 +451,6 @@
       if (target) target.classList.add('active');
       utils.get('status-text').textContent = this.textContent;
 
-      // Auto-fill history domain when switching to history panel
       if (panel === 'history') {
         var historyDomainInput = utils.get('history-domain');
         if (historyDomainInput && !historyDomainInput.value.trim()) {
@@ -462,7 +460,6 @@
         }
       }
 
-      // Lazy-load exifr when switching to exif panel
       if (panel === 'exif' && !onTabClick._exifLoaded) {
         onTabClick._exifLoaded = true;
         utils.loadLibs(['lib/exifr.full.js']).catch(function () {});
@@ -471,11 +468,11 @@
     document.querySelectorAll('.tab-btn').forEach(function (btn) {
       btn.addEventListener('click', onTabClick);
     });
+  }
 
-    // Encoding sub-tabs
+  function initEncodingJwtCrypto() {
     utils.bindTabSwitch('sub-tab-btn', 'type', switchEncodingTab);
 
-    // Encoding buttons
     const encodingBindings = [
       { id: 'encode-btn', handler: handleEncode },
       { id: 'decode-btn', handler: handleDecode },
@@ -485,7 +482,6 @@
     ];
     encodingBindings.forEach(({ id, handler }) => utils.bindClick(id, handler));
 
-    // JWT buttons
     var jwtDecodeBtn = utils.get('jwt-decode-btn');
     if (jwtDecodeBtn)
       jwtDecodeBtn.addEventListener('click', function () {
@@ -499,10 +495,8 @@
     utils.bindClick('jwt-copy-payload-btn', copyJwtPayload);
     utils.bindClick('jwt-verify-btn', verifyJwtSignature);
 
-    // Crypto algo tabs
     utils.bindTabSwitch('crypto-algo-btn', 'algo', switchCryptoAlgo);
 
-    // Crypto action buttons
     utils.bindClick('crypto-enc-btn', doCryptoEncrypt);
     utils.bindClick('crypto-dec-btn', doCryptoDecrypt);
     utils.bindClick('crypto-verify-btn', doCryptoVerify);
@@ -518,7 +512,6 @@
       if (v) utils.copyAndToast(v);
     });
 
-    // Crypto mode/IV toggle listeners
     utils.on('aes-mode', 'change', () => toggleIvVisibility('aes', 'aes-iv-group', 'aes-mode'));
     utils.on('des-mode', 'change', () => toggleIvVisibility('des', 'des-iv-group', 'des-mode'));
     utils.on('sm4-mode', 'change', function () {
@@ -529,7 +522,6 @@
       }
     });
 
-    // SM2 generate keypair
     utils.bindClick('sm2-genkey-btn', function () {
       if (typeof sm2 === 'undefined') {
         utils.showToast('SM2 库加载中，请稍候...', 'info');
@@ -547,12 +539,10 @@
       }
     });
 
-    // Initial IV visibility
     toggleIvVisibility('aes', 'aes-iv-group', 'aes-mode');
     toggleIvVisibility('des', 'des-iv-group', 'des-mode');
     switchCryptoAlgo('aes');
 
-    // Apply default settings from options page
     var defaultEncoding = utils.getSetting('defaultEncoding', 'base64');
     if (defaultEncoding && ENCODING_NAMES[defaultEncoding]) {
       switchEncodingTab(defaultEncoding);
@@ -562,11 +552,11 @@
       var hashAlgoEl = utils.get('hash-algo');
       if (hashAlgoEl) hashAlgoEl.value = defaultHash;
     }
+  }
 
-    // RSA genkey
+  function initRsaFaviconAsset() {
     utils.bindClick('rsa-genkey-btn', rsaGenerateKeyPair);
 
-    // Favicon buttons
     utils.bindClick('extract-favicon-btn', extractFavicon);
     utils.bindClick('copy-favicon-url-btn', copyFaviconUrl);
 
@@ -579,7 +569,6 @@
       utils.copyAndToast(hash, '已复制 Hash');
     });
 
-    // Asset mapping
     utils.bindTabSwitch('source-btn', 'source', switchAssetSource);
     chrome.storage.local.get(['pentest_ui_state'], function (r) {
       if (r.pentest_ui_state && r.pentest_ui_state['asset-source']) {
@@ -614,8 +603,9 @@
     utils.bindClick('clear-keys-btn', clearApiKeys);
 
     loadApiKeys();
+  }
 
-    // Info gather
+  function initGatherAndRules() {
     utils.bindClick('gather-btn', gatherInfo);
     utils.on('gather-search', 'input', function () {
       gather.applySearchFilter(this.value.trim());
@@ -623,7 +613,6 @@
     utils.bindClick('gather-copy-btn', gather.copyAllData);
     utils.bindClick('gather-export-btn', gather.exportAllData);
 
-    // API Traffic
     utils.bindClick('gather-api-start-btn', gatherStartApiTraffic);
     utils.bindClick('gather-api-stop-btn', gatherStopApiTraffic);
 
@@ -640,7 +629,6 @@
       });
     }
 
-    // Rules management
     const rulesBtn = utils.get('gather-rules-btn');
     const rulesModal = utils.get('rules-modal');
     const rulesModalClose = utils.get('rules-modal-close');
@@ -742,8 +730,9 @@
         applyRules(haeRules.getDefaultRules(), '已恢复默认规则');
       });
     }
+  }
 
-    // Link extract
+  function initLinksHistoryMultiUrl() {
     utils.bindClick('links-extract-btn', extractLinks);
     utils.bindClick('links-copy-btn', copyFilteredUrls);
     utils.bindClick('links-export-btn', exportLinks);
@@ -754,7 +743,6 @@
     utils.bindPersist('history-match-type');
     utils.bindPersist('history-output-type');
 
-    // URL multi-open
     utils.on('multiurl-input', 'input', () => updateMultiurlInfo(parseUrls().length));
     utils.bindClick('multiurl-open-btn', handleMultiurlOpen);
     utils.bindClick('multiurl-dedup-btn', handleMultiurlDedup);
@@ -764,12 +752,10 @@
       updateMultiurlInfo(0);
     });
 
-    // Tab save
     utils.bindClick('tabsave-grab-btn', grabAllTabs);
     utils.bindClick('tabsave-copy-btn', copySavedTabUrls);
     utils.bindClick('tabsave-export-btn', exportSavedTabUrls);
 
-    // History
     utils.bindClick('history-query-btn', queryHistory);
 
     utils.bindClick('history-copy-url-btn', async () => {
@@ -848,8 +834,9 @@
       if (multiurlPanel) multiurlPanel.classList.add('active');
       utils.showToast('已发送 ' + urls.length + ' 个链接', 'success');
     });
+  }
 
-    // EXIF viewer
+  function initExifAndSpoofing() {
     initExifDragDrop();
     checkExifPending();
 
@@ -877,7 +864,6 @@
     utils.bindClick('exif-copy-json-btn', copyExifData);
     utils.bindClick('exif-clear-btn', clearExif);
 
-    // Request Spoofing
     utils.bindTabSwitch('spoof-tab', 'spoof', switchSpoofTab);
 
     utils.on('ua-category', 'change', function () {
@@ -926,8 +912,9 @@
         updateUaStatus();
       }
     });
+  }
 
-    // Vue Analysis
+  function initVuePermissions() {
     utils.bindClick('vue-detect-btn', detectVue);
     utils.bindClick('vue-export-routes-btn', exportVueRoutes);
     utils.bindClick('vue-bypass-guards-btn', bypassVueGuards);
@@ -938,7 +925,6 @@
       utils.copyAndToast(lastVueResult);
     });
 
-    // Vue results event delegation (route open + batch copy)
     var vueResultsEl = utils.on('vue-results', 'click', function (e) {
       if (e.target.classList.contains('vue-route-open-btn')) {
         chrome.tabs.create({ url: e.target.dataset.url });
@@ -972,13 +958,11 @@
     });
     utils.bindTabSwitch('vue-stab', 'vstab', switchVueSubTab);
 
-    // Vue Store Explorer
     utils.bindClick('vue-store-read-btn', exploreVueStore);
     utils.bindClick('vue-store-copy-btn', copyFullStoreJson);
     utils.bindClick('vue-store-refresh-btn', exploreVueStore);
     initStoreExplorerEvents();
 
-    // Permission menu interception
     utils.bindClick('perm-start-btn', startPermInterception);
     utils.bindClick('perm-stop-btn', stopPermInterception);
     utils.bindClick('perm-refresh-btn', refreshPermCaptured);
@@ -1016,8 +1000,9 @@
       }
       autoInjectHiddenRoutes();
     });
+  }
 
-    // JS keyword search
+  function initJsSearchAndTraverse() {
     var doJsSearch = function () {
       searchJsKeywords(utils.get('jssearch-keyword').value.trim());
     };
@@ -1029,7 +1014,6 @@
       searchJsKeywords(kw);
     });
 
-    // Route vs menu comparison
     utils.bindClick('compare-btn', compareRoutesAndMenu);
     utils.bindClick('compare-copy-hidden', () => {
       const items = utils.get('compare-results').querySelectorAll('.compare-route-path');
@@ -1048,11 +1032,9 @@
       utils.showToast('已复制 ' + hiddenPaths.length + ' 条隐藏路由', 'success');
     });
 
-    // Auto-traverse routes
     utils.bindClick('traverse-start-btn', startTraverseRoutes);
     utils.bindClick('traverse-stop-btn', stopTraverse);
 
-    // JS Control
     utils.bindTabSwitch('jsctrl-tab', 'ctrl', switchJsCtrlTab);
     utils.bindClick('js-disable-btn', disableJs);
     utils.bindClick('js-enable-btn', enableJs);
@@ -1060,16 +1042,14 @@
     utils.bindClick('antidebug-bypass-btn', bypassAntiDebug);
     utils.bindClick('antidebug-clear-btn', clearScriptBlock);
 
-    // Remove copy restrictions
     utils.bindClick('uncopy-btn', removeCopyRestrictions);
+  }
 
-    // RuoYi sub-tabs
+  function initSecurityDetectors() {
     utils.bindTabSwitch('ruoyi-stab', 'rstab', switchRuoYiSubTab);
 
-    // RuoYi detection
     utils.bindClick('ruoyi-detect-btn', detectRuoYi);
 
-    // RuoYi route hook
     utils.bindClick('ruoyi-hook-install-btn', installRouteHook);
     utils.bindClick('ruoyi-hook-remove-btn', removeRouteHook);
     utils.bindClick('ruoyi-hook-check-btn', checkHookStatus);
@@ -1077,30 +1057,25 @@
       setAugmentMode(this.value);
     });
 
-    // RuoYi export buttons
     utils.bindClick('ruoyi-copy-json-btn', copyRouteJson);
     utils.bindClick('ruoyi-export-curl-btn', exportCurlCommands);
     utils.bindClick('ruoyi-export-html-btn', exportHtmlReport);
 
-    // RuoYi JS analysis
     utils.bindClick('ruoyi-analyze-btn', analyzeJsRoutes);
     utils.bindClick('ruoyi-apply-btn', applyExtraRoutes);
     utils.bindClick('ruoyi-clear-btn', clearExtraRoutes);
     utils.bindClick('ruoyi-selectall-btn', toggleSelectAll);
     utils.bindClick('ruoyi-copy-paths-btn', copyExtraPaths);
 
-    // RuoYi batch probe
     utils.bindClick('ruoyi-probe-btn', batchProbeRoutes);
     utils.bindClick('ruoyi-probe-stop-btn', stopProbe);
     utils.bindClick('ruoyi-probe-export-btn', exportProbeResults);
 
-    // RuoYi API traffic
     utils.bindClick('ruoyi-traffic-load-btn', loadApiTraffic);
     utils.bindClick('ruoyi-traffic-clear-btn', clearApiTraffic);
     utils.bindClick('ruoyi-traffic-export-btn', exportApiTraffic);
     utils.on('ruoyi-traffic-filter', 'input', filterApiTraffic);
 
-    // WAF Fingerprint
     utils.bindClick('waf-scan-btn', scanWaf);
     utils.bindClick('waf-copy-btn', wafCopyResults);
     utils.bindClick('waf-export-btn', wafExportResults);
@@ -1117,7 +1092,6 @@
       });
     });
 
-    // Cookie Security Audit
     utils.bindClick('cookie-audit-btn', auditCookies);
     utils.bindClick('cookie-audit-copy-btn', cookieAuditCopy);
     utils.bindClick('cookie-audit-export-btn', cookieAuditExport);
@@ -1134,17 +1108,16 @@
       });
     });
 
-    // React Detection
     utils.bindClick('react-detect-btn', detectReact);
     utils.bindClick('react-copy-btn', reactCopyResults);
     utils.bindClick('react-export-btn', reactExportResults);
 
-    // Angular Detection
     utils.bindClick('angular-detect-btn', detectAngular);
     utils.bindClick('angular-copy-btn', angularCopyResults);
     utils.bindClick('angular-export-btn', angularExportResults);
+  }
 
-    // CORS Detection
+  function initNetworkTools() {
     utils.bindClick('cors-scan-btn', scanCors);
     utils.bindClick('cors-copy-btn', corsCopyResults);
     utils.bindClick('cors-export-btn', corsExportJson);
@@ -1161,7 +1134,6 @@
       });
     });
 
-    // Subdomain Collection
     utils.bindClick('subdomain-scan-btn', collectSubdomains);
     utils.bindClick('subdomain-page-btn', extractFromPage);
     utils.bindClick('subdomain-dns-btn', bruteForceDns);
@@ -1180,17 +1152,17 @@
       });
     });
 
-    // Source Loader
     utils.bindClick('source-loader-load-btn', loadToSources);
     utils.bindClick('source-loader-copy-btn', slCopyResults);
     utils.bindClick('source-loader-clear-btn', slClearResults);
 
-    // MaR dynamic route loading
     utils.bindClick('mar-scan-btn', marScanDynamicRoutes);
     utils.bindClick('mar-inject-btn', marInjectToRouter);
     utils.bindClick('mar-selectall-btn', marToggleSelectAll);
     utils.bindClick('mar-copy-btn', marCopyHiddenPaths);
+  }
 
+  function initStateRestoration() {
     function restoreTabState(storageKey, onMatch) {
       chrome.storage.local.get([storageKey], function (result) {
         if (result[storageKey]) {
@@ -1205,7 +1177,6 @@
       });
     }
 
-    // Restore perm intercept state — verify interceptor is still in page
     restoreTabState('permInterceptTabId', function () {
       utils.requireTabId().then(function (tab) {
         if (!tab) {
@@ -1232,7 +1203,6 @@
       });
     });
 
-    // Restore JS toggle state — DNR rules are global, check actual rule presence
     chrome.runtime.sendMessage({ type: 'QUERY_JS_BLOCK' }, function (resp) {
       if (resp && resp.blocked) {
         jsBlocked = true;
@@ -1242,8 +1212,6 @@
       }
     });
 
-    // Restore RuoYi hook state
-    // Hook auto re-injects via registerContentScripts, so check by origin (not just tab ID).
     chrome.storage.local.get(['ruoyiHookEnabled', 'ruoyiHookOrigin', 'ruoyiHookTabId'], result => {
       getActiveTab().then(tab => {
         if (!tab) return;
@@ -1252,19 +1220,16 @@
         var hookEnabled = result.ruoyiHookEnabled && result.ruoyiHookOrigin;
 
         if (hookEnabled && tabOrigin === result.ruoyiHookOrigin) {
-          // Hook is enabled for this origin — restore full UI
           ruoyiHookActive = true;
           ruoyiTabId = tab.id;
           utils.toggleBtnPair('ruoyi-hook-install-btn', 'ruoyi-hook-remove-btn', true);
           checkHookStatus();
         } else if (tab.url && /^https?:/.test(tab.url)) {
-          // Always check for passively captured data on http/https pages
           checkHookStatus();
         }
       });
     });
 
-    // Restore gather data for current tab
     getActiveTab().then(tab => {
       const currentUrl = tab?.url || '';
       gather.restoreData(currentUrl);
@@ -1276,8 +1241,9 @@
         }
       });
     });
+  }
 
-    // Theme toggle
+  function initThemeAndPayload() {
     var themes = ['light', 'dark'];
     var savedTheme = localStorage.getItem('pentest-theme');
     if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
@@ -1292,10 +1258,8 @@
       localStorage.setItem('pentest-theme', next);
     });
 
-    // Payload tab switching
     utils.bindTabSwitch('payload-tab', 'ptab', switchPayloadTab);
 
-    // Payload data rendering
     renderPayloadCategories('xss-categories', XSS_DATA, false);
     renderSqliPayloads();
     renderPayloadCategories('lfi-categories', LFI_DATA, false);
@@ -1303,12 +1267,10 @@
     renderPayloadCategories('cmdref-categories', CMDREF_DATA, false);
     renderAllReverseShells();
 
-    // Payload search
     utils.on('payload-search', 'input', function () {
       payloadApplySearch(this.value.trim());
     });
 
-    // Reverse shell
     utils.bindClick('revshell-gen-btn', generateReverseShell);
     utils.bindClick('revshell-copy-btn', () => {
       var output = utils.get('revshell-output');
@@ -1321,12 +1283,12 @@
     utils.on('revshell-ip', 'input', generateReverseShell);
     utils.on('revshell-port', 'input', generateReverseShell);
 
-    // SQL injection regenerate
     utils.bindClick('sqli-regen-btn', renderSqliPayloads);
     utils.on('sqli-columns', 'change', renderSqliPayloads);
     utils.on('sqli-table', 'input', renderSqliPayloads);
+  }
 
-    // XSS Scan
+  function initXssAndSourcemap() {
     initXssScanPayloadSelect();
     utils.bindPersist('xssscan-payload-select');
     utils.bindPersist('xssscan-encoding');
@@ -1373,7 +1335,6 @@
       }
     });
 
-    // Webpack Module Mapping (Source Map Scan)
     utils.bindClick('sourcemap-scan-btn', scanWebpackModules);
     utils.bindClick('sourcemap-copy-all-btn', copyAllSourcemapPaths);
     utils.bindClick('sourcemap-copy-tree-btn', generateSourcemapTree);
@@ -1398,7 +1359,6 @@
       if (card) card.classList.add('hidden');
     });
 
-    // Webpack API endpoint extraction
     utils.bindClick('sourcemap-api-btn', showApiEndpoints);
     utils.bindClick('sm-api-close', function () {
       var card = utils.get('sm-api-card');
@@ -1406,8 +1366,9 @@
     });
     utils.bindClick('sourcemap-export-json-btn', exportModulesJSON);
     utils.bindClick('sourcemap-export-csv-btn', exportModulesCSV);
+  }
 
-    // Status bar clock
+  function initStatusBarAndKeyboard() {
     const statusTime = utils.get('status-time');
     if (statusTime) {
       const update = () => {
@@ -1419,7 +1380,6 @@
       setInterval(update, 30000);
     }
 
-    // Keyboard shortcuts: Alt+1~8 switch tab, Alt+Left/Right flip page
     document.addEventListener('keydown', function (e) {
       if (!e.altKey) return;
       var num = parseInt(e.key, 10);
@@ -1439,6 +1399,29 @@
         showTabPage(currentPage + 1);
       }
     });
+  }
+
+  // ====== Init ======
+  async function initApp() {
+    await utils.loadSettings();
+    initContextMenu();
+    var savedState = await utils.restoreUIState();
+    initSettings(savedState);
+    initTabPagination();
+    initMainTabs();
+    initEncodingJwtCrypto();
+    initRsaFaviconAsset();
+    initGatherAndRules();
+    initLinksHistoryMultiUrl();
+    initExifAndSpoofing();
+    initVuePermissions();
+    initJsSearchAndTraverse();
+    initSecurityDetectors();
+    initNetworkTools();
+    initStateRestoration();
+    initThemeAndPayload();
+    initXssAndSourcemap();
+    initStatusBarAndKeyboard();
   }
 
   function startApp() {
