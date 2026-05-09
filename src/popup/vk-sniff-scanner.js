@@ -238,4 +238,25 @@ async function runSniffScan() {
   }
 }
 
-export { sniffState, runSniffScan };
+function getFindings() {
+  if (!sniffState.lastResults || sniffState.lastResults.length === 0) return [];
+  return sniffState.lastResults.map(function (r) {
+    var score = r.confidence ? r.confidence.score : 0;
+    var severity = score > 80 ? 'high' : score > 50 ? 'medium' : 'low';
+    var evText = r.evidences
+      .map(function (e) {
+        return '[' + e.source + '] ' + e.evidence;
+      })
+      .join('; ');
+    return {
+      severity: severity,
+      title: '技术栈检测: ' + r.name,
+      detail:
+        (r.version ? '版本: ' + r.version + ' | ' : '') + '分类: ' + r.category + ' | ' + evText,
+      module: 'sniff',
+      url: '',
+    };
+  });
+}
+
+export { sniffState, runSniffScan, getFindings };

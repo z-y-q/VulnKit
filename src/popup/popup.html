@@ -23,11 +23,21 @@
   <link rel="stylesheet" href="../styles/popup/subdomain.css">
   <link rel="stylesheet" href="../styles/popup/source-loader.css">
   <link rel="stylesheet" href="../styles/popup/sniff.css">
+  <link rel="stylesheet" href="../styles/popup/report.css">
 </head>
 <body>
 <div class="lingmou-app">
   <div class="app-header">
     <div class="app-title">灵眸</div>
+    <div class="category-filter" id="category-filter">
+      <button class="category-chip active" data-category="all">全部</button>
+      <button class="category-chip" data-category="recon" style="--cat-color:#4A90E2">侦察</button>
+      <button class="category-chip" data-category="scan" style="--cat-color:#e74c3c">扫描</button>
+      <button class="category-chip" data-category="exploit" style="--cat-color:#e67e22">利用</button>
+      <button class="category-chip" data-category="framework" style="--cat-color:#27ae60">框架</button>
+      <button class="category-chip" data-category="tools" style="--cat-color:#9b59b6">工具</button>
+      <button class="category-chip" data-category="report" style="--cat-color:#999">报告</button>
+    </div>
     <div class="tab-nav-wrapper">
       <button class="tab-page-btn" id="tab-scroll-left">&#9664;</button>
       <div class="tab-grid" id="tab-grid">
@@ -54,6 +64,7 @@
         <button class="tab-btn" data-panel="subdomain">子域名</button>
         <button class="tab-btn" data-panel="source-loader">源码加载</button>
         <button class="tab-btn" data-panel="sniff">网站嗅探</button>
+        <button class="tab-btn" data-panel="report">统一报告</button>
       </div>
       <button class="tab-page-btn" id="tab-scroll-right">&#9654;</button>
       <span class="tab-page-indicator" id="tab-page-indicator"></span>

@@ -340,4 +340,22 @@ function applyFilter() {
   renderResults(filtered);
 }
 
-export { auditCookies, copyResults, exportResults, filterBySeverity, searchResults };
+function getFindings() {
+  if (!lastResult || lastResult.length === 0) return [];
+  var findings = [];
+  lastResult.forEach(function (r) {
+    r.issues.forEach(function (issue) {
+      if (SEV_ORDER[issue.severity] === undefined) return;
+      findings.push({
+        severity: issue.severity,
+        title: 'Cookie 安全问题: ' + r.cookie.name,
+        detail: issue.text,
+        module: 'cookie',
+        url: (r.cookie.domain || '') + (r.cookie.path || '/'),
+      });
+    });
+  });
+  return findings;
+}
+
+export { auditCookies, copyResults, exportResults, filterBySeverity, searchResults, getFindings };

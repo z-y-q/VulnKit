@@ -2,6 +2,7 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { loadRemotePayloads } from './vk-payload-remote.js';
 
 const XSS_DATA = {
   'Cookie 窃取': [
@@ -348,6 +349,46 @@ const CMDREF_DATA = {
   ],
 };
 
+let _remotePayloads = null;
+
+function initRemotePayloads() {
+  loadRemotePayloads(function (data) {
+    if (!data || !data.payloads) return;
+    _remotePayloads = data.payloads;
+  });
+}
+
+function getEffectiveXssData() {
+  return (_remotePayloads && _remotePayloads.xss) || XSS_DATA;
+}
+
+function getEffectiveLfiData() {
+  return (_remotePayloads && _remotePayloads.lfi) || LFI_DATA;
+}
+
+function getEffectiveWebshellData() {
+  return (_remotePayloads && _remotePayloads.webshell) || WEBSHELL_DATA;
+}
+
+function getEffectiveCmdrefData() {
+  return (_remotePayloads && _remotePayloads.cmdref) || CMDREF_DATA;
+}
+
+function refreshPayloadDisplay(filterText) {
+  const xss = getEffectiveXssData();
+  const lfi = getEffectiveLfiData();
+  const webshell = getEffectiveWebshellData();
+  const cmdref = getEffectiveCmdrefData();
+  renderPayloadCategories('xss-categories', xss, false, filterText);
+  renderPayloadCategories('lfi-categories', lfi, false, filterText);
+  renderPayloadCategories('webshell-categories', webshell, false, filterText);
+  renderPayloadCategories('cmdref-categories', cmdref, false, filterText);
+  const statusEl = utils.get('xss-status');
+  if (statusEl) statusEl.textContent = '共 ' + Object.keys(xss).length + ' 个分类';
+}
+
+initRemotePayloads();
+
 function renderPayloadCategories(containerId, data, collapsed, filterText) {
   const container = utils.get(containerId);
   if (!container) return;
@@ -459,11 +500,11 @@ function renderSqliPayloads(filterText) {
 }
 
 function applySearch(text) {
-  renderPayloadCategories('xss-categories', XSS_DATA, false, text);
+  renderPayloadCategories('xss-categories', getEffectiveXssData(), false, text);
   renderSqliPayloads(text);
-  renderPayloadCategories('lfi-categories', LFI_DATA, false, text);
-  renderPayloadCategories('webshell-categories', WEBSHELL_DATA, false, text);
-  renderPayloadCategories('cmdref-categories', CMDREF_DATA, false, text);
+  renderPayloadCategories('lfi-categories', getEffectiveLfiData(), false, text);
+  renderPayloadCategories('webshell-categories', getEffectiveWebshellData(), false, text);
+  renderPayloadCategories('cmdref-categories', getEffectiveCmdrefData(), false, text);
 }
 
 export {
@@ -479,4 +520,10 @@ export {
   applySearch,
   renderAllReverseShells,
   renderSqliPayloads,
+  getEffectiveXssData,
+  getEffectiveLfiData,
+  getEffectiveWebshellData,
+  getEffectiveCmdrefData,
+  refreshPayloadDisplay,
+  initRemotePayloads,
 };

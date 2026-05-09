@@ -151,4 +151,17 @@ async function runDeepLeakScan(existingGatherData, tabId) {
   return findings;
 }
 
-export { LEAK_SCAN_GROUP, runDeepLeakScan };
+function getFindings(existingFindings) {
+  if (!existingFindings || existingFindings.length === 0) return [];
+  return existingFindings.map(function (f) {
+    return {
+      severity: f.severity || 'medium',
+      title: '信息泄露: ' + f.name,
+      detail: (f.description || '') + (f.exploit ? ' | ' + f.exploit : ''),
+      module: 'leak',
+      url: '',
+    };
+  });
+}
+
+export { LEAK_SCAN_GROUP, runDeepLeakScan, getFindings };

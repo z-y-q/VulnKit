@@ -8,6 +8,7 @@ import * as gather from './vk-gather.js';
 import {
   initTabPagination,
   initMainTabs,
+  initCategoryFilter,
   initEncodingJwtCrypto,
   initRsaFaviconAsset,
   initGatherAndRules,
@@ -16,6 +17,7 @@ import {
   initThemeAndPayload,
   initXssAndSourcemap,
   initStatusBarAndKeyboard,
+  initReport,
 } from './vk-init-panels.js';
 import {
   initVuePermissions,
@@ -87,6 +89,7 @@ async function initApp() {
   initSettings(savedState);
   initTabPagination();
   initMainTabs();
+  initCategoryFilter();
   initEncodingJwtCrypto(savedState);
   initRsaFaviconAsset();
   initGatherAndRules();
@@ -101,6 +104,7 @@ async function initApp() {
   initThemeAndPayload();
   initXssAndSourcemap();
   initStatusBarAndKeyboard();
+  initReport();
 }
 
 function startApp() {

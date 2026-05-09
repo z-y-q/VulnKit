@@ -713,6 +713,19 @@ async function runAllScans() {
   }
 }
 
+function getFindings() {
+  if (lastSubdomains.length === 0) return [];
+  return lastSubdomains.map(function (s) {
+    return {
+      severity: 'info',
+      title: '子域名: ' + s.host,
+      detail: '来源: ' + sourceLabel(s.source),
+      module: 'subdomain',
+      url: 'https://' + s.host,
+    };
+  });
+}
+
 export {
   collectSubdomains,
   extractFromPage,
@@ -723,4 +736,5 @@ export {
   filterBySource,
   searchResults,
   runAllScans,
+  getFindings,
 };

@@ -555,4 +555,22 @@ function exportResults() {
   utils.showToast('报告已导出', 'success');
 }
 
-export { scanWaf, copyResults, exportResults, filterByStatus, searchResults };
+function getFindings() {
+  if (!lastWafResult || lastWafResult.length === 0) return [];
+  return lastWafResult.map(function (d) {
+    var evidenceText = d.evidence
+      .map(function (e) {
+        return `[${e.type}] ${e.value}`;
+      })
+      .join(', ');
+    return {
+      severity: d.severity === 'high' ? 'high' : d.severity === 'medium' ? 'medium' : 'low',
+      title: 'WAF 检测: ' + d.name,
+      detail: '置信度: ' + d.confidence + ' | ' + evidenceText,
+      module: 'waf',
+      url: '',
+    };
+  });
+}
+
+export { scanWaf, copyResults, exportResults, filterByStatus, searchResults, getFindings };

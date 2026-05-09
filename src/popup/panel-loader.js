@@ -27,6 +27,7 @@
     'subdomain.html',
     'source-loader.html',
     'sniff.html',
+    'report.html',
   ];
 
   const appMain = document.getElementById('app-main');

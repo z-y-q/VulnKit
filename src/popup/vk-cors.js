@@ -625,4 +625,31 @@ function exportJson() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export { scanCors, copyResults, exportJson, filterBySeverity, searchResults, verifyCredentials };
+const CORS_SEV_MAP = { critical: 'critical', danger: 'critical', warning: 'medium', safe: 'info' };
+
+function getFindings() {
+  if (!lastResult || !lastResult.issues) return [];
+  return lastResult.issues
+    .filter(function (i) {
+      return i.severity !== 'safe';
+    })
+    .map(function (i) {
+      return {
+        severity: CORS_SEV_MAP[i.severity] || 'medium',
+        title: 'CORS 配置风险',
+        detail: i.findings.join('; '),
+        module: 'cors',
+        url: i.url,
+      };
+    });
+}
+
+export {
+  scanCors,
+  copyResults,
+  exportJson,
+  filterBySeverity,
+  searchResults,
+  verifyCredentials,
+  getFindings,
+};

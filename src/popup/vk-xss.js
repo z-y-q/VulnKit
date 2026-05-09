@@ -760,6 +760,18 @@ function setXssSearchText(v) {
   renderXssPoints();
 }
 
+function getFindings() {
+  return xssPoints.map(function (p) {
+    return {
+      severity: 'high',
+      title: 'XSS 注入点',
+      detail: `${p.source} | ${p.param} (${p.method})`,
+      module: 'xss',
+      url: p.url,
+    };
+  });
+}
+
 export {
   startXssIntercept,
   stopXssIntercept,
@@ -778,4 +790,5 @@ export {
   xssSearchText,
   setXssFilterType,
   setXssSearchText,
+  getFindings,
 };

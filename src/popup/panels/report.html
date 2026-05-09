@@ -1,0 +1,22 @@
+    <!-- 统一报告面板 -->
+    <div id="panel-report" class="panel">
+      <div class="content-card">
+        <div class="card-title">统一报告</div>
+        <div class="report-module-desc">跨模块汇总扫描发现，生成 HTML / Markdown 渗透测试报告</div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="report-audit-btn">一键审计</button>
+          <button class="btn btn-outline" id="report-collect-btn">收集已有结果</button>
+          <button class="btn btn-outline" id="report-export-html-btn">导出 HTML</button>
+          <button class="btn btn-outline" id="report-export-md-btn">导出 Markdown</button>
+        </div>
+        <div class="status-bar" id="report-status"></div>
+        <div class="report-progress" id="report-progress" style="display:none">
+          <div class="report-progress-bar" id="report-progress-bar"></div>
+        </div>
+        <div class="report-progress-text" id="report-progress-text" style="display:none"></div>
+        <div id="report-summary"></div>
+        <div id="report-content">
+          <div class="empty-state">点击「一键审计」或「收集已有结果」开始生成报告</div>
+        </div>
+      </div>
+    </div>

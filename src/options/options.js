@@ -36,7 +36,45 @@ const DEFAULT_TABS = [
   { id: 'cors', label: 'CORS检测' },
   { id: 'subdomain', label: '子域名' },
   { id: 'source-loader', label: '源码加载' },
+  { id: 'sniff', label: '网站嗅探' },
+  { id: 'report', label: '统一报告' },
 ];
+
+const TAB_CATEGORIES_OPT = [
+  {
+    id: 'recon',
+    label: '侦察',
+    color: '#4A90E2',
+    tabs: ['favicon', 'gather', 'subdomain', 'sniff'],
+  },
+  { id: 'scan', label: '扫描', color: '#e74c3c', tabs: ['xssscan', 'cors', 'waf', 'cookie-audit'] },
+  {
+    id: 'exploit',
+    label: '利用',
+    color: '#e67e22',
+    tabs: ['jsctrl', 'payload', 'encoding', 'spoof'],
+  },
+  {
+    id: 'framework',
+    label: '框架分析',
+    color: '#27ae60',
+    tabs: ['vue', 'ruoyi', 'react', 'angular', 'sourcemap'],
+  },
+  {
+    id: 'tools',
+    label: '工具',
+    color: '#9b59b6',
+    tabs: ['asset', 'links', 'multiurl', 'history', 'exif', 'source-loader'],
+  },
+  { id: 'report', label: '统一报告', color: '#999', tabs: ['report'] },
+];
+
+var TAB_TO_CATEGORY_OPT = {};
+TAB_CATEGORIES_OPT.forEach(function (cat) {
+  cat.tabs.forEach(function (tabId) {
+    TAB_TO_CATEGORY_OPT[tabId] = cat;
+  });
+});
 
 function getToolbarConfig(settings) {
   const saved = settings.toolbarConfig;
@@ -126,8 +164,29 @@ function renderToolbarConfig() {
     const container = $('toolbar-config-list');
     if (!container) return;
     container.innerHTML = '';
+
+    var lastCatId = null;
     config.forEach(function (tab) {
-      const item = document.createElement('div');
+      var cat = TAB_TO_CATEGORY_OPT[tab.id];
+      if (cat && cat.id !== lastCatId) {
+        lastCatId = cat.id;
+        var header = document.createElement('div');
+        header.className = 'toolbar-config-category';
+        header.innerHTML =
+          '<span class="toolbar-cat-dot" style="background:' +
+          cat.color +
+          '"></span>' +
+          escapeHtml(cat.label);
+        container.appendChild(header);
+      }
+      if (!cat && lastCatId !== '_uncategorized') {
+        lastCatId = '_uncategorized';
+        var miscHeader = document.createElement('div');
+        miscHeader.className = 'toolbar-config-category';
+        miscHeader.textContent = '其他';
+        container.appendChild(miscHeader);
+      }
+      var item = document.createElement('div');
       item.className = 'toolbar-config-item';
       item.draggable = true;
       item.dataset.id = tab.id;
@@ -140,10 +199,11 @@ function renderToolbarConfig() {
         '</label>';
       container.appendChild(item);
     });
+
     initToolbarDragDrop(container);
     container.addEventListener('change', function (e) {
       if (e.target.type !== 'checkbox') return;
-      let checkedCount = container.querySelectorAll('input[type="checkbox"]:checked').length;
+      var checkedCount = container.querySelectorAll('input[type="checkbox"]:checked').length;
       if (checkedCount === 0) {
         e.target.checked = true;
         showStatus('至少保留一个可见工具', 'error');

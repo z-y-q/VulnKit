@@ -1,6 +1,8 @@
 // 灵眸 - XSS Scanner Data Tables
 'use strict';
 
+import { loadRemotePayloads } from './vk-payload-remote.js';
+
 const XSS_SCAN_PAYLOADS = [
   { name: 'alert(1)', value: '<script>alert(1)</script>' },
   { name: 'img onerror', value: '<img src=x onerror=alert(1)>' },
@@ -183,10 +185,43 @@ const SEVERITY_CONFIG = {
   info: { label: '信息', color: '#4A90E2', bg: '#eaf2fb', darkBg: 'rgba(74,144,226,0.15)' },
 };
 
+let _remoteScanPayloads = null;
+let _remoteContextPayloads = null;
+let _remoteSinkPatterns = null;
+let _remoteSanitizerPatterns = null;
+
+loadRemotePayloads(function (data) {
+  if (!data || !data.payloads) return;
+  if (data.payloads.xss_scan) _remoteScanPayloads = data.payloads.xss_scan;
+  if (data.payloads.context_payloads) _remoteContextPayloads = data.payloads.context_payloads;
+  if (data.payloads.sink_patterns) _remoteSinkPatterns = data.payloads.sink_patterns;
+  if (data.payloads.sanitizer_patterns) _remoteSanitizerPatterns = data.payloads.sanitizer_patterns;
+});
+
+function getEffectiveScanPayloads() {
+  return _remoteScanPayloads || XSS_SCAN_PAYLOADS;
+}
+
+function getEffectiveContextPayloads() {
+  return _remoteContextPayloads || CONTEXT_PAYLOADS;
+}
+
+function getEffectiveSinkPatterns() {
+  return _remoteSinkPatterns || SINK_PATTERNS;
+}
+
+function getEffectiveSanitizerPatterns() {
+  return _remoteSanitizerPatterns || SANITIZER_PATTERNS;
+}
+
 export {
   XSS_SCAN_PAYLOADS,
   CONTEXT_PAYLOADS,
   SINK_PATTERNS,
   SANITIZER_PATTERNS,
   SEVERITY_CONFIG,
+  getEffectiveScanPayloads,
+  getEffectiveContextPayloads,
+  getEffectiveSinkPatterns,
+  getEffectiveSanitizerPatterns,
 };

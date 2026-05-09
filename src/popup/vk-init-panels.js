@@ -2,6 +2,7 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { TAB_TO_CATEGORY } from './vk-categories.js';
 
 import * as encoding from './vk-encoding.js';
 import * as jwt from './vk-jwt.js';
@@ -44,7 +45,10 @@ import {
   renderAllReverseShells,
   renderSqliPayloads,
   applySearch as payloadApplySearch,
+  refreshPayloadDisplay,
+  initRemotePayloads,
 } from './vk-payload.js';
+import * as payloadRemote from './vk-payload-remote.js';
 import {
   smState,
   scanWebpackModules,
@@ -79,18 +83,37 @@ function showTabPage(page) {
   });
   if (scrollLeftBtn) scrollLeftBtn.disabled = page === 0;
   if (scrollRightBtn) scrollRightBtn.disabled = page >= totalPages - 1;
-  let pageIndicator = utils.get('tab-page-indicator');
-  if (pageIndicator) pageIndicator.textContent = `${page + 1}/${totalPages}`;
+  var pageIndicator = utils.get('tab-page-indicator');
+  if (pageIndicator) pageIndicator.textContent = totalPages <= 1 ? '' : page + 1 + '/' + totalPages;
+}
+
+function getVisibleTabBtns() {
+  return Array.from(
+    document.querySelectorAll('.tab-btn:not(.toolbar-hidden):not(.category-filtered)')
+  );
+}
+
+function recalcPagination() {
+  var visible = getVisibleTabBtns();
+  tabBtns = visible;
+  totalPages = Math.max(1, Math.ceil(visible.length / tabsPerPage));
+  if (currentPage >= totalPages) currentPage = totalPages - 1;
+  var pageIndicator = utils.get('tab-page-indicator');
+  if (pageIndicator) pageIndicator.style.display = totalPages <= 1 ? 'none' : '';
 }
 
 function initTabPagination() {
   tabBtns = Array.from(document.querySelectorAll('.tab-btn:not(.toolbar-hidden)'));
   tabsPerPage = 8;
-  const totalTabs = tabBtns.length;
-  totalPages = Math.ceil(totalTabs / tabsPerPage);
+  totalPages = Math.max(1, Math.ceil(tabBtns.length / tabsPerPage));
   currentPage = 0;
 
-  const pageIndicator = utils.get('tab-page-indicator');
+  tabBtns.forEach(function (btn) {
+    var cat = TAB_TO_CATEGORY[btn.dataset.panel];
+    if (cat) btn.style.setProperty('--cat-color', cat.color);
+  });
+
+  var pageIndicator = utils.get('tab-page-indicator');
   if (totalPages <= 1) {
     if (pageIndicator) pageIndicator.style.display = 'none';
   }
@@ -102,6 +125,52 @@ function initTabPagination() {
     if (currentPage < totalPages - 1) showTabPage(currentPage + 1);
   });
   showTabPage(0);
+}
+
+function initCategoryFilter() {
+  var chips = document.querySelectorAll('.category-chip');
+  if (chips.length === 0) return;
+
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      chips.forEach(function (c) {
+        c.classList.remove('active');
+      });
+      chip.classList.add('active');
+
+      var category = chip.dataset.category;
+      var allBtns = document.querySelectorAll('.tab-btn:not(.toolbar-hidden)');
+
+      if (category === 'all') {
+        allBtns.forEach(function (btn) {
+          btn.classList.remove('category-filtered');
+        });
+      } else {
+        var catConfig = TAB_TO_CATEGORY[Object.keys(TAB_TO_CATEGORY)[0]];
+        allBtns.forEach(function (btn) {
+          var tabCat = TAB_TO_CATEGORY[btn.dataset.panel];
+          if (tabCat && tabCat.id === category) {
+            btn.classList.remove('category-filtered');
+          } else {
+            btn.classList.add('category-filtered');
+          }
+        });
+      }
+
+      recalcPagination();
+      showTabPage(0);
+
+      var activeBtn = document.querySelector(
+        '.tab-btn.active:not(.toolbar-hidden):not(.category-filtered)'
+      );
+      if (!activeBtn) {
+        var firstVisible = document.querySelector(
+          '.tab-btn:not(.toolbar-hidden):not(.category-filtered)'
+        );
+        if (firstVisible) firstVisible.click();
+      }
+    });
+  });
 }
 
 function initMainTabs() {
@@ -610,6 +679,67 @@ function initThemeAndPayload() {
   utils.on('revshell-port', 'input', generateReverseShell);
 
   utils.bindClick('sqli-regen-btn', renderSqliPayloads);
+
+  initRemotePayloads();
+
+  utils.bindClick('payload-remote-config-btn', function () {
+    const config = utils.get('payload-remote-config');
+    if (!config) return;
+    config.classList.toggle('hidden');
+    if (!config.classList.contains('hidden')) {
+      const input = utils.get('payload-remote-url');
+      if (input) {
+        payloadRemote.getRemoteUrl(function (url) {
+          input.value = url;
+        });
+      }
+    }
+  });
+
+  utils.bindClick('payload-remote-save-btn', function () {
+    const input = utils.get('payload-remote-url');
+    if (!input) return;
+    payloadRemote.setRemoteUrl(input.value.trim());
+    utils.showToast('远程地址已保存', 'success');
+    const config = utils.get('payload-remote-config');
+    if (config) config.classList.add('hidden');
+  });
+
+  utils.bindClick('payload-remote-reset-btn', function () {
+    payloadRemote.setRemoteUrl('');
+    const input = utils.get('payload-remote-url');
+    if (input) input.value = '';
+    utils.showToast('已恢复默认', 'success');
+  });
+
+  utils.bindClick('payload-update-btn', async function () {
+    const btn = this;
+    const statusEl = utils.get('payload-remote-status');
+    btn.disabled = true;
+    btn.textContent = '更新中...';
+    try {
+      const stats = await payloadRemote.updatePayloads(function (msg) {
+        if (statusEl) statusEl.textContent = msg;
+      });
+      if (!stats.ok) {
+        if (statusEl) statusEl.textContent = '失败: ' + stats.error;
+        utils.showToast('更新失败: ' + stats.error, 'error');
+      } else {
+        initRemotePayloads();
+        refreshPayloadDisplay();
+        const keys = Object.keys(stats).filter(function (k) {
+          return k !== 'version' && k !== 'ok';
+        });
+        if (statusEl) statusEl.textContent = '已更新至 v' + (stats.version || 'unknown');
+        utils.showToast('Payload 已更新', 'success');
+      }
+    } catch (e) {
+      if (statusEl) statusEl.textContent = '失败: ' + e.message;
+      utils.showToast('更新失败', 'error');
+    }
+    btn.disabled = false;
+    btn.textContent = '更新远程 Payload';
+  });
   utils.on('sqli-columns', 'change', renderSqliPayloads);
   utils.on('sqli-table', 'input', renderSqliPayloads);
 }
@@ -728,9 +858,52 @@ function initStatusBarAndKeyboard() {
   });
 }
 
+import {
+  handleCollectFindings,
+  runFullAudit,
+  getLastFindings,
+  exportHtml,
+  exportMarkdown,
+} from './vk-report.js';
+
+function initReport() {
+  utils.bindClick('report-collect-btn', handleCollectFindings);
+
+  utils.bindClick('report-audit-btn', async function () {
+    var btn = utils.get('report-audit-btn');
+    if (btn) btn.disabled = true;
+    var progressTextEl = utils.get('report-progress-text');
+    if (progressTextEl) progressTextEl.style.display = '';
+    try {
+      await runFullAudit();
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+
+  utils.bindClick('report-export-html-btn', function () {
+    var findings = getLastFindings();
+    if (!findings || findings.length === 0) {
+      utils.showToast('没有可导出的结果', 'warning');
+      return;
+    }
+    exportHtml(findings);
+  });
+
+  utils.bindClick('report-export-md-btn', function () {
+    var findings = getLastFindings();
+    if (!findings || findings.length === 0) {
+      utils.showToast('没有可导出的结果', 'warning');
+      return;
+    }
+    exportMarkdown(findings);
+  });
+}
+
 export {
   initTabPagination,
   initMainTabs,
+  initCategoryFilter,
   initEncodingJwtCrypto,
   initRsaFaviconAsset,
   initGatherAndRules,
@@ -739,4 +912,5 @@ export {
   initThemeAndPayload,
   initXssAndSourcemap,
   initStatusBarAndKeyboard,
+  initReport,
 };
