@@ -145,8 +145,9 @@ function autoInjectHiddenRoutes() {
     utils.showToast('无缓存的路由对比结果，请先执行「路由对比」', 'warning');
     return;
   }
+  let parsed;
   try {
-    let parsed = JSON.parse(text);
+    parsed = JSON.parse(text);
   } catch (e) {
     utils.showToast('JSON 格式错误', 'error');
     return;

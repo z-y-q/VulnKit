@@ -4,14 +4,7 @@
 import { DEFAULT_RULES } from './vk-hae-default-rules.js';
 
 const STORAGE_KEY = 'haeRules';
-const PAGE_SCOPE = [
-  'response body',
-  'response',
-  'any',
-  'request',
-  'response header',
-  'any header',
-];
+const PAGE_SCOPE = ['response body', 'response', 'any', 'request', 'response header', 'any header'];
 function isPageScope(scope) {
   return PAGE_SCOPE.indexOf(scope) !== -1;
 }
@@ -193,7 +186,7 @@ function rulesToYaml(rules) {
   rules.forEach(function (group) {
     yaml += `  - group: ${group.group}\n    rules:\n`;
     (group.rules || []).forEach(function (rule) {
-      yaml += `      - name: ${rule.name}\n        loaded: ${rule.loaded}\n        f_regex: ${quoteYamlString(rule.f_regex || '')}\n        s_regex: ${quoteYamlString(rule.s_regex || '')}\n        format: ${quoteYamlString(rule.format || '{0}')}\n        color: ${rule.color || 'gray'}\n        scope: ${rule.scope || 'response body'}\n        engine: ${rule.engine || 'nfa'}\n        sensitive: ${rule.sensitive || false}\n`;
+      yaml += `      - name: ${quoteYamlString(rule.name || '')}\n        loaded: ${rule.loaded}\n        f_regex: ${quoteYamlString(rule.f_regex || '')}\n        s_regex: ${quoteYamlString(rule.s_regex || '')}\n        format: ${quoteYamlString(rule.format || '{0}')}\n        color: ${quoteYamlString(rule.color || 'gray')}\n        scope: ${quoteYamlString(rule.scope || 'response body')}\n        engine: ${quoteYamlString(rule.engine || 'nfa')}\n        sensitive: ${rule.sensitive || false}\n`;
     });
   });
   return yaml;

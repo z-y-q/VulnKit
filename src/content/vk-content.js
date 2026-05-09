@@ -453,8 +453,9 @@
       return true;
     }
     if (message.type === 'VK_API_TRAFFIC_START') {
+      const alreadyRunning = apiTrafficActive;
       startApiMonitoring();
-      sendResponse({ status: 'started' });
+      sendResponse({ status: alreadyRunning ? 'already_running' : 'started' });
       return true;
     }
     if (message.type === 'VK_API_TRAFFIC_STOP') {

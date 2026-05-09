@@ -213,7 +213,11 @@ function aesParams() {
 
 function aesEncrypt(input) {
   let p = aesParams();
-  return window.CryptoJS.AES.encrypt(window.CryptoJS.enc.Utf8.parse(input), p.keyWA, p.opts).toString();
+  return window.CryptoJS.AES.encrypt(
+    window.CryptoJS.enc.Utf8.parse(input),
+    p.keyWA,
+    p.opts
+  ).toString();
 }
 
 function aesDecrypt(input) {
@@ -235,7 +239,11 @@ function desParams() {
 
 function desEncrypt(input) {
   let p = desParams();
-  return window.CryptoJS.DES.encrypt(window.CryptoJS.enc.Utf8.parse(input), p.keyWA, p.opts).toString();
+  return window.CryptoJS.DES.encrypt(
+    window.CryptoJS.enc.Utf8.parse(input),
+    p.keyWA,
+    p.opts
+  ).toString();
 }
 
 function desDecrypt(input) {
@@ -262,10 +270,9 @@ function sm2Encrypt(input) {
   if (pubKey.length === 128) pubKey = `04${pubKey}`;
   if (pubKey.length !== 130 || !pubKey.startsWith('04'))
     throw new Error('公钥格式错误（需 130 位十六进制，04 开头）');
+  const bytes = new TextEncoder().encode(input);
   return window.sm2.doEncrypt(
-    input.split('').map(function (c) {
-      return c.charCodeAt(0);
-    }),
+    Array.from(bytes),
     pubKey,
     parseInt(readCryptoSelect('sm2-cipher')) || 1
   );
@@ -277,11 +284,7 @@ function sm2Decrypt(input) {
   let cipherMode = parseInt(readCryptoSelect('sm2-cipher')) || 1;
   let decrypted = window.sm2.doDecrypt(input, priKey, cipherMode, { output: 'array' });
   if (!decrypted) throw new Error('解密失败，请检查密钥和密文');
-  return decrypted
-    .map(function (c) {
-      return String.fromCharCode(c);
-    })
-    .join('');
+  return new TextDecoder().decode(new Uint8Array(decrypted));
 }
 
 function toHex(str) {
@@ -328,10 +331,14 @@ function computeHash(input) {
     let keyWA = window.CryptoJS.enc.Utf8.parse(hmacKey);
     let fn = window.CryptoJS[`Hmac${algoName.charAt(0).toUpperCase()}${algoName.slice(1)}`];
     let hash = fn ? fn(input, keyWA) : window.CryptoJS.HmacSHA256(input, keyWA);
-    return useHex ? hash.toString(window.CryptoJS.enc.Hex) : window.CryptoJS.enc.Base64.stringify(hash);
+    return useHex
+      ? hash.toString(window.CryptoJS.enc.Hex)
+      : window.CryptoJS.enc.Base64.stringify(hash);
   }
   let result = window.CryptoJS[algoName](input);
-  return useHex ? result.toString(window.CryptoJS.enc.Hex) : window.CryptoJS.enc.Base64.stringify(result);
+  return useHex
+    ? result.toString(window.CryptoJS.enc.Hex)
+    : window.CryptoJS.enc.Base64.stringify(result);
 }
 
 function toggleHashHmac() {
@@ -349,13 +356,9 @@ function rsaEncrypt(input) {
   let pubKeyStr = (utils.get('rsa-pubkey') || {}).value || '';
   if (!pubKeyStr) throw new Error('请先生成密钥对');
   return window.crypto.subtle
-    .importKey(
-      'spki',
-      pemToArrayBuffer(pubKeyStr),
-      { name: 'RSA-OAEP', hash: 'SHA-256' },
-      false,
-      ['encrypt']
-    )
+    .importKey('spki', pemToArrayBuffer(pubKeyStr), { name: 'RSA-OAEP', hash: 'SHA-256' }, false, [
+      'encrypt',
+    ])
     .then(function (pubKey) {
       return window.crypto.subtle.encrypt(
         { name: 'RSA-OAEP' },
@@ -377,13 +380,9 @@ function rsaDecrypt(input) {
   let priKeyStr = (utils.get('rsa-prikey') || {}).value || '';
   if (!priKeyStr) throw new Error('请先生成密钥对');
   return window.crypto.subtle
-    .importKey(
-      'pkcs8',
-      pemToArrayBuffer(priKeyStr),
-      { name: 'RSA-OAEP', hash: 'SHA-256' },
-      true,
-      ['decrypt']
-    )
+    .importKey('pkcs8', pemToArrayBuffer(priKeyStr), { name: 'RSA-OAEP', hash: 'SHA-256' }, true, [
+      'decrypt',
+    ])
     .then(function (priKey) {
       let bin = atob(input);
       let buf = new Uint8Array(bin.length);

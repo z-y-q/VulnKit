@@ -514,13 +514,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return true;
         }
         try {
-          chrome.dns.resolve(hostname, result => {
-            if (chrome.runtime.lastError) {
-              sendResponse({ error: chrome.runtime.lastError.message, addresses: [] });
-            } else {
-              sendResponse({ addresses: result.addresses || [], resultCode: result.resultCode });
-            }
-          });
+          fetch(`https://dns.google/resolve?name=${encodeURIComponent(hostname)}&type=A`)
+            .then(r => r.json())
+            .then(data => {
+              const addresses = (data.Answer || []).filter(a => a.type === 1).map(a => a.data);
+              sendResponse({ addresses: addresses, resultCode: 0 });
+            })
+            .catch(err => {
+              sendResponse({ error: err.message, addresses: [] });
+            });
         } catch (e) {
           sendResponse({ error: e.message, addresses: [] });
         }

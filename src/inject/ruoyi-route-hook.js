@@ -223,8 +223,8 @@
     let url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
     let fetchOpts = args[1] && typeof args[1] === 'object' ? args[1] : {};
     let fetchMethod = (fetchOpts.method || 'GET').toUpperCase();
-    let isRouter = _quickSkipRe.test(url);
-    let isUserInfo = !isRouter && /(?:getUserInfo|getInfo)\b/i.test(url);
+    let isUserInfo = /(?:getUserInfo|getInfo)\b/i.test(url);
+    let isRouter = !isUserInfo && _quickSkipRe.test(url);
     return origFetch.apply(this, args).then(function (response) {
       let config = window.__VK_RUOYI_HOOK__;
 
@@ -321,8 +321,8 @@
     let self = this;
     let config = window.__VK_RUOYI_HOOK__;
     let reqUrl = this.__vk_ruoyi_url;
-    let xhrIsRouter = reqUrl ? _quickSkipRe.test(reqUrl) : false;
-    let xhrIsUserInfo = !xhrIsRouter && reqUrl ? /(?:getUserInfo|getInfo)\b/i.test(reqUrl) : false;
+    let xhrIsUserInfo = reqUrl ? /(?:getUserInfo|getInfo)\b/i.test(reqUrl) : false;
+    let xhrIsRouter = !xhrIsUserInfo && reqUrl ? _quickSkipRe.test(reqUrl) : false;
 
     // ALWAYS capture router responses (passive)
     if (xhrIsRouter) {

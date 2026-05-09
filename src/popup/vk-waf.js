@@ -35,12 +35,7 @@ let WAF_SIGNATURES = [
     name: 'ModSecurity',
     severity: 'high',
     headerMatch: [/mod_security/i, /modsecurity/i, /noyb/i],
-    bodyMatch: [
-      /mod_security/i,
-      /modsecurity/i,
-      /not acceptable/i,
-      /access denied.*mod_security/i,
-    ],
+    bodyMatch: [/mod_security/i, /modsecurity/i, /not acceptable/i, /access denied.*mod_security/i],
     cookieMatch: [/modsecurity/i],
   },
   {
@@ -69,12 +64,12 @@ let WAF_SIGNATURES = [
     severity: 'high',
     headerMatch: [/bigip/i, /x-wa-info/i, /ts[i0-9]{5,}/i],
     bodyMatch: [/bigip/i, /f5/i, /request rejected/i, /traffic intercepted/i],
-    cookieMatch: [/bigipserver/i, /f5_*/i],
+    cookieMatch: [/bigipserver/i, /f5_.*/i],
   },
   {
     name: '阿里云盾 (Yundun)',
     severity: 'high',
-    headerMatch: [/aliyun/i, /yundun/i, /x-yd-*/i],
+    headerMatch: [/aliyun/i, /yundun/i, /x-yd-.*/i],
     bodyMatch: [/yundun/i, /aliyun/i, /error.*yun/i],
     cookieMatch: [/acw_tc/i, /acw_sc__v2/i],
   },
@@ -167,7 +162,7 @@ let WAF_SIGNATURES = [
     severity: 'medium',
     headerMatch: [/fortiweb/i, /x-fortiweb/i],
     bodyMatch: [/fortiweb/i, /fortinet/i],
-    cookieMatch: [/fortiweb/i, /apbfw*_.* Fortiweb/i],
+    cookieMatch: [/fortiweb/i, /apbfw.*_.* Fortiweb/i],
   },
   {
     name: 'Microsoft Azure Front Door',
@@ -186,7 +181,7 @@ let WAF_SIGNATURES = [
   {
     name: 'Squarespace',
     severity: 'low',
-    headerMatch: [/x-sq-*/i],
+    headerMatch: [/x-sq-.*/i],
     bodyMatch: [/squarespace/i],
     cookieMatch: [],
   },
@@ -277,8 +272,8 @@ function renderResults(detected, probeHeaders, probeUrl) {
       '<div class="waf-not-detected">',
       '<div style="font-size:32px;margin-bottom:8px">&#128274;</div>',
       '<div>未检测到 WAF</div>',
-      '<div style="font-size:11px;margin-top:4px;color:let(--text-secondary)">目标站点可能没有部署 WAF，或使用了自定义规则</div>',
-      '<div style="font-size:11px;margin-top:2px;color:let(--text-secondary)">提示: 探测请求已通过后台发送(不带 Cookie)，如仍无法检测，可尝试手动访问恶意路径</div>',
+      '<div style="font-size:11px;margin-top:4px;color:var(--text-secondary)">目标站点可能没有部署 WAF，或使用了自定义规则</div>',
+      '<div style="font-size:11px;margin-top:2px;color:var(--text-secondary)">提示: 探测请求已通过后台发送(不带 Cookie)，如仍无法检测，可尝试手动访问恶意路径</div>',
       '</div>',
     ].join('');
     if (copyBtn) copyBtn.style.display = 'none';
@@ -346,7 +341,7 @@ function searchResults(query) {
 
 function applyFilter() {
   if (!lastWafResult) return;
-  let filtered = lastWafResult.filter(function (d) {
+  let filtered = lastWafResult.filter(function () {
     if (currentFilter === 'detected') return true;
     if (currentFilter === 'none') return false;
     return true;
@@ -560,10 +555,4 @@ function exportResults() {
   utils.showToast('报告已导出', 'success');
 }
 
-export {
-  scanWaf,
-  copyResults,
-  exportResults,
-  filterByStatus,
-  searchResults,
-};
+export { scanWaf, copyResults, exportResults, filterByStatus, searchResults };

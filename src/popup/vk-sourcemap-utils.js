@@ -65,7 +65,7 @@ async function smBatchFetchInPage(urls, tailOnly, tabId) {
           return fetch(p.url, p.tailOnly ? { headers: { Range: 'bytes=-500' } } : {})
             .then(function (r) {
               if (!r.ok) return null;
-              return p.tailOnly ? r.text() : r.text();
+              return r.text();
             })
             .catch(function () {
               return null;

@@ -425,7 +425,9 @@ function exportResults() {
   let json = JSON.stringify(lastSubdomains, null, 2);
   let blob = new Blob([json], { type: 'application/json' });
   let url = URL.createObjectURL(blob);
-  chrome.downloads.download({ url: url, filename: 'subdomains.json', saveAs: true });
+  chrome.downloads.download({ url: url, filename: 'subdomains.json', saveAs: true }, function () {
+    URL.revokeObjectURL(url);
+  });
   utils.showToast('导出中...', 'info');
 }
 
@@ -437,16 +439,13 @@ function delay(ms) {
 
 function dnsResolve(hostname) {
   return new Promise(function (resolve) {
-    chrome.runtime.sendMessage(
-      { type: 'FETCH_DNS_RESOLVE', hostname: hostname },
-      function (resp) {
-        if (chrome.runtime.lastError || !resp || resp.error) {
-          resolve(null);
-          return;
-        }
-        resolve(resp);
+    chrome.runtime.sendMessage({ type: 'FETCH_DNS_RESOLVE', hostname: hostname }, function (resp) {
+      if (chrome.runtime.lastError || !resp || resp.error) {
+        resolve(null);
+        return;
       }
-    );
+      resolve(resp);
+    });
   });
 }
 
@@ -532,7 +531,6 @@ async function probeHttpTargets(targets, seen, wildcardDetected, statusEl) {
           let httpHits = results.length;
           if (httpHits > 2 && httpHits / (k + 1) > 0.8) {
             wildcardConfirmed = true;
-            results = results.slice(0, 2);
             continue;
           }
         }

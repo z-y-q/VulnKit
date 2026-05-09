@@ -64,43 +64,61 @@ function auditCookies() {
 
       chrome.cookies.getAll({ domain: domain }, function (cookies) {
         if (!cookies || cookies.length === 0) {
-          if (statusEl) statusEl.textContent = '当前域名没有 Cookie';
-          if (resultsEl)
-            resultsEl.innerHTML = '<div class="cookie-no-cookies">当前域名没有 Cookie</div>';
-          if (copyBtn) copyBtn.style.display = 'none';
-          if (exportBtn) exportBtn.style.display = 'none';
+          const parts = domain.split('.');
+          if (parts.length > 2) {
+            const baseDomain = parts.slice(-2).join('.');
+            chrome.cookies.getAll({ domain: baseDomain }, function (parentCookies) {
+              if (parentCookies && parentCookies.length > 0) {
+                processCookies(parentCookies, isHttpsSite, statusEl, resultsEl, copyBtn, exportBtn);
+              } else {
+                showNoCookies(statusEl, resultsEl, copyBtn, exportBtn);
+              }
+            });
+            return;
+          }
+          showNoCookies(statusEl, resultsEl, copyBtn, exportBtn);
           return;
         }
-
-        const results = cookies.map(function (c) {
-          return analyzeCookie(c, isHttpsSite);
-        });
-        const SEV_ORDER = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
-        const severityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-        results.forEach(function (r) {
-          let max = r.issues.reduce(function (m, i) {
-            return Math.max(m, SEV_ORDER[i.severity] || 0);
-          }, 0);
-          r._maxSev = max;
-          const sevKey = Object.keys(SEV_ORDER).find(function (k) {
-            return SEV_ORDER[k] === max;
-          });
-          if (sevKey && severityCounts.hasOwnProperty(sevKey)) severityCounts[sevKey]++;
-        });
-        results.sort(function (a, b) {
-          return b._maxSev - a._maxSev;
-        });
-
-        lastResult = results;
-        if (statusEl) statusEl.textContent = `审计完成: ${cookies.length} 个 Cookie`;
-        if (copyBtn) copyBtn.style.display = '';
-        if (exportBtn) exportBtn.style.display = '';
-
-        renderStats(severityCounts);
-        renderResults(results);
+        processCookies(cookies, isHttpsSite, statusEl, resultsEl, copyBtn, exportBtn);
       });
     });
   });
+}
+
+function showNoCookies(statusEl, resultsEl, copyBtn, exportBtn) {
+  if (statusEl) statusEl.textContent = '当前域名没有 Cookie';
+  if (resultsEl) resultsEl.innerHTML = '<div class="cookie-no-cookies">当前域名没有 Cookie</div>';
+  if (copyBtn) copyBtn.style.display = 'none';
+  if (exportBtn) exportBtn.style.display = 'none';
+}
+
+function processCookies(cookies, isHttpsSite, statusEl, resultsEl, copyBtn, exportBtn) {
+  const results = cookies.map(function (c) {
+    return analyzeCookie(c, isHttpsSite);
+  });
+  const SEV_ORDER = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
+  const severityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+  results.forEach(function (r) {
+    let max = r.issues.reduce(function (m, i) {
+      return Math.max(m, SEV_ORDER[i.severity] || 0);
+    }, 0);
+    r._maxSev = max;
+    const sevKey = Object.keys(SEV_ORDER).find(function (k) {
+      return SEV_ORDER[k] === max;
+    });
+    if (sevKey && severityCounts.hasOwnProperty(sevKey)) severityCounts[sevKey]++;
+  });
+  results.sort(function (a, b) {
+    return b._maxSev - a._maxSev;
+  });
+
+  lastResult = results;
+  if (statusEl) statusEl.textContent = `审计完成: ${cookies.length} 个 Cookie`;
+  if (copyBtn) copyBtn.style.display = '';
+  if (exportBtn) exportBtn.style.display = '';
+
+  renderStats(severityCounts);
+  renderResults(results);
 }
 
 function analyzeCookie(cookie, isHttpsSite) {
@@ -308,18 +326,11 @@ function applyFilter() {
     if (currentSearch) {
       const name = (r.cookie.name || '').toLowerCase();
       const domain = (r.cookie.domain || '').toLowerCase();
-      if (name.indexOf(currentSearch) === -1 && domain.indexOf(currentSearch) === -1)
-        return false;
+      if (name.indexOf(currentSearch) === -1 && domain.indexOf(currentSearch) === -1) return false;
     }
     return true;
   });
   renderResults(filtered);
 }
 
-export {
-  auditCookies,
-  copyResults,
-  exportResults,
-  filterBySeverity,
-  searchResults,
-};
+export { auditCookies, copyResults, exportResults, filterBySeverity, searchResults };

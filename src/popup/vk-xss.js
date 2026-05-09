@@ -340,8 +340,7 @@ function buildXssTestUrl(point, payload) {
       return url.href;
     }
     if (point.method === 'POST') {
-      url.searchParams.set(point.param, payload);
-      return { url: url.href, method: 'POST', param: point.param, payload: payload };
+      return { url: point.url, method: 'POST', param: point.param, payload: payload };
     }
     return url.href;
   } catch (_) {
@@ -491,7 +490,10 @@ async function verifySinglePoint(point, payload, rawPayload) {
     let postBody = buildPostBody(point, payload);
     if (postBody) {
       try {
-        let resp = await utils.fetchWithTimeout(point.url, 10000);
+        let resp = await utils.fetchWithTimeout(
+          `${point.url}?${point.param}=${encodeURIComponent(payload)}`,
+          10000
+        );
         if (resp && !resp.error) {
           let body = resp.body || '';
           if (body.indexOf(rawPayload) !== -1) {

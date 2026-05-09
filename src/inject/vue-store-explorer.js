@@ -42,7 +42,7 @@
         }
       }
     } catch (e) {
-      result.errors.push(`Vuex: `);
+      result.errors.push(`Vuex: ${(e && e.message) || String(e)}`);
     }
 
     // --- Pinia ---
@@ -60,7 +60,7 @@
         });
       }
     } catch (e) {
-      result.errors.push(`Pinia: `);
+      result.errors.push(`Pinia: ${(e && e.message) || String(e)}`);
     }
 
     return result;
@@ -89,9 +89,9 @@
       return JSON.parse(
         JSON.stringify(obj, function (key, value) {
           if (typeof value === 'function') return '[Function]';
-          if (value instanceof HTMLElement) return `[HTMLElement:]`;
+          if (value instanceof HTMLElement) return `[HTMLElement: ${value.tagName || 'unknown'}]`;
           if (value instanceof Window) return '[Window]';
-          if (value instanceof Error) return `[Error: ]`;
+          if (value instanceof Error) return `[Error: ${value.message}]`;
           if (typeof value === 'symbol') return value.toString();
           return value;
         })

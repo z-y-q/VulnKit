@@ -15,8 +15,8 @@ let _getCurrentTab = function () {
 let _renderSubTabs = null;
 let _renderGatherTab = null;
 
-export function initTrafficDeps(gatherData, getCurrentTab, renderSubTabs, renderGatherTab) {
-  _gatherData = gatherData;
+export function initTrafficDeps(getGatherData, getCurrentTab, renderSubTabs, renderGatherTab) {
+  _gatherData = typeof getGatherData === 'function' ? getGatherData : () => getGatherData;
   _getCurrentTab = getCurrentTab;
   _renderSubTabs = renderSubTabs;
   _renderGatherTab = renderGatherTab;
@@ -53,7 +53,7 @@ async function collectApiTraffic() {
       return null;
     });
   if (!result || !result.entries || result.entries.length === 0) return;
-  const existing = _gatherData[API_TRAFFIC_GROUP] || [];
+  const existing = _gatherData()[API_TRAFFIC_GROUP] || [];
   const existingKeys = {};
   existing.forEach(function (e) {
     existingKeys[e.value] = true;
@@ -82,7 +82,7 @@ async function collectApiTraffic() {
       },
     };
   });
-  _gatherData[API_TRAFFIC_GROUP] = (existing || []).concat(items);
+  _gatherData()[API_TRAFFIC_GROUP] = (existing || []).concat(items);
   if (_renderSubTabs) _renderSubTabs();
   if (_getCurrentTab() === API_TRAFFIC_GROUP && _renderGatherTab) _renderGatherTab();
   updateApiTrafficStatus();
@@ -91,7 +91,7 @@ async function collectApiTraffic() {
 function updateApiTrafficStatus() {
   let el = utils.get('gather-api-status');
   if (!el) return;
-  const count = (_gatherData[API_TRAFFIC_GROUP] || []).length;
+  const count = (_gatherData()[API_TRAFFIC_GROUP] || []).length;
   if (apiTrafficRunning) {
     el.textContent = `监听中... 已捕获 ${count} 个请求`;
     el.style.color = '#e67e22';

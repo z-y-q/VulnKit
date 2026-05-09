@@ -17,13 +17,6 @@ import * as exif from './vk-exif.js';
 import * as history from './vk-history.js';
 import * as spoof from './vk-spoof.js';
 import {
-  initVuePermissions,
-  initJsSearchAndTraverse,
-  initSecurityDetectors,
-  initNetworkTools,
-  initStateRestoration,
-} from './vk-init-detectors.js';
-import {
   startXssIntercept,
   stopXssIntercept,
   renderXssPoints,
@@ -273,6 +266,7 @@ function initRsaFaviconAsset() {
 }
 
 function initGatherAndRules() {
+  gather.init();
   utils.bindClick('gather-btn', gather.gatherInfo);
   utils.on('gather-search', 'input', function () {
     gather.applySearchFilter(this.value.trim());

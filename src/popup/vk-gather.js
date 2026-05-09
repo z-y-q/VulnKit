@@ -769,7 +769,12 @@ function updateRules(rules) {
   renderSubTabs();
 }
 
-initTrafficDeps(gatherData, () => currentGatherTab, renderSubTabs, renderGatherTab);
+initTrafficDeps(
+  () => gatherData,
+  () => currentGatherTab,
+  renderSubTabs,
+  renderGatherTab
+);
 
 export {
   init,

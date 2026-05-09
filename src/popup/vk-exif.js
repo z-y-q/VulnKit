@@ -74,12 +74,14 @@ function formatExifValue(value, format) {
   }
 }
 
-function formatGpsDms(value) {
+function formatGpsDms(value, isLat) {
   const abs = Math.abs(value);
   const d = Math.floor(abs);
   const m = Math.floor((abs - d) * 60);
   const s = ((abs - d) * 60 - m) * 60;
-  const dir = value > 0 ? 'N' : 'S';
+  const posDir = isLat ? 'N' : 'E';
+  const negDir = isLat ? 'S' : 'W';
+  const dir = value >= 0 ? posDir : negDir;
   return `${d}°${m}'${s.toFixed(2)}"${dir}`;
 }
 
@@ -169,8 +171,8 @@ async function handleExifFile(file) {
 
         if (field.format === 'gps') {
           const coord = exif[field.key];
-          let coordStr = `${formatGpsDms(coord)} (${coord.toFixed(6)})`;
-          if (field.key === 'longitude') coordStr = coordStr.replace('N', 'E').replace('S', 'W');
+          const isLat = field.key === 'latitude';
+          let coordStr = `${formatGpsDms(coord, isLat)} (${coord.toFixed(6)})`;
           html += exifRowHtml(field.label, coordStr, coord);
           return;
         }
