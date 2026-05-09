@@ -1,0 +1,18 @@
+    <!-- 网站嗅探面板 -->
+    <div id="panel-sniff" class="panel">
+      <div class="content-card">
+        <div class="card-title">网站嗅探</div>
+        <div class="sniff-module-desc">识别网站使用的技术栈：CMS、框架、服务器、CDN、JS 库等</div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="sniff-scan-btn">嗅探识别</button>
+          <button class="btn btn-outline" id="sniff-copy-btn" style="display:none">复制</button>
+          <button class="btn btn-outline" id="sniff-export-btn" style="display:none">导出 JSON</button>
+        </div>
+        <div class="status-bar" id="sniff-status"></div>
+        <div id="sniff-summary" style="display:none"></div>
+        <div id="sniff-category-filter" class="sniff-cat-filter-bar" style="display:none"></div>
+        <div class="sniff-results" id="sniff-results">
+          <div class="empty-state">点击「嗅探识别」分析当前网站技术栈</div>
+        </div>
+      </div>
+    </div>

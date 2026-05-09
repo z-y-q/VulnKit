@@ -503,6 +503,66 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       return true;
 
+    case 'FETCH_HEADER_PROBE':
+      {
+        let probeUrl;
+        try {
+          probeUrl = new URL(message.url);
+          if (probeUrl.protocol !== 'http:' && probeUrl.protocol !== 'https:') {
+            sendResponse({ error: 'Invalid protocol' });
+            return true;
+          }
+        } catch {
+          sendResponse({ error: 'Invalid URL' });
+          return true;
+        }
+        if (!isAllowedUrl(probeUrl.href)) {
+          sendResponse({ error: 'URL not allowed (no private IPs)' });
+          return true;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), message.timeout || 8000);
+        fetch(probeUrl.href, {
+          method: 'HEAD',
+          redirect: 'follow',
+          signal: controller.signal,
+          credentials: 'omit',
+        })
+          .then(async resp => {
+            clearTimeout(timer);
+            const hdrs = {};
+            resp.headers.forEach((v, k) => {
+              hdrs[k] = v;
+            });
+            sendResponse({
+              status: resp.status,
+              statusText: resp.statusText,
+              headers: hdrs,
+            });
+          })
+          .catch(e => {
+            clearTimeout(timer);
+            // HEAD may be blocked, fallback to GET with body drain
+            fetch(probeUrl.href, {
+              method: 'GET',
+              redirect: 'follow',
+              signal: AbortSignal.timeout(message.timeout || 8000),
+              credentials: 'omit',
+            })
+              .then(resp => {
+                const hdrs = {};
+                resp.headers.forEach((v, k) => {
+                  hdrs[k] = v;
+                });
+                sendResponse({ status: resp.status, statusText: resp.statusText, headers: hdrs });
+              })
+              .catch(e2 => {
+                sendResponse({ error: e2.message, status: 0 });
+              });
+          });
+      }
+      return true;
+
     case 'FETCH_DNS_RESOLVE':
       {
         const hostname = message.hostname;

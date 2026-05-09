@@ -90,6 +90,12 @@ import {
 } from './vk-source-loader.js';
 import * as gather from './vk-gather.js';
 import * as links from './vk-links.js';
+import {
+  runSniffScan,
+  sniffCopyResults,
+  sniffExportResults,
+  renderSniffResults,
+} from './vk-sniff.js';
 
 const { getActiveTab } = utils;
 
@@ -346,6 +352,35 @@ function initNetworkTools() {
   utils.bindClick('mar-copy-btn', marCopyHiddenPaths);
 }
 
+function initSniff() {
+  utils.bindClick('sniff-scan-btn', async function () {
+    utils.setStatus('sniff-status', '正在嗅探识别...');
+    utils.get('sniff-scan-btn').disabled = true;
+
+    try {
+      var results = await runSniffScan();
+      if (!results || results.length === 0) {
+        utils.setStatus('sniff-status', '未检测到技术特征');
+        utils.get('sniff-copy-btn').style.display = 'none';
+        utils.get('sniff-export-btn').style.display = 'none';
+        renderSniffResults([]);
+        return;
+      }
+      utils.setStatus('sniff-status', '识别完成 — ' + results.length + ' 项技术');
+      utils.get('sniff-copy-btn').style.display = '';
+      utils.get('sniff-export-btn').style.display = '';
+      renderSniffResults(results);
+    } catch (err) {
+      utils.setStatus('sniff-status', '嗅探失败: ' + (err.message || '未知错误'));
+    } finally {
+      utils.get('sniff-scan-btn').disabled = false;
+    }
+  });
+
+  utils.bindClick('sniff-copy-btn', sniffCopyResults);
+  utils.bindClick('sniff-export-btn', sniffExportResults);
+}
+
 function initStateRestoration() {
   function restoreTabState(storageKey, onMatch) {
     chrome.storage.local.get([storageKey], function (result) {
@@ -388,6 +423,10 @@ function initStateRestoration() {
   });
 
   chrome.runtime.sendMessage({ type: 'QUERY_JS_BLOCK' }, function (resp) {
+    if (chrome.runtime.lastError) {
+      chrome.storage.local.remove('js_blocked_tabId');
+      return;
+    }
     if (resp && resp.blocked) {
       setJsBlocked(true);
       updateJsToggleStatus();
@@ -432,5 +471,6 @@ export {
   initJsSearchAndTraverse,
   initSecurityDetectors,
   initNetworkTools,
+  initSniff,
   initStateRestoration,
 };

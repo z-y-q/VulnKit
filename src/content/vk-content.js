@@ -18,6 +18,8 @@
   let angularDetectToken = null;
   let sourcemapDetectToken = null;
   let storeExploreToken = null;
+  let pageInspectResolve = null;
+  let pageInspectToken = null;
 
   // Window message relay
   window.addEventListener('message', function (e) {
@@ -79,6 +81,15 @@
         storeExploreResolve(e.data.result);
         storeExploreResolve = null;
         storeExploreToken = null;
+      }
+      return;
+    }
+
+    if (e.data && e.data.__vk_page_inspect && pageInspectResolve) {
+      if (pageInspectToken && e.data.__vk_token === pageInspectToken) {
+        pageInspectResolve(e.data.result);
+        pageInspectResolve = null;
+        pageInspectToken = null;
       }
       return;
     }
@@ -519,6 +530,74 @@
       const data = apiTrafficData;
       apiTrafficData = [];
       sendResponse({ entries: data, running: apiTrafficActive });
+      return true;
+    }
+    if (message.type === 'VK_PAGE_INSPECT') {
+      const action = message.action || '';
+      if (!action) {
+        sendResponse({ error: 'Missing action' });
+        return true;
+      }
+      pageInspectResolve = null;
+      pageInspectToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      const inspectTimer = setTimeout(function () {
+        if (pageInspectResolve) {
+          pageInspectResolve(null);
+          pageInspectResolve = null;
+        }
+      }, message.timeout || 5000);
+      const inspectResolve = function (result) {
+        clearTimeout(inspectTimer);
+        pageInspectResolve = null;
+        sendResponse(result);
+      };
+      pageInspectResolve = inspectResolve;
+      const piScript = document.createElement('script');
+      piScript.src = chrome.runtime.getURL('src/inject/page-inspect.js');
+      piScript.dataset.vkToken = pageInspectToken;
+      piScript.dataset.vkAction = action;
+      piScript.onload = function () {
+        piScript.remove();
+      };
+      piScript.onerror = function () {
+        piScript.remove();
+        clearTimeout(inspectTimer);
+        inspectResolve(null);
+      };
+      (document.head || document.documentElement).appendChild(piScript);
+      return true;
+    }
+    if (message.type === 'VK_FINGERPRINT_DOM') {
+      var metaTags = [];
+      document.querySelectorAll('meta').forEach(function (m) {
+        var name =
+          m.getAttribute('name') ||
+          m.getAttribute('http-equiv') ||
+          m.getAttribute('property') ||
+          '';
+        var content = m.getAttribute('content') || '';
+        if (name) metaTags.push({ name: name, content: content });
+      });
+      var bodyHtml = '';
+      try {
+        bodyHtml = (document.body ? document.body.innerHTML : '').substring(0, 200000);
+      } catch (e) {
+        /* ignore */
+      }
+      var scriptSrcs = [];
+      document.querySelectorAll('script[src]').forEach(function (s) {
+        if (s.src) scriptSrcs.push(s.src);
+      });
+      var styleHrefs = [];
+      document.querySelectorAll('link[rel="stylesheet"]').forEach(function (l) {
+        if (l.href) styleHrefs.push(l.href);
+      });
+      sendResponse({
+        metaTags: metaTags,
+        bodyHtml: bodyHtml,
+        scriptSrcs: scriptSrcs,
+        styleHrefs: styleHrefs,
+      });
       return true;
     }
   });

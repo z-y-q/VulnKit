@@ -11,6 +11,7 @@ import {
   stopApiTraffic,
   setApiFilter,
 } from './vk-gather-traffic.js';
+import { LEAK_SCAN_GROUP, runDeepLeakScan } from './vk-leakscan-scanner.js';
 
 const DOM_GROUP = 'DOM Analysis';
 const STORAGE_KEY = 'gatherData';
@@ -64,6 +65,11 @@ function renderGatherTab() {
   const isApiTraffic = currentGatherTab === API_TRAFFIC_GROUP;
   const fullList = gatherData[currentGatherTab] || [];
   if (fullList.length === 0) {
+    if (currentGatherTab === LEAK_SCAN_GROUP && gatherData[LEAK_SCAN_GROUP]) {
+      utils.setEmpty('gather-results', '未发现敏感信息泄漏');
+      utils.setStatus('gather-status', '深度扫描完成');
+      return;
+    }
     utils.setEmpty('gather-results', '点击「收集当前页面」开始');
     utils.setStatus('gather-status', '');
     return;
@@ -175,6 +181,7 @@ function buildGroups() {
     gatherData['API Traffic'] ? [API_TRAFFIC_GROUP] : [],
     gatherData['JS API'] ? ['JS API'] : [],
     gatherData['JS Sensitive Info'] ? ['JS Sensitive Info'] : [],
+    gatherData[LEAK_SCAN_GROUP] ? [LEAK_SCAN_GROUP] : [],
     getHaeRules() ? getHaeRules().getGroups(loadedRules) : []
   );
 }
@@ -651,6 +658,12 @@ async function gatherInfo() {
         if (jsResult.sensitiveItems.length > 0) {
           gatherData['JS Sensitive Info'] = jsResult.sensitiveItems;
         }
+      }
+
+      if (!gatherAbortFlag) {
+        utils.setStatus('gather-status', '深度泄漏扫描中...');
+        var leakItems = await runDeepLeakScan(gatherData, tab.id);
+        gatherData[LEAK_SCAN_GROUP] = leakItems;
       }
 
       renderSubTabs();

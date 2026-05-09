@@ -1,0 +1,340 @@
+// page-inspect.js -- 灵眸 Chrome Extension
+// MAIN world inject script for page inspection (leak scan + fingerprint)
+(function () {
+  'use strict';
+
+  var action = '';
+  var token = '';
+  try {
+    var cs = document.currentScript;
+    if (cs) {
+      action = cs.dataset.vkAction || '';
+      token = cs.dataset.vkToken || '';
+    }
+  } catch (e) {
+    /* ignore */
+  }
+
+  var guardKey = '__VK_PI_' + action;
+  if (window[guardKey]) {
+    postResult({ error: 'Already scanned for: ' + action });
+    return;
+  }
+  window[guardKey] = true;
+
+  function postResult(result) {
+    try {
+      window.postMessage(
+        { __vk_page_inspect: true, __vk_token: token, result: result },
+        location.origin
+      );
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  if (action === 'leak-scan') {
+    var storage = [];
+    var globals = [];
+
+    // localStorage
+    try {
+      var lsLen = Math.min(localStorage.length || 0, 200);
+      for (var i = 0; i < lsLen; i++) {
+        var lsKey = localStorage.key(i);
+        if (!lsKey) continue;
+        try {
+          var lsVal = localStorage.getItem(lsKey);
+          storage.push({ store: 'localStorage', key: lsKey, value: lsVal });
+        } catch (e) {
+          storage.push({ store: 'localStorage', key: lsKey, value: '[access denied]' });
+        }
+      }
+    } catch (e) {
+      /* ignore */
+    }
+
+    // sessionStorage
+    try {
+      var ssLen = Math.min(sessionStorage.length || 0, 200);
+      for (var j = 0; j < ssLen; j++) {
+        var ssKey = sessionStorage.key(j);
+        if (!ssKey) continue;
+        try {
+          var ssVal = sessionStorage.getItem(ssKey);
+          storage.push({ store: 'sessionStorage', key: ssKey, value: ssVal });
+        } catch (e) {
+          storage.push({ store: 'sessionStorage', key: ssKey, value: '[access denied]' });
+        }
+      }
+    } catch (e) {
+      /* ignore */
+    }
+
+    // JS global variables matching sensitive patterns
+    var sensitivePatterns = [
+      /token/i,
+      /secret/i,
+      /key/i,
+      /auth/i,
+      /password/i,
+      /credential/i,
+      /api[_-]?key/i,
+      /access[_-]?key/i,
+      /private[_-]?key/i,
+      /session/i,
+      /config/i,
+      /firebase/i,
+      /aws/i,
+      /stripe/i,
+      /paypal/i,
+    ];
+    var scanned = 0;
+    for (var prop in window) {
+      if (scanned >= 100) break;
+      if (!window.hasOwnProperty || !window.hasOwnProperty(prop)) continue;
+      if (prop.startsWith('__') || prop.startsWith('_') || prop.startsWith('webkit')) continue;
+      if (
+        /^(on|CSS|DOM|SVG|Math|Intl|JSON|Array|Object|String|Number|Boolean|Date|RegExp|Error|Map|Set|Promise|Proxy|Reflect|Symbol|WeakMap|WeakSet|console|document|window|navigator|location|history|screen|performance|crypto|indexedDB|caches|speechSynthesis|visualViewport|matchMedia)$/.test(
+          prop
+        )
+      )
+        continue;
+
+      var val;
+      try {
+        val = window[prop];
+      } catch (e) {
+        continue;
+      }
+      if (val === null || val === undefined) continue;
+
+      var matches = sensitivePatterns.some(function (p) {
+        return p.test(prop);
+      });
+      if (matches) {
+        var type = typeof val;
+        var displayVal = '';
+        if (type === 'string') displayVal = val.length > 200 ? val.substring(0, 200) + '...' : val;
+        else if (type === 'object' && val !== null)
+          displayVal = '[Object ' + (val.constructor ? val.constructor.name : 'Unknown') + ']';
+        else if (type === 'function') displayVal = '[Function: ' + prop + ']';
+        else displayVal = String(val).substring(0, 200);
+        globals.push({ name: prop, type: type, value: displayVal });
+        scanned++;
+      }
+    }
+
+    postResult({ storage: storage, globals: globals });
+    return;
+  }
+
+  if (action === 'fingerprint') {
+    var detectedGlobals = [];
+    var versions = {};
+
+    // JS Framework / Library detection
+    var globalChecks = [
+      // Vue
+      {
+        name: 'Vue.js',
+        prop: 'Vue',
+        version: function () {
+          try {
+            return window.Vue && window.Vue.version ? window.Vue.version : null;
+          } catch (e) {
+            return null;
+          }
+        },
+      },
+      { name: 'Vue (devtools)', prop: '__VUE_DEVTOOLS_GLOBAL_HOOK__' },
+      { name: 'Vue Router', prop: '__VUE_ROUTER__' },
+      // React
+      { name: 'React', prop: 'React' },
+      { name: 'ReactDOM', prop: 'ReactDOM' },
+      { name: 'React DevTools', prop: '__REACT_DEVTOOLS_GLOBAL_HOOK__' },
+      // Angular
+      { name: 'Angular (ng)', prop: 'ng' },
+      { name: 'Angular', prop: 'angular' },
+      { name: 'Angular (zone)', prop: 'Zone' },
+      // jQuery
+      {
+        name: 'jQuery',
+        prop: 'jQuery',
+        version: function () {
+          try {
+            return window.jQuery && window.jQuery.fn && window.jQuery.fn.jquery
+              ? window.jQuery.fn.jquery
+              : null;
+          } catch (e) {
+            return null;
+          }
+        },
+      },
+      {
+        name: 'jQuery ($)',
+        prop: '$',
+        version: function () {
+          try {
+            if (window.$ && window.$.fn && window.$.fn.jquery && !window.jQuery)
+              return window.$.fn.jquery;
+            return null;
+          } catch (e) {
+            return null;
+          }
+        },
+      },
+      // Bootstrap
+      { name: 'Bootstrap', prop: 'bootstrap' },
+      // Lodash
+      {
+        name: 'Lodash',
+        prop: 'lodash',
+        version: function () {
+          try {
+            return window.lodash && window.lodash.VERSION ? window.lodash.VERSION : null;
+          } catch (e) {
+            return null;
+          }
+        },
+      },
+      {
+        name: 'Lodash (_)',
+        prop: '_',
+        version: function () {
+          try {
+            if (window._ && window._.VERSION && !window.lodash) return window._.VERSION;
+            return null;
+          } catch (e) {
+            return null;
+          }
+        },
+      },
+      // Moment
+      { name: 'Moment.js', prop: 'moment' },
+      // Axios
+      { name: 'Axios', prop: 'axios' },
+      // Webpack
+      { name: 'Webpack', prop: '__webpack_require__' },
+      { name: 'Webpack Modules', prop: '__webpack_modules__' },
+      { name: 'Webpack Chunk', prop: '__webpack_chunk_load__' },
+      // Build tools
+      { name: 'Vite', prop: '__vite_plugin_react_preamble_installed__' },
+      { name: 'Parcel', prop: '__parcel__' },
+      // Analytics
+      { name: 'Google Analytics (gtag)', prop: 'gtag' },
+      { name: 'Google Analytics (ga)', prop: 'ga' },
+      { name: 'Google DataLayer', prop: 'dataLayer' },
+      { name: 'Baidu Tongji', prop: '_hmt' },
+      { name: 'CNZZ', prop: '_czc' },
+      // Maps
+      { name: 'AMap (高德)', prop: 'AMap' },
+      { name: 'BMap (百度)', prop: 'BMap' },
+      { name: 'TMap (腾讯)', prop: 'TMap' },
+      { name: 'Google Maps', prop: 'google', sub: 'maps' },
+      // Rich Text Editors
+      { name: 'TinyMCE', prop: 'tinymce' },
+      { name: 'CKEditor', prop: 'CKEDITOR' },
+      { name: 'WangEditor', prop: 'wangEditor' },
+      // UI Frameworks
+      { name: 'Ant Design', prop: 'antd' },
+      { name: 'Element UI', prop: 'ELEMENT' },
+      { name: 'Element Plus', prop: 'ElementPlus' },
+      { name: 'Vuetify', prop: 'Vuetify' },
+      { name: 'iView/ViewUI', prop: 'iview' },
+      // Monitoring
+      { name: 'Sentry', prop: 'Sentry' },
+      // Chart Libraries
+      { name: 'ECharts', prop: 'echarts' },
+      { name: 'Chart.js', prop: 'Chart' },
+      { name: 'D3.js', prop: 'd3' },
+      { name: 'Highcharts', prop: 'Highcharts' },
+      // Crypto
+      { name: 'CryptoJS', prop: 'CryptoJS' },
+      { name: 'jsencrypt', prop: 'JSEncrypt' },
+      { name: 'Forge', prop: 'forge' },
+      // Utils
+      { name: 'Day.js', prop: 'dayjs' },
+      { name: 'Numeral.js', prop: 'numeral' },
+      // Social SDKs
+      { name: 'WeChat JS-SDK', prop: 'wx' },
+      { name: 'WeChat Bridge', prop: 'WeixinJSBridge' },
+      { name: 'Alipay JSAPI', prop: 'AlipayJSBridge' },
+      // Mobile frameworks
+      { name: 'Capacitor', prop: 'Capacitor' },
+      { name: 'Cordova', prop: 'cordova' },
+      // Other
+      { name: 'Socket.IO', prop: 'io', sub: 'Socket' },
+      { name: 'GraphQL', prop: 'graphql' },
+      { name: 'NProgress', prop: 'NProgress' },
+      { name: 'anime.js', prop: 'anime' },
+      { name: 'Swiper', prop: 'Swiper' },
+      { name: 'AOS', prop: 'AOS' },
+    ];
+
+    globalChecks.forEach(function (check) {
+      try {
+        var target = window;
+        if (check.sub) {
+          target = target[check.prop];
+          if (!target) return;
+          target = target[check.sub];
+        } else {
+          target = target[check.prop];
+        }
+        if (target === undefined || target === null) return;
+
+        var version = null;
+        if (check.version) version = check.version();
+        detectedGlobals.push(check.name);
+        if (version) versions[check.name] = version;
+      } catch (e) {
+        /* ignore */
+      }
+    });
+
+    // Cookies
+    var cookies = '';
+    try {
+      cookies = document.cookie || '';
+    } catch (e) {
+      /* ignore */
+    }
+
+    // body className
+    var classNames = '';
+    try {
+      if (document.body) classNames = document.body.className || '';
+    } catch (e) {
+      /* ignore */
+    }
+
+    // Element IDs (max 500)
+    var ids = [];
+    try {
+      var allElements = document.querySelectorAll('[id]');
+      var idSet = {};
+      for (var ei = 0; ei < allElements.length && ids.length < 500; ei++) {
+        var eid = allElements[ei].id;
+        if (eid && !idSet[eid]) {
+          idSet[eid] = true;
+          ids.push(eid);
+        }
+      }
+    } catch (e) {
+      /* ignore */
+    }
+
+    postResult({
+      globals: detectedGlobals,
+      versions: versions,
+      cookies: cookies,
+      classNames: classNames,
+      ids: ids.join(','),
+    });
+    return;
+  }
+
+  // Unknown action — no-op
+  postResult({ error: 'Unknown action: ' + action });
+})();

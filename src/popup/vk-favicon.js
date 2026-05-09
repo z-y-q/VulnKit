@@ -267,6 +267,10 @@ async function extractFavicon() {
 
     const response = await new Promise(function (resolve) {
       chrome.runtime.sendMessage({ type: 'FETCH_IMAGE', url: resolvedUrl }, function (resp) {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
         resolve(resp);
       });
     });

@@ -26,6 +26,7 @@
     'cors.html',
     'subdomain.html',
     'source-loader.html',
+    'sniff.html',
   ];
 
   const appMain = document.getElementById('app-main');

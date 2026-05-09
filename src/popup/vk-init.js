@@ -22,6 +22,7 @@ import {
   initJsSearchAndTraverse,
   initSecurityDetectors,
   initNetworkTools,
+  initSniff,
   initStateRestoration,
 } from './vk-init-detectors.js';
 
@@ -95,6 +96,7 @@ async function initApp() {
   initJsSearchAndTraverse();
   initSecurityDetectors();
   initNetworkTools();
+  initSniff();
   initStateRestoration();
   initThemeAndPayload();
   initXssAndSourcemap();

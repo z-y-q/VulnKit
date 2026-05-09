@@ -513,6 +513,10 @@ utils.fetchWithTimeout = function (url, timeoutMs) {
       { type: 'FETCH_URL', url: url, timeout: timeoutMs },
       function (resp) {
         clearTimeout(timer);
+        if (chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
         resolve(resp || null);
       }
     );
