@@ -1,6 +1,6 @@
 # 灵眸 v6.0 使用说明
 
-Chrome 渗透测试辅助工具包，集成 20 个功能模块，覆盖编码解码、加密解密、Payload 工具、信息收集、资产测绘、Vue 权限绕过、XSS 扫描、Source Map 分析、RuoYi 路由检测、WAF/CORS/子域名扫描等常见安全测试场景。
+Chrome 渗透测试辅助工具包，集成 22 个功能模块，覆盖编码解码、加密解密、Payload 工具、信息收集、资产测绘、网站嗅探、Vue 权限绕过、XSS 扫描、Source Map 分析、RuoYi 路由检测、WAF/CORS/子域名扫描等常见安全测试场景。
 
 ---
 
@@ -9,27 +9,27 @@ Chrome 渗透测试辅助工具包，集成 20 个功能模块，覆盖编码解
 - [安装](#安装)
 - [项目结构](#项目结构)
 - [编码工具](#1-编码工具)
-- [加密解密](#2-加密解密)
-- [图标识别](#3-图标识别)
-- [信息收集](#4-信息收集)
-- [资产测绘](#5-资产测绘)
-- [链接提取](#6-链接提取)
-- [URL 多开](#7-url-多开)
-- [历史档案](#8-历史档案)
-- [EXIF 查看](#9-exif-查看)
-- [请求伪造](#10-请求伪造)
-- [Vue 分析（重点）](#11-vue-分析)
-- [JS 控制](#12-js控制)
-- [Payload 工具](#13-payload-工具)
-- [XSS 扫描](#14-xss-扫描)
-- [Source Map 分析](#15-source-map-分析)
-- [RuoYi 路由](#16-ruoyi-路由)
-- [WAF 检测](#17-waf-检测)
+- [图标识别](#2-图标识别)
+- [信息收集](#3-信息收集)
+- [资产测绘](#4-资产测绘)
+- [链接提取](#5-链接提取)
+- [URL 多开](#6-url-多开)
+- [历史档案](#7-历史档案)
+- [EXIF 查看](#8-exif-查看)
+- [请求伪造](#9-请求伪造)
+- [Vue 分析（重点）](#10-vue-分析)
+- [JS 控制](#11-js控制)
+- [Payload 工具](#12-payload-工具)
+- [XSS 扫描](#13-xss-扫描)
+- [Source Map 分析](#14-source-map-分析)
+- [RuoYi 路由](#15-ruoyi-路由)
+- [WAF 检测](#16-waf-检测)
+- [Cookie 审计](#17-cookie-审计)
 - [CORS 检测](#18-cors-检测)
 - [子域名枚举](#19-子域名枚举)
-- [Cookie 审计](#20-cookie-审计)
-- [React/Angular 检测](#21-reactangular-检测)
-- [Source Loader](#22-source-loader)
+- [React/Angular 检测](#20-reactangular-检测)
+- [Source Loader](#21-source-loader)
+- [网站嗅探](#22-网站嗅探)
 - [权限说明](#权限说明)
 - [常见问题](#常见问题)
 
@@ -43,18 +43,19 @@ src/
 ├── background/
 │   └── background.js              # Service Worker，消息中转、请求头注入、Cookie 代理
 ├── content/
-│   └── vk-content.js              # Content Script，右键菜单处理
+│   └── vk-content.js              # Content Script，右键菜单处理、API 流量拦截
 ├── inject/                        # MAIN world 注入脚本（自包含 IIFE）
-│   ├── vue-detect.js              # Vue 实例检测 + 路由/Store 读取
+│   ├── vue-detect.js              # Vue 实例检测 + 路由/Store/守卫读取
 │   ├── vue-store-explorer.js      # Pinia/Vuex Store 遍历导出
 │   ├── ruoyi-route-hook.js        # RuoYi 动态路由拦截
 │   ├── react-detect.js            # React 实例检测
 │   ├── angular-detect.js          # Angular 实例检测
-│   └── sourcemap-detect.js        # Source Map 文件探测 + 下载
+│   ├── sourcemap-detect.js        # Source Map 文件探测 + 下载
+│   └── page-inspect.js            # 页面结构检测辅助
 ├── popup/
 │   ├── popup.html                 # Shell：头部 + 标签栏 + 状态栏，面板由 JS 加载
-│   ├── panel-loader.js            # 并行加载 20 个面板 HTML 片段到 #app-main
-│   ├── panels/                    # 面板 HTML 片段（21 个文件）
+│   ├── panel-loader.js            # 并行加载 22 个面板 HTML 片段到 #app-main
+│   ├── panels/                    # 面板 HTML 片段（22 个文件）
 │   │   ├── encoding.html          # 编码工具 + 加密解密
 │   │   ├── favicon-gather.html    # 图标识别 + 信息收集 + HaE 规则
 │   │   ├── rules-modal.html       # HaE 规则弹窗
@@ -75,21 +76,22 @@ src/
 │   │   ├── cookie-audit.html      # Cookie 审计
 │   │   ├── react.html             # React 检测
 │   │   ├── angular.html           # Angular 检测
-│   │   └── source-loader.html     # Source Loader
+│   │   ├── source-loader.html     # Source Loader
+│   │   └── sniff.html             # 网站嗅探（技术指纹 + 泄露扫描）
 │   │
 │   ├── vk-namespace.js            # ES module 入口：全局工具函数 + utilsProxy
 │   ├── vk-init.js                 # 应用入口，加载设置并调用初始化函数
 │   ├── vk-init-panels.js          # 面板初始化（编码/资产/收集/EXIF/伪造/Payload/SourceMap/状态栏）
-│   ├── vk-init-detectors.js       # 检测器初始化（Vue/JS控制/安全检测/网络工具/状态恢复）
+│   ├── vk-init-detectors.js       # 检测器初始化（Vue/JS控制/安全检测/网络工具/嗅探/状态恢复）
 │   │
 │   ├── vk-encoding.js             # 编码/解码
 │   ├── vk-jwt.js                  # JWT 解析
 │   ├── vk-crypto.js               # 加密解密（AES/DES/RC4/SM2/SM4/RSA/Bcrypt）
 │   ├── vk-favicon.js              # 图标识别 + MurmurHash3
 │   ├── vk-hae-rules.js            # HaE 安全规则管理
-│   ├── vk-hae-default-rules.js    # HaE 默认规则数据
+│   ├── vk-hae-default-rules.js    # HaE 默认规则数据（6 组 53 条）
 │   ├── vk-gather.js               # 信息收集（API/域名/敏感信息/IP/注释）
-│   ├── vk-gather-traffic.js       # API 流量捕获（XHR/Fetch 拦截）
+│   ├── vk-gather-traffic.js       # API 流量捕获（XHR/Fetch 拦截 + 实时展示）
 │   ├── vk-asset.js                # 资产测绘（FOFA/ZoomEye/Shodan）
 │   ├── vk-links.js                # 链接提取
 │   ├── vk-multiurl.js             # URL 批量多开
@@ -104,6 +106,14 @@ src/
 │   ├── vk-xss-data.js             # XSS 扫描载荷、Sink 模式、严重性配置
 │   ├── vk-xss-sinks.js            # DOM Sink 分析（document.write/innerHTML/src 等）
 │   │
+│   ├── vk-leak-rules.js           # 泄露扫描规则库（81 条源码规则 + 5 条 DOM 规则）
+│   ├── vk-leakscan-scanner.js     # 泄露扫描引擎（validate 验证 + 上下文分析）
+│   ├── vk-leak-render.js          # 泄露扫描结果渲染
+│   ├── vk-sniff.js                # 网站嗅探 barrel（统一导出）
+│   ├── vk-sniff-state.js          # 嗅探指纹数据库（97 项技术 / 19 个分类）
+│   ├── vk-sniff-scanner.js        # 嗅探扫描引擎（DOM + Runtime + Header 信号采集）
+│   ├── vk-sniff-render.js         # 嗅探结果渲染
+│   │
 │   ├── vk-sourcemap.js            # Source Map barrel（统一导出）
 │   ├── vk-sourcemap-state.js      # Source Map 共享状态
 │   ├── vk-sourcemap-phase1.js     # Phase 1: MAIN world Webpack 运行时检测
@@ -114,8 +124,8 @@ src/
 │   ├── vk-sourcemap-actions.js    # Source Map 批量操作（导出/下载/DevTools）
 │   │
 │   ├── vk-vue.js                  # Vue barrel（统一导出）
-│   ├── vk-vue-state.js            # Vue 共享状态
-│   ├── vk-vue-detect.js           # Vue 框架检测 + 路由/守卫绕过
+│   ├── vk-vue-state.js            # Vue 共享状态 + sub-tab 切换
+│   ├── vk-vue-detect.js           # Vue 框架检测 + 路由守卫绕过 + 备份恢复 + 智能跳转
 │   ├── vk-vue-perm.js             # Vue 权限菜单拦截 + 管理员提权
 │   ├── vk-vue-perm-inject.js      # 权限菜单注入序列化函数
 │   ├── vk-vue-compare.js          # 路由与菜单对比 + 隐藏路由发现
@@ -138,7 +148,7 @@ src/
 │   ├── vk-source-loader.js        # Source Loader（源码加载到 DevTools Sources）
 │   └── lib/                       # 第三方库（crypto-js, jsrsasign, sm2, sm4, bcrypt, exifr）
 ├── styles/
-│   ├── popup/                     # Popup 样式（20 个文件，按模块拆分）
+│   ├── popup/                     # Popup 样式（21 个文件，按模块拆分）
 │   │   ├── base.css               # 全局样式、暗色变量、Toast、确认弹窗、无障碍
 │   │   ├── favicon.css            # 图标识别
 │   │   ├── info-gather.css        # 信息收集
@@ -158,7 +168,8 @@ src/
 │   │   ├── cookie-audit.css       # Cookie 审计
 │   │   ├── react.css              # React 检测
 │   │   ├── angular.css            # Angular 检测
-│   │   └── source-loader.css      # Source Loader
+│   │   ├── source-loader.css      # Source Loader
+│   │   └── sniff.css              # 网站嗅探 + 泄露扫描
 │   └── options.css                # 选项页样式
 └── options/
     ├── options.html               # 选项页
@@ -246,23 +257,30 @@ src/
 
 集成 HaE（Hunt Executive）安全分析规则引擎，支持自定义规则管理和导入。
 
-- **内置规则** — 包含 SQL 注入、XSS、SSRF、信息泄露、逻辑漏洞等分类
+**内置规则（6 组 53 条）：**
+
+| 分组 | 规则数 | 说明 |
+|------|--------|------|
+| Fingerprint | 7 | Shiro、JWT、Swagger UI、Ueditor、Druid、PDF.js、Vite DevMode |
+| Maybe Vulnerability | 7 | Java 反序列化、调试参数、URL As Value、上传表单、DoS 参数、敏感文件 |
+| Basic Information | 5 | 邮箱、身份证、手机号、内网 IP、MAC 地址 |
+| Sensitive Information | 10 | 云厂商 Key、Windows 路径、密码字段、企微 Key、JDBC 连接、Authorization 头 |
+| JS Sensitive Info | 15 | AWS/GitHub/Slack/Stripe/Google/Twilio/Azure 密钥、私钥、硬编码密码、JWT |
+| Other | 8 | Linkfinder、Source Map、Router Push、所有 URL、302 Location、S3 密钥 |
+
 - **规则管理** — 按分组启用/禁用规则，支持导入/导出/恢复默认
 - **流量分析** — 实时拦截 XHR/Fetch 请求，匹配 HaE 规则高亮显示
-
-**使用方法：**
-1. 在目标页面打开插件
-2. 点击对应类别的「提取」按钮
-3. 结果逐条显示，可复制
-4. 点击「规则」按钮打开规则管理面板
 
 ### API 流量捕获
 
 实时拦截页面中的 XHR/Fetch 请求，记录 API 调用。
 
+**功能：**
 - **开始/停止** — 动态注入拦截器，捕获网络请求
+- **请求详情** — 记录方法、URL、状态码、Content-Type、耗时、请求/响应体、请求头
 - **方法筛选** — 按 GET/POST/PUT/DELETE 筛选
-- **状态码筛选** — 按 200/301/403/500 等筛选
+- **状态码筛选** — 按状态码分类筛选（2xx 绿色 / 3xx 橙色 / 4xx+ 红色）
+- **自动去重** — 按 `url + method` 去重
 - **导出** — 导出捕获的 API 列表
 
 ---
@@ -412,11 +430,20 @@ src/
 - **Store 实例** — 是否使用了 Vuex 或 Pinia 状态管理
 - **路由列表** — 导出所有路由路径（包括动态添加的 `router.addRoute()` 路由）
 - **路由元信息** — 显示 `meta.roles`、`meta.permissions`、`meta.hidden` 等权限相关字段
+- **守卫统计** — 显示 `beforeGuards`、`afterGuards`、`beforeResolveGuards` 各自数量（Vue 2/3 双适配）
+- **权限标记** — 每条路由标注认证要求（`requiresAuth` 等正则匹配 17 种 key）、`beforeEnter` 钩子、敏感路径
 
 **相关按钮：**
-- **检测 Vue** — 执行检测
-- **导出路由** — 复制所有路由路径到剪贴板
-- **绕过路由守卫** — 注入脚本禁用 `router.beforeEach` 中的权限检查
+
+| 按钮 | 功能 |
+|------|------|
+| **检测 Vue** | 执行检测 |
+| **导出路由** | 复制所有路由路径到剪贴板 |
+| **绕过路由守卫** | 清除全局导航守卫（操作前自动备份） |
+| **关闭 Auth** | 将所有路由的认证标记设为 `false`（操作前自动备份） |
+| **恢复备份** | 一键还原守卫和认证标记到备份状态 |
+| **路由搜索** | 实时搜索过滤路由树（按 path/name 匹配，200ms 防抖） |
+| **一键跳转** | 临时绕过守卫 + 关闭 Auth → router.push 导航 → 3 秒后自动恢复 |
 
 ### 10.2 权限菜单（核心功能）
 
@@ -466,7 +493,7 @@ src/
 
 #### 自动遍历（配合 Burpsuite 抓包）
 
-自动逐个通过 `$router.push()` 访问路由，配合 Burpsuite 抓包检测未授权访问。
+自动逐个通过 `$router.push()` 访问路由，配合 Burpsuite 抓包检测未授权访问。对参数化路由（`:id`）自动生成探测 URL。
 
 ### 10.5 Store 探索器
 
@@ -596,21 +623,28 @@ PHP 一句话木马和混淆 WebShell：
 ### 13.1 反射型 XSS 检测
 
 **工作流程：**
-1. **载荷采集** — 自动从 Payload 库选择载荷
-2. **参数注入** — 扫描页面中的表单和链接参数
-3. **反射验证** — 逐个注入载荷并检查是否在响应中反射
-4. **结果筛选** — 支持按状态（反射/未反射/可疑）和关键词过滤
+1. **参数采集** — 从 DOM（链接/表单/URL 参数）+ AJAX 拦截（XHR/Fetch Hook，30 秒倒计时）收集输入点
+2. **载荷注入** — 选择载荷后对每个输入点注入
+3. **反射验证** — 逐个注入载荷并检查是否在响应中反射，分析反射上下文（script 标签 / HTML 属性 / 标签注入 / 纯文本）
+4. **结果筛选** — 支持按来源（link/form/url/ajax）和关键词过滤
 
 **功能：**
-- **开始拦截** — 劫持表单提交，记录所有参数输入点
-- **批量采集** — 自动发现页面中的输入点并采集载荷
-- **验证反射** — 对每个输入点注入 XSS 载荷并检测反射
-- **批量打开** — 在新标签页中打开所有可疑的 XSS 点
-- **导出** — 导出检测结果
+- **DOM 采集** — 提取页面中所有链接参数、表单字段、URL Query String
+- **AJAX 拦截** — Hook XHR.open/send 和 window.fetch，捕获动态提交的参数（JSON body 自动提取 `parent.child` 格式）
+- **批量验证** — 逐个发送载荷并检测反射，自动分析反射上下文
+- **批量打开** — GET 参数新标签页打开，POST 参数自动创建隐藏表单提交
+- **载荷编码** — 支持原始 / URL 编码 / HTML 实体 / Base64 四种编码方式
+- **导出** — 导出检测结果为 CSV
 
 ### 13.2 DOM Sink 分析
 
 分析页面中危险的 DOM Sink 点，发现潜在的 DOM XSS。
+
+**检测范围：**
+- 内联 `<script>` 标签
+- 外部 JS 文件
+- 事件处理器属性（`onclick`、`onerror`、`onload` 等）
+- `javascript:` 伪协议链接
 
 **检测的 Sink 类型：**
 
@@ -625,6 +659,8 @@ PHP 一句话木马和混淆 WebShell：
 | `Function()` | 高 | 动态创建函数 |
 | `location` 赋值 | 中 | URL 跳转 |
 | `src`/`href` 赋值 | 中 | 资源加载 |
+
+**评分机制：** 每个 Sink 根据来源（内联/外部/事件处理器）和是否存在安全过滤（DOMPurify、escape 等）计算风险分值（1-10），自动降分已知净化器。
 
 **使用方法：** 点击「分析 DOM 汇点」扫描当前页面中的所有危险 Sink。
 
@@ -657,7 +693,11 @@ PHP 一句话木马和混淆 WebShell：
 - `request({ url: '/api/...' })` 调用
 - 字符串中的 URL 模式
 
-### 14.3 批量操作
+### 14.3 安全发现
+
+基于泄露规则库扫描模块源码，发现硬编码密钥、加密漏洞、PII 泄露等问题（复用泄露扫描的 81 条规则）。
+
+### 14.4 批量操作
 
 - **复制路径** — 复制所有模块路径
 - **生成树** — 生成模块依赖树
@@ -759,7 +799,30 @@ RuoYi 后台管理系统的路由分析与权限测试工具。发现被权限�
 
 ---
 
-## 17. CORS 检测
+## 17. Cookie 审计
+
+审计当前网站 Cookie 的安全性。
+
+**检查项：**
+
+| 检查项 | 说明 | 风险等级 |
+|--------|------|---------|
+| `Secure` 缺失 | Cookie 可通过 HTTP 传输 | 高 |
+| `HttpOnly` 缺失 | Cookie 可被 JavaScript 读取（XSS 窃取） | 高 |
+| `SameSite` 缺失/宽松 | Cookie 可在跨站请求中发送（CSRF） | 中 |
+| `Path` 过宽 | Cookie 在过多路径下可访问 | 低 |
+| `Domain` 过宽 | Cookie 在子域名间共享 | 低 |
+| 敏感名称 | Session ID / Token 等敏感 Cookie 未充分保护 | 高 |
+
+**功能：**
+- 一键审计
+- 按严重程度筛选
+- 搜索结果
+- 复制/导出结果
+
+---
+
+## 18. CORS 检测
 
 扫描目标网站 API 的 CORS（跨域资源共享）配置。
 
@@ -782,7 +845,7 @@ RuoYi 后台管理系统的路由分析与权限测试工具。发现被权限�
 
 ---
 
-## 18. 子域名枚举
+## 19. 子域名枚举
 
 收集目标域名的子域名信息。
 
@@ -796,29 +859,6 @@ RuoYi 后台管理系统的路由分析与权限测试工具。发现被权限�
 
 **功能：**
 - 按来源筛选
-- 搜索结果
-- 复制/导出结果
-
----
-
-## 19. Cookie 审计
-
-审计当前网站 Cookie 的安全性。
-
-**检查项：**
-
-| 检查项 | 说明 | 风险等级 |
-|--------|------|---------|
-| `Secure` 缺失 | Cookie 可通过 HTTP 传输 | 高 |
-| `HttpOnly` 缺失 | Cookie 可被 JavaScript 读取（XSS 窃取） | 高 |
-| `SameSite` 缺失/宽松 | Cookie 可在跨站请求中发送（CSRF） | 中 |
-| `Path` 过宽 | Cookie 在过多路径下可访问 | 低 |
-| `Domain` 过宽 | Cookie 在子域名间共享 | 低 |
-| 敏感名称 | Session ID / Token 等敏感 Cookie 未充分保护 | 高 |
-
-**功能：**
-- 一键审计
-- 按严重程度筛选
 - 搜索结果
 - 复制/导出结果
 
@@ -859,18 +899,89 @@ RuoYi 后台管理系统的路由分析与权限测试工具。发现被权限�
 
 ---
 
+## 22. 网站嗅探
+
+识别网站技术栈和敏感信息泄露，分为 2 个子标签。
+
+### 22.1 技术指纹
+
+识别网站使用的全部技术栈，覆盖 19 个分类、97 项技术。
+
+**信号采集：**
+- **DOM 信号** — meta 标签、body HTML、script src 属性
+- **Runtime 信号** — JS 全局变量、版本号、Cookie、CSS 类名、元素 ID
+- **Header 信号** — HTTP 响应头（通过 Background Service Worker 获取）
+
+**技术分类：**
+
+| 分类 | 示例技术 |
+|------|---------|
+| CMS | WordPress、Drupal、Joomla、DedeCMS |
+| Web 服务器 | Nginx、Apache、IIS、OpenResty |
+| 框架 | Laravel、Django、Express、Spring Boot |
+| CDN | Cloudflare、阿里云 CDN、腾讯云 CDN、Fastly |
+| JS 框架 | Vue、React、Angular、Svelte、jQuery |
+| JS 库 | Bootstrap、Tailwind、Lodash、Axios、Chart.js |
+| UI 框架 | Element UI/Plus、Ant Design、Vuetify |
+| 分析 | 百度统计、Google Analytics、CNZZ |
+| 地图 | 高德地图、百度地图、腾讯地图、Google Maps |
+| 富文本编辑器 | TinyMCE、CKEditor、Quill、WangEditor |
+| 图表库 | ECharts、Chart.js、D3.js、AntV |
+| 加密库 | CryptoJS、jsrsasign、sm-crypto |
+| 监控 | Sentry、Datadog、New Relic |
+| 构建工具 | Vite、Webpack、Rollup |
+| 社交 SDK | 微信 JS-SDK、支付宝 JSAPI、Facebook SDK |
+| 移动框架 | uni-app、Capacitor、Cordova |
+| 云服务 | 阿里云 OSS/COS、腾讯云 COS、AWS S3 |
+| 安全头 | CSP、X-Frame-Options、HSTS |
+| 其他 | Shiro、Swagger UI、Druid、PDF.js |
+
+**功能：**
+- 分类过滤按钮，快速定位
+- 点击技术标签展开查看证据详情（来源 + 匹配文本）
+- 一键复制/导出 JSON
+
+### 22.2 泄露扫描
+
+深度扫描页面 JS 源码和 DOM，发现敏感信息泄露。基于 AegisScope 规则库，共 86 条规则。
+
+**规则分类：**
+
+| 分类 | 规则数 | 检测内容 |
+|------|--------|---------|
+| 密钥凭证 (secret) | ~48 | AWS/GCP/Azure/Stripe/Slack/Twilio/Google 等云平台 API Key、JWT、PEM 私钥、Session Token、数据库连接串 |
+| 加密漏洞 (crypto-vuln) | ~11 | AES ECB 模式、硬编码密钥/IV、MD5/SHA1 弱哈希、DES/RC4 弱算法、RSA PKCS#1v15、Math.random 不安全随机、alg=none |
+| 硬编码凭证 (hardcode) | 2 | 硬编码管理员账号、硬编码密码 |
+| 个人信息 (pii) | 3 | 中国身份证号、银行卡号（含 Luhn 校验）、手机号 |
+| 信息暴露 (exposure) | ~17 | 内网 IP、内网域名、Source Map 引用、.git 暴露、debugger 残留、console.log 残留、CORS 通配符、CSP unsafe、eval/innerHTML、localStorage 密钥、Swagger 端点、Spring Actuator、备份文件、环境变量引用 |
+
+**规则特性：**
+- **Shannon 熵分析** — 检测 Base64 字符串是否为真实密钥而非占位符
+- **上下文感知验证** — 检测密钥附近 ±300 字符是否出现加密 API 调用（`crypto`、`createCipher` 等），减少误报
+- **动态严重性调整** — validate 函数可根据上下文提升/降低严重性和置信度
+- **DOM 规则** — 额外 5 条 DOM 检测规则（HTML 注释中的密钥、邮箱泄露、隐藏表单字段、data-* 属性、srcdoc）
+
+**功能：**
+- 一键深度扫描
+- 严重性摘要（严重/高危/中危/低危/信息统计）
+- 按分类过滤
+- 展开查看详情（描述、利用方式、修复建议、完整值）
+- 一键复制/导出 JSON
+
+---
+
 ## 权限说明
 
 | 权限 | 用途 |
 |------|------|
 | activeTab | 访问当前标签页内容 |
 | storage | 保存用户配置和缓存数据 |
-| clipboardWrite | 复制内容到剪贴板 |
 | scripting | 注入脚本到页面（Vue 分析、JS 控制、Source Map 等核心功能） |
 | contextMenus | 右键菜单快捷操作 |
-| declarativeNetRequest | 修改请求头（UA / Referer / 自定义 Header） |
+| declarativeNetRequestWithHostAccess | 修改请求头（UA / Referer / 自定义 Header） |
 | cookies | 读取和修改 Cookie |
 | downloads | 下载文件（Source Map 源码、导出报告等） |
+| host_permissions: `<all_urls>` | 访问所有网站的内容（嗅探、检测、注入等） |
 
 ---
 
@@ -889,7 +1000,10 @@ A: 必须在点击「开始拦截」后 **刷新页面**，拦截器需要在页
 A: 尝试手动刷新页面。如果仍然无效，可能是应用使用了不同的状态管理方式，可在 JS 搜索中搜索 `store` 或 `commit` 了解应用的 Store 结构。
 
 **Q: 自动遍历时页面跳转报错？**
-A: 部分路由可能需要特定参数（如 `/user/:id`），这类动态路由无法直接访问，属于正常现象。
+A: 部分路由可能需要特定参数（如 `/user/:id`），这类动态路由会自动生成探测 URL（`:id` → `1`），属于正常现象。
+
+**Q: 「一键跳转」没有反应？**
+A: 确保目标页面是 Vue 应用且 Router 已初始化。跳转操作会临时绕过守卫并在 3 秒后自动恢复，如果路由路径不存在会 fallback 到 URL 跳转。
 
 **Q: RSA 生成密钥对时卡住？**
 A: RSA 使用浏览器原生 `crypto.subtle` API（异步），不会阻塞 UI。生成大位数密钥（4096 位）可能需要几秒钟，按钮会显示「生成中...」。
@@ -905,3 +1019,9 @@ A: 部分应用可能不使用 Webpack，或使用了自定义的模块加载方
 
 **Q: WAF 检测结果不准确？**
 A: WAF 检测基于特征匹配，可能存在误报。建议结合 Burpsuite 手动验证。
+
+**Q: 泄露扫描误报太多？**
+A: 泄露扫描已内置 Shannon 熵分析和上下文验证来减少误报。对于特定的误报项，可以点击展开查看详情判断。规则库持续优化中。
+
+**Q: 网站嗅探检测不到某些技术？**
+A: 嗅探依赖页面可见的 DOM 信号、全局变量和 HTTP 响应头。某些技术可能在后端渲染、CDN 层面实现，前端无法直接检测。
