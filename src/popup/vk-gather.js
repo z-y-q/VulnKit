@@ -316,7 +316,9 @@ async function extractApiFromJsFiles(scriptSrcs, pageUrl) {
   let pageOrigin = '';
   try {
     pageOrigin = new URL(pageUrl).origin;
-  } catch {}
+  } catch (e) {
+    console.debug('URL parse failed in gather', e);
+  }
 
   let filesToFetch = scriptSrcs.filter(function (src) {
     try {
@@ -354,11 +356,15 @@ async function extractApiFromJsFiles(scriptSrcs, pageUrl) {
         if (cleanPath.startsWith('//')) {
           try {
             cleanPath = new URL(`https:${cleanPath}`).pathname;
-          } catch {}
+          } catch (e) {
+            console.debug('URL parse failed for double-slash path', e);
+          }
         } else if (cleanPath.startsWith('http')) {
           try {
             cleanPath = new URL(cleanPath).pathname;
-          } catch {}
+          } catch (e) {
+            console.debug('URL parse failed for http path', e);
+          }
         }
 
         if (!cleanPath || cleanPath.length < 2) continue;
@@ -792,7 +798,9 @@ async function stopApiTraffic() {
   apiTrafficRunning = false;
   const tab = await utils.requireTabId();
   if (tab) {
-    await chrome.tabs.sendMessage(tab.id, { type: 'VK_API_TRAFFIC_STOP' }).catch(function () {});
+    await chrome.tabs.sendMessage(tab.id, { type: 'VK_API_TRAFFIC_STOP' }).catch(function (e) {
+      console.debug('API traffic stop failed', e);
+    });
     await collectApiTraffic();
   }
   utils.toggleBtnPair('gather-api-start-btn', 'gather-api-stop-btn', false);

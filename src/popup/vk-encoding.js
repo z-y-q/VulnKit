@@ -131,7 +131,9 @@ function switchEncodingTab(type) {
       switchEncodingTab._cryptoLoaded = true;
       utils
         .loadLibs(['lib/crypto-js.min.js', 'lib/sm2.js', 'lib/sm4.js', 'lib/bcrypt.min.js'])
-        .catch(function () {});
+        .catch(function (e) {
+          console.debug('crypto libs load failed', e);
+        });
     }
   } else if (type === 'jwt') {
     if (encSection) encSection.classList.add('hidden');

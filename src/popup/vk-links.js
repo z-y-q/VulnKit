@@ -41,7 +41,9 @@ async function extractLinks() {
         let domain = '';
         try {
           domain = new URL(href, pageUrl).hostname;
-        } catch {}
+        } catch (e) {
+          console.debug('URL parse failed in makeLink', e);
+        }
         return {
           href: href,
           text: text,
@@ -59,7 +61,9 @@ async function extractLinks() {
         let domain = '';
         try {
           domain = new URL(href, pageUrl).hostname;
-        } catch {}
+        } catch (e) {
+          console.debug('URL parse failed for anchor', e);
+        }
         links.push({
           href,
           text: (el.textContent || '').trim().substring(0, 60) || el.getAttribute('title') || '',
@@ -93,7 +97,9 @@ async function extractLinks() {
         const method = (el.getAttribute('method') || 'GET').toUpperCase();
         try {
           action = new URL(action, pageUrl).href;
-        } catch {}
+        } catch (e) {
+          console.debug('URL parse failed for form action', e);
+        }
         const inputs = [];
         el.querySelectorAll('input[name],select[name],textarea[name]').forEach(function (inp) {
           inputs.push(inp.getAttribute('name'));

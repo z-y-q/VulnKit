@@ -207,7 +207,9 @@ function stopTraverse() {
       .execInTab(tab.id, function () {
         window.__VULN_TRAVERSE_ACTIVE__ = false;
       })
-      .catch(function () {});
+      .catch(function (e) {
+        console.debug('traverse stop failed', e);
+      });
   });
 }
 

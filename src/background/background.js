@@ -410,7 +410,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               sendResponse({ error: 'Origin mismatch' });
               return true;
             }
-          } catch {}
+          } catch (e) {
+            console.debug('URL origin check failed', e);
+          }
         }
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), message.timeout || 5000);
@@ -637,7 +639,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             ts: Date.now(),
           },
         })
-        .catch(function () {});
+        .catch(function (e) {
+          console.debug('analytics event send failed', e);
+        });
       return false;
 
     case 'REGISTER_RUOYI_HOOK':
@@ -666,7 +670,9 @@ const RUOYI_HOOK_CS_ID = 'ruoyi-route-hook-auto';
 
 async function registerRuoYiHook(origin) {
   try {
-    await chrome.scripting.unregisterContentScripts([RUOYI_HOOK_CS_ID]).catch(function () {});
+    await chrome.scripting.unregisterContentScripts([RUOYI_HOOK_CS_ID]).catch(function (e) {
+      console.debug('unregisterContentScripts failed', e);
+    });
     await chrome.scripting.registerContentScripts([
       {
         id: RUOYI_HOOK_CS_ID,
@@ -700,7 +706,9 @@ chrome.storage.local.get(['ruoyiHookEnabled', 'ruoyiHookOrigin'], function (resu
 chrome.tabs.onRemoved.addListener(function (tabId) {
   chrome.storage.local.get(['ruoyiHookTabId'], function (result) {
     if (result.ruoyiHookTabId === tabId) {
-      chrome.storage.local.remove(['ruoyiHookTabId']).catch(function () {});
+      chrome.storage.local.remove(['ruoyiHookTabId']).catch(function (e) {
+        console.debug('remove ruoyiHookTabId failed', e);
+      });
     }
   });
 });
@@ -754,7 +762,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (!tab?.id) return;
   switch (info.menuItemId) {
     case 'vulnkit-extract-links':
-      chrome.tabs.sendMessage(tab.id, { type: 'CONTEXT_EXTRACT_LINKS' }).catch(function () {});
+      chrome.tabs.sendMessage(tab.id, { type: 'CONTEXT_EXTRACT_LINKS' }).catch(function (e) {
+        console.debug('context extract links failed', e);
+      });
       chrome.storage.local.set({ contextExtractUrl: tab.url || '' }, function () {
         setTimeout(function () {
           chrome.tabs.create({
@@ -775,7 +785,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         if (typeof chrome.action.openPopup === 'function') {
           try {
             chrome.action.openPopup({ windowId: tab.windowId });
-          } catch {}
+          } catch (e) {
+            console.debug('openPopup failed', e);
+          }
         }
       }
       break;

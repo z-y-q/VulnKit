@@ -50,7 +50,9 @@
           augmented: e.data.augmented,
           injected: e.data.injected,
         })
-        .catch(function () {});
+        .catch(function (e) {
+          console.debug('ruoyi hook event forward failed', e);
+        });
       return;
     }
 

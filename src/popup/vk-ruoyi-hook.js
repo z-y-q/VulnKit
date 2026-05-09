@@ -72,7 +72,9 @@ async function installRouteHook() {
       if (origin) {
         chrome.runtime
           .sendMessage({ type: 'REGISTER_RUOYI_HOOK', origin: origin })
-          .catch(function () {});
+          .catch(function (e) {
+            console.debug('register ruoyi hook failed', e);
+          });
       }
       setHookUI(true);
 
@@ -135,7 +137,9 @@ async function installRouteHook() {
     if (origin) {
       chrome.runtime
         .sendMessage({ type: 'REGISTER_RUOYI_HOOK', origin: origin })
-        .catch(function () {});
+        .catch(function (e) {
+          console.debug('register ruoyi hook (reinject) failed', e);
+        });
     }
     setHookUI(true);
     updateWorkflowStep(2);
@@ -171,7 +175,9 @@ async function removeRouteHook() {
         state.hookStatus = 'idle';
       }
       chrome.storage.local.remove(['ruoyiHookTabId', 'ruoyiHookEnabled', 'ruoyiHookOrigin']);
-      chrome.runtime.sendMessage({ type: 'UNREGISTER_RUOYI_HOOK' }).catch(function () {});
+      chrome.runtime.sendMessage({ type: 'UNREGISTER_RUOYI_HOOK' }).catch(function (e) {
+        console.debug('unregister ruoyi hook failed', e);
+      });
 
       setHookUI(false);
       utils.setStatus('ruoyi-hook-status', '钩子已禁用');

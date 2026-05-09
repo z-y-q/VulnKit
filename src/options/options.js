@@ -2,6 +2,14 @@ function $(id) {
   return document.getElementById(id);
 }
 
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 // ====== Toolbar Configuration ======
 
 const DEFAULT_TABS = [
@@ -127,7 +135,7 @@ function renderToolbarConfig() {
         '<label><input type="checkbox"' +
         (tab.visible ? ' checked' : '') +
         '> ' +
-        tab.label +
+        escapeHtml(tab.label) +
         '</label>';
       container.appendChild(item);
     });

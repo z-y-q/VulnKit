@@ -17,49 +17,133 @@ import * as exif from './vk-exif.js';
 import * as history from './vk-history.js';
 import * as spoof from './vk-spoof.js';
 import * as vue from './vk-vue.js';
-import { ruoyiState, detectRuoYi, installRouteHook, removeRouteHook, checkHookStatus,
-  analyzeJsRoutes, applyExtraRoutes, clearExtraRoutes, setAugmentMode,
-  switchRuoYiSubTab, copyRouteJson, copyExtraPaths, toggleSelectAllRoutes,
-  exportCurlCommands, exportHtmlReport, batchProbeRoutes, stopProbe, exportProbeResults,
-  loadApiTraffic, clearApiTraffic, exportApiTraffic, filterApiTraffic,
-  marScanDynamicRoutes, marInjectToRouter, marToggleSelectAll, marCopyHiddenPaths,
+import {
+  ruoyiState,
+  detectRuoYi,
+  installRouteHook,
+  removeRouteHook,
+  checkHookStatus,
+  analyzeJsRoutes,
+  applyExtraRoutes,
+  clearExtraRoutes,
+  setAugmentMode,
+  switchRuoYiSubTab,
+  copyRouteJson,
+  copyExtraPaths,
+  toggleSelectAllRoutes,
+  exportCurlCommands,
+  exportHtmlReport,
+  batchProbeRoutes,
+  stopProbe,
+  exportProbeResults,
+  loadApiTraffic,
+  clearApiTraffic,
+  exportApiTraffic,
+  filterApiTraffic,
+  marScanDynamicRoutes,
+  marInjectToRouter,
+  marToggleSelectAll,
+  marCopyHiddenPaths,
 } from './vk-ruoyi.js';
-import { switchJsCtrlTab, updateJsToggleStatus, disableJs, enableJs,
-  scanAntiDebug, bypassAntiDebug, clearScriptBlock, removeCopyRestrictions,
+import {
+  switchJsCtrlTab,
+  updateJsToggleStatus,
+  disableJs,
+  enableJs,
+  scanAntiDebug,
+  bypassAntiDebug,
+  clearScriptBlock,
+  removeCopyRestrictions,
   setJsBlocked,
 } from './vk-jsctrl.js';
-import { startXssIntercept, stopXssIntercept, renderXssPoints,
-  handleXssHarvest, handleBatchOpenXss, handleVerifyReflection, handleCopyXssUrls,
-  initXssScanPayloadSelect, clearResults as xssClearResults, exportData as xssExportData,
-  setXssSearchText, analyzeDomSinks, xssFilterType, setXssFilterType,
+import {
+  startXssIntercept,
+  stopXssIntercept,
+  renderXssPoints,
+  handleXssHarvest,
+  handleBatchOpenXss,
+  handleVerifyReflection,
+  handleCopyXssUrls,
+  initXssScanPayloadSelect,
+  clearResults as xssClearResults,
+  exportData as xssExportData,
+  setXssSearchText,
+  analyzeDomSinks,
+  xssFilterType,
+  setXssFilterType,
 } from './vk-xss.js';
-import { XSS_DATA, LFI_DATA, WEBSHELL_DATA, CMDREF_DATA,
-  renderPayloadCategories, switchPayloadTab, generateReverseShell,
-  renderAllReverseShells, renderSqliPayloads, applySearch as payloadApplySearch,
+import {
+  XSS_DATA,
+  LFI_DATA,
+  WEBSHELL_DATA,
+  CMDREF_DATA,
+  renderPayloadCategories,
+  switchPayloadTab,
+  generateReverseShell,
+  renderAllReverseShells,
+  renderSqliPayloads,
+  applySearch as payloadApplySearch,
 } from './vk-payload.js';
-import { scanWaf, copyResults as wafCopyResults, exportResults as wafExportResults,
-  filterByStatus as wafFilterByStatus, searchResults as wafSearchResults,
+import {
+  scanWaf,
+  copyResults as wafCopyResults,
+  exportResults as wafExportResults,
+  filterByStatus as wafFilterByStatus,
+  searchResults as wafSearchResults,
 } from './vk-waf.js';
-import { auditCookies, copyResults as cookieAuditCopy, exportResults as cookieAuditExport,
-  filterBySeverity as cookieFilterBySeverity, searchResults as cookieSearchResults,
+import {
+  auditCookies,
+  copyResults as cookieAuditCopy,
+  exportResults as cookieAuditExport,
+  filterBySeverity as cookieFilterBySeverity,
+  searchResults as cookieSearchResults,
 } from './vk-cookie-audit.js';
-import { detectReact, copyResults as reactCopyResults, exportResults as reactExportResults,
+import {
+  detectReact,
+  copyResults as reactCopyResults,
+  exportResults as reactExportResults,
 } from './vk-react.js';
-import { detectAngular, copyResults as angularCopyResults, exportResults as angularExportResults,
+import {
+  detectAngular,
+  copyResults as angularCopyResults,
+  exportResults as angularExportResults,
 } from './vk-angular.js';
-import { scanCors, copyResults as corsCopyResults, exportJson as corsExportJson,
-  filterBySeverity as corsFilterBySeverity, searchResults as corsSearchResults,
+import {
+  scanCors,
+  copyResults as corsCopyResults,
+  exportJson as corsExportJson,
+  filterBySeverity as corsFilterBySeverity,
+  searchResults as corsSearchResults,
 } from './vk-cors.js';
-import { collectSubdomains, extractFromPage, bruteForceDns,
-  copyResults as subdomainCopyResults, exportResults as subdomainExportResults,
-  filterBySource as subdomainFilterBySource, searchResults as subdomainSearchResults,
+import {
+  collectSubdomains,
+  extractFromPage,
+  bruteForceDns,
+  copyResults as subdomainCopyResults,
+  exportResults as subdomainExportResults,
+  filterBySource as subdomainFilterBySource,
+  searchResults as subdomainSearchResults,
 } from './vk-subdomain.js';
-import { loadToSources, copyResults as slCopyResults, clearResults as slClearResults,
+import {
+  loadToSources,
+  copyResults as slCopyResults,
+  clearResults as slClearResults,
 } from './vk-source-loader.js';
-import { smState, scanWebpackModules, copyAllSourcemapPaths, generateSourcemapTree,
-  loadSourcesToDevTools, downloadAllSourcemapSources, backToSourcemapList,
-  copyModuleSource, renderSourcemapModules, analyzeSourcemaps, downloadSingleModule,
-  showApiEndpoints, exportModulesJSON, exportModulesCSV,
+import {
+  smState,
+  scanWebpackModules,
+  copyAllSourcemapPaths,
+  generateSourcemapTree,
+  loadSourcesToDevTools,
+  downloadAllSourcemapSources,
+  backToSourcemapList,
+  copyModuleSource,
+  renderSourcemapModules,
+  analyzeSourcemaps,
+  downloadSingleModule,
+  showApiEndpoints,
+  exportModulesJSON,
+  exportModulesCSV,
 } from './vk-sourcemap.js';
 
 const { getCurrentDomain, getActiveTab } = utils;
@@ -125,7 +209,9 @@ function initMainTabs() {
 
     if (panel === 'exif' && !onTabClick._exifLoaded) {
       onTabClick._exifLoaded = true;
-      utils.loadLibs(['lib/exifr.full.js']).catch(function () {});
+      utils.loadLibs(['lib/exifr.full.js']).catch(function (e) {
+        console.debug('exifr load failed', e);
+      });
     }
   };
   document.querySelectorAll('.tab-btn').forEach(function (btn) {
@@ -175,8 +261,12 @@ function initEncodingJwtCrypto() {
     if (v) utils.copyAndToast(v);
   });
 
-  utils.on('aes-mode', 'change', () => crypto.toggleIvVisibility('aes', 'aes-iv-group', 'aes-mode'));
-  utils.on('des-mode', 'change', () => crypto.toggleIvVisibility('des', 'des-iv-group', 'des-mode'));
+  utils.on('aes-mode', 'change', () =>
+    crypto.toggleIvVisibility('aes', 'aes-iv-group', 'aes-mode')
+  );
+  utils.on('des-mode', 'change', () =>
+    crypto.toggleIvVisibility('des', 'des-iv-group', 'des-mode')
+  );
   utils.on('sm4-mode', 'change', function () {
     const ivG = utils.get('sm4-iv-group');
     if (ivG) {
@@ -382,7 +472,9 @@ function initLinksHistoryMultiUrl() {
   utils.bindPersist('history-match-type');
   utils.bindPersist('history-output-type');
 
-  utils.on('multiurl-input', 'input', () => multiurl.updateMultiurlInfo(multiurl.parseUrls().length));
+  utils.on('multiurl-input', 'input', () =>
+    multiurl.updateMultiurlInfo(multiurl.parseUrls().length)
+  );
   utils.bindClick('multiurl-open-btn', multiurl.handleMultiurlOpen);
   utils.bindClick('multiurl-dedup-btn', multiurl.handleMultiurlDedup);
   utils.bindClick('multiurl-copy-btn', multiurl.copyAllUrls);
@@ -458,7 +550,9 @@ function initLinksHistoryMultiUrl() {
       utils.showToast('没有结果', 'warning');
       return;
     }
-    const urls = history.lastHistoryResults.map(i => i.url).filter(u => u && !u.startsWith('mailto:'));
+    const urls = history.lastHistoryResults
+      .map(i => i.url)
+      .filter(u => u && !u.startsWith('mailto:'));
     if (urls.length === 0) {
       utils.showToast('没有可用的URL', 'warning');
       return;
@@ -989,7 +1083,8 @@ function initXssAndSourcemap() {
   utils.bindClick('sourcemap-detail-back', backToSourcemapList);
   utils.bindClick('sourcemap-copy-src-btn', copyModuleSource);
   utils.bindClick('sourcemap-download-btn', function () {
-    if (smState.sourcemapCurrentModule !== null) downloadSingleModule(smState.sourcemapCurrentModule);
+    if (smState.sourcemapCurrentModule !== null)
+      downloadSingleModule(smState.sourcemapCurrentModule);
   });
   let smSearchTimer = null;
   utils.on('sourcemap-search-input', 'input', function () {

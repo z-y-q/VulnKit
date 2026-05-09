@@ -283,7 +283,9 @@ const permInterceptorFunc = function (MENU_KEYWORDS) {
                     /* ignore */
                   }
                 })
-                .catch(function () {});
+                .catch(function (e) {
+                  console.debug('vue perm inject script failed', e);
+                });
             }
           }
         }
