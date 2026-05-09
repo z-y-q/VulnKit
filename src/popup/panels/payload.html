@@ -2,6 +2,21 @@
     <div id="panel-payload" class="panel">
       <div class="content-card">
         <div class="card-title">Payload 工具</div>
+        <div class="remote-payload-toolbar">
+          <button class="btn btn-sm btn-secondary" id="payload-update-btn">更新远程 Payload</button>
+          <span class="remote-payload-status" id="payload-remote-status"></span>
+          <button class="btn btn-sm btn-outline" id="payload-remote-config-btn" title="配置远程地址">⚙</button>
+        </div>
+        <div class="remote-payload-config hidden" id="payload-remote-config">
+          <div class="form-group">
+            <label>远程 Payload 地址</label>
+            <input type="text" id="payload-remote-url" class="input" placeholder="https://example.com/payloads.json">
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-sm btn-primary" id="payload-remote-save-btn">保存</button>
+            <button class="btn btn-sm btn-outline" id="payload-remote-reset-btn">恢复默认</button>
+          </div>
+        </div>
         <div class="payload-tabs">
           <button class="payload-tab active" data-ptab="xss">XSS</button>
           <button class="payload-tab" data-ptab="sqli">SQL注入</button>
