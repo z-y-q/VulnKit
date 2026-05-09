@@ -516,6 +516,9 @@ async function verifySinglePoint(point, payload, rawPayload) {
     }
     try {
       const resp = await new Promise(function (resolve) {
+        const timer = setTimeout(function () {
+          resolve({ error: 'timeout' });
+        }, 12000);
         chrome.runtime.sendMessage(
           {
             type: 'FETCH_CORS_PROBE',
@@ -526,6 +529,7 @@ async function verifySinglePoint(point, payload, rawPayload) {
             timeout: 10000,
           },
           function (r) {
+            clearTimeout(timer);
             resolve(r || { error: 'no response' });
           }
         );

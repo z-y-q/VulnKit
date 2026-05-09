@@ -9,8 +9,8 @@ const MAX_HEADER_RULES = 20;
 
 // Track active spoof state
 let spoofState = {
-  ua: { enabled: false, current: '' },
-  headers: { xff: '', referer: '', clientIp: '', custom: [] },
+  ua: { enabled: false, current: '', url: '' },
+  headers: { xff: '', referer: '', clientIp: '', custom: [], url: '' },
 };
 
 function persistSpoofState() {
@@ -23,7 +23,7 @@ chrome.storage.local.get(['pentest_spoof'], result => {
     spoofState = result.pentest_spoof;
     // Re-create DNR rules after browser restart
     if (spoofState.ua.enabled && spoofState.ua.current) {
-      addUaRule(null, null, spoofState.ua.current).catch(() => {});
+      addUaRule(null, spoofState.ua.url || null, spoofState.ua.current).catch(() => {});
     }
     if (
       spoofState.headers &&
@@ -32,7 +32,7 @@ chrome.storage.local.get(['pentest_spoof'], result => {
         spoofState.headers.clientIp ||
         (spoofState.headers.custom && spoofState.headers.custom.length > 0))
     ) {
-      addHeaderRules(null, null, spoofState.headers).catch(() => {});
+      addHeaderRules(null, spoofState.headers.url || null, spoofState.headers).catch(() => {});
     }
   }
 });
@@ -116,7 +116,7 @@ async function addHeaderRules(tabId, url, headers) {
     let parsed = new URL(url);
     urlFilter = parsed.hostname + '/*';
   } catch {
-    urlFilter = '*';
+    throw new Error('Invalid URL for header spoof rule');
   }
 
   if (headers.xff) {
@@ -323,7 +323,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'SPOOF_UA':
       if (message.url && message.userAgent) {
-        spoofState.ua = { enabled: true, current: message.userAgent };
+        spoofState.ua = { enabled: true, current: message.userAgent, url: message.url };
         persistSpoofState();
         addUaRule(message.tabId, message.url, message.userAgent)
           .then(() => sendResponse({ success: true }))
@@ -334,7 +334,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'RESET_SPOOF_UA':
-      spoofState.ua = { enabled: false, current: '' };
+      spoofState.ua = { enabled: false, current: '', url: '' };
       persistSpoofState();
       removeUaRule()
         .then(() => sendResponse({ success: true }))
@@ -343,7 +343,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'SPOOF_HEADERS':
       if (message.headers) {
-        spoofState.headers = message.headers;
+        spoofState.headers = Object.assign({}, message.headers, { url: message.url });
         persistSpoofState();
         addHeaderRules(message.tabId, message.url, message.headers)
           .then(() => sendResponse({ success: true }))
@@ -354,7 +354,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'RESET_SPOOF_HEADERS':
-      spoofState.headers = { xff: '', referer: '', clientIp: '', custom: [] };
+      spoofState.headers = { xff: '', referer: '', clientIp: '', custom: [], url: '' };
       persistSpoofState();
       removeAllHeaderRules()
         .then(() => sendResponse({ success: true }))

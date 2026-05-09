@@ -82,7 +82,7 @@ async function detectVue() {
     html += `<div class="vue-info-row"><span class="vue-info-label">Base Path</span><span class="vue-info-value">${utils.escapeHtml(ri.base || '/')}</span></div>`;
     html += `<div class="vue-info-row"><span class="vue-info-label">状态管理</span><span class="vue-info-value">${data.store ? '<span class="vue-badge vue-badge-warn">已检测</span>' : '未检测到'}</span></div>`;
 
-    if (data.router && data.routes.length > 0) {
+    if (data.router && data.routes && data.routes.length > 0) {
       html += renderGuardStats(data.guards, data.version);
       html += renderRouteSummary(data.routes);
       html += `<div class="card-spacing"><div class="vue-route-toolbar"><span class="vue-route-count">路由列表 (${data.routes.length})</span><button class="btn btn-xs btn-outline vue-copy-hist-btn">复制 History URL</button><button class="btn btn-xs btn-outline vue-copy-hash-btn">复制 Hash URL</button></div></div>`;
@@ -586,8 +586,8 @@ async function navigateVueRoute(path) {
       },
       { args: [path], world: 'MAIN' }
     );
-    if (!result.ok) {
-      utils.showToast(`跳转失败: ${result.msg}`, 'error');
+    if (!result || !result.ok) {
+      utils.showToast(`跳转失败: ${result ? result.msg : '执行失败'}`, 'error');
     } else {
       utils.showToast(`正在跳转到 ${path}`, 'success');
     }

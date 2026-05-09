@@ -200,9 +200,9 @@ function classifyPermType(data) {
           };
         }
         return {
-          label: '特殊0开放 - 检测到角色控制字段',
-          cssClass: 'perm-classify-warning',
-          type: 'special-zero',
+          label: '角色控制字段已激活 - ' + key + '=' + String(val),
+          cssClass: 'perm-classify-info',
+          type: 'role-active',
         };
       }
       if (/^type$/i.test(key)) {

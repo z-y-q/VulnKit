@@ -314,8 +314,10 @@ async function autoCaptureRoutes(tabId, hasToken) {
         '/prod-api/getRouters',
         '/api/getRouters',
       ];
-      const tab = await utils.requireTabId();
-      const origin = tab.url ? new URL(tab.url).origin : '';
+      const tab = await chrome.tabs.get(tabId).catch(function () {
+        return null;
+      });
+      const origin = tab && tab.url ? new URL(tab.url).origin : '';
 
       for (let i = 0; i < routerPaths.length; i++) {
         const probeUrl = origin + routerPaths[i];

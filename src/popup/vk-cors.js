@@ -330,7 +330,7 @@ function analyzeResults(results) {
       acma: acma,
       severity: severity,
       findings: findings,
-      statusCode: r.response.status,
+      statusCode: r.response.status || 0,
     });
   });
 

@@ -181,7 +181,7 @@ function renderApiEndpoints(container, endpoints) {
   html += '<div class="react-api-list">';
   endpoints.forEach(function (ep) {
     var isAction = ep.indexOf('[Action]') === 0;
-    var displayUrl = isAction ? ep : ep;
+    var displayUrl = isAction ? ep.substring(8) : ep;
     var copyClass = isAction ? 'react-api-item react-api-action' : 'react-api-item';
     html += '<div class="' + copyClass + '" data-url="' + utils.escapeHtml(displayUrl) + '">';
     html +=

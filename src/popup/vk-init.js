@@ -87,7 +87,7 @@ async function initApp() {
   initSettings(savedState);
   initTabPagination();
   initMainTabs();
-  initEncodingJwtCrypto();
+  initEncodingJwtCrypto(savedState);
   initRsaFaviconAsset();
   initGatherAndRules();
   initLinksHistoryMultiUrl();

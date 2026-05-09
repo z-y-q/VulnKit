@@ -805,13 +805,11 @@ export {
 
 function getScriptUrls() {
   var urls = [];
-  var jsGroup = gatherData['Script Src'] || [];
-  var cssGroup = gatherData['CSS Link'] || [];
-  jsGroup.forEach(function (item) {
-    if (item.value && item.value.startsWith('http')) urls.push(item.value);
-  });
-  cssGroup.forEach(function (item) {
-    if (item.value && item.value.startsWith('http')) urls.push(item.value);
+  var domGroup = gatherData[DOM_GROUP] || [];
+  domGroup.forEach(function (item) {
+    if (item.name === 'script' && item.value && item.value.startsWith('http')) {
+      urls.push(item.value);
+    }
   });
   return urls;
 }

@@ -283,7 +283,7 @@ function sendToMultiUrl() {
   }
   const urls = filtered
     .filter(function (l) {
-      return l.tag === 'a' || l.tag === 'iframe';
+      return (l.tag === 'a' || l.tag === 'iframe') && !l.isMailto;
     })
     .map(function (l) {
       return l.href;

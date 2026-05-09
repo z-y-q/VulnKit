@@ -136,7 +136,7 @@ function initMainTabs() {
   });
 }
 
-function initEncodingJwtCrypto() {
+function initEncodingJwtCrypto(savedState) {
   utils.bindTabSwitch('sub-tab-btn', 'type', encoding.switchEncodingTab);
 
   const encodingBindings = [
@@ -214,7 +214,8 @@ function initEncodingJwtCrypto() {
   crypto.switchCryptoAlgo('aes');
 
   const defaultEncoding = utils.getSetting('defaultEncoding', 'base64');
-  if (defaultEncoding && encoding.ENCODING_NAMES[defaultEncoding]) {
+  const hasSavedSubtab = savedState && savedState['encoding-subtab'];
+  if (!hasSavedSubtab && defaultEncoding && encoding.ENCODING_NAMES[defaultEncoding]) {
     encoding.switchEncodingTab(defaultEncoding);
   }
   const defaultHash = utils.getSetting('defaultHash', 'SHA256');

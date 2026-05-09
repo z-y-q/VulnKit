@@ -158,8 +158,9 @@ function autoFillFromJsPaths() {
     utils.showToast('请先选择一条捕获数据', 'warning');
     return;
   }
+  let parsed;
   try {
-    const parsed = JSON.parse(text);
+    parsed = JSON.parse(text);
   } catch (e) {
     utils.showToast('JSON 格式错误', 'error');
     return;
