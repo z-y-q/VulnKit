@@ -20,7 +20,7 @@ function decodeJwt(token) {
   const sigEl = utils.get('jwt-signature');
   const claimsEl = utils.get('jwt-claims');
 
-  if (!resultEl || !errorEl || !headerEl || !payloadEl || !claimsEl) return;
+  if (!resultEl || !errorEl || !headerEl || !payloadEl || !claimsEl || !sigEl) return;
   resultEl.classList.add('hidden');
   errorEl.classList.add('hidden');
 
@@ -41,8 +41,9 @@ function decodeJwt(token) {
     return;
   }
 
+  let payload = null;
   try {
-    const payload = JSON.parse(base64UrlDecode(parts[1]));
+    payload = JSON.parse(base64UrlDecode(parts[1]));
     payloadEl.textContent = JSON.stringify(payload, null, 2);
   } catch (e) {
     errorEl.textContent = `Payload 解析失败: ${e.message}`;
@@ -179,10 +180,4 @@ function showVerifyResult(el, msg, cls) {
   el.classList.remove('hidden');
 }
 
-export {
-  decodeJwt,
-  clearJwt,
-  copyJwtHeader,
-  copyJwtPayload,
-  verifyJwtSignature,
-};
+export { decodeJwt, clearJwt, copyJwtHeader, copyJwtPayload, verifyJwtSignature };

@@ -154,9 +154,9 @@ function collectSubdomains() {
     const ctUrl = `https://crt.sh/?q=%.${encodeURIComponent(baseDomain)}&output=json`;
     utils.fetchWithTimeout(ctUrl, CT_TIMEOUT_MS).then(function (resp) {
       let ctFailed = false;
-      if (resp && resp.body) {
+      if (resp && resp.data) {
         try {
-          const entries = JSON.parse(resp.body);
+          const entries = JSON.parse(resp.data);
           if (Array.isArray(entries)) {
             entries.forEach(function (entry) {
               let name = (entry.name_value || entry.name || '').trim();

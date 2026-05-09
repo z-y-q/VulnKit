@@ -1,7 +1,6 @@
 // 灵眸 - RuoYi Detect Sub-module
 // Framework detection, auto-capture, and CVE lookup
-import { utils } from './vk-ruoyi-common.js';
-import { updateWorkflowStep, copyRoutePaths } from './vk-ruoyi-common.js';
+import { utils, updateWorkflowStep } from './vk-ruoyi-common.js';
 import * as CveDb from './vk-ruoyi-cve-db.js';
 
 let state = null;

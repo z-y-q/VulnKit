@@ -495,21 +495,21 @@ async function verifySinglePoint(point, payload, rawPayload) {
           10000
         );
         if (resp && !resp.error) {
-          let body = resp.body || '';
+          let body = resp.data || '';
           if (body.indexOf(rawPayload) !== -1) {
             return {
               point: point,
               status: 'reflected',
-              detail: 'Payload 在 POST 响应中出现',
+              detail: 'Payload 在响应中出现（GET 回退）',
               context: analyzeReflectionContext(body, rawPayload),
-              testUrl: `${point.url} [POST]`,
+              testUrl: `${point.url}?${point.param}=${encodeURIComponent(payload)}`,
             };
           }
           return {
             point: point,
             status: 'safe',
-            detail: 'Payload 未在 POST 响应中出现',
-            testUrl: `${point.url} [POST]`,
+            detail: 'Payload 未在响应中出现（GET 回退）',
+            testUrl: `${point.url}?${point.param}=${encodeURIComponent(payload)}`,
           };
         }
         return { point: point, status: 'error', detail: (resp && resp.error) || 'POST 请求失败' };
@@ -525,7 +525,7 @@ async function verifySinglePoint(point, payload, rawPayload) {
     if (!resp || resp.error) {
       return { point: point, status: 'error', detail: (resp && resp.error) || '请求失败' };
     }
-    let body = resp.body || '';
+    let body = resp.data || '';
     if (body.indexOf(rawPayload) !== -1) {
       return {
         point: point,

@@ -165,7 +165,8 @@ function initVuePermissions() {
   utils.bindClick('perm-change-admin', vue.permChangeAdmin);
   utils.bindClick('perm-apply-btn', vue.applyPermOverride);
   utils.bindClick('perm-copy-json', () => {
-    let val = utils.get('perm-json-editor').value;
+    const editorEl = utils.get('perm-json-editor');
+    let val = editorEl ? editorEl.value : '';
     val = utils.requireInput(val, '没有数据');
     if (!val) return;
     utils.copyAndToast(val);

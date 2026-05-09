@@ -517,23 +517,24 @@ async function loadApiTraffic() {
         </div>`;
       });
       html += '</div>';
-      if (listEl) listEl.innerHTML = html;
+      if (listEl) {
+        listEl.innerHTML = html;
 
-      listEl.querySelectorAll('.ruoyi-traffic-item').forEach(function (el) {
-        el.addEventListener('click', function () {
-          let idx = parseInt(el.dataset.idx, 10);
-          const entry = log[idx];
-          if (!entry || !entry.body) return;
-          const preview = entry.body.substring(0, 500);
-          const existing = listEl.querySelector('.traffic-preview');
-          if (existing) existing.remove();
-          const pre = document.createElement('div');
-          pre.className = 'traffic-preview';
-          pre.textContent = preview;
-          el.after(pre);
+        listEl.querySelectorAll('.ruoyi-traffic-item').forEach(function (el) {
+          el.addEventListener('click', function () {
+            let idx = parseInt(el.dataset.idx, 10);
+            const entry = log[idx];
+            if (!entry || !entry.body) return;
+            const preview = entry.body.substring(0, 500);
+            const existing = listEl.querySelector('.traffic-preview');
+            if (existing) existing.remove();
+            const pre = document.createElement('div');
+            pre.className = 'traffic-preview';
+            pre.textContent = preview;
+            el.after(pre);
+          });
         });
-      });
-    });
+      }
   } catch (e) {
     console.warn('[灵眸] loadApiTraffic:', e);
   }

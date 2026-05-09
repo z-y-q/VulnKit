@@ -381,23 +381,16 @@ async function removeCopyRestrictions() {
   }
 
   try {
-    // Inject CSS via extension API (bypasses page CSP)
+    // Inject __vk-hidden rule first (needed by pointer overlay logic in execInTabData)
     await chrome.scripting.insertCSS({
       target: { tabId: tab.id },
-      css: [
-        '*, *::before, *::after {',
-        '  -webkit-user-select: auto !important;',
-        '  user-select: auto !important;',
-        '  -webkit-user-drag: auto !important;',
-        '}',
-        '.__vk-hidden { display: none !important; }',
-      ].join('\n'),
+      css: '.__vk-hidden { display: none !important; }',
     });
 
     let log = await utils.execInTabData(tab.id, function () {
       let log = {};
 
-      // 1. Count elements with user-select: none (now overridden by injected CSS)
+      // 1. Count elements with user-select: none (before CSS override is injected)
       let allEls = document.querySelectorAll('*');
       let userSelectCount = 0;
       for (let i = 0; i < allEls.length; i++) {
@@ -490,6 +483,18 @@ async function removeCopyRestrictions() {
       if (btn) btn.disabled = false;
       return;
     }
+
+    // Inject user-select/drag CSS overrides after counting (bypasses page CSP)
+    await chrome.scripting.insertCSS({
+      target: { tabId: tab.id },
+      css: [
+        '*, *::before, *::after {',
+        '  -webkit-user-select: auto !important;',
+        '  user-select: auto !important;',
+        '  -webkit-user-drag: auto !important;',
+        '}',
+      ].join('\n'),
+    });
 
     // Render log
     let logEl = utils.get('uncopy-log');

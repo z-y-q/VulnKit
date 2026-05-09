@@ -666,7 +666,7 @@ async function scanWebpackModules() {
     }
 
     await runPhase3(ctx);
-    finalizeResults(ctx);
+    await finalizeResults(ctx);
   } catch (err) {
     statusEl.textContent = `扫描失败: ${err.message || '未知错误'}`;
   } finally {

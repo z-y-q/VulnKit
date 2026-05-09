@@ -111,7 +111,8 @@ function initMainTabs() {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     const target = utils.get(`panel-${panel}`);
     if (target) target.classList.add('active');
-    utils.get('status-text').textContent = this.textContent;
+    const statusText = utils.get('status-text');
+    if (statusText) statusText.textContent = this.textContent;
 
     if (panel === 'history') {
       const historyDomainInput = utils.get('history-domain');
@@ -396,7 +397,8 @@ function initLinksHistoryMultiUrl() {
   utils.bindClick('multiurl-dedup-btn', multiurl.handleMultiurlDedup);
   utils.bindClick('multiurl-copy-btn', multiurl.copyAllUrls);
   utils.bindClick('multiurl-clear-btn', () => {
-    utils.get('multiurl-input').value = '';
+    const multiurlInput = utils.get('multiurl-input');
+    if (multiurlInput) multiurlInput.value = '';
     multiurl.updateMultiurlInfo(0);
   });
 
@@ -407,7 +409,8 @@ function initLinksHistoryMultiUrl() {
   utils.bindClick('history-query-btn', history.queryHistory);
 
   utils.bindClick('history-copy-url-btn', async () => {
-    let raw = utils.get('history-domain').value.trim();
+    const historyDomainInput = utils.get('history-domain');
+    let raw = historyDomainInput ? historyDomainInput.value.trim() : '';
     if (!raw) {
       const d = await getCurrentDomain();
       if (!d) {
@@ -417,7 +420,7 @@ function initLinksHistoryMultiUrl() {
       raw = d;
     }
     const domain = history.extractDomain(raw);
-    utils.get('history-domain').value = domain;
+    if (historyDomainInput) historyDomainInput.value = domain;
     const cdxUrl = history.buildCdxUrl(domain);
     utils.copyAndToast(cdxUrl, '查询URL已复制');
   });
@@ -442,8 +445,9 @@ function initLinksHistoryMultiUrl() {
     if (history.allHistoryResults.length === 0) return;
     const filtered = history.filterByType(history.allHistoryResults, this.value);
     history.renderHistoryResults(filtered, true);
-    utils.get('history-status').textContent =
-      `筛选: ${filtered.length} / ${history.allHistoryResults.length} 条`;
+    const historyStatus = utils.get('history-status');
+    if (historyStatus)
+      historyStatus.textContent = `筛选: ${filtered.length} / ${history.allHistoryResults.length} 条`;
   });
 
   utils.bindClick('history-copy-filtered-btn', () => {
@@ -474,7 +478,8 @@ function initLinksHistoryMultiUrl() {
       utils.showToast('没有可用的URL', 'warning');
       return;
     }
-    utils.get('multiurl-input').value = urls.join('\n');
+    const multiurlInput = utils.get('multiurl-input');
+    if (multiurlInput) multiurlInput.value = urls.join('\n');
     multiurl.updateMultiurlInfo(urls.length);
     document
       .querySelectorAll('.tab-btn')

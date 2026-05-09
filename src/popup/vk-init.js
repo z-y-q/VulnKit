@@ -102,7 +102,9 @@ async function initApp() {
 }
 
 function startApp() {
-  window._panelsReady.then(initApp);
+  window._panelsReady.then(initApp).catch(function (err) {
+    console.error('VulnKit init failed:', err);
+  });
 }
 
 if (document.readyState === 'loading') {

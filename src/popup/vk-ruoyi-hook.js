@@ -80,6 +80,7 @@ async function installRouteHook() {
 
       const capData = await utils.execInTabData(tab.id, function () {
         let hook = window.__VK_RUOYI_HOOK__;
+        if (!hook) return { captured: false, logCount: 0 };
         return {
           captured: !!hook.capturedRouters,
           logCount: (hook.requestLog || []).length,

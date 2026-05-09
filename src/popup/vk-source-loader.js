@@ -70,7 +70,7 @@ async function loadToSources() {
     const item = { url: url, filename: filename, status: 'loading', size: 0 };
 
     if (statusEl) statusEl.textContent = `加载中... (${i + 1}/${urls.length})`;
-    renderResults([item]);
+    renderResults(lastResults.concat(item));
 
     try {
       const resp = await utils.fetchWithTimeout(url, 30000);
@@ -113,10 +113,7 @@ async function loadToSources() {
 
   renderResults(lastResults);
   if (copyBtn) copyBtn.style.display = '';
-  utils.showToast(
-    `已加载 ${lastResults.length} 个资源，请打开 DevTools → Sources 查看`,
-    'success'
-  );
+  utils.showToast(`已加载 ${lastResults.length} 个资源，请打开 DevTools → Sources 查看`, 'success');
 }
 
 function injectJs(tabId, code, sourceUrl) {
@@ -181,9 +178,7 @@ function renderResults(results) {
   let html = '';
   results.forEach(function (item) {
     let sizeHtml =
-      item.size > 0
-        ? `<span class="source-loader-item-size">${formatSize(item.size)}</span>`
-        : '';
+      item.size > 0 ? `<span class="source-loader-item-size">${formatSize(item.size)}</span>` : '';
     let statusHtml;
     if (item.status === 'success') {
       statusHtml = '<span class="source-loader-badge success">成功</span>';
@@ -223,8 +218,4 @@ function clearResults() {
   renderResults([]);
 }
 
-export {
-  loadToSources,
-  copyResults,
-  clearResults,
-};
+export { loadToSources, copyResults, clearResults };

@@ -302,7 +302,7 @@ const API_PATTERNS = [
 function isValidApiPath(path) {
   if (!path || path.length < 3 || path.length > 200) return false;
   if (
-    /^(https?:)?\/\/([^/]+\.)?google|facebook|github\.com|jquery|analytics|doubleclick|googletagmanager|fontawesome|bootstrapcdn|unpkg\.com|cdn\./i.test(
+    /^(https?:)?\/\/([^/]+\.)?(?:google|facebook|github\.com|jquery|analytics|doubleclick|googletagmanager|fontawesome|bootstrapcdn|unpkg\.com|cdn\.)/i.test(
       path
     )
   )

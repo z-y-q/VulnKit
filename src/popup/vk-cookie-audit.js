@@ -45,7 +45,6 @@ const FIX_RECOMMENDATIONS = {
 
 function auditCookies() {
   const statusEl = utils.get('cookie-audit-status');
-  let statsEl = utils.get('cookie-audit-stats');
   const resultsEl = utils.get('cookie-audit-results');
   const copyBtn = utils.get('cookie-audit-copy-btn');
   const exportBtn = utils.get('cookie-audit-export-btn');
@@ -63,11 +62,20 @@ function auditCookies() {
       const isHttpsSite = tab && tab.url && tab.url.indexOf('https://') === 0;
 
       chrome.cookies.getAll({ domain: domain }, function (cookies) {
+        if (chrome.runtime.lastError) {
+          if (statusEl) statusEl.textContent = `查询失败: ${chrome.runtime.lastError.message}`;
+          return;
+        }
         if (!cookies || cookies.length === 0) {
           const parts = domain.split('.');
           if (parts.length > 2) {
             const baseDomain = parts.slice(-2).join('.');
             chrome.cookies.getAll({ domain: baseDomain }, function (parentCookies) {
+              if (chrome.runtime.lastError) {
+                if (statusEl)
+                  statusEl.textContent = `查询失败: ${chrome.runtime.lastError.message}`;
+                return;
+              }
               if (parentCookies && parentCookies.length > 0) {
                 processCookies(parentCookies, isHttpsSite, statusEl, resultsEl, copyBtn, exportBtn);
               } else {
@@ -96,7 +104,6 @@ function processCookies(cookies, isHttpsSite, statusEl, resultsEl, copyBtn, expo
   const results = cookies.map(function (c) {
     return analyzeCookie(c, isHttpsSite);
   });
-  const SEV_ORDER = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
   const severityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
   results.forEach(function (r) {
     let max = r.issues.reduce(function (m, i) {

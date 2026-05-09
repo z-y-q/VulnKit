@@ -80,7 +80,11 @@ async function stopPermInterception() {
   }
 }
 
+let _permRefreshing = false;
+
 async function refreshPermCaptured() {
+  if (_permRefreshing) return;
+  _permRefreshing = true;
   try {
     const tab = await utils.requireTabId();
     if (!tab) return;
@@ -95,6 +99,8 @@ async function refreshPermCaptured() {
     renderPermList();
   } catch (e) {
     utils.showToast('获取捕获数据失败', 'error');
+  } finally {
+    _permRefreshing = false;
   }
 }
 

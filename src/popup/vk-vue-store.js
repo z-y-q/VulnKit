@@ -167,10 +167,7 @@ function renderStoreTree(obj, prefix, depth) {
     let val = obj[key];
     const path = prefix ? `${prefix}.${key}` : key;
     const isExpandable =
-      val !== null &&
-      typeof val === 'object' &&
-      !Array.isArray(val) &&
-      Object.keys(val).length > 0;
+      val !== null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0;
     const isArr = Array.isArray(val);
 
     const toggleIcon = isExpandable
@@ -219,7 +216,7 @@ async function copyFullStoreJson() {
       }
       const json = JSON.stringify(data.store ? data.store.stores : {}, null, 2);
       await utils.copyText(json);
-      utils.showToast(`Store JSON 已复制 (${json.length} 字符)`);
+      utils.showToast(`Store JSON 已复制 (${json.length} 字符)`, 'success');
     });
   } catch (e) {
     utils.showToast(`复制失败: ${e.message}`, 'error');
