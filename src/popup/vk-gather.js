@@ -73,7 +73,7 @@ function renderGatherTab() {
   }
 
   let statusText = searchFilter ? `全局搜索: ${list.length} 条匹配` : `共 ${fullList.length} 条`;
-  if (searchFilter && !searchFilter) {
+  if (searchFilter && list.length !== fullList.length) {
     statusText += `（筛选: ${list.length}）`;
   }
   utils.setStatus('gather-status', statusText);

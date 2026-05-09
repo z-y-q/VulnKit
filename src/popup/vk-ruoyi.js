@@ -564,7 +564,7 @@ function exportApiTraffic() {
       });
     })
     .then(function (log) {
-      if (log.length === 0) {
+      if (!log || log.length === 0) {
         utils.showToast('没有API流量数据', 'warning');
         return;
       }

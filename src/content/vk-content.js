@@ -239,38 +239,6 @@
       });
       return true;
     }
-    if (message.type === 'VK_WAF_PROBE') {
-      const probeUrl = message.url;
-      if (!probeUrl) {
-        sendResponse({ error: 'Missing url' });
-        return true;
-      }
-      const controller = new AbortController();
-      const timer = setTimeout(function () {
-        controller.abort();
-      }, message.timeout || 5000);
-      fetch(probeUrl, {
-        method: message.method || 'GET',
-        redirect: 'follow',
-        signal: controller.signal,
-        headers: message.headers || {},
-      })
-        .then(function (resp) {
-          clearTimeout(timer);
-          const hdrs = {};
-          resp.headers.forEach(function (v, k) {
-            hdrs[k] = v;
-          });
-          return resp.text().then(function (body) {
-            sendResponse({ status: resp.status, headers: hdrs, body: body });
-          });
-        })
-        .catch(function (e) {
-          clearTimeout(timer);
-          sendResponse({ error: e.message, status: 0 });
-        });
-      return true;
-    }
     if (message.type === 'VK_VUE_STORE_EXPLORE') {
       storeExploreResolve = null;
       storeExploreToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
