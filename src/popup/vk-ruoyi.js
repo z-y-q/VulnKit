@@ -535,6 +535,7 @@ async function loadApiTraffic() {
           });
         });
       }
+    });
   } catch (e) {
     console.warn('[灵眸] loadApiTraffic:', e);
   }
