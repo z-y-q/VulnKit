@@ -253,10 +253,7 @@ async function applyExtraRoutes() {
       );
 
       state.extraRoutes = routesToApply;
-      utils.setStatus(
-        'ruoyi-analyze-status',
-        `已设置 ${selected.length} 条额外路由，刷新页面生效`
-      );
+      utils.setStatus('ruoyi-analyze-status', `已设置 ${selected.length} 条额外路由，刷新页面生效`);
       utils.showToast(`已设置 ${selected.length} 条路由，刷新页面即可生效`, 'success');
     });
   } catch (e) {
@@ -545,8 +542,7 @@ async function loadApiTraffic() {
 function clearApiTraffic() {
   const listEl = utils.get('ruoyi-traffic-list');
   const countEl = utils.get('ruoyi-traffic-count');
-  if (listEl)
-    listEl.innerHTML = utils.emptyHtml('安装路由钩子并浏览页面后，此处显示捕获的API请求');
+  if (listEl) listEl.innerHTML = utils.emptyHtml('安装路由钩子并浏览页面后，此处显示捕获的API请求');
   if (countEl) countEl.textContent = '';
   utils.requireTabId().then(function (tab) {
     if (!tab) return;
@@ -642,25 +638,36 @@ function toggleSelectAllRoutes() {
 
 // ====== Public API ======
 
+const { detectRuoYi, autoCaptureRoutes, lookupCve, fetchCapturedRoutes } = detect;
+const {
+  installRouteHook,
+  removeRouteHook,
+  checkHookStatus,
+  renderRouterData,
+  exportCurlCommands,
+  exportHtmlReport,
+} = hook;
+const { marScanDynamicRoutes, marInjectToRouter, marToggleSelectAll, marCopyHiddenPaths } = mar;
+
 export {
   state as ruoyiState,
   detect,
   hook,
   mar,
-  detectRuoYi: detect.detectRuoYi,
-  autoCaptureRoutes: detect.autoCaptureRoutes,
-  lookupCve: detect.lookupCve,
-  fetchCapturedRoutes: detect.fetchCapturedRoutes,
-  installRouteHook: hook.installRouteHook,
-  removeRouteHook: hook.removeRouteHook,
-  checkHookStatus: hook.checkHookStatus,
-  renderRouterData: hook.renderRouterData,
-  exportCurlCommands: hook.exportCurlCommands,
-  exportHtmlReport: hook.exportHtmlReport,
-  marScanDynamicRoutes: mar.marScanDynamicRoutes,
-  marInjectToRouter: mar.marInjectToRouter,
-  marToggleSelectAll: mar.marToggleSelectAll,
-  marCopyHiddenPaths: mar.marCopyHiddenPaths,
+  detectRuoYi,
+  autoCaptureRoutes,
+  lookupCve,
+  fetchCapturedRoutes,
+  installRouteHook,
+  removeRouteHook,
+  checkHookStatus,
+  renderRouterData,
+  exportCurlCommands,
+  exportHtmlReport,
+  marScanDynamicRoutes,
+  marInjectToRouter,
+  marToggleSelectAll,
+  marCopyHiddenPaths,
   analyzeJsRoutes,
   applyExtraRoutes,
   clearExtraRoutes,
