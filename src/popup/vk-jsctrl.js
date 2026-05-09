@@ -527,13 +527,20 @@ function setJsBlocked(v) {
   jsBlocked = v;
 }
 
+const disableJs = function () {
+  return toggleJs(false);
+};
+const enableJs = function () {
+  return toggleJs(true);
+};
+
 export {
   switchJsCtrlTab,
   updateJsToggleStatus,
   updateAntidebugIndicator,
   toggleJs,
-  function disableJs() { return toggleJs(false); },
-  function enableJs() { return toggleJs(true); },
+  disableJs,
+  enableJs,
   scanAntiDebug,
   bypassAntiDebug,
   clearScriptBlock,
