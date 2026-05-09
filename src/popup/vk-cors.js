@@ -492,13 +492,7 @@ function exportJson() {
   a.href = url;
   a.download = 'cors-results.json';
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export {
-  scanCors,
-  copyResults,
-  exportJson,
-  filterBySeverity,
-  searchResults,
-};
+export { scanCors, copyResults, exportJson, filterBySeverity, searchResults };

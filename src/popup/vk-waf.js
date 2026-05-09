@@ -551,7 +551,7 @@ function exportResults() {
   a.href = url;
   a.download = `waf-report-${Date.now()}.json`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
   utils.showToast('报告已导出', 'success');
 }
 

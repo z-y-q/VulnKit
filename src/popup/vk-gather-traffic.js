@@ -16,7 +16,7 @@ let _renderSubTabs = null;
 let _renderGatherTab = null;
 
 export function initTrafficDeps(getGatherData, getCurrentTab, renderSubTabs, renderGatherTab) {
-  _gatherData = typeof getGatherData === 'function' ? getGatherData : () => getGatherData;
+  _gatherData = typeof getGatherData === 'function' ? getGatherData : () => ({});
   _getCurrentTab = getCurrentTab;
   _renderSubTabs = renderSubTabs;
   _renderGatherTab = renderGatherTab;

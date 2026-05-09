@@ -17,7 +17,7 @@ function exportResults() {
   a.href = url;
   a.download = `angular-analysis-${Date.now()}.json`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
   utils.showToast('已导出 JSON', 'success');
 }
 
@@ -30,66 +30,71 @@ function detectAngular() {
   if (statusEl) statusEl.textContent = '正在检测 Angular...';
   if (resultsEl) resultsEl.innerHTML = '';
 
-  utils.requireTabId().then(function (tab) {
-    if (!tab || !/^https?:/.test(tab.url)) {
-      if (statusEl) statusEl.textContent = '请打开一个网页';
-      return;
-    }
-
-    function handleMessage(response) {
-      if (chrome.runtime.lastError || !response) {
-        if (statusEl) statusEl.textContent = '检测失败: 请刷新目标网页后重试';
+  utils
+    .requireTabId()
+    .then(function (tab) {
+      if (!tab || !/^https?:/.test(tab.url)) {
+        if (statusEl) statusEl.textContent = '请打开一个网页';
         return;
       }
 
-      lastResult = response;
-      if (response.detected) {
-        if (statusEl) statusEl.textContent = '检测到 Angular';
-        if (copyBtn) copyBtn.style.display = '';
-        if (exportBtn) exportBtn.style.display = '';
-      } else {
-        if (statusEl) statusEl.textContent = '未检测到 Angular';
-        if (copyBtn) copyBtn.style.display = 'none';
-        if (exportBtn) exportBtn.style.display = 'none';
-      }
-      renderResult(response);
-    }
+      function handleMessage(response) {
+        if (chrome.runtime.lastError || !response) {
+          if (statusEl) statusEl.textContent = '检测失败: 请刷新目标网页后重试';
+          return;
+        }
 
-    chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_DETECT' }, function (response) {
-      if (chrome.runtime.lastError || !response) {
-        if (statusEl) statusEl.textContent = '正在注入检测脚本...';
-        chrome.scripting.executeScript(
-          {
-            target: { tabId: tab.id },
-            files: ['src/content/vk-content.js'],
-          },
-          function () {
-            if (chrome.runtime.lastError) {
-              if (statusEl)
-                statusEl.textContent = `注入失败: ${chrome.runtime.lastError.message || '未知错误'}`;
-              return;
-            }
-            function trySend(remaining) {
-              chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_DETECT' }, function (resp) {
-                if (chrome.runtime.lastError) {
-                  if (remaining > 0)
-                    setTimeout(function () {
-                      trySend(remaining - 1);
-                    }, 100);
-                  else if (statusEl) statusEl.textContent = '检测超时：内容脚本未响应';
-                  return;
-                }
-                handleMessage(resp);
-              });
-            }
-            trySend(5);
-          }
-        );
-        return;
+        lastResult = response;
+        if (response.detected) {
+          if (statusEl) statusEl.textContent = '检测到 Angular';
+          if (copyBtn) copyBtn.style.display = '';
+          if (exportBtn) exportBtn.style.display = '';
+        } else {
+          if (statusEl) statusEl.textContent = '未检测到 Angular';
+          if (copyBtn) copyBtn.style.display = 'none';
+          if (exportBtn) exportBtn.style.display = 'none';
+        }
+        renderResult(response);
       }
-      handleMessage(response);
+
+      chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_DETECT' }, function (response) {
+        if (chrome.runtime.lastError || !response) {
+          if (statusEl) statusEl.textContent = '正在注入检测脚本...';
+          chrome.scripting.executeScript(
+            {
+              target: { tabId: tab.id },
+              files: ['src/content/vk-content.js'],
+            },
+            function () {
+              if (chrome.runtime.lastError) {
+                if (statusEl)
+                  statusEl.textContent = `注入失败: ${chrome.runtime.lastError.message || '未知错误'}`;
+                return;
+              }
+              function trySend(remaining) {
+                chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_DETECT' }, function (resp) {
+                  if (chrome.runtime.lastError) {
+                    if (remaining > 0)
+                      setTimeout(function () {
+                        trySend(remaining - 1);
+                      }, 100);
+                    else if (statusEl) statusEl.textContent = '检测超时：内容脚本未响应';
+                    return;
+                  }
+                  handleMessage(resp);
+                });
+              }
+              trySend(5);
+            }
+          );
+          return;
+        }
+        handleMessage(response);
+      });
+    })
+    .catch(function () {
+      if (statusEl) statusEl.textContent = '获取标签页失败';
     });
-  });
 }
 
 function renderResult(data) {

@@ -297,7 +297,7 @@ async function scanPageImages() {
           const imgs = [];
           document.querySelectorAll('img[src]').forEach(function (img) {
             if (img.src && img.naturalWidth > 50 && img.naturalHeight > 50) {
-              if (/^(blob:|data:)/i.test(img.src)) return;
+              if (/^(blob:|data:|javascript:)/i.test(img.src)) return;
               imgs.push({
                 src: img.src,
                 alt: img.alt || '',
@@ -308,7 +308,7 @@ async function scanPageImages() {
           });
           document.querySelectorAll('[style*="background"]').forEach(function (el) {
             const m = el.style.backgroundImage.match(/url\(["']?(.*?)["']?\)/);
-            if (m && m[1] && !/^(blob:|data:)/i.test(m[1])) {
+            if (m && m[1] && !/^(blob:|data:|javascript:)/i.test(m[1])) {
               imgs.push({ src: m[1], alt: '', w: 0, h: 0 });
             }
           });

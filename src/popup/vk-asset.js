@@ -232,7 +232,7 @@ async function doShodanLookup(input, container) {
     });
     if (dnsResult && dnsResult.success && dnsResult.data) {
       const dnsJson = dnsResult.data;
-      if (dnsJson && dnsJson.answers) {
+      if (dnsJson && dnsJson.answers && dnsJson.answers.length > 0) {
         resolvedIp = dnsJson.answers[0].value;
       }
     }

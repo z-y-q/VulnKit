@@ -160,10 +160,10 @@ function renderUaList(category) {
 
   if (category === 'custom') {
     container.innerHTML = '';
-    customGroup.classList.remove('hidden');
+    if (customGroup) customGroup.classList.remove('hidden');
     return;
   }
-  customGroup.classList.add('hidden');
+  if (customGroup) customGroup.classList.add('hidden');
 
   const presets = UA_PRESETS[category] || [];
   if (presets.length === 0) {
@@ -347,7 +347,7 @@ function renderCookieEditor(cookieData, isNew) {
     <div class="setting-item"><label>Value</label><textarea class="textarea cookie-edit-value" rows="2" placeholder="cookie值">${utils.escapeHtml(c.value || '')}</textarea></div>
     <div class="setting-item"><label>Domain</label><input type="text" class="input cookie-edit-domain" value="${utils.escapeHtml((c.domain || '').replace(/^\./, ''))}" placeholder="自动获取"></div>
     <div class="setting-item"><label>Path</label><input type="text" class="input cookie-edit-path" value="${utils.escapeHtml(c.path || '/')}"></div>
-    <div class="setting-item"><label>Expires (秒, 0=会话)</label><input type="number" class="input cookie-edit-expires" value="${c.expirationDate ? Math.floor(c.expirationDate - Date.now() / 1000) : 0}"></div>
+    <div class="setting-item"><label>Expires (秒, 0=会话)</label><input type="number" class="input cookie-edit-expires" value="${c.expirationDate ? Math.max(0, Math.floor(c.expirationDate - Date.now() / 1000)) : 0}"></div>
     <div class="setting-item"><label>SameSite</label><select class="select-filter cookie-edit-samesite">`;
   ['unspecified', 'no_restriction', 'lax', 'strict'].forEach(opt => {
     const sel = c.sameSite === opt || (!c.sameSite && opt === 'lax') ? ' selected' : '';

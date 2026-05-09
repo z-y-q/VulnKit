@@ -31,15 +31,18 @@ function showHistoryQuickLinks(domain) {
 }
 
 function buildCdxUrl(domain) {
+  const ALLOWED_MATCH = ['domain', 'host', 'exact', 'prefix', 'suffix'];
   const matchType = (utils.get('history-match-type') || {}).value || 'domain';
   const outputType = (utils.get('history-output-type') || {}).value || 'json';
+  const safeMatch = ALLOWED_MATCH.indexOf(matchType) !== -1 ? matchType : 'domain';
+  const safeOutput = outputType === 'json' || outputType === 'text' ? outputType : 'json';
   const fields =
     (utils.get('history-fields') || {}).value || 'timestamp,original,statuscode,mimetype';
   const from = (utils.get('history-from') || {}).value || '';
   const to = (utils.get('history-to') || {}).value || '';
   const typeFilter = ((utils.get('history-type-filter') || {}).value || '').trim();
 
-  let url = `https://web.archive.org/cdx/search/cdx?url=${encodeURIComponent(domain)}&collapse=urlkey&matchType=${matchType}&output=${outputType}&fl=${encodeURIComponent(fields)}`;
+  let url = `https://web.archive.org/cdx/search/cdx?url=${encodeURIComponent(domain)}&collapse=urlkey&matchType=${encodeURIComponent(safeMatch)}&output=${encodeURIComponent(safeOutput)}&fl=${encodeURIComponent(fields)}`;
   if (from) url += `&from=${from}`;
   if (to) url += `&to=${to}`;
   if (typeFilter) {

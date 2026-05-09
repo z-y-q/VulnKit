@@ -34,9 +34,9 @@ const encodingTools = {
       return d.innerHTML;
     },
     decode(t) {
-      const d = document.createElement('textarea');
+      const d = document.createElement('div');
       d.innerHTML = t;
-      return d.value || '';
+      return d.textContent || '';
     },
   },
   hex: {

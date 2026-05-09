@@ -34,6 +34,12 @@
     resolve = r;
   });
 
+  if (!appMain) {
+    console.error('[panel-loader] #app-main not found');
+    resolve();
+    return;
+  }
+
   Promise.all(
     PANEL_FILES.map(function (file) {
       return fetch(PANEL_DIR + file).then(function (resp) {
