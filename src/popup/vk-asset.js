@@ -181,7 +181,7 @@ async function scanShodan(query, opts) {
     ? query
     : /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(query)
       ? query
-      : `hostname:${query}`;
+      : `hostname:"${query}"`;
   const url = `https://api.shodan.io/shodan/search?key=${encodeURIComponent(key)}&query=${encodeURIComponent(searchQuery)}`;
 
   const json = await fetchScanResults('Shodan', url);
@@ -306,9 +306,18 @@ function renderShodanHostInfo(container, idbData, shodanData, queryInput, resolv
   const serviceData = shodanData && shodanData.data ? shodanData.data : [];
 
   let h = '';
+  const otherHostnames = hostnames.filter(function (hn) {
+    return hn !== queryInput && hn !== resolvedIp;
+  });
   h += `<div class="shodan-host-header">
-    <div class="shodan-host-title">${esc(hostnames[0] || queryInput)}</div>
+    <div class="shodan-host-title">${esc(queryInput)}</div>
     <div class="shodan-host-ip">${esc(ip)}</div>`;
+  if (otherHostnames.length > 0) {
+    h +=
+      '<div style="margin-top:4px;font-size:11px;color:#888;">同 IP 域名: ' +
+      otherHostnames.map(hn => esc(hn)).join(', ') +
+      '</div>';
+  }
   if (tags.length > 0) {
     h += '<div style="margin-top:4px;">';
     tags.forEach(function (tag) {
@@ -391,7 +400,7 @@ function renderShodanHostInfo(container, idbData, shodanData, queryInput, resolv
     h += '<div style="color:#888;padding:8px;">该 IP 暂无开放端口或漏洞信息</div>';
   }
 
-  h += `<div style="text-align:center;padding:6px;font-size:10px;color:#aaa;">数据来源: Shodan InternetDB${shodanData ? ' + Shodan API' : ''}</div>`;
+  h += `<div style="text-align:center;padding:6px;font-size:10px;color:#aaa;">数据来源: Shodan InternetDB${shodanData ? ' + Shodan API' : '（配置 Shodan API Key 可获取地理位置、ISP、服务等详情）'}</div>`;
 
   container.innerHTML = h;
 }
