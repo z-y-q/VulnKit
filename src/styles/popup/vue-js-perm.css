@@ -225,8 +225,68 @@
 .vstab-subpanel { display: none; }
 .vstab-subpanel.active { display: block; }
 
-/* Relocated vue sub-tabs dark overrides */
-/* ====== Dark Theme Overrides for New Components ====== */
+/* ====== Route Badges ====== */
+.vue-badge-auth {
+  display: inline-block; padding: 0 5px; border-radius: 3px; font-size: 9px;
+  font-weight: 600; background: #DBEAFE; color: #1D4ED8; margin-left: 4px; line-height: 16px;
+}
+.vue-badge-sensitive {
+  display: inline-block; padding: 0 5px; border-radius: 3px; font-size: 9px;
+  font-weight: 600; background: #FEE2E2; color: #DC2626; margin-left: 4px; line-height: 16px;
+}
+.vue-badge-enter {
+  display: inline-block; padding: 0 5px; border-radius: 3px; font-size: 9px;
+  font-weight: 600; background: #FEF3C7; color: #D97706; margin-left: 4px; line-height: 16px;
+}
+.vue-badge-children {
+  display: inline-block; padding: 0 4px; border-radius: 3px; font-size: 9px;
+  color: #6B7280; background: #F3F4F6; margin-left: 4px; line-height: 16px;
+}
+
+/* ====== Guard Stats ====== */
+.vue-guard-stats {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px;
+  background: #F9FAFB; border-radius: 6px; margin-bottom: 8px; font-size: 11px;
+  border: 1px solid #E5E7EB;
+}
+.vue-guard-label { color: #6B7280; font-weight: 500; }
+.vue-guard-item { color: #374151; }
+.vue-guard-item span { font-weight: 700; color: #4A90E2; }
+
+/* ====== Route Summary ====== */
+.vue-route-summary {
+  font-size: 11px; color: #6B7280; padding: 4px 0; margin-bottom: 4px;
+  border-bottom: 1px solid #F0F0F0;
+}
+.vue-route-summary strong { color: #374151; }
+
+/* ====== Route Jump Button ====== */
+.vue-route-jump-btn {
+  font-size: 9px; padding: 0 4px; line-height: 16px; border: 1px solid #4A90E2;
+  border-radius: 3px; background: #4A90E2; color: #fff; cursor: pointer;
+  font-family: monospace; font-weight: 700; margin-left: 2px;
+}
+.vue-route-jump-btn:hover { background: #3B7DD8; border-color: #3B7DD8; }
+
+/* ====== Route Filter ====== */
+.vue-route-filter { margin-bottom: 6px; }
+.vue-route-filter .input { width: 100%; font-size: 11px; }
+
+/* ====== Dark Theme: Badges & Stats ====== */
+[data-theme='dark'] .vue-badge-auth { background: #1E3A5F; color: #93C5FD; }
+[data-theme='dark'] .vue-badge-sensitive { background: #5F1E1E; color: #FCA5A5; }
+[data-theme='dark'] .vue-badge-enter { background: #5F4B1E; color: #FCD34D; }
+[data-theme='dark'] .vue-badge-children { background: var(--bg-tertiary); color: var(--text-secondary); }
+[data-theme='dark'] .vue-guard-stats { background: var(--bg-tertiary); border-color: var(--border-color); }
+[data-theme='dark'] .vue-guard-label { color: var(--text-secondary); }
+[data-theme='dark'] .vue-guard-item { color: var(--text-primary); }
+[data-theme='dark'] .vue-guard-item span { color: var(--accent); }
+[data-theme='dark'] .vue-route-summary { color: var(--text-secondary); border-color: var(--border-color); }
+[data-theme='dark'] .vue-route-summary strong { color: var(--text-primary); }
+[data-theme='dark'] .vue-route-jump-btn { background: var(--accent); border-color: var(--accent); }
+[data-theme='dark'] .vue-route-jump-btn:hover { opacity: 0.85; }
+
+/* ====== Dark Theme Overrides for Vue Sub-tabs ====== */
 [data-theme='dark'] .vue-stab { background: var(--bg-secondary); color: var(--text-secondary); border-color: var(--border-color); }
 [data-theme='dark'] .vue-stab:hover { color: var(--accent); border-color: var(--accent); }
 [data-theme='dark'] .vue-stab.active { background: var(--accent); color: #fff; border-color: var(--accent); }

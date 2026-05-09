@@ -5,6 +5,12 @@ import { utilsProxy as utils } from './vk-namespace.js';
 
 import * as vue from './vk-vue.js';
 import {
+  restoreVueRuntime,
+  navigateVueRoute,
+  jumpToRoute,
+  filterRouteTree,
+} from './vk-vue-detect.js';
+import {
   ruoyiState,
   detectRuoYi,
   installRouteHook,
@@ -104,6 +110,7 @@ function initVuePermissions() {
   utils.bindClick('vue-export-routes-btn', vue.exportVueRoutes);
   utils.bindClick('vue-bypass-guards-btn', vue.bypassVueGuards);
   utils.bindClick('vue-disable-auth-btn', vue.disableRouteAuth);
+  utils.bindClick('vue-restore-btn', restoreVueRuntime);
   utils.bindClick('vue-copy-btn', () => {
     if (!vue.vueState.lastVueResult) {
       utils.showToast('没有可复制的内容', 'warning');
@@ -111,8 +118,15 @@ function initVuePermissions() {
     }
     utils.copyAndToast(vue.vueState.lastVueResult);
   });
+  utils.on('vue-route-search', 'input', function () {
+    filterRouteTree(this.value.trim());
+  });
 
   const vueResultsEl = utils.on('vue-results', 'click', function (e) {
+    if (e.target.classList.contains('vue-route-jump-btn')) {
+      navigateVueRoute(e.target.dataset.path);
+      return;
+    }
     if (e.target.classList.contains('vue-route-open-btn')) {
       chrome.tabs.create({ url: e.target.dataset.url });
       return;

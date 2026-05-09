@@ -9,6 +9,10 @@ import {
   exportVueRoutes,
   bypassVueGuards,
   disableRouteAuth,
+  restoreVueRuntime,
+  navigateVueRoute,
+  jumpToRoute,
+  filterRouteTree,
   collectAllPaths,
 } from './vk-vue-detect.js';
 
@@ -57,6 +61,10 @@ export {
   exportVueRoutes,
   bypassVueGuards,
   disableRouteAuth,
+  restoreVueRuntime,
+  navigateVueRoute,
+  jumpToRoute,
+  filterRouteTree,
   collectAllPaths,
   startPermInterception,
   stopPermInterception,

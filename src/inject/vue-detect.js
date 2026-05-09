@@ -5,12 +5,18 @@
 
   const __vk_token = document.currentScript ? document.currentScript.dataset.vkToken || '' : '';
 
-  const info = {
+  var AUTH_KEY_RE =
+    /^(?:requiresAuth|requireAuth|auth|authenticated|needLogin|loginRequired|permission|permissions|role|roles|admin|access|authority|authorize|whiteList|noAuth)$/i;
+  var SENSITIVE_PATH_RE =
+    /(?:admin|manage|dashboard|system|config|setting|permission|role|user|account|secret|token|debug|internal)/i;
+
+  var info = {
     detected: false,
     version: '',
     router: false,
     store: false,
     routes: [],
+    guards: {},
     pageOrigin: location.origin,
   };
 
@@ -22,12 +28,55 @@
     }
   }
 
+  function routeHasAuth(route) {
+    if (typeof route.beforeEnter === 'function') return true;
+    if (route.meta && typeof route.meta === 'object') {
+      var keys = Object.keys(route.meta);
+      for (var i = 0; i < keys.length; i++) {
+        if (AUTH_KEY_RE.test(keys[i]) && route.meta[keys[i]]) return true;
+      }
+    }
+    return false;
+  }
+
+  function isSensitivePath(path, name) {
+    return SENSITIVE_PATH_RE.test(path || '') || SENSITIVE_PATH_RE.test(name || '');
+  }
+
+  function getGuardStats(router) {
+    var stats = {};
+    if (Array.isArray(router.beforeGuards)) stats.beforeGuards = router.beforeGuards.length;
+    if (Array.isArray(router.afterGuards)) stats.afterGuards = router.afterGuards.length;
+    if (Array.isArray(router.beforeResolveGuards))
+      stats.beforeResolveGuards = router.beforeResolveGuards.length;
+    if (Array.isArray(router.beforeHooks)) stats.beforeHooks = router.beforeHooks.length;
+    if (Array.isArray(router.afterHooks)) stats.afterHooks = router.afterHooks.length;
+    if (Array.isArray(router.beforeResolveHooks))
+      stats.beforeResolveHooks = router.beforeResolveHooks.length;
+    return stats;
+  }
+
   function normalizeRoute(r) {
+    var comps = [];
+    if (r.components) {
+      try {
+        comps = Object.keys(r.components);
+      } catch (e) {
+        /* ignore */
+      }
+    } else if (r.component) {
+      comps = ['default'];
+    }
     return {
       path: r.path,
       name: r.name || '',
       meta: safeSerialize(r.meta) || {},
       children: [],
+      hasAuth: routeHasAuth(r),
+      sensitive: isSensitivePath(r.path, r.name),
+      hasBeforeEnter: typeof r.beforeEnter === 'function',
+      childCount: (r.children || []).length,
+      componentKeys: comps,
     };
   }
 
@@ -169,6 +218,7 @@
       info.router = true;
       info.routes = isVue3 ? getVue3Routes(router) : getVue2Routes(router);
       info.routerInfo = getRouterInfo(router);
+      info.guards = getGuardStats(router);
     }
     if (isVue3) {
       const store = app.config.globalProperties.$pinia || app.config.globalProperties.$store;
