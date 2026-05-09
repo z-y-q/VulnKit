@@ -67,6 +67,12 @@ import {
   detectReact,
   copyResults as reactCopyResults,
   exportResults as reactExportResults,
+  initSubTabs as initReactSubTabs,
+  initStoreExplorerEvents,
+  handleStoreRead,
+  handleRouterRead,
+  handleRouterCopy,
+  copyReactStoreJson,
 } from './vk-react.js';
 import {
   detectAngular,
@@ -319,9 +325,18 @@ function initSecurityDetectors() {
     });
   });
 
+  initReactSubTabs();
   utils.bindClick('react-detect-btn', detectReact);
   utils.bindClick('react-copy-btn', reactCopyResults);
   utils.bindClick('react-export-btn', reactExportResults);
+
+  utils.bindClick('react-store-read-btn', handleStoreRead);
+  utils.bindClick('react-store-copy-btn', copyReactStoreJson);
+  utils.bindClick('react-store-refresh-btn', handleStoreRead);
+  initStoreExplorerEvents();
+
+  utils.bindClick('react-router-read-btn', handleRouterRead);
+  utils.bindClick('react-router-copy-btn', handleRouterCopy);
 
   utils.bindClick('angular-detect-btn', detectAngular);
   utils.bindClick('angular-copy-btn', angularCopyResults);

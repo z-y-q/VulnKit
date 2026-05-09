@@ -76,7 +76,7 @@ function getSelectedOrigins() {
   return origins;
 }
 
-function sendCorsProbe(url, method, origin, timeoutMs) {
+function sendCorsProbe(url, method, origin, timeoutMs, credentials) {
   return new Promise(function (resolve) {
     const timer = setTimeout(function () {
       resolve({ error: 'timeout' });
@@ -87,23 +87,23 @@ function sendCorsProbe(url, method, origin, timeoutMs) {
       headers['X-Requested-With'] = 'XMLHttpRequest';
     }
 
-    chrome.runtime.sendMessage(
-      {
-        type: 'FETCH_CORS_PROBE',
-        url: url,
-        method: method || 'GET',
-        headers: headers,
-        timeout: timeoutMs || PROBE_TIMEOUT_MS,
-      },
-      function (resp) {
-        clearTimeout(timer);
-        if (chrome.runtime.lastError) {
-          resolve({ error: chrome.runtime.lastError.message });
-          return;
-        }
-        resolve(resp || { error: 'no response' });
+    const msg = {
+      type: 'FETCH_CORS_PROBE',
+      url: url,
+      method: method || 'GET',
+      headers: headers,
+      timeout: timeoutMs || PROBE_TIMEOUT_MS,
+    };
+    if (credentials) msg.credentials = credentials;
+
+    chrome.runtime.sendMessage(msg, function (resp) {
+      clearTimeout(timer);
+      if (chrome.runtime.lastError) {
+        resolve({ error: chrome.runtime.lastError.message });
+        return;
       }
-    );
+      resolve(resp || { error: 'no response' });
+    });
   });
 }
 
@@ -406,14 +406,20 @@ function renderResults(analysis) {
   }
 
   analysis.issues.forEach(function (issue) {
+    const credId = `cors-cred-${CSS.escape(issue.url + issue.method + issue.origin.value)}`;
     html +=
       `<div class="cors-endpoint-card">` +
       `<div class="cors-endpoint-header">` +
       `<span class="cors-severity-badge ${issue.severity}">${severityLabel(issue.severity)}</span>` +
       `<span class="cors-endpoint-url">${utils.escapeHtml(issue.url)}</span>` +
       `<span class="cors-method-tag">${issue.method}</span>` +
-      `<span class="cors-origin-tag">Origin: ${utils.escapeHtml(issue.origin.value)}</span>` +
-      `</div>`;
+      `<span class="cors-origin-tag">Origin: ${utils.escapeHtml(issue.origin.value)}</span>`;
+
+    if (issue.severity === 'danger' || issue.severity === 'critical') {
+      html += `<button class="cors-cred-verify-btn" data-cors-url="${utils.escapeHtml(issue.url)}" data-cors-method="${issue.method}" data-cors-origin="${utils.escapeHtml(issue.origin.value)}">验证凭据</button>`;
+    }
+
+    html += `</div>`;
 
     issue.findings.forEach(function (f) {
       html += `<div class="cors-detail-row"><span class="cors-detail-value">${utils.escapeHtml(f)}</span></div>`;
@@ -426,15 +432,136 @@ function renderResults(analysis) {
     if (issue.acma) {
       html += `<div class="cors-detail-row"><span class="cors-detail-label">预检缓存</span><span class="cors-detail-value">${issue.acma}s</span></div>`;
     }
+
+    html += `<div id="${credId}"></div>`;
     html += `</div>`;
   });
 
   resultsEl.innerHTML = html;
+
+  resultsEl.querySelectorAll('.cors-cred-verify-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      verifyCredentials({
+        url: btn.dataset.corsUrl,
+        method: btn.dataset.corsMethod,
+        origin: { value: btn.dataset.corsOrigin },
+      });
+    });
+  });
 }
 
 function severityLabel(sev) {
   const labels = { safe: '安全', warning: '警告', danger: '危险', critical: '严重' };
   return labels[sev] || sev;
+}
+
+async function verifyCredentials(issue) {
+  const statusEl = utils.get('cors-status');
+  if (statusEl) {
+    statusEl.textContent = '正在验证凭据利用性...';
+    statusEl.style.color = '#4A90E2';
+  }
+
+  try {
+    const omitResp = await sendCorsProbe(issue.url, issue.method, issue.origin.value, 8000);
+    const includeResp = await sendCorsProbe(
+      issue.url,
+      issue.method,
+      issue.origin.value,
+      8000,
+      'include'
+    );
+
+    let omitAcao = '';
+    let omitAcac = '';
+    let omitOpaque = true;
+    if (omitResp && !omitResp.error) {
+      omitOpaque = omitResp.type === 'opaque';
+      omitAcao = (omitResp.headers || {})['access-control-allow-origin'] || '';
+      omitAcac = (omitResp.headers || {})['access-control-allow-credentials'] || '';
+    }
+
+    let includeAcao = '';
+    let includeAcac = '';
+    let includeOpaque = true;
+    if (includeResp && !includeResp.error) {
+      includeOpaque = includeResp.type === 'opaque';
+      includeAcao = (includeResp.headers || {})['access-control-allow-origin'] || '';
+      includeAcac = (includeResp.headers || {})['access-control-allow-credentials'] || '';
+    }
+
+    const omitReflects = !omitOpaque && omitAcao === issue.origin.value;
+    const includeReflects = !includeOpaque && includeAcao === issue.origin.value;
+    const includeAcacTrue = includeAcac && includeAcac.toLowerCase() === 'true';
+
+    let result;
+    if (includeReflects && includeAcacTrue) {
+      result = {
+        exploitable: true,
+        detail: 'credentials:include 仍返回 ACAO 反射 + ACAC:true — 确认可跨站窃取数据',
+        omit: { opaque: omitOpaque, acao: omitAcao, acac: omitAcac },
+        include: { opaque: includeOpaque, acao: includeAcao, acac: includeAcac },
+      };
+    } else if (includeReflects && !includeAcacTrue) {
+      result = {
+        exploitable: false,
+        detail: 'credentials:include 返回 ACAO 反射但无 ACAC — 浏览器会阻断凭据发送',
+        omit: { opaque: omitOpaque, acao: omitAcao, acac: omitAcac },
+        include: { opaque: includeOpaque, acao: includeAcao, acac: includeAcac },
+      };
+    } else if (includeOpaque) {
+      result = {
+        exploitable: false,
+        detail: 'credentials:include 返回 opaque 响应 — 浏览器安全机制阻止了凭据请求',
+        omit: { opaque: omitOpaque, acao: omitAcao, acac: omitAcac },
+        include: { opaque: includeOpaque, acao: includeAcao, acac: includeAcac },
+      };
+    } else if (!includeReflects) {
+      result = {
+        exploitable: false,
+        detail: 'credentials:include 时 Origin 未被反射 — 凭据模式下安全',
+        omit: { opaque: omitOpaque, acao: omitAcao, acac: omitAcac },
+        include: { opaque: includeOpaque, acao: includeAcao, acac: includeAcac },
+      };
+    } else {
+      result = {
+        exploitable: false,
+        detail: '凭据验证完成，未发现可利用的凭据泄露',
+        omit: { opaque: omitOpaque, acao: omitAcao, acac: omitAcac },
+        include: { opaque: includeOpaque, acao: includeAcao, acac: includeAcac },
+      };
+    }
+
+    const credDiv = document.getElementById(
+      `cors-cred-${CSS.escape(issue.url + issue.method + issue.origin.value)}`
+    );
+    if (credDiv) {
+      const color = result.exploitable ? '#e74c3c' : '#27ae60';
+      const badge = result.exploitable ? '可利用' : '不可利用';
+      credDiv.innerHTML =
+        `<div style="margin-top:6px;padding:6px 8px;border-radius:4px;background:${result.exploitable ? 'rgba(231,76,60,0.1)' : 'rgba(39,174,96,0.1)'};font-size:11px">` +
+        `<span style="color:${color};font-weight:bold">[凭据验证: ${badge}]</span> ${utils.escapeHtml(result.detail)}` +
+        `<br><span style="color:#999">omit: opaque=${omitOpaque} ACAO=${omitAcao || '(空)'} ACAC=${omitAcac || '(空)'}</span>` +
+        `<br><span style="color:#999">include: opaque=${includeOpaque} ACAO=${includeAcao || '(空)'} ACAC=${includeAcac || '(空)'}</span>` +
+        `</div>`;
+    }
+
+    if (statusEl) {
+      statusEl.textContent = result.exploitable
+        ? '凭据验证: 确认可跨站窃取数据!'
+        : '凭据验证: 未发现可利用的凭据泄露';
+      statusEl.style.color = result.exploitable ? '#e74c3c' : '#27ae60';
+    }
+    utils.showToast(
+      result.exploitable ? '确认可利用! 凭据模式下可跨站读取数据' : '凭据模式下安全',
+      result.exploitable ? 'error' : 'success'
+    );
+  } catch (e) {
+    if (statusEl) {
+      statusEl.textContent = `凭据验证失败: ${e.message}`;
+      statusEl.style.color = '#e74c3c';
+    }
+  }
 }
 
 function copyResults() {
@@ -495,4 +622,4 @@ function exportJson() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export { scanCors, copyResults, exportJson, filterBySeverity, searchResults };
+export { scanCors, copyResults, exportJson, filterBySeverity, searchResults, verifyCredentials };

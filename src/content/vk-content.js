@@ -20,6 +20,8 @@
   let storeExploreToken = null;
   let pageInspectResolve = null;
   let pageInspectToken = null;
+  let reactStoreResolve = null;
+  let reactStoreToken = null;
 
   // Window message relay
   window.addEventListener('message', function (e) {
@@ -90,6 +92,15 @@
         pageInspectResolve(e.data.result);
         pageInspectResolve = null;
         pageInspectToken = null;
+      }
+      return;
+    }
+
+    if (e.data && e.data.__vk_react_store && reactStoreResolve) {
+      if (reactStoreToken && e.data.__vk_token === reactStoreToken) {
+        reactStoreResolve(e.data.result);
+        reactStoreResolve = null;
+        reactStoreToken = null;
       }
       return;
     }
@@ -307,6 +318,40 @@
       ).then(function (result) {
         sendResponse(result);
       });
+      return true;
+    }
+    if (message.type === 'VK_REACT_STORE_EXPLORE') {
+      reactStoreResolve = null;
+      reactStoreToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      new Promise(function (resolve) {
+        reactStoreResolve = resolve;
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL('src/inject/react-store-explorer.js');
+        script.dataset.vkToken = reactStoreToken;
+        script.onload = function () {
+          script.remove();
+          setTimeout(function () {
+            if (reactStoreResolve) {
+              reactStoreResolve({ error: 'React store explorer timeout' });
+              reactStoreResolve = null;
+            }
+          }, 5000);
+        };
+        script.onerror = function () {
+          script.remove();
+          if (reactStoreResolve) {
+            reactStoreResolve({ error: 'Failed to load react store explorer' });
+            reactStoreResolve = null;
+          }
+        };
+        (document.head || document.documentElement).appendChild(script);
+      })
+        .then(function (result) {
+          sendResponse(result);
+        })
+        .catch(function (err) {
+          sendResponse({ error: err.message || 'React store explore failed' });
+        });
       return true;
     }
     if (message.type === 'VK_PAGE_INSPECT') {

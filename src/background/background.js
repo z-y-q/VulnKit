@@ -475,7 +475,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           redirect: 'follow',
           signal: controller.signal,
           headers: corsHeaders,
-          credentials: 'omit',
+          credentials: message.credentials || 'omit',
         })
           .then(async resp => {
             clearTimeout(timer);

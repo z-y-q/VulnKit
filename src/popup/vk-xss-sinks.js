@@ -179,29 +179,38 @@ async function analyzeDomSinks() {
         document.querySelectorAll('script[src]').forEach(function (s) {
           sinks.push({ code: s.src || '', line: 0, source: 'external', isUrl: true });
         });
-        let eventAttrs = document.querySelectorAll(
-          '[onclick],[onerror],[onload],[onmouseover],[onfocus],[onblur],[onchange],[onsubmit],[onkeydown],[onkeyup],[onkeypress]'
-        );
-        eventAttrs.forEach(function (el) {
-          let attrs = [];
+        let allEls = document.querySelectorAll('*');
+        let scanned = 0;
+        for (let i = 0; i < allEls.length && scanned < 2000; i++) {
+          let el = allEls[i];
+          let hasOn = false;
           el.getAttributeNames().forEach(function (n) {
             if (n.indexOf('on') === 0 && el.getAttribute(n)) {
-              attrs.push({ attr: n, value: el.getAttribute(n) });
+              hasOn = true;
             }
           });
-          if (attrs.length > 0) {
-            sinks.push({
-              code: attrs
-                .map(function (a) {
-                  return `${a.attr}="${a.value}"`;
-                })
-                .join(' '),
-              line: 0,
-              source: 'event-attr',
-              tag: el.tagName.toLowerCase(),
+          if (hasOn) {
+            scanned++;
+            let attrs = [];
+            el.getAttributeNames().forEach(function (n) {
+              if (n.indexOf('on') === 0 && el.getAttribute(n)) {
+                attrs.push({ attr: n, value: el.getAttribute(n) });
+              }
             });
+            if (attrs.length > 0) {
+              sinks.push({
+                code: attrs
+                  .map(function (a) {
+                    return `${a.attr}="${a.value}"`;
+                  })
+                  .join(' '),
+                line: 0,
+                source: 'event-attr',
+                tag: el.tagName.toLowerCase(),
+              });
+            }
           }
-        });
+        }
         let hrefs = document.querySelectorAll('a[href^="javascript:"]');
         hrefs.forEach(function (a) {
           sinks.push({

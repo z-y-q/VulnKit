@@ -1,16 +1,56 @@
     <!-- React 分析面板 -->
     <div id="panel-react" class="panel">
       <div class="content-card">
-        <div class="card-title">React 框架分析</div>
-        <div class="react-module-desc">分析当前页面 React 框架版本、组件结构和路由信息</div>
-        <div class="panel-actions">
-          <button class="btn btn-primary" id="react-detect-btn">检测 React</button>
-          <button class="btn btn-outline" id="react-copy-btn" style="display:none">复制结果</button>
-          <button class="btn btn-outline" id="react-export-btn" style="display:none">导出 JSON</button>
+        <div class="card-title">React 分析</div>
+        <div class="react-sub-tabs">
+          <button class="react-stab active" data-reacttab="detect">基础检测</button>
+          <button class="react-stab" data-reacttab="store">状态探索</button>
+          <button class="react-stab" data-reacttab="router">路由表</button>
         </div>
-        <div class="status-bar" id="react-status"></div>
-        <div class="react-results" id="react-results">
-          <div class="empty-state">点击「检测 React」分析当前页面的 React 框架信息</div>
+
+        <!-- 基础检测 -->
+        <div id="reacttab-detect" class="react-stab-panel active">
+          <div class="react-module-desc">分析当前页面 React 框架版本、组件结构和路由信息</div>
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="react-detect-btn">检测 React</button>
+            <button class="btn btn-outline" id="react-copy-btn" style="display:none">复制结果</button>
+            <button class="btn btn-outline" id="react-export-btn" style="display:none">导出 JSON</button>
+          </div>
+          <div class="status-bar" id="react-status"></div>
+          <div class="react-results" id="react-results">
+            <div class="empty-state">点击「检测 React」分析当前页面的 React 框架信息</div>
+          </div>
         </div>
+
+        <!-- 状态探索 -->
+        <div id="reacttab-store" class="react-stab-panel">
+          <div class="react-store-actions">
+            <button class="btn btn-primary" id="react-store-read-btn">读取 Store</button>
+            <button class="btn btn-sm btn-outline" id="react-store-copy-btn">复制 JSON</button>
+            <button class="btn btn-sm btn-secondary" id="react-store-refresh-btn">刷新</button>
+          </div>
+          <div class="status-bar" id="react-store-status"></div>
+          <div class="react-store-section-label">Store 数据</div>
+          <div class="react-store-results" id="react-store-results">
+            <div class="empty-state">点击「读取 Store」探索 Redux/Zustand 状态数据</div>
+          </div>
+          <div class="react-store-section-label">API 端点</div>
+          <div class="react-api-results" id="react-api-results">
+            <div class="empty-state">读取 Store 后自动提取</div>
+          </div>
+        </div>
+
+        <!-- 路由表 -->
+        <div id="reacttab-router" class="react-stab-panel">
+          <div class="react-router-actions">
+            <button class="btn btn-primary" id="react-router-read-btn">读取路由</button>
+            <button class="btn btn-sm btn-outline" id="react-router-copy-btn">复制路由</button>
+          </div>
+          <div class="status-bar" id="react-router-status"></div>
+          <div class="react-router-results" id="react-routes-results">
+            <div class="empty-state">点击「读取路由」提取 React Router / Next.js 路由表</div>
+          </div>
+        </div>
+
       </div>
     </div>

@@ -218,3 +218,24 @@
   background: #3d3000;
   color: #ffc107;
 }
+.cors-cred-verify-btn {
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  border: 1px solid #e74c3c;
+  background: transparent;
+  color: #e74c3c;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.cors-cred-verify-btn:hover {
+  background: #e74c3c;
+  color: #fff;
+}
+[data-theme='dark'] .cors-cred-verify-btn {
+  border-color: #e74c3c;
+  color: #e74c3c;
+}

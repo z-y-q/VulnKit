@@ -481,42 +481,79 @@ function buildTestUrl(point, payload) {
 
 function buildPostBody(point, payload) {
   if (point.method !== 'POST') return null;
-  return JSON.stringify({ param: point.param, payload: payload });
+  return `${encodeURIComponent(point.param)}=${encodeURIComponent(payload)}`;
+}
+
+function isReflected(body, rawPayload) {
+  if (!body || !rawPayload) return false;
+  if (body.indexOf(rawPayload) !== -1) return true;
+  try {
+    const txt = document.createElement('textarea');
+    txt.innerHTML = body;
+    const decoded = txt.value;
+    if (decoded.indexOf(rawPayload) !== -1) return true;
+  } catch (_) {
+    // fallback
+  }
+  try {
+    if (decodeURIComponent(body).indexOf(rawPayload) !== -1) return true;
+  } catch (_) {
+    // malformed URI
+  }
+  const stripped = body.replace(/\s+/g, '');
+  const rawStripped = rawPayload.replace(/\s+/g, '');
+  if (stripped.indexOf(rawStripped) !== -1) return true;
+  return false;
 }
 
 async function verifySinglePoint(point, payload, rawPayload) {
   let testUrl = buildTestUrl(point, payload);
-  if (!testUrl) {
-    let postBody = buildPostBody(point, payload);
-    if (postBody) {
-      try {
-        let resp = await utils.fetchWithTimeout(
-          `${point.url}?${point.param}=${encodeURIComponent(payload)}`,
-          10000
-        );
-        if (resp && !resp.error) {
-          let body = resp.data || '';
-          if (body.indexOf(rawPayload) !== -1) {
-            return {
-              point: point,
-              status: 'reflected',
-              detail: 'Payload 在响应中出现（GET 回退）',
-              context: analyzeReflectionContext(body, rawPayload),
-              testUrl: `${point.url}?${point.param}=${encodeURIComponent(payload)}`,
-            };
-          }
-          return {
-            point: point,
-            status: 'safe',
-            detail: 'Payload 未在响应中出现（GET 回退）',
-            testUrl: `${point.url}?${point.param}=${encodeURIComponent(payload)}`,
-          };
-        }
-        return { point: point, status: 'error', detail: (resp && resp.error) || 'POST 请求失败' };
-      } catch (e) {
-        return { point: point, status: 'error', detail: e.message };
-      }
+
+  if (!testUrl && point.method === 'POST') {
+    const postBody = buildPostBody(point, payload);
+    if (!postBody) {
+      return { point: point, status: 'skip', detail: '不支持的请求方法' };
     }
+    try {
+      const resp = await new Promise(function (resolve) {
+        chrome.runtime.sendMessage(
+          {
+            type: 'FETCH_CORS_PROBE',
+            url: point.url,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            timeout: 10000,
+          },
+          function (r) {
+            resolve(r || { error: 'no response' });
+          }
+        );
+      });
+      if (resp.error) {
+        return { point: point, status: 'error', detail: resp.error };
+      }
+      const body = resp.body || '';
+      if (isReflected(body, rawPayload)) {
+        return {
+          point: point,
+          status: 'reflected',
+          detail: 'Payload 在 POST 响应中出现',
+          context: analyzeReflectionContext(body, rawPayload),
+          testUrl: point.url,
+        };
+      }
+      return {
+        point: point,
+        status: 'safe',
+        detail: 'Payload 未在 POST 响应中出现',
+        testUrl: point.url,
+      };
+    } catch (e) {
+      return { point: point, status: 'error', detail: e.message };
+    }
+  }
+
+  if (!testUrl) {
     return { point: point, status: 'skip', detail: '不支持的请求方法' };
   }
 
@@ -526,7 +563,7 @@ async function verifySinglePoint(point, payload, rawPayload) {
       return { point: point, status: 'error', detail: (resp && resp.error) || '请求失败' };
     }
     let body = resp.data || '';
-    if (body.indexOf(rawPayload) !== -1) {
+    if (isReflected(body, rawPayload)) {
       return {
         point: point,
         status: 'reflected',

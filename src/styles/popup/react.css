@@ -142,3 +142,246 @@
   background: var(--bg-tertiary, #2a2a3e);
   color: var(--text-primary, #e0e0e0);
 }
+/* React sub-tabs */
+.react-sub-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  margin-bottom: 12px;
+}
+[data-theme='dark'] .react-sub-tabs {
+  border-color: var(--border-color, #333);
+}
+.react-stab {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #666);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.react-stab:hover {
+  color: var(--accent, #0066cc);
+}
+.react-stab.active {
+  color: var(--accent, #0066cc);
+  border-bottom-color: var(--accent, #0066cc);
+}
+.react-stab-panel {
+  display: none;
+}
+.react-stab-panel.active {
+  display: block;
+}
+/* React Store Explorer */
+.react-store-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.react-store-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 10px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+}
+[data-theme='dark'] .react-store-section-label {
+  color: var(--text-secondary, #aaa);
+  border-color: var(--border-color, #2a2a2a);
+}
+.react-store-card {
+  background: var(--bg-tertiary, #f8f9fa);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+[data-theme='dark'] .react-store-card {
+  background: var(--bg-tertiary, #1a1a2e);
+  border-color: var(--border-color, #333);
+}
+.react-store-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.react-store-name {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+[data-theme='dark'] .react-store-name {
+  color: var(--text-primary, #e0e0e0);
+}
+.react-store-type-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.react-store-type-badge.type-redux {
+  background: #764abc;
+  color: #fff;
+}
+.react-store-type-badge.type-zustand {
+  background: #f59e0b;
+  color: #fff;
+}
+.react-store-type-badge.type-jotai {
+  background: #e74c3c;
+  color: #fff;
+}
+.react-store-type-badge.type-recoil {
+  background: #3498db;
+  color: #fff;
+}
+.react-store-type-badge.type-unknown {
+  background: #95a5a6;
+  color: #fff;
+}
+.react-store-node {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.react-store-key-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 0;
+}
+.react-store-key-row:hover {
+  background: var(--bg-card, rgba(0,0,0,0.02));
+  border-radius: 2px;
+}
+.react-store-toggle {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--text-secondary, #888);
+  flex-shrink: 0;
+  user-select: none;
+}
+.react-store-toggle-collapsed {
+  color: var(--accent, #0066cc);
+}
+.react-store-toggle-expanded {
+  color: var(--accent, #0066cc);
+}
+.react-store-key {
+  font-family: monospace;
+  font-weight: 500;
+  color: var(--text-primary, #333);
+  flex-shrink: 0;
+}
+[data-theme='dark'] .react-store-key {
+  color: var(--text-primary, #e0e0e0);
+}
+.react-store-val {
+  color: var(--text-secondary, #666);
+  font-size: 11px;
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+[data-theme='dark'] .react-store-val {
+  color: var(--text-secondary, #aaa);
+}
+.react-store-val.react-store-null {
+  color: #95a5a6;
+  font-style: italic;
+}
+.react-store-children {
+  padding-left: 16px;
+}
+.react-store-children.hidden {
+  display: none;
+}
+.react-store-more {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  padding: 2px 0;
+  font-style: italic;
+}
+.react-store-truncated {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  font-style: italic;
+}
+.react-store-section {
+  margin-bottom: 8px;
+}
+.react-store-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  margin-bottom: 4px;
+}
+/* React API list */
+.react-api-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.react-api-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--bg-tertiary, #f8f9fa);
+  border-radius: 4px;
+}
+[data-theme='dark'] .react-api-item {
+  background: var(--bg-tertiary, #1e1e2e);
+}
+.react-api-item code {
+  flex: 1;
+  font-size: 11px;
+  font-family: monospace;
+  word-break: break-all;
+  color: var(--accent, #0066cc);
+}
+.react-api-action {
+  border-left: 2px solid #f39c12;
+}
+/* React Router */
+.react-router-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.react-route-group {
+  margin-bottom: 6px;
+}
+.react-route-source {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  margin-bottom: 2px;
+}
+.react-route-attr {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--bg-tertiary, #e8ecf0);
+  color: var(--text-secondary, #555);
+}
+[data-theme='dark'] .react-route-attr {
+  background: var(--bg-tertiary, #2a2a3e);
+  color: var(--text-secondary, #aaa);
+}
