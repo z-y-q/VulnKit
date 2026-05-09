@@ -326,10 +326,12 @@
 
     // ALWAYS capture router responses (passive)
     if (xhrIsRouter) {
-      this.addEventListener('readystatechange', function () {
+      const origOnReadyStateChange = this.onreadystatechange;
+      this.onreadystatechange = function () {
         if (self.readyState === 4) {
           if (self.status !== 200) {
             logRequest('router-error', self.__vk_ruoyi_url, self.status, self.__vk_ruoyi_method);
+            if (typeof origOnReadyStateChange === 'function') origOnReadyStateChange.call(self);
             return;
           }
           let original = self.responseText;
@@ -373,6 +375,7 @@
                 },
                 location.origin
               );
+              if (typeof origOnReadyStateChange === 'function') origOnReadyStateChange.call(self);
               return;
             }
           }
@@ -381,7 +384,8 @@
             location.origin
           );
         }
-      });
+        if (typeof origOnReadyStateChange === 'function') origOnReadyStateChange.call(self);
+      };
     } else if (
       config &&
       config.enabled &&

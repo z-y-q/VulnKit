@@ -4,6 +4,8 @@
   if (window.__VK_ANGULAR_DETECT_DONE__) return;
   window.__VK_ANGULAR_DETECT_DONE__ = true;
 
+  const __vk_token = document.currentScript ? document.currentScript.dataset.vkToken || '' : '';
+
   const result = {
     detected: false,
     version: '',
@@ -189,5 +191,8 @@
     result.signals.push('Angular Router detected (<router-outlet>)');
   }
   result.routes = Object.keys(routeSet).slice(0, 50);
-  window.postMessage({ __vk_angular_detect: true, result: result }, location.origin);
+  window.postMessage(
+    { __vk_angular_detect: true, __vk_token: __vk_token, result: result },
+    location.origin
+  );
 })();

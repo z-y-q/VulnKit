@@ -4,6 +4,8 @@
   if (window.__VK_REACT_DETECT_DONE__) return;
   window.__VK_REACT_DETECT_DONE__ = true;
 
+  const __vk_token = document.currentScript ? document.currentScript.dataset.vkToken || '' : '';
+
   const result = {
     detected: false,
     version: '',
@@ -236,5 +238,8 @@
     }
   }
 
-  window.postMessage({ __vk_react_detect: true, result: result }, location.origin);
+  window.postMessage(
+    { __vk_react_detect: true, __vk_token: __vk_token, result: result },
+    location.origin
+  );
 })();

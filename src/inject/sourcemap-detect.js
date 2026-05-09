@@ -4,6 +4,8 @@
   if (window.__vkSourcemapDetectDone) return;
   window.__vkSourcemapDetectDone = true;
 
+  const __vk_token = document.currentScript ? document.currentScript.dataset.vkToken || '' : '';
+
   const result = { tool: null, version: null, hints: [], features: [] };
 
   // Webpack
@@ -168,5 +170,8 @@
     result.hints.push(`module scripts: ${moduleScripts.length}`);
   }
 
-  window.postMessage({ __vk_sourcemap_detect: true, result: result }, window.location.origin);
+  window.postMessage(
+    { __vk_sourcemap_detect: true, __vk_token: __vk_token, result: result },
+    window.location.origin
+  );
 })();

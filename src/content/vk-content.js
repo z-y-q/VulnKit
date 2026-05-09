@@ -13,32 +13,50 @@
   let angularDetectResolve = null;
   let sourcemapDetectResolve = null;
 
+  let pendingToken = null;
+  let reactDetectToken = null;
+  let angularDetectToken = null;
+  let sourcemapDetectToken = null;
+  let storeExploreToken = null;
+
   // Window message relay
   window.addEventListener('message', function (e) {
     if (e.origin !== location.origin) return;
 
     if (e.data && e.data.__vk_detect && pendingResolve) {
-      pendingResolve(e.data.result);
-      pendingResolve = null;
-      detecting = false;
+      if (pendingToken && e.data.__vk_token === pendingToken) {
+        pendingResolve(e.data.result);
+        pendingResolve = null;
+        pendingToken = null;
+        detecting = false;
+      }
       return;
     }
 
     if (e.data && e.data.__vk_react_detect && reactDetectResolve) {
-      reactDetectResolve(e.data.result);
-      reactDetectResolve = null;
+      if (reactDetectToken && e.data.__vk_token === reactDetectToken) {
+        reactDetectResolve(e.data.result);
+        reactDetectResolve = null;
+        reactDetectToken = null;
+      }
       return;
     }
 
     if (e.data && e.data.__vk_angular_detect && angularDetectResolve) {
-      angularDetectResolve(e.data.result);
-      angularDetectResolve = null;
+      if (angularDetectToken && e.data.__vk_token === angularDetectToken) {
+        angularDetectResolve(e.data.result);
+        angularDetectResolve = null;
+        angularDetectToken = null;
+      }
       return;
     }
 
     if (e.data && e.data.__vk_sourcemap_detect && sourcemapDetectResolve) {
-      sourcemapDetectResolve(e.data.result);
-      sourcemapDetectResolve = null;
+      if (sourcemapDetectToken && e.data.__vk_token === sourcemapDetectToken) {
+        sourcemapDetectResolve(e.data.result);
+        sourcemapDetectResolve = null;
+        sourcemapDetectToken = null;
+      }
       return;
     }
 
@@ -57,8 +75,11 @@
     }
 
     if (e.data && e.data.__vk_vue_store && storeExploreResolve) {
-      storeExploreResolve(e.data.result);
-      storeExploreResolve = null;
+      if (storeExploreToken && e.data.__vk_token === storeExploreToken) {
+        storeExploreResolve(e.data.result);
+        storeExploreResolve = null;
+        storeExploreToken = null;
+      }
       return;
     }
   });
@@ -68,8 +89,10 @@
     detecting = true;
     return new Promise(function (resolve) {
       pendingResolve = resolve;
+      pendingToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
       let script = document.createElement('script');
       script.src = chrome.runtime.getURL('src/inject/vue-detect.js');
+      script.dataset.vkToken = pendingToken;
       script.onload = function () {
         script.remove();
         setTimeout(function () {
@@ -92,8 +115,10 @@
     });
   }
 
-  function injectScript(url, resultVarSetter, timeoutMs) {
+  function injectScript(url, resultVarSetter, timeoutMs, tokenSetter) {
     return new Promise(function (resolve) {
+      const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      if (tokenSetter) tokenSetter(token);
       const timer = setTimeout(function () {
         resultVarSetter(null);
         resolve(null);
@@ -105,6 +130,7 @@
       resultVarSetter(innerResolve);
       const script = document.createElement('script');
       script.src = chrome.runtime.getURL(url);
+      script.dataset.vkToken = token;
       script.onload = function () {
         script.remove();
       };
@@ -365,17 +391,31 @@
       return true;
     }
     if (message.type === 'VK_REACT_DETECT') {
-      injectScript('src/inject/react-detect.js', function (r) {
-        reactDetectResolve = r;
-      }).then(function (result) {
+      injectScript(
+        'src/inject/react-detect.js',
+        function (r) {
+          reactDetectResolve = r;
+        },
+        3000,
+        function (t) {
+          reactDetectToken = t;
+        }
+      ).then(function (result) {
         sendResponse(result);
       });
       return true;
     }
     if (message.type === 'VK_ANGULAR_DETECT') {
-      injectScript('src/inject/angular-detect.js', function (r) {
-        angularDetectResolve = r;
-      }).then(function (result) {
+      injectScript(
+        'src/inject/angular-detect.js',
+        function (r) {
+          angularDetectResolve = r;
+        },
+        3000,
+        function (t) {
+          angularDetectToken = t;
+        }
+      ).then(function (result) {
         sendResponse(result);
       });
       return true;
@@ -414,10 +454,12 @@
     }
     if (message.type === 'VK_VUE_STORE_EXPLORE') {
       storeExploreResolve = null;
+      storeExploreToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
       new Promise(function (resolve) {
         storeExploreResolve = resolve;
         const script = document.createElement('script');
         script.src = chrome.runtime.getURL('src/inject/vue-store-explorer.js');
+        script.dataset.vkToken = storeExploreToken;
         script.onload = function () {
           script.remove();
           setTimeout(function () {
@@ -445,9 +487,16 @@
       return true;
     }
     if (message.type === 'VK_SOURCEMAP_DETECT') {
-      injectScript('src/inject/sourcemap-detect.js', function (r) {
-        sourcemapDetectResolve = r;
-      }).then(function (result) {
+      injectScript(
+        'src/inject/sourcemap-detect.js',
+        function (r) {
+          sourcemapDetectResolve = r;
+        },
+        3000,
+        function (t) {
+          sourcemapDetectToken = t;
+        }
+      ).then(function (result) {
         sendResponse(result);
       });
       return true;

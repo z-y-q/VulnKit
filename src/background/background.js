@@ -66,15 +66,11 @@ async function addUaRule(tabId, url, ua) {
     const parsed = new URL(url);
     urlFilter = parsed.hostname + '/*';
   } catch {
-    urlFilter = '*';
+    throw new Error('Invalid URL for UA spoof rule');
   }
 
-  // Remove old UA rules first
   await chrome.declarativeNetRequest.updateDynamicRules({
     removeRuleIds: [UA_RULE_ID],
-  });
-
-  await chrome.declarativeNetRequest.updateDynamicRules({
     addRules: [
       {
         id: UA_RULE_ID,
@@ -188,7 +184,8 @@ function isAllowedUrl(url) {
       hostname === '[::ffff:127.0.0.1]'
     )
       return false;
-    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|127\.)/.test(hostname)) return false;
+    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|127\.|169\.254\.)/.test(hostname))
+      return false;
     if (/\[::ffff:(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.)/.test(hostname)) return false;
     if (/^\d+$/.test(hostname)) return false;
     if (hostname.endsWith('.local') || hostname.endsWith('.internal')) return false;

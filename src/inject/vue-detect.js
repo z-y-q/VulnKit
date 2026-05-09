@@ -3,6 +3,8 @@
 (function () {
   'use strict';
 
+  const __vk_token = document.currentScript ? document.currentScript.dataset.vkToken || '' : '';
+
   const info = {
     detected: false,
     version: '',
@@ -224,5 +226,5 @@
     info.version = window.Vue.version;
   }
 
-  window.postMessage({ __vk_detect: true, result: info }, location.origin);
+  window.postMessage({ __vk_detect: true, __vk_token: __vk_token, result: info }, location.origin);
 })();

@@ -3,6 +3,8 @@
 (function () {
   'use strict';
 
+  const __vk_token = document.currentScript ? document.currentScript.dataset.vkToken || '' : '';
+
   function exploreStore() {
     let result = { stores: {}, frameworks: [], errors: [] };
 
@@ -29,10 +31,10 @@
           result.stores.root = extractVuexStore(store);
         }
       }
-      // Vue 2 instance
+      // Vue 2 instance (limit scan to 2000 elements)
       if (!vueRoot || !result.stores.root) {
         let allEls = document.querySelectorAll('*');
-        for (let i = 0; i < allEls.length; i++) {
+        for (let i = 0; i < Math.min(allEls.length, 2000); i++) {
           const el = allEls[i];
           if (el.__vue__ && el.__vue__.$store) {
             result.frameworks.push('Vue 2');
@@ -118,7 +120,7 @@
       }
       if (!store) {
         let allEls = document.querySelectorAll('*');
-        for (let i = 0; i < allEls.length; i++) {
+        for (let i = 0; i < Math.min(allEls.length, 2000); i++) {
           if (allEls[i].__vue__ && allEls[i].__vue__.$store) {
             store = allEls[i].__vue__.$store;
             break;
@@ -188,7 +190,7 @@
     ];
     const customAttrs = {};
     const allEls = document.querySelectorAll('*');
-    for (let i = 0; i < allEls.length; i++) {
+    for (let i = 0; i < Math.min(allEls.length, 2000); i++) {
       const el = allEls[i];
       const attrs = el.attributes;
       for (let j = 0; j < attrs.length; j++) {
@@ -235,6 +237,7 @@
   window.postMessage(
     {
       __vk_vue_store: true,
+      __vk_token: __vk_token,
       result: {
         store: storeData,
         actions: actionsData,
