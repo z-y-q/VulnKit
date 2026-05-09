@@ -1,14 +1,17 @@
     <!-- XSS 扫描面板 -->
     <div id="panel-xssscan" class="panel">
       <div class="content-card">
-        <div class="card-title">XSS 扫描</div>
+        <div class="card-title">参数点采集</div>
+        <div class="xssscan-module-desc" style="font-size:11px;color:var(--text-secondary,#888);margin-bottom:8px;line-height:1.5">
+          采集页面中的输入参数点，检查 Payload 是否在响应中反射。反射 ≠ 可利用，需结合上下文进一步验证。
+        </div>
         <div class="xssscan-actions">
           <button class="btn btn-primary" id="xssscan-harvest-btn">采集参数</button>
           <button class="btn btn-secondary" id="xssscan-start-intercept-btn">启动拦截</button>
           <button class="btn btn-outline" id="xssscan-stop-intercept-btn" disabled>停止拦截</button>
           <button class="btn btn-outline" id="xssscan-clear-btn">清空</button>
         </div>
-        <div class="xssscan-status" id="xssscan-status">点击「采集参数」开始扫描当前页面</div>
+        <div class="xssscan-status" id="xssscan-status">点击「采集参数」发现页面输入点</div>
 
         <div class="xssscan-filter-row">
           <span class="xssscan-filter-label">来源筛选:</span>

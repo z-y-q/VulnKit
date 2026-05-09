@@ -537,7 +537,7 @@ async function verifySinglePoint(point, payload, rawPayload) {
         return {
           point: point,
           status: 'reflected',
-          detail: 'Payload 在 POST 响应中出现',
+          detail: 'Payload 在 POST 响应中出现（输入反射，需验证可利用性）',
           context: analyzeReflectionContext(body, rawPayload),
           testUrl: point.url,
         };
@@ -567,7 +567,7 @@ async function verifySinglePoint(point, payload, rawPayload) {
       return {
         point: point,
         status: 'reflected',
-        detail: 'Payload 在响应中出现',
+        detail: 'Payload 在响应中出现（输入反射，需验证可利用性）',
         context: analyzeReflectionContext(body, rawPayload),
         testUrl: testUrl,
       };
@@ -578,7 +578,7 @@ async function verifySinglePoint(point, payload, rawPayload) {
   }
 }
 
-let VERIFY_BADGES = { reflected: '反射', safe: '安全', skip: '跳过', error: '错误' };
+let VERIFY_BADGES = { reflected: '输入反射', safe: '未反射', skip: '跳过', error: '错误' };
 
 function renderVerifyResult(r) {
   let badge = VERIFY_BADGES[r.status] || '错误';
@@ -609,12 +609,12 @@ function updateVerifyStatus(results, statusEl) {
     return r.status === 'safe';
   }).length;
   let other = results.length - reflected - safe;
-  statusEl.textContent = `反射验证完成: ${reflected} 反射 / ${safe} 安全 / ${other} 其他`;
+  statusEl.textContent = `反射检查完成: ${reflected} 个输入反射 / ${safe} 个未反射 / ${other} 个其他`;
   statusEl.style.color = reflected > 0 ? '#e74c3c' : '#27ae60';
   if (reflected > 0) {
-    utils.showToast(`发现 ${reflected} 个反射点!`, 'error');
+    utils.showToast(`发现 ${reflected} 个输入反射点，需进一步验证可利用性`, 'warning');
   } else {
-    utils.showToast('验证完成，未发现反射', 'success');
+    utils.showToast('反射检查完成，未发现输入反射', 'success');
   }
 }
 
@@ -632,14 +632,14 @@ async function handleVerifyReflection() {
   let verifyList = utils.get('xssscan-verify-list');
 
   if (statusEl) {
-    statusEl.textContent = '正在验证反射...';
+    statusEl.textContent = '正在检查反射...';
     statusEl.style.color = '#4A90E2';
   }
   if (verifyPanel) verifyPanel.style.display = '';
 
   let results = [];
   for (let i = 0; i < selected.length; i++) {
-    if (statusEl) statusEl.textContent = `验证反射中... (${i + 1}/${selected.length})`;
+    if (statusEl) statusEl.textContent = `检查反射中... (${i + 1}/${selected.length})`;
     results.push(await verifySinglePoint(selected[i], payload, rawPayload));
   }
 

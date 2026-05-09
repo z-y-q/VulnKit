@@ -416,7 +416,7 @@ function renderResults(analysis) {
       `<span class="cors-origin-tag">Origin: ${utils.escapeHtml(issue.origin.value)}</span>`;
 
     if (issue.severity === 'danger' || issue.severity === 'critical') {
-      html += `<button class="cors-cred-verify-btn" data-cors-url="${utils.escapeHtml(issue.url)}" data-cors-method="${issue.method}" data-cors-origin="${utils.escapeHtml(issue.origin.value)}">验证凭据</button>`;
+      html += `<button class="cors-cred-verify-btn" data-cors-url="${utils.escapeHtml(issue.url)}" data-cors-method="${issue.method}" data-cors-origin="${utils.escapeHtml(issue.origin.value)}">凭据预检</button>`;
     }
 
     html += `</div>`;
@@ -458,7 +458,7 @@ function severityLabel(sev) {
 async function verifyCredentials(issue) {
   const statusEl = utils.get('cors-status');
   if (statusEl) {
-    statusEl.textContent = '正在验证凭据利用性...';
+    statusEl.textContent = '正在进行凭据预检...';
     statusEl.style.color = '#4A90E2';
   }
 
@@ -498,35 +498,35 @@ async function verifyCredentials(issue) {
     if (includeReflects && includeAcacTrue) {
       result = {
         exploitable: true,
-        detail: 'credentials:include 仍返回 ACAO 反射 + ACAC:true — 确认可跨站窃取数据',
+        detail: '服务端在凭据模式下仍返回 ACAO 反射 + ACAC:true — CORS 策略存在配置缺陷',
         omit: { opaque: omitOpaque, acao: omitAcao, acac: omitAcac },
         include: { opaque: includeOpaque, acao: includeAcao, acac: includeAcac },
       };
     } else if (includeReflects && !includeAcacTrue) {
       result = {
         exploitable: false,
-        detail: 'credentials:include 返回 ACAO 反射但无 ACAC — 浏览器会阻断凭据发送',
+        detail: '凭据模式下 ACAO 反射但无 ACAC — 浏览器会阻断凭据发送',
         omit: { opaque: omitOpaque, acao: omitAcao, acac: omitAcac },
         include: { opaque: includeOpaque, acao: includeAcao, acac: includeAcac },
       };
     } else if (includeOpaque) {
       result = {
         exploitable: false,
-        detail: 'credentials:include 返回 opaque 响应 — 浏览器安全机制阻止了凭据请求',
+        detail: '凭据模式下返回 opaque — 服务端或浏览器安全机制阻止了请求',
         omit: { opaque: omitOpaque, acao: omitAcao, acac: omitAcac },
         include: { opaque: includeOpaque, acao: includeAcao, acac: includeAcac },
       };
     } else if (!includeReflects) {
       result = {
         exploitable: false,
-        detail: 'credentials:include 时 Origin 未被反射 — 凭据模式下安全',
+        detail: '凭据模式下 Origin 未被反射 — CORS 配置相对安全',
         omit: { opaque: omitOpaque, acao: omitAcao, acac: omitAcac },
         include: { opaque: includeOpaque, acao: includeAcao, acac: includeAcac },
       };
     } else {
       result = {
         exploitable: false,
-        detail: '凭据验证完成，未发现可利用的凭据泄露',
+        detail: '凭据预检完成，未发现 CORS 凭据泄露风险',
         omit: { opaque: omitOpaque, acao: omitAcao, acac: omitAcac },
         include: { opaque: includeOpaque, acao: includeAcao, acac: includeAcac },
       };
@@ -537,24 +537,27 @@ async function verifyCredentials(issue) {
     );
     if (credDiv) {
       const color = result.exploitable ? '#e74c3c' : '#27ae60';
-      const badge = result.exploitable ? '可利用' : '不可利用';
+      const badge = result.exploitable ? '高风险' : '低风险';
       credDiv.innerHTML =
         `<div style="margin-top:6px;padding:6px 8px;border-radius:4px;background:${result.exploitable ? 'rgba(231,76,60,0.1)' : 'rgba(39,174,96,0.1)'};font-size:11px">` +
-        `<span style="color:${color};font-weight:bold">[凭据验证: ${badge}]</span> ${utils.escapeHtml(result.detail)}` +
+        `<span style="color:${color};font-weight:bold">[预检结果: ${badge}]</span> ${utils.escapeHtml(result.detail)}` +
         `<br><span style="color:#999">omit: opaque=${omitOpaque} ACAO=${omitAcao || '(空)'} ACAC=${omitAcac || '(空)'}</span>` +
         `<br><span style="color:#999">include: opaque=${includeOpaque} ACAO=${includeAcao || '(空)'} ACAC=${includeAcac || '(空)'}</span>` +
+        `<div style="margin-top:4px;padding:3px 6px;background:rgba(243,156,18,0.15);border-radius:3px;color:#b8860b;font-size:10px">` +
+        `⚠ 此为服务端 CORS 策略预检。Service Worker 环境无法携带页面 Cookie，实际利用需在浏览器环境中进一步验证。` +
+        `</div>` +
         `</div>`;
     }
 
     if (statusEl) {
       statusEl.textContent = result.exploitable
-        ? '凭据验证: 确认可跨站窃取数据!'
-        : '凭据验证: 未发现可利用的凭据泄露';
+        ? '预检结果: CORS 策略存在配置缺陷'
+        : '预检结果: 未发现凭据泄露风险';
       statusEl.style.color = result.exploitable ? '#e74c3c' : '#27ae60';
     }
     utils.showToast(
-      result.exploitable ? '确认可利用! 凭据模式下可跨站读取数据' : '凭据模式下安全',
-      result.exploitable ? 'error' : 'success'
+      result.exploitable ? 'CORS 策略存在配置缺陷，需进一步验证' : 'CORS 凭据预检相对安全',
+      result.exploitable ? 'warning' : 'success'
     );
   } catch (e) {
     if (statusEl) {

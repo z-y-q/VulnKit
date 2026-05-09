@@ -3,6 +3,29 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 
+let lastReactStores = null;
+
+function nodeMatches(key, val, filter) {
+  if (!filter) return true;
+  var lower = filter.toLowerCase();
+  if (key.toLowerCase().indexOf(lower) !== -1) return true;
+  if (typeof val === 'string' && val.toLowerCase().indexOf(lower) !== -1) return true;
+  if (typeof val === 'number' || typeof val === 'boolean') {
+    if (String(val).toLowerCase().indexOf(lower) !== -1) return true;
+  }
+  return false;
+}
+
+function subtreeHasMatch(obj, filter) {
+  if (!filter || !obj || typeof obj !== 'object') return false;
+  return Object.keys(obj).some(function (k) {
+    var v = obj[k];
+    if (nodeMatches(k, v, filter)) return true;
+    if (v && typeof v === 'object') return subtreeHasMatch(v, filter);
+    return false;
+  });
+}
+
 async function exploreReactStore() {
   const statusEl = utils.get('react-store-status');
   const storeEl = utils.get('react-store-results');
@@ -36,6 +59,7 @@ async function exploreReactStore() {
     const routes = data.routes || [];
     const apiEndpoints = data.apiEndpoints || [];
     const errors = data.errors || [];
+    lastReactStores = stores;
 
     const storeKeys = Object.keys(stores);
     if (statusEl) {
@@ -44,7 +68,10 @@ async function exploreReactStore() {
         const typeSeen = {};
         storeKeys.forEach(function (k) {
           var t = (stores[k] || {}).type || 'unknown';
-          if (!typeSeen[t]) { typeSeen[t] = true; types.push(t); }
+          if (!typeSeen[t]) {
+            typeSeen[t] = true;
+            types.push(t);
+          }
         });
         statusEl.textContent = types.join(', ') + ' | ' + storeKeys.length + ' 个 Store';
       } else {
@@ -53,7 +80,10 @@ async function exploreReactStore() {
     }
 
     // Render stores
-    renderStores(storeEl, stores, storeKeys);
+    renderStores(storeEl, stores, storeKeys, '');
+
+    var searchInput = utils.get('react-store-search');
+    if (searchInput) searchInput.style.display = storeKeys.length > 0 ? '' : 'none';
 
     // Render routes
     if (routesEl) renderRoutes(routesEl, routes);
@@ -71,7 +101,7 @@ async function exploreReactStore() {
   }
 }
 
-function renderStores(container, stores, storeKeys) {
+function renderStores(container, stores, storeKeys, filter) {
   if (storeKeys.length === 0) {
     container.innerHTML = utils.emptyHtml('未发现 Redux/Zustand/Jotai Store');
     return;
@@ -83,15 +113,23 @@ function renderStores(container, stores, storeKeys) {
     var state = storeData.state || {};
     var storeType = storeData.type || 'unknown';
 
+    var treeHtml = renderStoreTree(state, '', 0, filter);
+    if (filter && !treeHtml) return;
+
     html += '<div class="react-store-card">';
     html += '<div class="react-store-header">';
     html += '<span class="react-store-name">' + utils.escapeHtml(storeId) + '</span>';
-    html += '<span class="react-store-type-badge type-' + utils.escapeHtml(storeType) + '">' + utils.escapeHtml(storeType) + '</span>';
+    html +=
+      '<span class="react-store-type-badge type-' +
+      utils.escapeHtml(storeType) +
+      '">' +
+      utils.escapeHtml(storeType) +
+      '</span>';
     html += '</div>';
-    html += renderStoreTree(state, '', 0);
+    html += treeHtml;
     html += '</div>';
   });
-  container.innerHTML = html;
+  container.innerHTML = filter && !html ? utils.emptyHtml('没有匹配的结果') : html;
 }
 
 function renderRoutes(container, routes) {
@@ -112,7 +150,12 @@ function renderRoutes(container, routes) {
   html += '<div class="react-store-section-title">路由 (' + routes.length + ')</div>';
   Object.keys(grouped).forEach(function (src) {
     html += '<div class="react-route-group">';
-    html += '<div class="react-route-source">' + utils.escapeHtml(src) + ' (' + grouped[src].length + ')</div>';
+    html +=
+      '<div class="react-route-source">' +
+      utils.escapeHtml(src) +
+      ' (' +
+      grouped[src].length +
+      ')</div>';
     grouped[src].forEach(function (r) {
       html += '<div class="react-route-item">';
       html += '<code class="react-route-path">' + utils.escapeHtml(r.path) + '</code>';
@@ -141,8 +184,14 @@ function renderApiEndpoints(container, endpoints) {
     var displayUrl = isAction ? ep : ep;
     var copyClass = isAction ? 'react-api-item react-api-action' : 'react-api-item';
     html += '<div class="' + copyClass + '" data-url="' + utils.escapeHtml(displayUrl) + '">';
-    html += '<code>' + utils.escapeHtml(displayUrl.length > 100 ? displayUrl.substring(0, 97) + '...' : displayUrl) + '</code>';
-    html += '<button class="btn btn-sm btn-outline react-api-copy-btn" data-url="' + utils.escapeHtml(displayUrl) + '">复制</button>';
+    html +=
+      '<code>' +
+      utils.escapeHtml(displayUrl.length > 100 ? displayUrl.substring(0, 97) + '...' : displayUrl) +
+      '</code>';
+    html +=
+      '<button class="btn btn-sm btn-outline react-api-copy-btn" data-url="' +
+      utils.escapeHtml(displayUrl) +
+      '">复制</button>';
     html += '</div>';
   });
   html += '</div>';
@@ -157,16 +206,22 @@ function renderApiEndpoints(container, endpoints) {
   });
 }
 
-function renderStoreTree(obj, prefix, depth) {
+function renderStoreTree(obj, prefix, depth, filter) {
   if (depth > 5) return '<div class="react-store-node react-store-truncated">...</div>';
   if (obj === null || obj === undefined) return '';
   if (typeof obj !== 'object') return '';
   if (Array.isArray(obj)) {
-    return '<div class="react-store-node"><div class="react-store-key-row">' +
+    return (
+      '<div class="react-store-node"><div class="react-store-key-row">' +
       '<span class="react-store-toggle react-store-toggle-leaf"></span>' +
-      '<span class="react-store-type-badge">Array[' + obj.length + ']</span>' +
-      '<span class="react-store-val">' + utils.escapeHtml(JSON.stringify(obj).substring(0, 120)) + '</span>' +
-      '</div></div>';
+      '<span class="react-store-type-badge">Array[' +
+      obj.length +
+      ']</span>' +
+      '<span class="react-store-val">' +
+      utils.escapeHtml(JSON.stringify(obj).substring(0, 120)) +
+      '</span>' +
+      '</div></div>'
+    );
   }
 
   let html = '';
@@ -176,10 +231,16 @@ function renderStoreTree(obj, prefix, depth) {
 
   keys.forEach(function (key) {
     if (shown >= maxShow) return;
-    shown++;
     var val = obj[key];
+    if (filter) {
+      var directMatch = nodeMatches(key, val, filter);
+      var childMatch = val && typeof val === 'object' && subtreeHasMatch(val, filter);
+      if (!directMatch && !childMatch) return;
+    }
+    shown++;
     var path = prefix ? prefix + '.' + key : key;
-    var isExpandable = val !== null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0;
+    var isExpandable =
+      val !== null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0;
     var isArr = Array.isArray(val);
 
     var toggleIcon = isExpandable
@@ -188,10 +249,19 @@ function renderStoreTree(obj, prefix, depth) {
 
     var valHtml = '';
     if (isArr) {
-      valHtml = '<span class="react-store-type-badge">Array[' + val.length + ']</span>' +
-        '<span class="react-store-val">' + utils.escapeHtml(JSON.stringify(val).substring(0, 120)) + '</span>';
+      valHtml =
+        '<span class="react-store-type-badge">Array[' +
+        val.length +
+        ']</span>' +
+        '<span class="react-store-val">' +
+        utils.escapeHtml(JSON.stringify(val).substring(0, 120)) +
+        '</span>';
     } else if (typeof val === 'string') {
-      valHtml = '<span class="react-store-val">"' + utils.escapeHtml(val.substring(0, 100)) + (val.length > 100 ? '...' : '') + '"</span>';
+      valHtml =
+        '<span class="react-store-val">"' +
+        utils.escapeHtml(val.substring(0, 100)) +
+        (val.length > 100 ? '...' : '') +
+        '"</span>';
     } else if (typeof val === 'number' || typeof val === 'boolean') {
       valHtml = '<span class="react-store-val">' + String(val) + '</span>';
     } else if (val === null) {
@@ -199,13 +269,20 @@ function renderStoreTree(obj, prefix, depth) {
     }
 
     var childrenHtml = isExpandable
-      ? '<div class="react-store-children hidden">' + renderStoreTree(val, path, depth + 1) + '</div>'
+      ? '<div class="react-store-children hidden">' +
+        renderStoreTree(val, path, depth + 1, filter) +
+        '</div>'
       : '';
 
-    html += '<div class="react-store-node">' +
-      '<div class="react-store-key-row" data-path="' + utils.escapeHtml(path) + '">' +
+    html +=
+      '<div class="react-store-node">' +
+      '<div class="react-store-key-row" data-path="' +
+      utils.escapeHtml(path) +
+      '">' +
       toggleIcon +
-      '<span class="react-store-key">' + utils.escapeHtml(key) + '</span>' +
+      '<span class="react-store-key">' +
+      utils.escapeHtml(key) +
+      '</span>' +
       valHtml +
       '</div>' +
       childrenHtml +
@@ -222,6 +299,13 @@ function renderStoreTree(obj, prefix, depth) {
 function initStoreExplorerEvents() {
   var storeEl = utils.get('react-store-results');
   if (!storeEl) return;
+
+  var searchInput = utils.get('react-store-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      searchReactStore(this.value.trim());
+    });
+  }
 
   storeEl.addEventListener('click', function (e) {
     var toggle = e.target.closest('.react-store-toggle-collapsed, .react-store-toggle-expanded');
@@ -255,4 +339,12 @@ async function copyReactStoreJson() {
   }
 }
 
-export { exploreReactStore, copyReactStoreJson, initStoreExplorerEvents };
+function searchReactStore(text) {
+  if (!lastReactStores) return;
+  var storeEl = utils.get('react-store-results');
+  if (!storeEl) return;
+  var storeKeys = Object.keys(lastReactStores);
+  renderStores(storeEl, lastReactStores, storeKeys, text);
+}
+
+export { exploreReactStore, copyReactStoreJson, initStoreExplorerEvents, searchReactStore };

@@ -286,7 +286,7 @@ async function extractApiFromJsFiles(scriptSrcs, pageUrl) {
       return false;
     }
   });
-  filesToFetch = filesToFetch.slice(0, 15);
+  filesToFetch = filesToFetch.slice(0, 50);
 
   if (gatherAbortFlag) return { endpoints: endpoints, sensitiveItems: sensitiveItems };
 

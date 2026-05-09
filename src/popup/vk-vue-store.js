@@ -4,6 +4,29 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 
+let lastStoreInfo = null;
+
+function nodeMatches(key, val, filter) {
+  if (!filter) return true;
+  var lower = filter.toLowerCase();
+  if (key.toLowerCase().indexOf(lower) !== -1) return true;
+  if (typeof val === 'string' && val.toLowerCase().indexOf(lower) !== -1) return true;
+  if (typeof val === 'number' || typeof val === 'boolean') {
+    if (String(val).toLowerCase().indexOf(lower) !== -1) return true;
+  }
+  return false;
+}
+
+function subtreeHasMatch(obj, filter) {
+  if (!filter || !obj || typeof obj !== 'object') return false;
+  return Object.keys(obj).some(function (k) {
+    var v = obj[k];
+    if (nodeMatches(k, v, filter)) return true;
+    if (v && typeof v === 'object') return subtreeHasMatch(v, filter);
+    return false;
+  });
+}
+
 async function exploreVueStore() {
   const statusEl = utils.get('vue-store-status');
   const resultsEl = utils.get('vue-store-results');
@@ -36,9 +59,13 @@ async function exploreVueStore() {
     const storeInfo = data.store || {};
     const actionsInfo = data.actions || {};
     const dirsInfo = data.directives || [];
+    lastStoreInfo = { store: storeInfo, actions: actionsInfo, directives: dirsInfo };
 
     const frameworks = storeInfo.frameworks || [];
     const storeKeys = Object.keys(storeInfo.stores || {});
+
+    const searchInput = utils.get('vue-store-search');
+    if (searchInput) searchInput.style.display = storeKeys.length > 0 ? '' : 'none';
     if (statusEl) {
       if (frameworks.length > 0) {
         statusEl.textContent = `检测到 ${frameworks.join(', ')} | ${storeKeys.length} 个 Store`;
@@ -58,7 +85,7 @@ async function exploreVueStore() {
             <span class="vue-store-name">${utils.escapeHtml(storeId)}</span>
             <span class="vue-store-type">${utils.escapeHtml(storeData.type || 'unknown')}</span>
           </div>
-          ${renderStoreTree(storeData.state, '', 0)}
+          ${renderStoreTree(storeData.state, '', 0, '')}
           ${renderTagList(storeData.getters, 'vue-store-tag', 'Getters')}
           ${renderTagList(storeData.mutations, 'vue-store-tag vue-store-tag-mut', 'Mutations')}
           ${renderTagList(storeData.actions, 'vue-store-tag vue-store-tag-act', 'Actions')}
@@ -151,7 +178,7 @@ function renderTagList(items, tagClass, label) {
   </div>`;
 }
 
-function renderStoreTree(obj, prefix, depth) {
+function renderStoreTree(obj, prefix, depth, filter) {
   if (depth > 5) return '<div class="vue-store-node vue-store-truncated">...</div>';
   if (obj === null || obj === undefined) return '';
   if (typeof obj !== 'object') return '';
@@ -163,8 +190,13 @@ function renderStoreTree(obj, prefix, depth) {
 
   keys.forEach(function (key) {
     if (shown >= maxShow) return;
-    shown++;
     let val = obj[key];
+    if (filter) {
+      var directMatch = nodeMatches(key, val, filter);
+      var childMatch = val && typeof val === 'object' && subtreeHasMatch(val, filter);
+      if (!directMatch && !childMatch) return;
+    }
+    shown++;
     const path = prefix ? `${prefix}.${key}` : key;
     const isExpandable =
       val !== null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0;
@@ -186,7 +218,7 @@ function renderStoreTree(obj, prefix, depth) {
     }
 
     const childrenHtml = isExpandable
-      ? `<div class="vue-store-children hidden">${renderStoreTree(val, path, depth + 1)}</div>`
+      ? `<div class="vue-store-children hidden">${renderStoreTree(val, path, depth + 1, filter)}</div>`
       : '';
 
     html += `<div class="vue-store-node">
@@ -227,6 +259,13 @@ function initStoreExplorerEvents() {
   const resultsEl = utils.get('vue-store-results');
   if (!resultsEl) return;
 
+  const searchInput = utils.get('vue-store-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      searchVueStore(this.value.trim());
+    });
+  }
+
   resultsEl.addEventListener('click', function (e) {
     const toggle = e.target.closest('.vue-store-toggle-collapsed, .vue-store-toggle-expanded');
     if (toggle) {
@@ -243,4 +282,66 @@ function initStoreExplorerEvents() {
   });
 }
 
-export { exploreVueStore, copyFullStoreJson, initStoreExplorerEvents };
+function searchVueStore(text) {
+  if (!lastStoreInfo) return;
+  var storeInfo = lastStoreInfo.store;
+  var storeKeys = Object.keys(storeInfo.stores || {});
+  var resultsEl = utils.get('vue-store-results');
+  if (!resultsEl) return;
+
+  if (!text) {
+    storeKeys.forEach(function (storeId) {
+      var storeData = storeInfo.stores[storeId];
+      // Re-render without filter — will be handled by exploreVueStore cache
+    });
+    // Re-render full tree without filter
+    var html = '';
+    storeKeys.forEach(function (storeId) {
+      var storeData = storeInfo.stores[storeId];
+      html +=
+        '<div class="vue-store-card">' +
+        '<div class="vue-store-header">' +
+        '<span class="vue-store-name">' +
+        utils.escapeHtml(storeId) +
+        '</span>' +
+        '<span class="vue-store-type">' +
+        utils.escapeHtml(storeData.type || 'unknown') +
+        '</span>' +
+        '</div>' +
+        renderStoreTree(storeData.state, '', 0, '') +
+        renderTagList(storeData.getters, 'vue-store-tag', 'Getters') +
+        renderTagList(storeData.mutations, 'vue-store-tag vue-store-tag-mut', 'Mutations') +
+        renderTagList(storeData.actions, 'vue-store-tag vue-store-tag-act', 'Actions') +
+        '</div>';
+    });
+    resultsEl.innerHTML = html;
+    return;
+  }
+
+  var html = '';
+  var hasMatch = false;
+  storeKeys.forEach(function (storeId) {
+    var storeData = storeInfo.stores[storeId];
+    var treeHtml = renderStoreTree(storeData.state, '', 0, text);
+    if (!treeHtml) return;
+    hasMatch = true;
+    html +=
+      '<div class="vue-store-card">' +
+      '<div class="vue-store-header">' +
+      '<span class="vue-store-name">' +
+      utils.escapeHtml(storeId) +
+      '</span>' +
+      '<span class="vue-store-type">' +
+      utils.escapeHtml(storeData.type || 'unknown') +
+      '</span>' +
+      '</div>' +
+      treeHtml +
+      renderTagList(storeData.getters, 'vue-store-tag', 'Getters') +
+      renderTagList(storeData.mutations, 'vue-store-tag vue-store-tag-mut', 'Mutations') +
+      renderTagList(storeData.actions, 'vue-store-tag vue-store-tag-act', 'Actions') +
+      '</div>';
+  });
+  resultsEl.innerHTML = hasMatch ? html : utils.emptyHtml('没有匹配的结果');
+}
+
+export { exploreVueStore, copyFullStoreJson, initStoreExplorerEvents, searchVueStore };
