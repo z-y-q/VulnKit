@@ -522,6 +522,7 @@ async function verifySinglePoint(point, payload, rawPayload) {
             url: point.url,
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: postBody,
             timeout: 10000,
           },
           function (r) {

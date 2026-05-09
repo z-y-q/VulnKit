@@ -476,6 +476,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           signal: controller.signal,
           headers: corsHeaders,
           credentials: message.credentials || 'omit',
+          body: message.body || undefined,
         })
           .then(async resp => {
             clearTimeout(timer);
