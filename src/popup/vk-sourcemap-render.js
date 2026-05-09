@@ -8,7 +8,8 @@ function renderSourcemapModules() {
   if (!container) return;
 
   if (smState.sourcemapModules.length === 0) {
-    container.innerHTML = utils.emptyHtml('未找到 Webpack 模块');
+    container.innerHTML =
+      '<div class="gather-empty-state"><div class="gather-empty-icon">&#128533;</div><div class="gather-empty-text">未找到 Webpack 模块</div></div>';
     return;
   }
 
@@ -205,8 +206,4 @@ smState.Render = {
   backToSourcemapList: backToSourcemapList,
 };
 
-export {
-  renderSourcemapModules,
-  showSourcemapModuleDetail,
-  backToSourcemapList,
-};
+export { renderSourcemapModules, showSourcemapModuleDetail, backToSourcemapList };

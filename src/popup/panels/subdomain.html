@@ -3,13 +3,16 @@
       <div class="content-card">
         <div class="card-title">子域名收集</div>
         <div class="subdomain-module-desc">通过证书透明度、页面提取和 DNS/HTTP 探测收集子域名</div>
-        <div class="panel-actions">
+        <div class="gather-primary-actions">
           <button class="btn btn-primary" id="subdomain-all-btn">一键全部</button>
-          <button class="btn btn-secondary" id="subdomain-scan-btn">CT 证书查询</button>
-          <button class="btn btn-secondary" id="subdomain-page-btn">页面提取</button>
-          <button class="btn btn-outline" id="subdomain-dns-btn">DNS/HTTP 探测</button>
-          <button class="btn btn-outline" id="subdomain-copy-btn" hidden>复制结果</button>
-          <button class="btn btn-outline" id="subdomain-export-btn" hidden>导出</button>
+        </div>
+        <div class="gather-toolbar">
+          <button class="gather-tool-btn" id="subdomain-scan-btn">CT 证书查询</button>
+          <button class="gather-tool-btn" id="subdomain-page-btn">页面提取</button>
+          <button class="gather-tool-btn" id="subdomain-dns-btn">DNS/HTTP 探测</button>
+          <span class="gather-tool-divider"></span>
+          <button class="gather-tool-btn" id="subdomain-copy-btn" hidden>复制结果</button>
+          <button class="gather-tool-btn" id="subdomain-export-btn" hidden>导出</button>
         </div>
         <div class="status-bar" id="subdomain-status"></div>
         <div class="subdomain-stats" id="subdomain-stats" hidden></div>
@@ -25,7 +28,10 @@
         </div>
 
         <div class="subdomain-results" id="subdomain-results">
-          <div class="empty-state">点击「CT 证书查询」通过证书透明度查询子域名</div>
+          <div class="gather-empty-state">
+            <div class="gather-empty-icon">&#127760;</div>
+            <div class="gather-empty-text">点击上方按钮开始收集子域名</div>
+          </div>
         </div>
       </div>
     </div>

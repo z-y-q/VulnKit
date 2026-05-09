@@ -2,16 +2,20 @@
     <div id="panel-sourcemap" class="panel">
       <div class="content-card">
         <div class="card-title">Webpack 模块映射</div>
-        <div class="panel-actions">
+        <div class="gather-primary-actions">
           <button class="btn btn-primary" id="sourcemap-scan-btn">扫描[v2]</button>
-          <button class="btn btn-sm btn-outline" id="sourcemap-analyze-btn">安全分析</button>
-          <button class="btn btn-sm btn-outline" id="sourcemap-copy-all-btn">复制路径</button>
-          <button class="btn btn-sm btn-outline" id="sourcemap-copy-tree-btn">目录树</button>
-          <button class="btn btn-sm btn-outline" id="sourcemap-load-sources-btn">加载到Sources</button>
-          <button class="btn btn-sm btn-outline" id="sourcemap-download-all-btn">下载全部</button>
-          <button class="btn btn-sm btn-outline" id="sourcemap-api-btn">提取API</button>
-          <button class="btn btn-sm btn-outline" id="sourcemap-export-json-btn">导出JSON</button>
-          <button class="btn btn-sm btn-outline" id="sourcemap-export-csv-btn">导出CSV</button>
+        </div>
+        <div class="gather-toolbar">
+          <button class="gather-tool-btn" id="sourcemap-analyze-btn">安全分析</button>
+          <span class="gather-tool-divider"></span>
+          <button class="gather-tool-btn" id="sourcemap-copy-all-btn">复制路径</button>
+          <button class="gather-tool-btn" id="sourcemap-copy-tree-btn">目录树</button>
+          <button class="gather-tool-btn" id="sourcemap-load-sources-btn">源码注入</button>
+          <button class="gather-tool-btn" id="sourcemap-download-all-btn">下载</button>
+          <span class="gather-tool-divider"></span>
+          <button class="gather-tool-btn" id="sourcemap-api-btn">API</button>
+          <button class="gather-tool-btn" id="sourcemap-export-json-btn">JSON</button>
+          <button class="gather-tool-btn" id="sourcemap-export-csv-btn">CSV</button>
         </div>
         <div class="sourcemap-status" id="sourcemap-status"></div>
         <div class="sm-progress hidden" id="sm-progress">
@@ -31,7 +35,10 @@
 
         <!-- 扫描结果列表 -->
         <div id="sourcemap-results" class="sourcemap-results">
-          <div class="empty-state">点击「扫描当前页面」提取 Webpack 模块映射</div>
+          <div class="gather-empty-state">
+            <div class="gather-empty-icon">&#128269;</div>
+            <div class="gather-empty-text">点击「扫描」提取 Webpack 模块映射</div>
+          </div>
         </div>
 
         <!-- 安全分析结果 -->
