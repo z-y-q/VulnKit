@@ -25,6 +25,7 @@ import {
   handleXssHarvest,
   handleBatchOpenXss,
   handleVerifyReflection,
+  handleOpenReflected,
   handleCopyXssUrls,
   initXssScanPayloadSelect,
   clearResults as xssClearResults,
@@ -779,6 +780,7 @@ function initXssAndSourcemap() {
   });
   utils.bindClick('xssscan-batchopen-btn', handleBatchOpenXss);
   utils.bindClick('xssscan-verify-btn', handleVerifyReflection);
+  utils.bindClick('xssscan-open-reflected-btn', handleOpenReflected);
   utils.bindClick('xssscan-copyall-btn', handleCopyXssUrls);
   utils.bindClick('xssscan-export-btn', xssExportData);
   utils.bindClick('xssscan-sink-btn', analyzeDomSinks);

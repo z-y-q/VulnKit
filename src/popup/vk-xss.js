@@ -6,12 +6,49 @@ import { XSS_DATA } from './vk-payload.js';
 import { XSS_SCAN_PAYLOADS } from './vk-xss-data.js';
 import { analyzeDomSinks } from './vk-xss-sinks.js';
 
+var REFLECTION_PROBE = 'vkprobe\'"><xyz';
+
 let xssPoints = [];
 let xssFilterType = 'all';
 let xssSearchText = '';
 let xssInterceptTimer = null;
 let xssInterceptActive = false;
 let xssInterceptCountdown = 0;
+
+async function fetchInTab(url, fetchOpts, timeoutMs) {
+  const tab = await utils.requireTabId();
+  if (!tab) return { error: '无法获取活动标签页' };
+  var ms = timeoutMs || 10000;
+  try {
+    var results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: function (urlStr, opts, timeout) {
+        var ac = new AbortController();
+        var t = setTimeout(function () {
+          ac.abort();
+        }, timeout);
+        var fo = Object.assign({ credentials: 'include', signal: ac.signal }, opts || {});
+        return fetch(urlStr, fo)
+          .then(function (r) {
+            clearTimeout(t);
+            return r.text();
+          })
+          .then(function (text) {
+            return { data: text };
+          })
+          .catch(function (e) {
+            clearTimeout(t);
+            return { error: e.message || 'fetch 失败' };
+          });
+      },
+      args: [url, fetchOpts || null, ms],
+    });
+    var data = results && results[0] && results[0].result;
+    return data !== undefined ? data : { error: '执行失败' };
+  } catch (e) {
+    return { error: e.message };
+  }
+}
 
 async function harvestXssParamsFromDom() {
   const tab = await utils.requireTabId();
@@ -488,25 +525,40 @@ function buildPostBody(point, payload) {
   return `${encodeURIComponent(point.param)}=${encodeURIComponent(payload)}`;
 }
 
+function htmlDecode(str) {
+  if (!str) return '';
+  return str
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, '/')
+    .replace(/&#39;/g, "'")
+    .replace(/&#47;/g, '/')
+    .replace(/&#(\d+);/g, function (_, n) {
+      return String.fromCharCode(parseInt(n, 10));
+    });
+}
+
 function isReflected(body, rawPayload) {
   if (!body || !rawPayload) return false;
   if (body.indexOf(rawPayload) !== -1) return true;
-  try {
-    const txt = document.createElement('textarea');
-    txt.innerHTML = body;
-    const decoded = txt.value;
-    if (decoded.indexOf(rawPayload) !== -1) return true;
-  } catch (_) {
-    // fallback
-  }
+  var decoded = htmlDecode(body);
+  if (decoded !== body && decoded.indexOf(rawPayload) !== -1) return true;
   try {
     if (decodeURIComponent(body).indexOf(rawPayload) !== -1) return true;
-  } catch (_) {
-    // malformed URI
-  }
-  const stripped = body.replace(/\s+/g, '');
-  const rawStripped = rawPayload.replace(/\s+/g, '');
+  } catch (_) {}
+  var stripped = body.replace(/\s+/g, '');
+  var rawStripped = rawPayload.replace(/\s+/g, '');
   if (stripped.indexOf(rawStripped) !== -1) return true;
+  var decStripped = decoded.replace(/\s+/g, '');
+  if (decStripped !== stripped && decStripped.indexOf(rawStripped) !== -1) return true;
+  var marker = 'vkprobe';
+  if (rawPayload.indexOf(marker) !== -1) {
+    if (body.indexOf(marker) !== -1) return true;
+    if (decoded !== body && decoded.indexOf(marker) !== -1) return true;
+  }
   return false;
 }
 
@@ -519,29 +571,19 @@ async function verifySinglePoint(point, payload, rawPayload) {
       return { point: point, status: 'skip', detail: '不支持的请求方法' };
     }
     try {
-      const resp = await new Promise(function (resolve) {
-        const timer = setTimeout(function () {
-          resolve({ error: 'timeout' });
-        }, 12000);
-        chrome.runtime.sendMessage(
-          {
-            type: 'FETCH_CORS_PROBE',
-            url: point.url,
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: postBody,
-            timeout: 10000,
-          },
-          function (r) {
-            clearTimeout(timer);
-            resolve(r || { error: 'no response' });
-          }
-        );
-      });
+      const resp = await fetchInTab(
+        point.url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: postBody,
+        },
+        10000
+      );
       if (resp.error) {
         return { point: point, status: 'error', detail: resp.error };
       }
-      const body = resp.body || '';
+      const body = resp.data || '';
       if (isReflected(body, rawPayload)) {
         return {
           point: point,
@@ -567,11 +609,22 @@ async function verifySinglePoint(point, payload, rawPayload) {
   }
 
   try {
-    let resp = await utils.fetchWithTimeout(testUrl, 10000);
+    let resp = await fetchInTab(testUrl, null, 10000);
     if (!resp || resp.error) {
       return { point: point, status: 'error', detail: (resp && resp.error) || '请求失败' };
     }
     let body = resp.data || '';
+    console.debug(
+      '[XSS verify]',
+      point.param,
+      testUrl,
+      'bodyLen:',
+      body.length,
+      'payloadLen:',
+      rawPayload.length
+    );
+    if (body.length < 500) console.debug('[XSS verify] full body:', body.substring(0, 500));
+    else console.debug('[XSS verify] body snippet:', body.substring(0, 500));
     if (isReflected(body, rawPayload)) {
       return {
         point: point,
@@ -634,8 +687,7 @@ async function handleVerifyReflection() {
     return;
   }
 
-  let payload = getEncodedPayload();
-  let rawPayload = getSelectedPayload();
+  let probe = REFLECTION_PROBE;
   let statusEl = utils.get('xssscan-status');
   let verifyPanel = utils.get('xssscan-verify-results');
   let verifyList = utils.get('xssscan-verify-list');
@@ -649,11 +701,55 @@ async function handleVerifyReflection() {
   let results = [];
   for (let i = 0; i < selected.length; i++) {
     if (statusEl) statusEl.textContent = `检查反射中... (${i + 1}/${selected.length})`;
-    results.push(await verifySinglePoint(selected[i], payload, rawPayload));
+    results.push(await verifySinglePoint(selected[i], probe, probe));
   }
 
   renderVerifyResults(results, verifyList);
   updateVerifyStatus(results, statusEl);
+  lastVerifyResults = results;
+}
+
+var lastVerifyResults = [];
+
+function handleOpenReflected() {
+  var reflected = lastVerifyResults.filter(function (r) {
+    return r.status === 'reflected';
+  });
+  if (reflected.length === 0) {
+    utils.showToast('没有已验证的反射点', 'warning');
+    return;
+  }
+  var payload = getEncodedPayload();
+  var opened = 0;
+  reflected.forEach(function (r) {
+    var point = r.point;
+    if (point.method === 'POST') {
+      var targetUrl = buildXssTestUrl(point, payload);
+      if (targetUrl && typeof targetUrl === 'object') {
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = targetUrl.url;
+        form.target = '_blank';
+        form.style.display = 'none';
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = targetUrl.param;
+        input.value = targetUrl.payload;
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
+        opened++;
+      }
+      return;
+    }
+    var url = buildXssTestUrl(point, payload);
+    if (url && typeof url === 'string') {
+      chrome.tabs.create({ url: url, active: false });
+      opened++;
+    }
+  });
+  utils.showToast('已打开 ' + opened + ' 个反射点测试页面', 'success');
 }
 
 function truncateUrl(url) {
@@ -780,6 +876,7 @@ export {
   handleXssHarvest,
   handleBatchOpenXss,
   handleVerifyReflection,
+  handleOpenReflected,
   handleCopyXssUrls,
   initXssScanPayloadSelect,
   clearResults,
