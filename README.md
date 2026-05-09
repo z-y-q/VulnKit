@@ -1,12 +1,13 @@
-# VulnKit v6.0 使用说明
+# 灵眸 v6.0 使用说明
 
-Chrome 渗透测试辅助工具包，集成 12 个功能模块，覆盖编码解码、加密解密、Payload 工具、信息收集、资产测绘、Vue 权限绕过等常见安全测试场景。
+Chrome 渗透测试辅助工具包，集成 20 个功能模块，覆盖编码解码、加密解密、Payload 工具、信息收集、资产测绘、Vue 权限绕过、XSS 扫描、Source Map 分析、RuoYi 路由检测、WAF/CORS/子域名扫描等常见安全测试场景。
 
 ---
 
 ## 目录
 
 - [安装](#安装)
+- [项目结构](#项目结构)
 - [编码工具](#1-编码工具)
 - [加密解密](#2-加密解密)
 - [图标识别](#3-图标识别)
@@ -20,6 +21,15 @@ Chrome 渗透测试辅助工具包，集成 12 个功能模块，覆盖编码解
 - [Vue 分析（重点）](#11-vue-分析)
 - [JS 控制](#12-js控制)
 - [Payload 工具](#13-payload-工具)
+- [XSS 扫描](#14-xss-扫描)
+- [Source Map 分析](#15-source-map-分析)
+- [RuoYi 路由](#16-ruoyi-路由)
+- [WAF 检测](#17-waf-检测)
+- [CORS 检测](#18-cors-检测)
+- [子域名枚举](#19-子域名枚举)
+- [Cookie 审计](#20-cookie-审计)
+- [React/Angular 检测](#21-reactangular-检测)
+- [Source Loader](#22-source-loader)
 - [权限说明](#权限说明)
 - [常见问题](#常见问题)
 
@@ -31,76 +41,128 @@ Chrome 渗透测试辅助工具包，集成 12 个功能模块，覆盖编码解
 src/
 ├── manifest.json
 ├── background/
-│   └── background.js            # Service Worker，消息中转、请求头注入、Cookie 代理
+│   └── background.js              # Service Worker，消息中转、请求头注入、Cookie 代理
 ├── content/
-│   └── vk-content.js            # Content Script，右键菜单处理
-├── inject/
-│   ├── vue-detect.js            # 注入脚本：Vue 实例检测 + 路由/Store 读取
-│   ├── vue-store-explorer.js    # 注入脚本：Pinia/Vuex Store 遍历导出
-│   └── ruoyi-route-hook.js      # 注入脚本：RuoYi 动态路由拦截
+│   └── vk-content.js              # Content Script，右键菜单处理
+├── inject/                        # MAIN world 注入脚本（自包含 IIFE）
+│   ├── vue-detect.js              # Vue 实例检测 + 路由/Store 读取
+│   ├── vue-store-explorer.js      # Pinia/Vuex Store 遍历导出
+│   ├── ruoyi-route-hook.js        # RuoYi 动态路由拦截
+│   ├── react-detect.js            # React 实例检测
+│   ├── angular-detect.js          # Angular 实例检测
+│   └── sourcemap-detect.js        # Source Map 文件探测 + 下载
 ├── popup/
-│   ├── popup.html               # Shell：头部 + 标签栏 + 状态栏，面板由 JS 加载
-│   ├── panel-loader.js          # 并行加载 14 个面板 HTML 片段到 #app-main
-│   ├── panels/                  # 面板 HTML 片段（14 个文件）
-│   │   ├── encoding.html        # 编码工具 + 加密解密
-│   │   ├── favicon-gather.html  # 图标识别 + 信息收集
-│   │   ├── rules-modal.html     # HaE 规则弹窗
-│   │   ├── asset.html           # 资产测绘
-│   │   ├── links-multiurl.html  # 链接提取 + URL 多开
-│   │   ├── history.html         # 历史档案
-│   │   ├── exif.html            # EXIF 查看
-│   │   ├── spoof.html           # 请求伪造
-│   │   ├── vue.html             # Vue 分析
-│   │   ├── jsctrl.html          # JS 控制
-│   │   ├── payload.html         # Payload 工具
-│   │   ├── xssscan.html         # XSS 扫描
-│   │   ├── sourcemap.html       # Source Map 分析
-│   │   └── ruoyi.html           # RuoYi 路由
-│   ├── vk-namespace.js          # 全局命名空间 VulnKit / VulnKitUtils
-│   ├── vk-init.js               # 初始化：标签切换、面板绑定、主题管理
-│   ├── vk-encoding.js           # 编码/解码模块
-│   ├── vk-jwt.js                # JWT 解析模块
-│   ├── vk-crypto.js             # 加密解密（AES/DES/RC4/SM2/SM4/RSA/Bcrypt）
-│   ├── vk-favicon.js            # 图标识别 + MurmurHash3
-│   ├── vk-hae-rules.js          # HaE 安全规则管理
-│   ├── vk-gather.js             # 信息收集（API/域名/敏感信息/IP/注释）
-│   ├── vk-asset.js              # 资产测绘（FOFA/ZoomEye/Shodan）
-│   ├── vk-links.js              # 链接提取
-│   ├── vk-multiurl.js           # URL 批量多开
-│   ├── vk-tabsave.js            # 标签页保存
-│   ├── vk-exif.js               # EXIF 元数据查看
-│   ├── vk-history.js            # Wayback Machine 历史快照
-│   ├── vk-spoof.js              # 请求伪造（UA/Cookie/Header）
-│   ├── vk-payload.js            # Payload 工具（XSS/SQLi/LFI/反弹Shell/WebShell）
-│   ├── vk-xss.js                # XSS 自动扫描
-│   ├── vk-sourcemap.js          # Webpack Source Map 分析 + 模块扫描
-│   ├── vk-vue.js                # Vue 分析（检测/拦截/权限菜单/路由对比/JS搜索）
-│   ├── vk-ruoyi-common.js       # RuoYi 公共工具
-│   ├── vk-ruoyi-detect.js       # RuoYi 框架检测
-│   ├── vk-ruoyi-hook.js         # RuoYi 拦截器 + API 流量查看
-│   ├── vk-ruoyi-mar.js          # RuoYi MaR 动态路由
-│   ├── vk-ruoyi.js              # RuoYi 主模块（批量探测/路由管理）
-│   ├── vk-jsctrl.js             # JS 控制（开关/反调试/复制限制解除）
-│   └── lib/                     # 第三方库（crypto-js, jsrsasign, sm2, sm4, bcrypt, exifr）
+│   ├── popup.html                 # Shell：头部 + 标签栏 + 状态栏，面板由 JS 加载
+│   ├── panel-loader.js            # 并行加载 20 个面板 HTML 片段到 #app-main
+│   ├── panels/                    # 面板 HTML 片段（21 个文件）
+│   │   ├── encoding.html          # 编码工具 + 加密解密
+│   │   ├── favicon-gather.html    # 图标识别 + 信息收集 + HaE 规则
+│   │   ├── rules-modal.html       # HaE 规则弹窗
+│   │   ├── asset.html             # 资产测绘
+│   │   ├── links-multiurl.html    # 链接提取 + URL 多开
+│   │   ├── history.html           # 历史档案
+│   │   ├── exif.html              # EXIF 查看
+│   │   ├── spoof.html             # 请求伪造
+│   │   ├── vue.html               # Vue 分析
+│   │   ├── jsctrl.html            # JS 控制
+│   │   ├── payload.html           # Payload 工具
+│   │   ├── xssscan.html           # XSS 扫描
+│   │   ├── sourcemap.html         # Source Map 分析
+│   │   ├── ruoyi.html             # RuoYi 路由
+│   │   ├── waf.html               # WAF 检测
+│   │   ├── cors.html              # CORS 检测
+│   │   ├── subdomain.html         # 子域名枚举
+│   │   ├── cookie-audit.html      # Cookie 审计
+│   │   ├── react.html             # React 检测
+│   │   ├── angular.html           # Angular 检测
+│   │   └── source-loader.html     # Source Loader
+│   │
+│   ├── vk-namespace.js            # ES module 入口：全局工具函数 + utilsProxy
+│   ├── vk-init.js                 # 应用入口，加载设置并调用初始化函数
+│   ├── vk-init-panels.js          # 面板初始化（编码/资产/收集/EXIF/伪造/Payload/SourceMap/状态栏）
+│   ├── vk-init-detectors.js       # 检测器初始化（Vue/JS控制/安全检测/网络工具/状态恢复）
+│   │
+│   ├── vk-encoding.js             # 编码/解码
+│   ├── vk-jwt.js                  # JWT 解析
+│   ├── vk-crypto.js               # 加密解密（AES/DES/RC4/SM2/SM4/RSA/Bcrypt）
+│   ├── vk-favicon.js              # 图标识别 + MurmurHash3
+│   ├── vk-hae-rules.js            # HaE 安全规则管理
+│   ├── vk-hae-default-rules.js    # HaE 默认规则数据
+│   ├── vk-gather.js               # 信息收集（API/域名/敏感信息/IP/注释）
+│   ├── vk-gather-traffic.js       # API 流量捕获（XHR/Fetch 拦截）
+│   ├── vk-asset.js                # 资产测绘（FOFA/ZoomEye/Shodan）
+│   ├── vk-links.js                # 链接提取
+│   ├── vk-multiurl.js             # URL 批量多开
+│   ├── vk-tabsave.js              # 标签页保存
+│   ├── vk-exif.js                 # EXIF 元数据查看
+│   ├── vk-history.js              # Wayback Machine 历史快照
+│   ├── vk-spoof.js                # 请求伪造（UA/Cookie/Header）
+│   ├── vk-jsctrl.js               # JS 控制（开关/反调试/复制限制解除）
+│   │
+│   ├── vk-payload.js              # Payload 工具（XSS/SQLi/LFI/反弹Shell/WebShell/命令参考）
+│   ├── vk-xss.js                  # XSS 扫描主模块（拦截/DOM Sink/反射验证）
+│   ├── vk-xss-data.js             # XSS 扫描载荷、Sink 模式、严重性配置
+│   ├── vk-xss-sinks.js            # DOM Sink 分析（document.write/innerHTML/src 等）
+│   │
+│   ├── vk-sourcemap.js            # Source Map barrel（统一导出）
+│   ├── vk-sourcemap-state.js      # Source Map 共享状态
+│   ├── vk-sourcemap-phase1.js     # Phase 1: MAIN world Webpack 运行时检测
+│   ├── vk-sourcemap-scanner.js    # Source Map 扫描主流程
+│   ├── vk-sourcemap-render.js     # Source Map 模块列表渲染
+│   ├── vk-sourcemap-utils.js      # Source Map 文件下载/解析工具
+│   ├── vk-sourcemap-analysis.js   # Source Map API 端点/依赖分析
+│   ├── vk-sourcemap-actions.js    # Source Map 批量操作（导出/下载/DevTools）
+│   │
+│   ├── vk-vue.js                  # Vue barrel（统一导出）
+│   ├── vk-vue-state.js            # Vue 共享状态
+│   ├── vk-vue-detect.js           # Vue 框架检测 + 路由/守卫绕过
+│   ├── vk-vue-perm.js             # Vue 权限菜单拦截 + 管理员提权
+│   ├── vk-vue-perm-inject.js      # 权限菜单注入序列化函数
+│   ├── vk-vue-compare.js          # 路由与菜单对比 + 隐藏路由发现
+│   ├── vk-vue-jssearch.js         # JS 关键词搜索
+│   ├── vk-vue-store.js            # Pinia/Vuex Store 探索器
+│   │
+│   ├── vk-ruoyi.js                # RuoYi barrel + 批量探测/路由管理
+│   ├── vk-ruoyi-common.js         # RuoYi 公共工具
+│   ├── vk-ruoyi-detect.js         # RuoYi 框架检测 + 自动捕获
+│   ├── vk-ruoyi-hook.js           # RuoYi 路由钩子拦截 + API 流量
+│   ├── vk-ruoyi-mar.js            # RuoYi MaR 动态路由发现
+│   ├── vk-ruoyi-cve-db.js         # RuoYi CVE 数据库
+│   │
+│   ├── vk-waf.js                  # WAF 检测（特征识别 + 指纹匹配）
+│   ├── vk-cors.js                 # CORS 配置扫描
+│   ├── vk-subdomain.js            # 子域名枚举（页面提取/CRT/DNS 暴力枚举）
+│   ├── vk-cookie-audit.js         # Cookie 安全审计
+│   ├── vk-react.js                # React 框架检测
+│   ├── vk-angular.js              # Angular 框架检测
+│   ├── vk-source-loader.js        # Source Loader（源码加载到 DevTools Sources）
+│   └── lib/                       # 第三方库（crypto-js, jsrsasign, sm2, sm4, bcrypt, exifr）
 ├── styles/
-│   ├── popup/                   # Popup 样式（13 个文件，按模块拆分）
-│   │   ├── base.css             # 全局样式、暗色变量、Toast、确认弹窗、无障碍
-│   │   ├── favicon.css          # 图标识别
-│   │   ├── info-gather.css      # 信息收集
-│   │   ├── link-extract.css     # 链接提取
-│   │   ├── asset-shodan.css     # 资产测绘
-│   │   ├── history.css          # 历史档案
-│   │   ├── ruoyi.css            # RuoYi 路由
-│   │   ├── exif.css             # EXIF 查看
-│   │   ├── request-spoofing.css # 请求伪造
-│   │   ├── vue-js-perm.css      # Vue 分析 + JS 控制
+│   ├── popup/                     # Popup 样式（20 个文件，按模块拆分）
+│   │   ├── base.css               # 全局样式、暗色变量、Toast、确认弹窗、无障碍
+│   │   ├── favicon.css            # 图标识别
+│   │   ├── info-gather.css        # 信息收集
+│   │   ├── link-extract.css       # 链接提取
+│   │   ├── asset-shodan.css       # 资产测绘
+│   │   ├── history.css            # 历史档案
+│   │   ├── ruoyi.css              # RuoYi 路由
+│   │   ├── exif.css               # EXIF 查看
+│   │   ├── request-spoofing.css   # 请求伪造
+│   │   ├── vue-js-perm.css        # Vue 分析 + JS 控制
 │   │   ├── perm-search-compare.css # 权限菜单 + 搜索 + 路由对比
-│   │   ├── payload-xss.css      # Payload + XSS 扫描
-│   │   └── sourcemap-vue-store.css # Source Map + HaE + Vue Store
-│   └── options.css              # 选项页样式
+│   │   ├── payload-xss.css        # Payload + XSS 扫描
+│   │   ├── sourcemap-vue-store.css # Source Map + HaE + Vue Store
+│   │   ├── waf.css                # WAF 检测
+│   │   ├── cors.css               # CORS 检测
+│   │   ├── subdomain.css          # 子域名枚举
+│   │   ├── cookie-audit.css       # Cookie 审计
+│   │   ├── react.css              # React 检测
+│   │   ├── angular.css            # Angular 检测
+│   │   └── source-loader.css      # Source Loader
+│   └── options.css                # 选项页样式
 └── options/
-    ├── options.html             # 选项页
-    └── options.js               # 选项页逻辑
+    ├── options.html               # 选项页
+    └── options.js                 # 选项页逻辑
 ```
 
 ---
@@ -180,10 +242,28 @@ src/
 | IP 地址 | 公网 IP 和内网 IP（10.x / 172.16-31.x / 192.168.x） |
 | 注释内容 | HTML 注释 `<!-- -->` 中的开发者备注、TODO、敏感信息 |
 
+### HaE 安全规则
+
+集成 HaE（Hunt Executive）安全分析规则引擎，支持自定义规则管理和导入。
+
+- **内置规则** — 包含 SQL 注入、XSS、SSRF、信息泄露、逻辑漏洞等分类
+- **规则管理** — 按分组启用/禁用规则，支持导入/导出/恢复默认
+- **流量分析** — 实时拦截 XHR/Fetch 请求，匹配 HaE 规则高亮显示
+
 **使用方法：**
 1. 在目标页面打开插件
 2. 点击对应类别的「提取」按钮
 3. 结果逐条显示，可复制
+4. 点击「规则」按钮打开规则管理面板
+
+### API 流量捕获
+
+实时拦截页面中的 XHR/Fetch 请求，记录 API 调用。
+
+- **开始/停止** — 动态注入拦截器，捕获网络请求
+- **方法筛选** — 按 GET/POST/PUT/DELETE 筛选
+- **状态码筛选** — 按 200/301/403/500 等筛选
+- **导出** — 导出捕获的 API 列表
 
 ---
 
@@ -388,6 +468,15 @@ src/
 
 自动逐个通过 `$router.push()` 访问路由，配合 Burpsuite 抓包检测未授权访问。
 
+### 10.5 Store 探索器
+
+探测并展示 Vue 应用中 Pinia/Vuex Store 的数据结构。
+
+**功能：**
+- 自动发现所有 Store 模块
+- 展示每个模块的 State 数据
+- 复制完整 Store JSON
+
 ---
 
 ## 11. JS 控制
@@ -500,6 +589,276 @@ PHP 一句话木马和混淆 WebShell：
 
 ---
 
+## 13. XSS 扫描
+
+自动化 XSS 漏洞检测工具，支持反射型 XSS 发现和 DOM Sink 分析。
+
+### 13.1 反射型 XSS 检测
+
+**工作流程：**
+1. **载荷采集** — 自动从 Payload 库选择载荷
+2. **参数注入** — 扫描页面中的表单和链接参数
+3. **反射验证** — 逐个注入载荷并检查是否在响应中反射
+4. **结果筛选** — 支持按状态（反射/未反射/可疑）和关键词过滤
+
+**功能：**
+- **开始拦截** — 劫持表单提交，记录所有参数输入点
+- **批量采集** — 自动发现页面中的输入点并采集载荷
+- **验证反射** — 对每个输入点注入 XSS 载荷并检测反射
+- **批量打开** — 在新标签页中打开所有可疑的 XSS 点
+- **导出** — 导出检测结果
+
+### 13.2 DOM Sink 分析
+
+分析页面中危险的 DOM Sink 点，发现潜在的 DOM XSS。
+
+**检测的 Sink 类型：**
+
+| Sink | 危险等级 | 说明 |
+|------|---------|------|
+| `document.write()` | 高 | 直接写入 HTML |
+| `innerHTML` | 高 | 解析 HTML 内容 |
+| `outerHTML` | 高 | 替换元素 HTML |
+| `eval()` | 高 | 执行任意代码 |
+| `setTimeout(string)` | 高 | 延迟执行代码 |
+| `setInterval(string)` | 高 | 定时执行代码 |
+| `Function()` | 高 | 动态创建函数 |
+| `location` 赋值 | 中 | URL 跳转 |
+| `src`/`href` 赋值 | 中 | 资源加载 |
+
+**使用方法：** 点击「分析 DOM 汇点」扫描当前页面中的所有危险 Sink。
+
+---
+
+## 14. Source Map 分析
+
+分析 Webpack 打包的前端应用，提取源码映射、模块列表和 API 端点。
+
+### 14.1 Webpack 模块扫描
+
+**扫描流程：**
+1. **Phase 1** — 在 MAIN world 检测 Webpack 运行时，捕获模块缓存
+2. **Phase 2** — 尝试获取各模块的源代码
+3. **Phase 3** — 尝试加载 `.map` 文件获取原始源码
+
+**检测结果：**
+- 模块 ID 和路径
+- 模块依赖关系
+- 模块源代码（如果可获取）
+- Source Map 状态
+
+### 14.2 API 端点发现
+
+从模块源码中自动提取 API 端点路径。
+
+**提取规则：**
+- `fetch('/api/...')` 调用
+- `axios.get/post/put/delete('/api/...')` 调用
+- `request({ url: '/api/...' })` 调用
+- 字符串中的 URL 模式
+
+### 14.3 批量操作
+
+- **复制路径** — 复制所有模块路径
+- **生成树** — 生成模块依赖树
+- **加载到 DevTools** — 将源码加载到 Chrome DevTools Sources 面板
+- **下载全部** — 批量下载所有模块源码
+- **导出 JSON/CSV** — 导出模块列表
+
+---
+
+## 15. RuoYi 路由
+
+RuoYi 后台管理系统的路由分析与权限测试工具。发现被权限系统隐藏的菜单和接口。
+
+### 15.1 框架检测
+
+检测当前页面是否使用 RuoYi 框架，识别版本号和变体。
+
+**识别的 RuoYi 变体：**
+
+| 变体 | 特征 |
+|------|------|
+| Vue2 前后端分离 | Element UI + Vue Router + Vuex |
+| Vue3 | Element Plus + Vue 3 + Pinia |
+| Thymeleaf 模板 | jQuery + Bootstrap + 服务端渲染 |
+| 微服务 | Spring Cloud + Gateway + Nacos |
+| App | uni-app 移动端 |
+
+**检测特征：**
+- 脚本文件名（request.js、auth.js、permission.js）
+- 页面布局结构（sidebar-container、app-container）
+- 全局对象（`__CONFIG__`、`__APP_BASE_API__`）
+- Cookie Token（Admin-Token）
+- Element UI/Plus 版本
+- 云原生组件（Gateway、Nacos、Sentinel）
+
+### 15.2 路由钩子拦截
+
+注入路由钩子到目标页面，拦截动态路由加载过程。
+
+**工作流程：**
+1. 点击「安装钩子」注入拦截脚本
+2. 刷新页面，拦截器自动捕获 `router.addRoutes()` 调用
+3. 捕获的路由数据实时显示在面板中
+4. 可查看每个路由的完整路径、组件、权限配置
+
+**增强模式：**
+- **标准模式** — 仅捕获路由数据
+- **增强模式** — 额外拦截 API 请求，捕获更多路由信息
+
+### 15.3 动态路由发现
+
+通过分析 JS 文件发现可能存在的动态路由。
+
+**功能：**
+- **JS 分析** — 扫描页面 JS 文件中的路由定义模式
+- **应用路由** — 将发现的路由添加到路由表中
+- **全选/复制** — 批量选择和复制路由路径
+
+### 15.4 批量探测
+
+对发现的路由进行批量 HTTP 请求探测。
+
+**功能：**
+- **自定义并发数** — 控制同时发送的请求数量
+- **HTTP 方法选择** — GET / POST / PUT / DELETE
+- **状态码过滤** — 按响应状态码筛选结果
+- **导出** — 导出探测结果（cURL 命令 / HTML 报告）
+
+### 15.5 API 流量查看
+
+查看 RuoYi 钩子拦截到的 API 流量。
+
+### 15.6 CVE 查询
+
+内置 RuoYi 相关 CVE 漏洞数据库，支持按版本号查询。
+
+---
+
+## 16. WAF 检测
+
+检测目标网站是否部署了 Web 应用防火墙（WAF）。
+
+**检测原理：** 发送带有特定攻击特征的请求，根据响应状态码、响应体特征判断 WAF 类型。
+
+**支持的 WAF 指纹：**
+
+| WAF | 厂商 |
+|-----|------|
+| 云 WAF | 阿里云 WAF、腾讯云 WAF、华为云 WAF |
+| 国外 WAF | Cloudflare、AWS WAF、Akamai |
+| 硬件 WAF | Imperva、F5 BIG-IP |
+| 开源 WAF | ModSecurity、NAXSI |
+
+**功能：**
+- 一键扫描
+- 按状态筛选（已识别/未拦截/异常）
+- 搜索结果
+- 复制/导出结果
+
+---
+
+## 17. CORS 检测
+
+扫描目标网站 API 的 CORS（跨域资源共享）配置。
+
+**检测内容：**
+- `Access-Control-Allow-Origin` — 允许的源
+- `Access-Control-Allow-Credentials` — 是否允许携带凭证
+- `Access-Control-Allow-Methods` — 允许的方法
+- `Access-Control-Allow-Headers` — 允许的请求头
+
+**安全风险：**
+- `Allow-Origin: *` + `Allow-Credentials: true` — 高危配置
+- `Allow-Origin` 包含不可信源 — 可能导致数据泄露
+- `Reflect Origin` — 反射任意 Origin
+
+**功能：**
+- 一键扫描当前页面引用的 API
+- 按严重程度筛选
+- 搜索结果
+- 导出 JSON
+
+---
+
+## 18. 子域名枚举
+
+收集目标域名的子域名信息。
+
+**收集方式：**
+
+| 方式 | 说明 |
+|------|------|
+| 页面提取 | 从当前页面源码中提取域名和链接 |
+| CRT 证书 | 查询证书透明度日志 |
+| DNS 暴力枚举 | 尝试常见子域名前缀 |
+
+**功能：**
+- 按来源筛选
+- 搜索结果
+- 复制/导出结果
+
+---
+
+## 19. Cookie 审计
+
+审计当前网站 Cookie 的安全性。
+
+**检查项：**
+
+| 检查项 | 说明 | 风险等级 |
+|--------|------|---------|
+| `Secure` 缺失 | Cookie 可通过 HTTP 传输 | 高 |
+| `HttpOnly` 缺失 | Cookie 可被 JavaScript 读取（XSS 窃取） | 高 |
+| `SameSite` 缺失/宽松 | Cookie 可在跨站请求中发送（CSRF） | 中 |
+| `Path` 过宽 | Cookie 在过多路径下可访问 | 低 |
+| `Domain` 过宽 | Cookie 在子域名间共享 | 低 |
+| 敏感名称 | Session ID / Token 等敏感 Cookie 未充分保护 | 高 |
+
+**功能：**
+- 一键审计
+- 按严重程度筛选
+- 搜索结果
+- 复制/导出结果
+
+---
+
+## 20. React/Angular 检测
+
+检测目标页面是否使用 React 或 Angular 框架。
+
+### React 检测
+
+- **框架版本** — 识别 React 版本号
+- **构建工具** — 识别 Create React App / Next.js / Vite 等
+- **路由信息** — 如果使用 React Router，提取路由配置
+- **Store 信息** — 如果使用 Redux/Context，展示 Store 结构
+
+### Angular 检测
+
+- **框架版本** — 识别 Angular 版本号
+- **组件信息** — 提取页面中的 Angular 组件
+- **路由信息** — 提取路由配置
+- **Service 信息** — 发现注入的 Service
+
+**功能：** 检测、复制结果、导出 JSON
+
+---
+
+## 21. Source Loader
+
+将外部 JS 源码加载到 Chrome DevTools Sources 面板，方便调试和分析。
+
+**使用方法：**
+1. 在输入框中粘贴 JS 文件的 URL 列表
+2. 点击「加载」，文件会出现在 DevTools Sources 面板的特殊目录中
+3. 在 DevTools 中可直接设置断点调试
+
+**用途：** 分析混淆的 JS 代码、调试第三方库、查看动态加载的脚本。
+
+---
+
 ## 权限说明
 
 | 权限 | 用途 |
@@ -507,10 +866,11 @@ PHP 一句话木马和混淆 WebShell：
 | activeTab | 访问当前标签页内容 |
 | storage | 保存用户配置和缓存数据 |
 | clipboardWrite | 复制内容到剪贴板 |
-| scripting | 注入脚本到页面（Vue 分析、JS 控制等核心功能） |
+| scripting | 注入脚本到页面（Vue 分析、JS 控制、Source Map 等核心功能） |
 | contextMenus | 右键菜单快捷操作 |
 | declarativeNetRequest | 修改请求头（UA / Referer / 自定义 Header） |
 | cookies | 读取和修改 Cookie |
+| downloads | 下载文件（Source Map 源码、导出报告等） |
 
 ---
 
@@ -536,3 +896,12 @@ A: RSA 使用浏览器原生 `crypto.subtle` API（异步），不会阻塞 UI�
 
 **Q: Burpsuite 如何配合自动遍历？**
 A: 先在 Burpsuite 中配置好代理，浏览器通过代理访问目标站点。点击「自动遍历」后，所有路由请求都会经过 Burpsuite，在 HTTP History 中逐条检查响应内容即可。
+
+**Q: RuoYi 检测出错？**
+A: 确保当前标签页是普通 HTTP/HTTPS 网页。Chrome 内置页面（`chrome://`、`chrome-extension://`）不允许注入脚本。
+
+**Q: Source Map 扫描不到模块？**
+A: 部分应用可能不使用 Webpack，或使用了自定义的模块加载方式。Vue CLI / Create React App 等脚手架项目通常有 Source Map。
+
+**Q: WAF 检测结果不准确？**
+A: WAF 检测基于特征匹配，可能存在误报。建议结合 Burpsuite 手动验证。
