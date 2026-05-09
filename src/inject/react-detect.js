@@ -34,8 +34,9 @@
     document.getElementById('root') ||
     document.getElementById('app') ||
     document.getElementById('__next');
+  let fiberKey;
   if (rootEl) {
-    const fiberKey = Object.keys(rootEl).find(function (k) {
+    fiberKey = Object.keys(rootEl).find(function (k) {
       return k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$');
     });
     if (fiberKey) {
