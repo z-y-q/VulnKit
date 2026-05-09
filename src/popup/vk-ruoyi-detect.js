@@ -33,7 +33,7 @@ async function detectRuoYi() {
       return;
     }
 
-    const data = await utils.execInTabData(tab.id, function () {
+    let data = await utils.execInTabData(tab.id, function () {
       const evidence = [];
       let variant = null;
       let version = null;
@@ -50,8 +50,7 @@ async function detectRuoYi() {
         if (/\/validate\.js/i.test(src)) evidence.push('script:validate.js');
         if (/\/ruoyi/i.test(src)) evidence.push('script:ruoyi');
         if (/\/router\/index\.js/i.test(src)) evidence.push('script:router/index.js');
-        if (/\/store\/modules\/(user|permission|app)\.js/i.test(src))
-          evidence.push('script:store');
+        if (/\/store\/modules\/(user|permission|app)\.js/i.test(src)) evidence.push('script:store');
         if (/\/gateway\/js\//i.test(src)) {
           variant = variant || 'cloud';
           evidence.push('script:gateway');
@@ -82,8 +81,7 @@ async function detectRuoYi() {
       if (/若依|RuoYi|管理系统/i.test(title)) evidence.push('title:若依/RuoYi');
 
       // --- UI Framework ---
-      const hasEl =
-        !!window.ELEMENT || !!window.ElPlus || document.querySelector('[class*="el-"]');
+      const hasEl = !!window.ELEMENT || !!window.ElPlus || document.querySelector('[class*="el-"]');
       if (hasEl) evidence.push('ui:element');
 
       // --- Version detection ---
@@ -507,10 +505,7 @@ async function autoCaptureRoutes(tabId, hasToken) {
                 .join(', ')}${discoveredServices.length > 8 ? '...' : ''}</span></div>`;
               panelEl.innerHTML += nacosHtml;
             }
-            utils.setStatus(
-              'ruoyi-hook-status',
-              `发现 ${discoveredServices.length} 个 Nacos 服务`
-            );
+            utils.setStatus('ruoyi-hook-status', `发现 ${discoveredServices.length} 个 Nacos 服务`);
             utils.showToast(`发现 Nacos 服务: ${discoveredServices.length} 个`, 'success');
           }
         }
@@ -618,10 +613,4 @@ function init(stateRef) {
   state = stateRef;
 }
 
-export {
-  init,
-  detectRuoYi,
-  autoCaptureRoutes,
-  lookupCve,
-  fetchCapturedRoutes,
-};
+export { init, detectRuoYi, autoCaptureRoutes, lookupCve, fetchCapturedRoutes };
