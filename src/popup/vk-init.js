@@ -6,12 +6,24 @@ import * as encoding from './vk-encoding.js';
 import * as asset from './vk-asset.js';
 import * as gather from './vk-gather.js';
 import {
-  initTabPagination, initMainTabs, initEncodingJwtCrypto,
-  initRsaFaviconAsset, initGatherAndRules, initLinksHistoryMultiUrl,
-  initExifAndSpoofing, initVuePermissions, initJsSearchAndTraverse,
-  initSecurityDetectors, initNetworkTools, initStateRestoration,
-  initThemeAndPayload, initXssAndSourcemap, initStatusBarAndKeyboard,
+  initTabPagination,
+  initMainTabs,
+  initEncodingJwtCrypto,
+  initRsaFaviconAsset,
+  initGatherAndRules,
+  initLinksHistoryMultiUrl,
+  initExifAndSpoofing,
+  initThemeAndPayload,
+  initXssAndSourcemap,
+  initStatusBarAndKeyboard,
 } from './vk-init-panels.js';
+import {
+  initVuePermissions,
+  initJsSearchAndTraverse,
+  initSecurityDetectors,
+  initNetworkTools,
+  initStateRestoration,
+} from './vk-init-detectors.js';
 
 function initContextMenu() {
   chrome.storage.local.get(['contextSelection', 'contextAction'], function (data) {
