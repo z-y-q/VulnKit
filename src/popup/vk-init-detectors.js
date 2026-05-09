@@ -101,7 +101,13 @@ import {
   sniffCopyResults,
   sniffExportResults,
   renderSniffResults,
+  renderLeakResults,
+  clearLeakResults,
+  leakCopyResults,
+  leakExportResults,
+  leakState,
 } from './vk-sniff.js';
+import { runDeepLeakScan } from './vk-leakscan-scanner.js';
 
 const { getActiveTab } = utils;
 
@@ -367,6 +373,10 @@ function initNetworkTools() {
 }
 
 function initSniff() {
+  utils.bindTabSwitch('sniff-stab', 'sstab', function (tab) {
+    utils.switchSubTabs('sniff-stab', 'sstab', 'sstab', tab);
+  });
+
   utils.bindClick('sniff-scan-btn', async function () {
     utils.setStatus('sniff-status', '正在嗅探识别...');
     utils.get('sniff-scan-btn').disabled = true;
@@ -393,6 +403,55 @@ function initSniff() {
 
   utils.bindClick('sniff-copy-btn', sniffCopyResults);
   utils.bindClick('sniff-export-btn', sniffExportResults);
+
+  utils.bindClick('leak-scan-btn', async function () {
+    if (leakState.scanning) return;
+    leakState.scanning = true;
+    utils.setStatus('leak-status', '正在深度泄露扫描...');
+    utils.get('leak-scan-btn').disabled = true;
+    clearLeakResults();
+
+    try {
+      var tab = await utils.requireTabId();
+      if (!tab) {
+        utils.setStatus('leak-status', '无法获取当前标签页');
+        return;
+      }
+
+      var results = await runDeepLeakScan({ 'API Traffic': [] }, tab.id);
+      leakState.lastResults = results;
+
+      if (!results || results.length === 0) {
+        utils.setStatus('leak-status', '未发现敏感信息泄漏');
+        utils.get('leak-copy-btn').style.display = 'none';
+        utils.get('leak-export-btn').style.display = 'none';
+        renderLeakResults([]);
+        return;
+      }
+
+      var critCount = results.filter(function (r) {
+        return r.severity === 'critical';
+      }).length;
+      var highCount = results.filter(function (r) {
+        return r.severity === 'high';
+      }).length;
+      var statusText = '扫描完成 — 发现 ' + results.length + ' 项';
+      if (critCount > 0) statusText += '（严重 ' + critCount + '）';
+      else if (highCount > 0) statusText += '（高危 ' + highCount + '）';
+      utils.setStatus('leak-status', statusText);
+      utils.get('leak-copy-btn').style.display = '';
+      utils.get('leak-export-btn').style.display = '';
+      renderLeakResults(results);
+    } catch (err) {
+      utils.setStatus('leak-status', '泄露扫描失败: ' + (err.message || '未知错误'));
+    } finally {
+      utils.get('leak-scan-btn').disabled = false;
+      leakState.scanning = false;
+    }
+  });
+
+  utils.bindClick('leak-copy-btn', leakCopyResults);
+  utils.bindClick('leak-export-btn', leakExportResults);
 }
 
 function initStateRestoration() {

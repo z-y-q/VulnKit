@@ -2,17 +2,41 @@
     <div id="panel-sniff" class="panel">
       <div class="content-card">
         <div class="card-title">网站嗅探</div>
-        <div class="sniff-module-desc">识别网站使用的技术栈：CMS、框架、服务器、CDN、JS 库等</div>
-        <div class="panel-actions">
-          <button class="btn btn-primary" id="sniff-scan-btn">嗅探识别</button>
-          <button class="btn btn-outline" id="sniff-copy-btn" style="display:none">复制</button>
-          <button class="btn btn-outline" id="sniff-export-btn" style="display:none">导出 JSON</button>
+        <div class="sniff-sub-tabs">
+          <button class="sniff-stab active" data-sstab="fingerprint">技术指纹</button>
+          <button class="sniff-stab" data-sstab="leak">泄露扫描</button>
         </div>
-        <div class="status-bar" id="sniff-status"></div>
-        <div id="sniff-summary" style="display:none"></div>
-        <div id="sniff-category-filter" class="sniff-cat-filter-bar" style="display:none"></div>
-        <div class="sniff-results" id="sniff-results">
-          <div class="empty-state">点击「嗅探识别」分析当前网站技术栈</div>
+
+        <!-- 技术指纹 -->
+        <div id="sstab-fingerprint" class="sstab-subpanel active">
+          <div class="sniff-module-desc">识别网站使用的技术栈：CMS、框架、服务器、CDN、JS 库等</div>
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="sniff-scan-btn">嗅探识别</button>
+            <button class="btn btn-outline" id="sniff-copy-btn" style="display:none">复制</button>
+            <button class="btn btn-outline" id="sniff-export-btn" style="display:none">导出 JSON</button>
+          </div>
+          <div class="status-bar" id="sniff-status"></div>
+          <div id="sniff-summary" style="display:none"></div>
+          <div id="sniff-category-filter" class="sniff-cat-filter-bar" style="display:none"></div>
+          <div class="sniff-results" id="sniff-results">
+            <div class="empty-state">点击「嗅探识别」分析当前网站技术栈</div>
+          </div>
+        </div>
+
+        <!-- 泄露扫描 -->
+        <div id="sstab-leak" class="sstab-subpanel">
+          <div class="sniff-module-desc">深度扫描页面敏感信息：密钥凭证、加密漏洞、硬编码密码、PII 泄露等</div>
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="leak-scan-btn">泄露扫描</button>
+            <button class="btn btn-outline" id="leak-copy-btn" style="display:none">复制</button>
+            <button class="btn btn-outline" id="leak-export-btn" style="display:none">导出 JSON</button>
+          </div>
+          <div class="status-bar" id="leak-status"></div>
+          <div id="leak-summary" style="display:none"></div>
+          <div id="leak-category-filter" class="sniff-cat-filter-bar" style="display:none"></div>
+          <div class="leak-results" id="leak-results">
+            <div class="empty-state">点击「泄露扫描」分析当前页面敏感信息</div>
+          </div>
         </div>
       </div>
     </div>

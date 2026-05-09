@@ -1,9 +1,9 @@
 // vk-sourcemap-state.js -- 灵眸 Chrome Extension
 // Sourcemap shared state, constants, registration slots
 import { utilsProxy as utils } from './vk-namespace.js';
-import { LEAK_RULES } from './vk-leak-rules.js';
+import { LEAK_RULES_LEGACY } from './vk-leak-rules.js';
 
-const SM_SECURITY_RULES = LEAK_RULES;
+const SM_SECURITY_RULES = LEAK_RULES_LEGACY;
 
 const SOURCE_TYPE_LABELS = {
   runtime: 'Webpack 运行时',

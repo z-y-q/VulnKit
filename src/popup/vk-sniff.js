@@ -3,3 +3,4 @@
 
 export { sniffState, runSniffScan } from './vk-sniff-scanner.js';
 export { renderAll as renderSniffResults, copyResults as sniffCopyResults, exportResults as sniffExportResults } from './vk-sniff-render.js';
+export { leakState, renderAll as renderLeakResults, clearAll as clearLeakResults, copyResults as leakCopyResults, exportResults as leakExportResults } from './vk-leak-render.js';

@@ -1,10 +1,16 @@
 // vk-leakscan-scanner.js -- 灵眸 Chrome Extension
-// Deep leak scan: multi-source sensitive information detection
+// Deep leak scan: multi-source sensitive information detection with validate() support
 
-import { LEAK_RULES, DOM_LEAK_RULES, SEVERITY_ORDER, SEVERITY_COLOR } from './vk-leak-rules.js';
+import {
+  RULES,
+  DOM_LEAK_RULES,
+  SEVERITY_ORDER,
+  SEVERITY_COLOR,
+  CONFIDENCE_ORDER,
+} from './vk-leak-rules.js';
 
-const LEAK_SCAN_GROUP = 'Deep Leak Scan';
-const MAX_FINDINGS = 200;
+var LEAK_SCAN_GROUP = 'Deep Leak Scan';
+var MAX_FINDINGS = 200;
 
 async function collectPageData(tabId) {
   try {
@@ -64,7 +70,7 @@ function buildTextSources(inspectResult, apiEntries) {
 function matchRules(sources) {
   var findings = [];
   var seen = {};
-  var allRules = LEAK_RULES.concat(DOM_LEAK_RULES);
+  var allRules = RULES.concat(DOM_LEAK_RULES);
 
   for (var s = 0; s < sources.length; s++) {
     var source = sources[s];
@@ -73,32 +79,61 @@ function matchRules(sources) {
     for (var r = 0; r < allRules.length; r++) {
       if (findings.length >= MAX_FINDINGS) break;
 
-      var ruleName = allRules[r][0];
-      var regex = allRules[r][1];
-      var severity = allRules[r][2];
-      var re = new RegExp(regex.source, regex.flags);
+      var rule = allRules[r];
+      var re = new RegExp(rule.regex.source, rule.regex.flags);
       var match;
 
       while ((match = re.exec(source.text)) !== null) {
         var value = match[1] || match[0];
         if (!value || value.length > 500) continue;
 
-        var dedupKey = ruleName + '::' + value;
+        var dedupKey = rule.id + '::' + value;
         if (seen[dedupKey]) continue;
         seen[dedupKey] = true;
 
+        var ctx = {
+          match: match[0],
+          captured: value,
+          source: source.text,
+          offset: match.index,
+          sourceLabel: source.label,
+        };
+
+        var severity = rule.severity;
+        var confidence = rule.confidence;
+        var evidence = null;
+
+        if (typeof rule.validate === 'function') {
+          var vr = rule.validate(ctx);
+          if (vr && vr.drop) continue;
+          if (vr) {
+            if (vr.severity) severity = vr.severity;
+            if (vr.confidence) confidence = vr.confidence;
+            if (vr.evidence) evidence = vr.evidence;
+          }
+        }
+
         findings.push({
-          name: ruleName + ' (' + source.label + ')',
+          ruleId: rule.id,
+          name: rule.name + ' (' + source.label + ')',
           value: value,
           color: SEVERITY_COLOR[severity] || 'gray',
           severity: severity,
+          confidence: confidence,
+          category: rule.category,
+          description: rule.description,
+          exploit: rule.exploit || '',
+          recommendation: rule.recommendation || '',
+          evidence: evidence,
         });
       }
     }
   }
 
   findings.sort(function (a, b) {
-    return (SEVERITY_ORDER[b.severity] || 0) - (SEVERITY_ORDER[a.severity] || 0);
+    var sevDiff = (SEVERITY_ORDER[b.severity] || 0) - (SEVERITY_ORDER[a.severity] || 0);
+    if (sevDiff !== 0) return sevDiff;
+    return (CONFIDENCE_ORDER[b.confidence] || 0) - (CONFIDENCE_ORDER[a.confidence] || 0);
   });
 
   return findings;
