@@ -14,7 +14,9 @@ let spoofState = {
 };
 
 function persistSpoofState() {
-  chrome.storage.local.set({ pentest_spoof: spoofState }).catch(() => {});
+  chrome.storage.local.set({ pentest_spoof: spoofState }).catch(function (e) {
+    console.debug('persist spoof state failed', e);
+  });
 }
 
 // Restore spoof state from storage on startup
@@ -23,7 +25,9 @@ chrome.storage.local.get(['pentest_spoof'], result => {
     spoofState = result.pentest_spoof;
     // Re-create DNR rules after browser restart
     if (spoofState.ua.enabled && spoofState.ua.current) {
-      addUaRule(null, spoofState.ua.url || null, spoofState.ua.current).catch(() => {});
+      addUaRule(null, spoofState.ua.url || null, spoofState.ua.current).catch(function (e) {
+        console.debug('restore UA rule failed', e);
+      });
     }
     if (
       spoofState.headers &&
@@ -32,7 +36,9 @@ chrome.storage.local.get(['pentest_spoof'], result => {
         spoofState.headers.clientIp ||
         (spoofState.headers.custom && spoofState.headers.custom.length > 0))
     ) {
-      addHeaderRules(null, spoofState.headers.url || null, spoofState.headers).catch(() => {});
+      addHeaderRules(null, spoofState.headers.url || null, spoofState.headers).catch(function (e) {
+        console.debug('restore header rules failed', e);
+      });
     }
   }
 });
@@ -208,16 +214,18 @@ async function fetchUrl(url, tailOnly, timeoutMs) {
     }, timeoutMs || 10000);
     opts.signal = controller.signal;
     const resp = await fetch(url, opts);
-    clearTimeout(timer);
     if (!resp.ok && resp.status !== 206) {
       let body = await resp.text().catch(function () {
         return '';
       });
+      clearTimeout(timer);
       throw new Error('HTTP ' + resp.status + (body ? ': ' + body.slice(0, 200) : ''));
     }
     const data = await resp.text();
+    clearTimeout(timer);
     return { success: true, data };
   } catch (e) {
+    clearTimeout(timer);
     return { success: false, error: e.message || '请求超时' };
   }
 }
@@ -365,9 +373,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (!isAllowedUrl(message.url)) {
         sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
       } else {
-        fetchUrl(message.url, message.tailOnly, message.timeout).then(result => {
-          sendResponse(result.success ? { data: result.data } : { error: result.error });
-        });
+        fetchUrl(message.url, message.tailOnly, message.timeout)
+          .then(result => {
+            sendResponse(result.success ? { data: result.data } : { error: result.error });
+          })
+          .catch(e => sendResponse({ error: e.message || 'fetch failed' }));
       }
       return true;
 
@@ -375,9 +385,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (!isAllowedUrl(message.url)) {
         sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
       } else if (message.provider === 'zoomeye') {
-        fetchZoomEyeAuth(message.url, message.key).then(result => {
-          sendResponse(result.success ? { data: result.data } : { error: result.error });
-        });
+        fetchZoomEyeAuth(message.url, message.key)
+          .then(result => {
+            sendResponse(result.success ? { data: result.data } : { error: result.error });
+          })
+          .catch(e => sendResponse({ error: e.message || 'auth fetch failed' }));
       } else {
         sendResponse({ error: 'Unknown provider: ' + (message.provider || '(none)') });
       }
@@ -684,9 +696,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (!isAllowedUrl(message.url)) {
         sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
       } else {
-        fetchImage(message.url).then(result => {
-          sendResponse(result.success ? { data: result.data } : { error: result.error });
-        });
+        fetchImage(message.url)
+          .then(result => {
+            sendResponse(result.success ? { data: result.data } : { error: result.error });
+          })
+          .catch(e => sendResponse({ error: e.message || 'image fetch failed' }));
       }
       return true;
 
@@ -778,7 +792,9 @@ function createContextMenus() {
   chrome.storage.local.get(['pentestSettings'], result => {
     const settings = result.pentestSettings || {};
     if (settings.enableContextMenu === false) {
-      chrome.contextMenus.removeAll().catch(() => {});
+      chrome.contextMenus.removeAll().catch(function (e) {
+        console.debug('remove context menus failed', e);
+      });
       return;
     }
     chrome.contextMenus.removeAll(() => {

@@ -261,8 +261,12 @@ function initStoreExplorerEvents() {
 
   const searchInput = utils.get('vue-store-search');
   if (searchInput) {
+    let searchTimer = null;
     searchInput.addEventListener('input', function () {
-      searchVueStore(this.value.trim());
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () {
+        searchVueStore(searchInput.value.trim());
+      }, 200);
     });
   }
 
@@ -344,4 +348,4 @@ function searchVueStore(text) {
   resultsEl.innerHTML = hasMatch ? html : utils.emptyHtml('没有匹配的结果');
 }
 
-export { exploreVueStore, copyFullStoreJson, initStoreExplorerEvents, searchVueStore };
+export { exploreVueStore, copyFullStoreJson, initStoreExplorerEvents };

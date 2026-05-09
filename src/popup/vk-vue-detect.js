@@ -242,33 +242,6 @@ function renderRouteSummary(routes) {
   return html;
 }
 
-var AUTH_KEY_RE =
-  /^(?:requiresAuth|requireAuth|auth|authenticated|needLogin|loginRequired|permission|permissions|role|roles|admin|access|authority|authorize|whiteList|noAuth)$/i;
-
-function findRouterInPage() {
-  var appEl = document.querySelector('#app,[data-v-app],[id^="app"],#root,#application,#main');
-  if (appEl && appEl.__vue_app__) {
-    var r = appEl.__vue_app__.config.globalProperties.$router;
-    if (r) return { router: r, version: 'vue3' };
-  }
-  var allEls = document.querySelectorAll('*');
-  for (var n = 0; n < allEls.length; n++) {
-    if (allEls[n].__vue__) {
-      var vm = allEls[n].__vue__.$root || allEls[n].__vue__;
-      if (vm.$router) return { router: vm.$router, version: 'vue2' };
-    }
-  }
-  return null;
-}
-
-function safeSerialize(obj) {
-  try {
-    return JSON.parse(JSON.stringify(obj));
-  } catch (e) {
-    return null;
-  }
-}
-
 async function exportVueRoutes() {
   let tab = await utils.requireTabId();
   if (!tab) return;

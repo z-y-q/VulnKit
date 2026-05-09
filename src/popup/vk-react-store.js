@@ -302,8 +302,12 @@ function initStoreExplorerEvents() {
 
   var searchInput = utils.get('react-store-search');
   if (searchInput) {
+    var searchTimer = null;
     searchInput.addEventListener('input', function () {
-      searchReactStore(this.value.trim());
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () {
+        searchReactStore(searchInput.value.trim());
+      }, 200);
     });
   }
 
@@ -347,4 +351,4 @@ function searchReactStore(text) {
   renderStores(storeEl, lastReactStores, storeKeys, text);
 }
 
-export { exploreReactStore, copyReactStoreJson, initStoreExplorerEvents, searchReactStore };
+export { exploreReactStore, copyReactStoreJson, initStoreExplorerEvents };

@@ -203,7 +203,7 @@ async function scanAntiDebug() {
             }
           }
         } catch (e) {
-          // Skip failed fetches
+          console.debug('antidebug script fetch failed', e);
         }
       }
 
@@ -395,7 +395,8 @@ async function removeCopyRestrictions() {
       let userSelectCount = 0;
       for (let i = 0; i < allEls.length; i++) {
         let style = window.getComputedStyle(allEls[i]);
-        let us = style.getPropertyValue('user-select') || style.webkitUserSelect;
+        let us =
+          style.getPropertyValue('user-select') || style.getPropertyValue('-webkit-user-select');
         if (us === 'none' || us === '-webkit-none') {
           userSelectCount++;
         }
@@ -542,7 +543,6 @@ const enableJs = function () {
 export {
   switchJsCtrlTab,
   updateJsToggleStatus,
-  updateAntidebugIndicator,
   toggleJs,
   disableJs,
   enableJs,
@@ -550,6 +550,5 @@ export {
   bypassAntiDebug,
   clearScriptBlock,
   removeCopyRestrictions,
-  updateUncopyIndicator,
   setJsBlocked,
 };

@@ -287,7 +287,7 @@ async function renderRequestLog(tabId) {
 </div>`;
     panelEl.innerHTML = html;
   } catch (e) {
-    // ignore
+    console.debug('hook log render failed', e);
   }
 }
 
@@ -362,38 +362,42 @@ function renderRouterData(data, containerEl) {
 
   const searchInput = containerEl.querySelector('#ruoyi-route-search');
   if (searchInput) {
+    let routeSearchTimer = null;
     searchInput.addEventListener('input', function () {
-      const query = this.value.toLowerCase().trim();
-      containerEl.querySelectorAll('.ruoyi-route-node').forEach(function (node) {
-        if (!query) {
-          node.style.display = '';
-          return;
-        }
-        let path = (node.querySelector('.ruoyi-route-path') || {}).textContent || '';
-        let name = (node.querySelector('.ruoyi-route-name') || {}).textContent || '';
-        let title = (node.querySelector('.ruoyi-route-title') || {}).textContent || '';
-        let match =
-          path.toLowerCase().indexOf(query) !== -1 ||
-          name.toLowerCase().indexOf(query) !== -1 ||
-          title.toLowerCase().indexOf(query) !== -1;
-        node.style.display = match ? '' : 'none';
-        if (match) {
-          let parent = node.parentElement;
-          while (parent) {
-            if (parent.classList && parent.classList.contains('ruoyi-route-children')) {
-              parent.style.display = '';
-              const toggle = parent.previousElementSibling;
-              if (toggle && toggle.classList.contains('ruoyi-route-toggle')) {
-                toggle.textContent = '▼';
-              }
-            }
-            if (parent.classList && parent.classList.contains('ruoyi-route-node')) {
-              parent.style.display = '';
-            }
-            parent = parent.parentElement;
+      clearTimeout(routeSearchTimer);
+      routeSearchTimer = setTimeout(function () {
+        const query = searchInput.value.toLowerCase().trim();
+        containerEl.querySelectorAll('.ruoyi-route-node').forEach(function (node) {
+          if (!query) {
+            node.style.display = '';
+            return;
           }
-        }
-      });
+          let path = (node.querySelector('.ruoyi-route-path') || {}).textContent || '';
+          let name = (node.querySelector('.ruoyi-route-name') || {}).textContent || '';
+          let title = (node.querySelector('.ruoyi-route-title') || {}).textContent || '';
+          let match =
+            path.toLowerCase().indexOf(query) !== -1 ||
+            name.toLowerCase().indexOf(query) !== -1 ||
+            title.toLowerCase().indexOf(query) !== -1;
+          node.style.display = match ? '' : 'none';
+          if (match) {
+            let parent = node.parentElement;
+            while (parent) {
+              if (parent.classList && parent.classList.contains('ruoyi-route-children')) {
+                parent.style.display = '';
+                const toggle = parent.previousElementSibling;
+                if (toggle && toggle.classList.contains('ruoyi-route-toggle')) {
+                  toggle.textContent = '▼';
+                }
+              }
+              if (parent.classList && parent.classList.contains('ruoyi-route-node')) {
+                parent.style.display = '';
+              }
+              parent = parent.parentElement;
+            }
+          }
+        });
+      }, 200);
     });
   }
 }
@@ -495,7 +499,7 @@ async function exportCurlCommands() {
         cookieHeader = ` -H 'Cookie: ${safeToken}'`;
       }
     } catch (e) {
-      // ignore
+      console.debug('cookie extraction failed', e);
     }
 
     const cmds = paths.map(function (p) {

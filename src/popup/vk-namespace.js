@@ -9,7 +9,9 @@ const utils = {
   cache: new Map(),
   get(id) {
     if (!this.cache.has(id)) {
-      this.cache.set(id, document.getElementById(id));
+      const el = document.getElementById(id);
+      if (el) this.cache.set(id, el);
+      return el;
     }
     return this.cache.get(id);
   },

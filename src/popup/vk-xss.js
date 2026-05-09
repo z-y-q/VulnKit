@@ -45,7 +45,9 @@ async function harvestXssParamsFromDom() {
             href.searchParams.forEach((_, key) => {
               addPoint('link', href.pathname + href.search, key, 'GET');
             });
-          } catch (_) {}
+          } catch (_) {
+            console.debug('link URL parse skipped');
+          }
         });
 
         document.querySelectorAll('form').forEach(form => {
@@ -63,7 +65,9 @@ async function harvestXssParamsFromDom() {
           currentUrl.searchParams.forEach((_, key) => {
             addPoint('url', currentUrl.pathname + currentUrl.search, key, 'GET');
           });
-        } catch (_) {}
+        } catch (_) {
+          console.debug('URL parse skipped');
+        }
 
         return collected;
       },

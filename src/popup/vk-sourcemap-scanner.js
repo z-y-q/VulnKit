@@ -62,7 +62,7 @@ async function runPhase1(ctx) {
       }
     }
   } catch (e) {
-    // MAIN world may fail on some pages, continue with fallback
+    console.debug('phase1 MAIN world failed, continuing', e);
   }
 }
 
@@ -82,7 +82,7 @@ async function detectBuildTool(ctx) {
       ctx.statusEl.textContent = toolLabel + (toolHints ? ` (${toolHints})` : '');
     }
   } catch (e) {
-    // content script may not be ready, continue
+    console.debug('build tool detection failed', e);
   }
 }
 
@@ -112,7 +112,9 @@ async function runPhase2(ctx) {
               perfUrls.push(e.name);
             }
           });
-        } catch (ex) {}
+        } catch (ex) {
+          console.debug('performance entries not available', ex);
+        }
         const preloadUrls = [];
         document
           .querySelectorAll('link[rel="preload"][as="script"], link[rel="modulepreload"]')
@@ -151,7 +153,7 @@ async function runPhase2(ctx) {
       });
     }
   } catch (e) {
-    // continue
+    console.debug('phase2 script collection failed', e);
   }
 
   // Parse script files for source map URLs
@@ -345,7 +347,7 @@ async function discoverChunksDeepParse(ctx) {
         smRegisterChunkUrls(chunkIdToHash, baseInfo1, ctx.discoveredChunkUrls, ctx.scriptUrls);
       }
     } catch (e) {
-      /* ignore */
+      console.debug('webpack require.u parse failed', e);
     }
   }
 
@@ -600,7 +602,7 @@ async function finalizeResults(ctx) {
       }
     }
   } catch (e) {
-    /* ignore */
+    console.debug('hook active check failed', e);
   }
 }
 
