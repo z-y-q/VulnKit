@@ -160,9 +160,7 @@ function renderHistoryResults(items, isFilter) {
       (status
         ? `<span class="timeline-status ${utils.escapeHtml(statusClass)}">${utils.escapeHtml(status)}</span>`
         : '') +
-      (mime
-        ? `<span class="timeline-status status-other">${utils.escapeHtml(mime)}</span>`
-        : '') +
+      (mime ? `<span class="timeline-status status-other">${utils.escapeHtml(mime)}</span>` : '') +
       `<span class="timeline-url" data-wayback="${utils.escapeHtml(waybackUrl)}" title="${utils.escapeHtml(url)}">${utils.escapeHtml(url)}</span>` +
       `<button class="timeline-open" data-url="${utils.escapeHtml(waybackUrl)}">查看</button>` +
       `</div>`;
@@ -192,15 +190,19 @@ async function queryHistory() {
     raw = tab.url;
   }
   const domain = extractDomain(raw);
-  utils.get('history-domain').value = domain;
+  const domainInput = utils.get('history-domain');
+  if (domainInput) domainInput.value = domain;
 
   showHistoryQuickLinks(domain);
   utils.setStatus('history-status', '正在查询...');
-  utils.get('history-timeline').innerHTML = '';
-  utils.get('history-summary').classList.add('hidden');
+  const timeline = utils.get('history-timeline');
+  if (timeline) timeline.innerHTML = '';
+  const summary = utils.get('history-summary');
+  if (summary) summary.classList.add('hidden');
 
   const cdxUrl = buildCdxUrl(domain);
-  let outputType = utils.get('history-output-type').value;
+  const outputTypeEl = utils.get('history-output-type');
+  let outputType = outputTypeEl ? outputTypeEl.value : 'text';
   const isJson = outputType === 'json';
   const result = isJson
     ? await utils.fetchUrlJson({ url: cdxUrl })

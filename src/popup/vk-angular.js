@@ -69,9 +69,20 @@ function detectAngular() {
                 statusEl.textContent = `注入失败: ${chrome.runtime.lastError.message || '未知错误'}`;
               return;
             }
-            setTimeout(function () {
-              chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_DETECT' }, handleMessage);
-            }, 200);
+            function trySend(remaining) {
+              chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_DETECT' }, function (resp) {
+                if (chrome.runtime.lastError) {
+                  if (remaining > 0)
+                    setTimeout(function () {
+                      trySend(remaining - 1);
+                    }, 100);
+                  else if (statusEl) statusEl.textContent = '检测超时：内容脚本未响应';
+                  return;
+                }
+                handleMessage(resp);
+              });
+            }
+            trySend(5);
           }
         );
         return;
@@ -86,8 +97,7 @@ function renderResult(data) {
   if (!resultsEl) return;
 
   if (!data.detected && (!data.signals || data.signals.length === 0)) {
-    resultsEl.innerHTML =
-      '<div class="angular-not-detected">未在当前页面检测到 Angular 框架</div>';
+    resultsEl.innerHTML = '<div class="angular-not-detected">未在当前页面检测到 Angular 框架</div>';
     return;
   }
 
@@ -178,8 +188,4 @@ function copyResults() {
   utils.copyAndToast(lines.join('\n'));
 }
 
-export {
-  detectAngular,
-  copyResults,
-  exportResults,
-};
+export { detectAngular, copyResults, exportResults };

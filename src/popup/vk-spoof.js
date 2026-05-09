@@ -140,8 +140,7 @@ const UA_PRESETS = {
     { label: 'Twitterbot', value: 'Mozilla/5.0 (compatible; Twitterbot/1.0)' },
     {
       label: 'Baiduspider',
-      value:
-        'Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)',
+      value: 'Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)',
     },
     { label: 'curl/8.4', value: 'curl/8.4.0' },
     { label: 'Python requests', value: 'python-requests/2.31.0' },
@@ -226,10 +225,7 @@ async function applyUserAgent() {
     spoofState.ua.enabled = true;
     spoofState.ua.current = ua;
 
-    await sendBgMsg(
-      { type: 'SPOOF_UA', tabId: tab.id, url: tab.url, userAgent: ua },
-      'UA 已应用'
-    );
+    await sendBgMsg({ type: 'SPOOF_UA', tabId: tab.id, url: tab.url, userAgent: ua }, 'UA 已应用');
     updateUaStatus();
 
     chrome.storage.local.set({ pentest_spoof: spoofState });
@@ -388,15 +384,14 @@ async function saveCookieEdit(isNew) {
   if (!tab?.url) return;
   const url = new URL(tab.url);
 
-  const name = document.querySelector('.cookie-edit-name').value;
+  let name = document.querySelector('.cookie-edit-name').value;
   const value = document.querySelector('.cookie-edit-value').value;
   const domain = document.querySelector('.cookie-edit-domain').value || url.hostname;
   const path = document.querySelector('.cookie-edit-path').value || '/';
   const expiresSec = parseInt(document.querySelector('.cookie-edit-expires').value, 10) || 0;
   const sameSite = document.querySelector('.cookie-edit-samesite').value;
   const httpOnly = document.querySelector('.cookie-edit-httponly').checked;
-  const secure =
-    document.querySelector('.cookie-edit-secure').checked || url.protocol === 'https:';
+  const secure = document.querySelector('.cookie-edit-secure').checked || url.protocol === 'https:';
 
   name = utils.requireInput(name, 'Cookie 名称不能为空');
   if (!name) return;

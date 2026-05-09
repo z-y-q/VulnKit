@@ -69,9 +69,20 @@ function detectReact() {
                 statusEl.textContent = `注入失败: ${chrome.runtime.lastError.message || '未知错误'}`;
               return;
             }
-            setTimeout(function () {
-              chrome.tabs.sendMessage(tab.id, { type: 'VK_REACT_DETECT' }, handleMessage);
-            }, 200);
+            function trySend(remaining) {
+              chrome.tabs.sendMessage(tab.id, { type: 'VK_REACT_DETECT' }, function (resp) {
+                if (chrome.runtime.lastError) {
+                  if (remaining > 0)
+                    setTimeout(function () {
+                      trySend(remaining - 1);
+                    }, 100);
+                  else if (statusEl) statusEl.textContent = '检测超时：内容脚本未响应';
+                  return;
+                }
+                handleMessage(resp);
+              });
+            }
+            trySend(5);
           }
         );
         return;
@@ -171,8 +182,4 @@ function copyResults() {
   utils.copyAndToast(lines.join('\n'));
 }
 
-export {
-  detectReact,
-  copyResults,
-  exportResults,
-};
+export { detectReact, copyResults, exportResults };

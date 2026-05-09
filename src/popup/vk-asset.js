@@ -119,29 +119,30 @@ function exportData() {
   );
 }
 
-async function scanFofa(query) {
+async function scanFofa(query, opts) {
   const keys = await getApiKey('fofa');
   if (!keys?.email || !keys?.key) {
     utils.showToast('请先配置 FOFA API Key', 'warning');
-    return;
+    return [];
   }
   const fofaQuery = customQueryMode ? query : `domain="${query}"`;
   const qbase64 = btoa(unescape(encodeURIComponent(fofaQuery)));
   const url = `https://fofa.info/api/v1/search/all?email=${encodeURIComponent(keys.email)}&key=${encodeURIComponent(keys.key)}&qbase64=${qbase64}&fields=host,port,protocol,title&size=${getAssetSize()}`;
 
   const json = await fetchScanResults('FOFA', url);
-  if (!json) return;
+  if (!json) return [];
   const results = (json.results || []).map(function (r) {
     return { host: r[0], port: r[1], protocol: r[2], title: r[3] };
   });
   setAssetStatus(`FOFA: 查询完成 (共 ${json.size || results.length} 条)`);
-  renderAssetResults(results);
+  if (!opts?.skipRender) renderAssetResults(results);
+  return results;
 }
 
-async function scanZoomEye(query) {
+async function scanZoomEye(query, opts) {
   let key = await getApiKey('zoomeye');
   key = utils.requireInput(key, '请先配置 ZoomEye API Key');
-  if (!key) return;
+  if (!key) return [];
   const zoomQuery = customQueryMode ? query : `hostname:${query.replace(/^www\./, '')}`;
   const url = `https://api.zoomeye.org/host/search?query=${encodeURIComponent(zoomQuery)}&page=1&size=${getAssetSize()}`;
 
@@ -151,13 +152,13 @@ async function scanZoomEye(query) {
     key: key,
     provider: 'zoomeye',
   });
-  if (!json) return;
+  if (!json) return [];
   const list = json.matches || json.data || [];
   let total = json.total || list.length;
   if (list.length === 0) {
     setAssetStatus('ZoomEye: 未找到资产 (total=0)');
-    renderAssetResults([]);
-    return;
+    if (!opts?.skipRender) renderAssetResults([]);
+    return [];
   }
   const results = list.map(function (r) {
     return {
@@ -168,13 +169,14 @@ async function scanZoomEye(query) {
     };
   });
   setAssetStatus(`ZoomEye: 查询完成 (共 ${total} 条)`);
-  renderAssetResults(results);
+  if (!opts?.skipRender) renderAssetResults(results);
+  return results;
 }
 
-async function scanShodan(query) {
+async function scanShodan(query, opts) {
   let key = await getApiKey('shodan');
   key = utils.requireInput(key, '请先配置 Shodan API Key');
-  if (!key) return;
+  if (!key) return [];
   const searchQuery = customQueryMode
     ? query
     : /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(query)
@@ -183,7 +185,7 @@ async function scanShodan(query) {
   const url = `https://api.shodan.io/shodan/search?key=${encodeURIComponent(key)}&query=${encodeURIComponent(searchQuery)}`;
 
   const json = await fetchScanResults('Shodan', url);
-  if (!json) return;
+  if (!json) return [];
   const results = (json.matches || []).slice(0, getAssetSize()).map(function (m) {
     return {
       host: m.ip_str || '-',
@@ -193,7 +195,8 @@ async function scanShodan(query) {
     };
   });
   setAssetStatus(`Shodan: 查询完成 (共 ${json.total || results.length} 条)`);
-  renderAssetResults(results);
+  if (!opts?.skipRender) renderAssetResults(results);
+  return results;
 }
 
 function shodanHostLookup() {
@@ -366,8 +369,7 @@ function renderShodanHostInfo(container, idbData, shodanData, queryInput, resolv
       let v = vulns[cve];
       let severity;
       if (v && typeof v === 'object' && v.cvss) {
-        severity =
-          v.cvss >= 9 ? 'critical' : v.cvss >= 7 ? 'high' : v.cvss >= 4 ? 'medium' : 'low';
+        severity = v.cvss >= 9 ? 'critical' : v.cvss >= 7 ? 'high' : v.cvss >= 4 ? 'medium' : 'low';
       } else {
         severity = 'info';
       }
@@ -450,14 +452,24 @@ async function scanAllEngines() {
   try {
     const results = await Promise.allSettled(
       scanFns.map(function (fn) {
-        return fn(query);
+        return fn(query, { skipRender: true });
       })
     );
 
+    const allResults = results.reduce(function (merged, r) {
+      if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+        return merged.concat(r.value);
+      }
+      return merged;
+    }, []);
+
     const successCount = results.filter(function (r) {
-      return r.status === 'fulfilled';
+      return r.status === 'fulfilled' && Array.isArray(r.value);
     }).length;
-    setAssetStatus(`全部引擎查询完成 (${successCount}/${engineNames.length} 成功)`);
+    renderAssetResults(allResults);
+    setAssetStatus(
+      `全部引擎查询完成 (${successCount}/${engineNames.length} 成功，共 ${allResults.length} 条)`
+    );
   } catch (e) {
     setAssetStatus(`查询出错: ${e.message}`);
   } finally {

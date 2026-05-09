@@ -340,7 +340,8 @@ function initGatherAndRules() {
       rulesModal.style.display = 'none';
     };
     rulesModalClose.addEventListener('click', closeRulesModal);
-    rulesModal.querySelector('.modal-overlay').addEventListener('click', closeRulesModal);
+    const overlay = rulesModal.querySelector('.modal-overlay');
+    if (overlay) overlay.addEventListener('click', closeRulesModal);
   }
   const applyRules = (rules, msg) => {
     gather.updateRules(rules);
