@@ -218,4 +218,10 @@ function clearResults() {
   renderResults([]);
 }
 
-export { loadToSources, copyResults, clearResults };
+function setSourceUrls(urls) {
+  const urlsEl = utils.get('source-loader-urls');
+  if (!urlsEl) return;
+  urlsEl.value = urls.join('\n');
+}
+
+export { loadToSources, copyResults, clearResults, setSourceUrls };

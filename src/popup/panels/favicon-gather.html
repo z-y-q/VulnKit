@@ -35,48 +35,29 @@
     <div id="panel-gather" class="panel">
       <div class="content-card">
         <div class="card-title">信息收集</div>
-        <div class="gather-actions">
+        <div class="gather-primary-actions">
           <button class="btn btn-primary" id="gather-btn">收集当前页面</button>
-          <button class="btn btn-sm btn-outline" id="gather-copy-btn">复制当前分类</button>
-          <button class="btn btn-sm btn-outline" id="gather-export-btn">导出</button>
-          <button class="btn btn-sm btn-outline" id="gather-rules-btn">规则管理</button>
         </div>
-        <div class="gather-sub-tabs" id="gather-sub-tabs">
-          <!-- 由 JS 动态生成 -->
+        <div class="gather-toolbar">
+          <button class="gather-tool-btn" id="gather-copy-btn">复制当前</button>
+          <button class="gather-tool-btn" id="gather-copy-all-btn">复制全部</button>
+          <span class="gather-tool-divider"></span>
+          <button class="gather-tool-btn" id="gather-export-btn">CSV</button>
+          <button class="gather-tool-btn" id="gather-export-json-btn">JSON</button>
+          <span class="gather-tool-divider"></span>
+          <button class="gather-tool-btn" id="gather-rules-btn">规则</button>
+          <button class="gather-tool-btn" id="gather-to-source-btn" title="将收集到的 JS/CSS 链接发送到源码加载面板">源码加载</button>
         </div>
-        <input type="text" id="gather-search" class="input" placeholder="搜索过滤结果..." style="margin-bottom:4px;display:none;">
+        <div class="gather-filter-row">
+          <div class="gather-sub-tabs" id="gather-sub-tabs"></div>
+          <input type="text" id="gather-search" class="gather-search-input" placeholder="搜索..." style="display:none;">
+        </div>
         <div class="gather-status" id="gather-status"></div>
         <div class="gather-results" id="gather-results">
-          <div class="empty-state">点击「收集当前页面」开始</div>
+          <div class="gather-empty-state">
+            <div class="gather-empty-icon">&#128269;</div>
+            <div class="gather-empty-text">点击上方按钮开始收集页面信息</div>
+          </div>
         </div>
-      </div>
-
-      <div class="content-card card-spacing">
-        <div class="card-title">API 流量捕获</div>
-        <div class="gather-actions">
-          <button class="btn btn-secondary" id="gather-api-start-btn">启动监听</button>
-          <button class="btn btn-outline" id="gather-api-stop-btn" disabled>停止监听</button>
-        </div>
-        <div class="api-filter-bar" id="api-filter-bar">
-          <select class="api-filter-select" id="api-filter-method">
-            <option value="ALL">All Methods</option>
-            <option value="GET">GET</option>
-            <option value="POST">POST</option>
-            <option value="PUT">PUT</option>
-            <option value="DELETE">DELETE</option>
-            <option value="PATCH">PATCH</option>
-            <option value="OPTIONS">OPTIONS</option>
-          </select>
-          <select class="api-filter-select" id="api-filter-status">
-            <option value="ALL">All Status</option>
-            <option value="2xx">2xx Success</option>
-            <option value="3xx">3xx Redirect</option>
-            <option value="4xx">4xx Client Error</option>
-            <option value="5xx">5xx Server Error</option>
-            <option value="err">Error / 0</option>
-          </select>
-        </div>
-        <div class="gather-status" id="gather-api-status">未启动监听</div>
-        <div style="font-size:11px;color:#999;">捕获页面中的 XHR/Fetch 请求，点击条目展开详情（请求头/请求体/响应体）</div>
       </div>
     </div>

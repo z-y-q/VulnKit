@@ -12,6 +12,7 @@ import * as multiurl from './vk-multiurl.js';
 import * as tabSave from './vk-tabsave.js';
 import * as gather from './vk-gather.js';
 import * as haeRules from './vk-hae-rules.js';
+import { setSourceUrls } from './vk-source-loader.js';
 import * as links from './vk-links.js';
 import * as exif from './vk-exif.js';
 import * as history from './vk-history.js';
@@ -273,23 +274,18 @@ function initGatherAndRules() {
     gather.applySearchFilter(this.value.trim());
   });
   utils.bindClick('gather-copy-btn', gather.copyAllData);
+  utils.bindClick('gather-copy-all-btn', gather.copyAllGroupsData);
   utils.bindClick('gather-export-btn', gather.exportAllData);
-
-  utils.bindClick('gather-api-start-btn', gather.startApiTraffic);
-  utils.bindClick('gather-api-stop-btn', gather.stopApiTraffic);
-
-  const apiFilterMethod = utils.get('api-filter-method');
-  const apiFilterStatus = utils.get('api-filter-status');
-  if (apiFilterMethod) {
-    apiFilterMethod.addEventListener('change', function () {
-      gather.setApiFilter('method', this.value);
-    });
-  }
-  if (apiFilterStatus) {
-    apiFilterStatus.addEventListener('change', function () {
-      gather.setApiFilter('status', this.value);
-    });
-  }
+  utils.bindClick('gather-export-json-btn', gather.exportAllDataJson);
+  utils.bindClick('gather-to-source-btn', function () {
+    var urls = gather.getScriptUrls();
+    if (urls.length === 0) {
+      utils.showToast('没有收集到 JS/CSS 链接', 'warning');
+      return;
+    }
+    setSourceUrls(urls);
+    utils.showToast(`已发送 ${urls.length} 个链接到源码加载面板`, 'success');
+  });
 
   const rulesBtn = utils.get('gather-rules-btn');
   const rulesModal = utils.get('rules-modal');

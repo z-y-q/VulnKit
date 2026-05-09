@@ -91,7 +91,6 @@ src/
 │   ├── vk-hae-rules.js            # HaE 安全规则管理
 │   ├── vk-hae-default-rules.js    # HaE 默认规则数据（6 组 53 条）
 │   ├── vk-gather.js               # 信息收集（API/域名/敏感信息/IP/注释）
-│   ├── vk-gather-traffic.js       # API 流量捕获（XHR/Fetch 拦截 + 实时展示）
 │   ├── vk-asset.js                # 资产测绘（FOFA/ZoomEye/Shodan）
 │   ├── vk-links.js                # 链接提取
 │   ├── vk-multiurl.js             # URL 批量多开
@@ -270,18 +269,6 @@ src/
 
 - **规则管理** — 按分组启用/禁用规则，支持导入/导出/恢复默认
 - **流量分析** — 实时拦截 XHR/Fetch 请求，匹配 HaE 规则高亮显示
-
-### API 流量捕获
-
-实时拦截页面中的 XHR/Fetch 请求，记录 API 调用。
-
-**功能：**
-- **开始/停止** — 动态注入拦截器，捕获网络请求
-- **请求详情** — 记录方法、URL、状态码、Content-Type、耗时、请求/响应体、请求头
-- **方法筛选** — 按 GET/POST/PUT/DELETE 筛选
-- **状态码筛选** — 按状态码分类筛选（2xx 绿色 / 3xx 橙色 / 4xx+ 红色）
-- **自动去重** — 按 `url + method` 去重
-- **导出** — 导出捕获的 API 列表
 
 ---
 

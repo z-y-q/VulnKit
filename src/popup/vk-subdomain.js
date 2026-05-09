@@ -632,6 +632,87 @@ async function bruteForceHttpProbe() {
   if (exportBtn) exportBtn.hidden = false;
 }
 
+function collectSubdomainsAsync() {
+  return new Promise(function (resolve) {
+    const origSubdomains = lastSubdomains;
+    const origBase = lastBaseDomain;
+    collectSubdomains();
+    function checkDone() {
+      let statusEl = utils.get('subdomain-status');
+      if (statusEl && statusEl.textContent.indexOf('CT 收集完成') !== -1) {
+        resolve();
+      } else if (
+        statusEl &&
+        (statusEl.textContent.indexOf('无法获取') !== -1 ||
+          statusEl.textContent.indexOf('查询超时或失败') !== -1)
+      ) {
+        resolve();
+      } else {
+        setTimeout(checkDone, 500);
+      }
+    }
+    setTimeout(checkDone, 500);
+  });
+}
+
+function extractFromPageAsync() {
+  return new Promise(function (resolve) {
+    extractFromPage();
+    function checkDone() {
+      let statusEl = utils.get('subdomain-status');
+      if (statusEl && statusEl.textContent.indexOf('页面提取完成') !== -1) {
+        resolve();
+      } else if (statusEl && statusEl.textContent.indexOf('提取失败') !== -1) {
+        resolve();
+      } else {
+        setTimeout(checkDone, 500);
+      }
+    }
+    setTimeout(checkDone, 500);
+  });
+}
+
+async function runAllScans() {
+  if (dnsScanActive) {
+    utils.showToast('探测进行中，请等待完成', 'warning');
+    return;
+  }
+  let statusEl = utils.get('subdomain-status');
+  let copyBtn = utils.get('subdomain-copy-btn');
+  let exportBtn = utils.get('subdomain-export-btn');
+  let allBtn = utils.get('subdomain-all-btn');
+  if (allBtn) {
+    allBtn.disabled = true;
+    allBtn.textContent = '扫描中...';
+  }
+
+  if (statusEl) statusEl.textContent = '① CT 证书查询中...';
+  await collectSubdomainsAsync();
+  await delay(300);
+
+  if (statusEl) statusEl.textContent = '② 页面提取中...';
+  await extractFromPageAsync();
+  await delay(300);
+
+  if (statusEl) statusEl.textContent = '③ DNS/HTTP 探测中...';
+  await bruteForceHttpProbe();
+
+  if (statusEl) {
+    let prev = statusEl.textContent;
+    if (prev.indexOf('探测完成') !== -1 || prev.indexOf('探测已取消') !== -1) {
+      statusEl.textContent = '✓ 全部完成 — ' + prev.replace(/^探测/, 'DNS探测');
+    } else {
+      statusEl.textContent = '✓ 全部扫描结束，共 ' + lastSubdomains.length + ' 个子域名';
+    }
+  }
+  if (copyBtn) copyBtn.hidden = false;
+  if (exportBtn) exportBtn.hidden = false;
+  if (allBtn) {
+    allBtn.disabled = false;
+    allBtn.textContent = '一键全部';
+  }
+}
+
 export {
   collectSubdomains,
   extractFromPage,
@@ -641,4 +722,5 @@ export {
   exportResults,
   filterBySource,
   searchResults,
+  runAllScans,
 };

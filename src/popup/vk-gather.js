@@ -3,14 +3,6 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 import * as haeRules from './vk-hae-rules.js';
-import {
-  initTrafficDeps,
-  API_TRAFFIC_GROUP,
-  applyApiTrafficFilter,
-  startApiTraffic,
-  stopApiTraffic,
-  setApiFilter,
-} from './vk-gather-traffic.js';
 import { LEAK_SCAN_GROUP, runDeepLeakScan } from './vk-leakscan-scanner.js';
 
 const DOM_GROUP = 'DOM Analysis';
@@ -32,18 +24,22 @@ function getHaeRules() {
 
 function getFilteredList() {
   let list = gatherData[currentGatherTab] || [];
-  const isApiTraffic = currentGatherTab === API_TRAFFIC_GROUP;
-  if (isApiTraffic) {
-    list = applyApiTrafficFilter(list);
-  }
   if (!searchFilter) return list;
   const lower = searchFilter.toLowerCase();
-  return list.filter(function (item) {
-    return (
-      (item.value && item.value.toLowerCase().indexOf(lower) !== -1) ||
-      (item.name && item.name.toLowerCase().indexOf(lower) !== -1)
-    );
+  var crossGroup = [];
+  Object.keys(gatherData).forEach(function (group) {
+    var items = gatherData[group];
+    if (!Array.isArray(items)) return;
+    items.forEach(function (item) {
+      if (
+        (item.value && item.value.toLowerCase().indexOf(lower) !== -1) ||
+        (item.name && item.name.toLowerCase().indexOf(lower) !== -1)
+      ) {
+        crossGroup.push(Object.assign({}, item, { _matchedGroup: group }));
+      }
+    });
   });
+  return crossGroup;
 }
 
 function updateSearchVisibility() {
@@ -62,99 +58,50 @@ function renderGatherTab() {
 
   updateSearchVisibility();
 
-  const isApiTraffic = currentGatherTab === API_TRAFFIC_GROUP;
   const fullList = gatherData[currentGatherTab] || [];
   if (fullList.length === 0) {
     if (currentGatherTab === LEAK_SCAN_GROUP && gatherData[LEAK_SCAN_GROUP]) {
-      utils.setEmpty('gather-results', '未发现敏感信息泄漏');
+      utils.get('gather-results').innerHTML =
+        '<div class="gather-empty-state"><div class="gather-empty-icon">&#9989;</div><div class="gather-empty-text">未发现敏感信息泄漏</div></div>';
       utils.setStatus('gather-status', '深度扫描完成');
       return;
     }
-    utils.setEmpty('gather-results', '点击「收集当前页面」开始');
+    utils.get('gather-results').innerHTML =
+      '<div class="gather-empty-state"><div class="gather-empty-icon">&#128269;</div><div class="gather-empty-text">点击「收集当前页面」开始</div></div>';
     utils.setStatus('gather-status', '');
     return;
   }
 
-  let statusText = `共 ${fullList.length} 条`;
-  if (searchFilter && list.length !== fullList.length) {
-    statusText += `（筛选: ${list.length}）`;
-  }
-  if (isApiTraffic && list.length !== fullList.length && !searchFilter) {
+  let statusText = searchFilter ? `全局搜索: ${list.length} 条匹配` : `共 ${fullList.length} 条`;
+  if (searchFilter && !searchFilter) {
     statusText += `（筛选: ${list.length}）`;
   }
   utils.setStatus('gather-status', statusText);
 
   if (list.length === 0) {
-    utils.setEmpty('gather-results', '没有匹配的结果');
+    utils.get('gather-results').innerHTML =
+      '<div class="gather-empty-state"><div class="gather-empty-icon">&#128270;</div><div class="gather-empty-text">没有匹配的结果</div></div>';
     return;
   }
 
   let html = '';
-  list.forEach(function (item, idx) {
-    let meta = item._meta || {};
-    if (isApiTraffic && meta.method) {
-      html += `<div class="gather-item gather-api-item" data-api-idx="${idx}">
-        <span class="gather-item-type type-${item.color || 'gray'}">${utils.escapeHtml(meta.method)}</span>
-        <span class="gather-item-value" title="${utils.escapeHtml(item.value)}">${utils.escapeHtml(item.value)}</span>
-        <span class="api-duration">${meta.duration || 0}ms</span>
-        <button class="gather-item-copy" data-copy="${utils.escapeHtml(item.value)}">复制</button>
-      </div>`;
-      html += `<div class="gather-api-detail" id="api-detail-${idx}" style="display:none;">`;
-      if (meta.contentType) {
-        html += `<div class="api-detail-row"><span class="api-detail-label">Content-Type</span><span class="api-detail-value">${utils.escapeHtml(meta.contentType)}</span></div>`;
-      }
-      if (meta.status) {
-        html += `<div class="api-detail-row"><span class="api-detail-label">Status</span><span class="api-detail-value"><span class="api-status-badge ${
-          meta.status >= 200 && meta.status < 300
-            ? 'api-st-2xx'
-            : meta.status >= 400
-              ? 'api-st-err'
-              : 'api-st-warn'
-        }">${meta.status}</span></span></div>`;
-      }
-      const headers = meta.reqHeaders || {};
-      const headerKeys = Object.keys(headers);
-      if (headerKeys.length > 0) {
-        html +=
-          '<div class="api-detail-row"><span class="api-detail-label">Headers</span><span class="api-detail-value">';
-        headerKeys.forEach(function (k) {
-          html += `<div class="api-header-entry"><span class="api-header-key">${utils.escapeHtml(k)}:</span> ${utils.escapeHtml(headers[k])}</div>`;
-        });
-        html += '</span></div>';
-      }
-      if (meta.reqBody) {
-        html += `<div class="api-detail-row"><span class="api-detail-label">Request Body</span><span class="api-detail-value api-body-preview">${utils.escapeHtml(meta.reqBody)}</span></div>`;
-      }
-      if (meta.resBody) {
-        html += `<div class="api-detail-row"><span class="api-detail-label">Response Body</span><span class="api-detail-value api-body-preview">${utils.escapeHtml(meta.resBody)}</span></div>`;
-      }
-      html += '</div>';
-    } else {
-      html += `<div class="gather-item">
+  var lastGroup = '';
+  list.forEach(function (item) {
+    if (searchFilter && item._matchedGroup && item._matchedGroup !== lastGroup) {
+      lastGroup = item._matchedGroup;
+      html += `<div class="gather-cross-group-label">${utils.escapeHtml(lastGroup)}</div>`;
+    }
+    html += `<div class="gather-item">
         <span class="gather-item-type type-${item.color || item.type || 'gray'}">${utils.escapeHtml(item.name || item.type || '')}</span>
         <span class="gather-item-value" title="${utils.escapeHtml(item.value)}">${utils.escapeHtml(item.value)}</span>
         <button class="gather-item-copy" data-copy="${utils.escapeHtml(item.value)}">复制</button>
       </div>`;
-    }
   });
   container.innerHTML = html;
 
   container.querySelectorAll('.gather-item-copy').forEach(function (btn) {
     btn.addEventListener('click', function () {
       utils.copyAndToast(btn.dataset.copy);
-    });
-  });
-
-  container.querySelectorAll('.gather-api-item').forEach(function (el) {
-    el.addEventListener('click', function (ev) {
-      if (ev.target.classList.contains('gather-item-copy')) return;
-      let idx = el.dataset.apiIdx;
-      const detail = document.getElementById(`api-detail-${idx}`);
-      if (detail) {
-        const shown = detail.style.display !== 'none';
-        detail.style.display = shown ? 'none' : '';
-        el.classList.toggle('gather-api-expanded', !shown);
-      }
     });
   });
 }
@@ -178,7 +125,6 @@ function countAll() {
 
 function buildGroups() {
   return [DOM_GROUP].concat(
-    gatherData['API Traffic'] ? [API_TRAFFIC_GROUP] : [],
     gatherData['JS API'] ? ['JS API'] : [],
     gatherData['JS Sensitive Info'] ? ['JS Sensitive Info'] : [],
     gatherData[LEAK_SCAN_GROUP] ? [LEAK_SCAN_GROUP] : [],
@@ -669,12 +615,29 @@ async function gatherInfo() {
       renderSubTabs();
       renderGatherTab();
 
-      let statusText = `收集完成，共 ${countAll()} 条`;
+      let statusText = `收集完成，共 ${countAll()} 条（${gatherElapsed()}s）`;
       if (meta && meta.truncated) {
-        statusText += `（HTML 已截断至 500KB/${(meta.totalSize / 1024).toFixed(0)}KB）`;
+        const truncatedKb = (500).toFixed(0);
+        const totalKb = (meta.totalSize / 1024).toFixed(0);
+        const warningEl = utils.get('gather-status');
+        if (warningEl) {
+          warningEl.innerHTML =
+            '<span class="gather-truncation-warn" title="HTML 体积过大，仅分析了前 500KB，可能导致部分规则匹配遗漏">' +
+            '⚠ 页面过大，HTML 已截断至 ' +
+            truncatedKb +
+            'KB/' +
+            totalKb +
+            'KB，部分内容可能未被分析</span>' +
+            ' — 共 ' +
+            countAll() +
+            ' 条（' +
+            gatherElapsed() +
+            's）';
+          warningEl.style.display = '';
+        }
+      } else {
+        utils.setStatus('gather-status', statusText);
       }
-      statusText += `（${gatherElapsed()}s）`;
-      utils.setStatus('gather-status', statusText);
       utils.showToast(
         meta && meta.truncated ? '收集完成（页面过大，部分内容被截断）' : '收集完成',
         meta && meta.truncated ? 'warning' : 'success'
@@ -758,6 +721,31 @@ function exportAllData() {
   utils.buildCsv(['Group', 'Type', 'Value'], rows, `lingmou-gather-${Date.now()}.csv`);
 }
 
+function exportAllDataJson() {
+  const output = {};
+  Object.keys(gatherData).forEach(function (group) {
+    const items = gatherData[group];
+    if (!Array.isArray(items) || items.length === 0) return;
+    output[group] = items.map(function (item) {
+      return { name: item.name, value: item.value };
+    });
+  });
+  if (Object.keys(output).length === 0) {
+    utils.showToast('没有数据可导出', 'warning');
+    return;
+  }
+  const json = JSON.stringify(output, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  chrome.downloads.download(
+    { url: url, filename: `lingmou-gather-${Date.now()}.json`, saveAs: true },
+    function () {
+      URL.revokeObjectURL(url);
+    }
+  );
+  utils.showToast('JSON 导出中...', 'info');
+}
+
 function copyAllData() {
   let list = gatherData[currentGatherTab] || [];
   if (list.length === 0) {
@@ -772,6 +760,23 @@ function copyAllData() {
   utils.copyAndToast(text, `已复制 ${list.length} 条数据`);
 }
 
+function copyAllGroupsData() {
+  const rows = [];
+  Object.keys(gatherData).forEach(function (group) {
+    const items = gatherData[group];
+    if (!Array.isArray(items) || items.length === 0) return;
+    rows.push(`=== ${group} ===`);
+    items.forEach(function (item) {
+      rows.push(item.value);
+    });
+  });
+  if (rows.length === 0) {
+    utils.showToast('没有数据可复制', 'warning');
+    return;
+  }
+  utils.copyAndToast(rows.join('\n'), `已复制全部 ${countAll()} 条数据`);
+}
+
 function getActiveRules() {
   return loadedRules;
 }
@@ -782,25 +787,31 @@ function updateRules(rules) {
   renderSubTabs();
 }
 
-initTrafficDeps(
-  () => gatherData,
-  () => currentGatherTab,
-  renderSubTabs,
-  renderGatherTab
-);
-
 export {
   init,
   gatherInfo,
   restoreData,
   applySearchFilter,
   exportAllData,
+  exportAllDataJson,
   copyAllData,
+  copyAllGroupsData,
+  getScriptUrls,
   getActiveRules,
   updateRules,
-  startApiTraffic,
-  stopApiTraffic,
-  setApiFilter,
   gatherData,
   currentGatherTab,
 };
+
+function getScriptUrls() {
+  var urls = [];
+  var jsGroup = gatherData['Script Src'] || [];
+  var cssGroup = gatherData['CSS Link'] || [];
+  jsGroup.forEach(function (item) {
+    if (item.value && item.value.startsWith('http')) urls.push(item.value);
+  });
+  cssGroup.forEach(function (item) {
+    if (item.value && item.value.startsWith('http')) urls.push(item.value);
+  });
+  return urls;
+}

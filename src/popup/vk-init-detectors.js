@@ -88,6 +88,7 @@ import {
   exportResults as subdomainExportResults,
   filterBySource as subdomainFilterBySource,
   searchResults as subdomainSearchResults,
+  runAllScans,
 } from './vk-subdomain.js';
 import {
   loadToSources,
@@ -347,6 +348,7 @@ function initNetworkTools() {
   utils.bindClick('subdomain-scan-btn', collectSubdomains);
   utils.bindClick('subdomain-page-btn', extractFromPage);
   utils.bindClick('subdomain-dns-btn', bruteForceDns);
+  utils.bindClick('subdomain-all-btn', runAllScans);
   utils.bindClick('subdomain-copy-btn', subdomainCopyResults);
   utils.bindClick('subdomain-export-btn', subdomainExportResults);
   utils.on('subdomain-search', 'input', function () {
