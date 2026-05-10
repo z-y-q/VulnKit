@@ -267,15 +267,24 @@ function loadSettings() {
   });
 }
 
+var _toastEl = null;
+var _toastTimer = null;
+
 function showStatus(message, type) {
   type = type || 'info';
-  const status = $('status');
-  if (!status) return;
-  status.textContent = message;
-  status.className = 'status ' + type;
-
-  setTimeout(() => {
-    status.className = 'status status-hidden';
+  if (!_toastEl) {
+    _toastEl = document.createElement('div');
+    _toastEl.className = 'options-toast';
+    document.body.appendChild(_toastEl);
+  }
+  clearTimeout(_toastTimer);
+  _toastEl.textContent = message;
+  _toastEl.className = 'options-toast ' + type;
+  requestAnimationFrame(function () {
+    _toastEl.classList.add('show');
+  });
+  _toastTimer = setTimeout(function () {
+    _toastEl.classList.remove('show');
   }, 3000);
 }
 
@@ -362,11 +371,12 @@ function importSettings() {
 
 function clearData() {
   if (confirm('确定要清除所有数据吗？此操作不可恢复。')) {
-    chrome.storage.local.remove(
-      [
+    chrome.storage.local.get(null, function (allData) {
+      var keysToRemove = Object.keys(allData).filter(function (key) {
+        return !key.startsWith('context') && key !== '__vk_ruoyi_event';
+      });
+      var known = [
         'pentestSettings',
-        'pentest_history',
-        'pentest_spoof',
         'pentest_keys',
         'haeRules',
         'gatherData',
@@ -375,18 +385,32 @@ function clearData() {
         'gatherDataTime',
         'allLinks',
         'allLinksUrl',
+        'pentest_spoof',
         'pentest_ui_state',
-      ],
-      () => {
+        'remotePayloads',
+        'payloadRemoteUrl',
+        'payloadVersion',
+        'ruoyiHookTabId',
+        'ruoyiHookEnabled',
+        'ruoyiHookOrigin',
+        'js_blocked_tabId',
+        'permInterceptTabId',
+      ];
+      known.forEach(function (k) {
+        if (keysToRemove.indexOf(k) === -1) keysToRemove.push(k);
+      });
+      chrome.storage.local.remove(keysToRemove, function () {
         if (chrome.runtime.lastError) {
           showStatus('清除失败: ' + chrome.runtime.lastError.message, 'error');
           return;
         }
         loadSettings();
+        loadApiKeys();
+        renderStorageOverview();
         renderToolbarConfig();
         showStatus('所有数据已清除', 'success');
-      }
-    );
+      });
+    });
   }
 }
 
@@ -402,6 +426,328 @@ function resetSettings() {
     });
   }
 }
+
+function initScrollSpy() {
+  var sections = document.querySelectorAll('.options-section[id]');
+  var navItems = document.querySelectorAll('.sidebar-nav-item');
+  if (!sections.length || !navItems.length) return;
+
+  var observer = new IntersectionObserver(
+    function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          var id = entry.target.id;
+          navItems.forEach(function (item) {
+            item.classList.toggle('active', item.getAttribute('href') === '#' + id);
+          });
+        }
+      });
+    },
+    { rootMargin: '-20% 0px -70% 0px' }
+  );
+
+  sections.forEach(function (s) {
+    observer.observe(s);
+  });
+
+  navItems.forEach(function (item) {
+    item.addEventListener('click', function (e) {
+      e.preventDefault();
+      var target = document.querySelector(item.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+}
+
+// ====== Storage Management ======
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(2) + ' MB';
+}
+
+function renderStorageOverview() {
+  var knownKeys = [
+    { key: 'pentestSettings', label: '通用设置' },
+    { key: 'pentest_keys', label: 'API 密钥' },
+    { key: 'haeRules', label: 'HaE 规则' },
+    { key: 'gatherData', label: '采集数据' },
+    { key: 'gatherDataUrl', label: '采集来源' },
+    { key: 'gatherDataTabs', label: '采集标签' },
+    { key: 'gatherDataTime', label: '采集时间' },
+    { key: 'allLinks', label: '链接数据' },
+    { key: 'allLinksUrl', label: '链接来源' },
+    { key: 'pentest_spoof', label: '伪装状态' },
+    { key: 'remotePayloads', label: '远程载荷' },
+    { key: 'payloadRemoteUrl', label: '载荷 URL' },
+    { key: 'payloadVersion', label: '载荷版本' },
+    { key: 'pentest_ui_state', label: 'UI 状态' },
+  ];
+
+  chrome.storage.local.get(
+    knownKeys.map(function (k) {
+      return k.key;
+    }),
+    function (result) {
+      var container = $('storage-overview');
+      if (!container) return;
+      container.innerHTML = '';
+
+      var totalBytes = 0;
+      knownKeys.forEach(function (item) {
+        var val = result[item.key];
+        if (val === undefined) return;
+        var json = JSON.stringify(val);
+        var bytes = new Blob([json]).size;
+        totalBytes += bytes;
+
+        var row = document.createElement('div');
+        row.className = 'storage-item';
+        row.innerHTML =
+          '<span class="storage-label">' +
+          escapeHtml(item.label) +
+          '</span>' +
+          '<span class="storage-size">' +
+          formatBytes(bytes) +
+          '</span>';
+        container.appendChild(row);
+      });
+
+      var totalEl = $('storage-total');
+      if (totalEl) totalEl.textContent = '总计: ' + formatBytes(totalBytes);
+    }
+  );
+}
+
+function clearStorageCategory(keys, label) {
+  if (!confirm('确定要清除 ' + label + ' 吗？')) return;
+  chrome.storage.local.remove(keys, function () {
+    if (chrome.runtime.lastError) {
+      showStatus('清除失败: ' + chrome.runtime.lastError.message, 'error');
+      return;
+    }
+    showStatus(label + ' 已清除', 'success');
+    renderStorageOverview();
+  });
+}
+
+// ====== API Key Management ======
+
+var _cryptoCache = null;
+
+async function _getCryptoKey() {
+  if (_cryptoCache) return _cryptoCache;
+  var extId = chrome.runtime.id;
+  var enc = new TextEncoder();
+  var keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode('vulnkit-key-v1:' + extId),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+  _cryptoCache = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: enc.encode('vulnkit-salt'), iterations: 100000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+  return _cryptoCache;
+}
+
+async function _decryptValue(encrypted) {
+  if (!encrypted || !encrypted.startsWith('enc:aes256:gcm:')) return encrypted;
+  var raw = atob(encrypted.slice(14));
+  var iv = new Uint8Array(
+    raw.length > 12
+      ? raw
+          .slice(0, 12)
+          .split('')
+          .map(function (c) {
+            return c.charCodeAt(0);
+          })
+      : []
+  );
+  var data = new Uint8Array(
+    raw.length > 12
+      ? raw
+          .slice(12)
+          .split('')
+          .map(function (c) {
+            return c.charCodeAt(0);
+          })
+      : []
+  );
+  var key = await _getCryptoKey();
+  var decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, data);
+  return new TextDecoder().decode(decrypted);
+}
+
+async function _encryptValue(plain) {
+  if (!plain) return '';
+  var enc = new TextEncoder();
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  var key = await _getCryptoKey();
+  var encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(plain));
+  var combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(encrypted), iv.length);
+  return 'enc:aes256:gcm:' + btoa(String.fromCharCode.apply(null, combined));
+}
+
+var API_KEY_FIELDS = [
+  { id: 'opt-key-fofa-email', storageKey: 'fofa_email' },
+  { id: 'opt-key-fofa-key', storageKey: 'fofa_key' },
+  { id: 'opt-key-zoomeye', storageKey: 'zoomeye' },
+  { id: 'opt-key-shodan', storageKey: 'shodan' },
+];
+
+function loadApiKeys() {
+  chrome.storage.local.get(['pentest_keys'], async function (result) {
+    var keys = result.pentest_keys || {};
+    for (var i = 0; i < API_KEY_FIELDS.length; i++) {
+      var f = API_KEY_FIELDS[i];
+      var el = $(f.id);
+      if (el && keys[f.storageKey]) {
+        try {
+          el.value = await _decryptValue(keys[f.storageKey]);
+        } catch (e) {
+          el.value = '';
+        }
+      }
+    }
+  });
+}
+
+async function saveApiKeys() {
+  var keys = {};
+  for (var i = 0; i < API_KEY_FIELDS.length; i++) {
+    var f = API_KEY_FIELDS[i];
+    var el = $(f.id);
+    if (el && el.value.trim()) {
+      keys[f.storageKey] = await _encryptValue(el.value.trim());
+    }
+  }
+  chrome.storage.local.get(['pentest_keys'], function (result) {
+    var existing = result.pentest_keys || {};
+    var updated = Object.assign({}, existing, keys);
+    API_KEY_FIELDS.forEach(function (f) {
+      var el = $(f.id);
+      if (!el || !el.value.trim()) delete updated[f.storageKey];
+    });
+    chrome.storage.local.set({ pentest_keys: updated }, function () {
+      if (chrome.runtime.lastError) {
+        showStatus('保存失败: ' + chrome.runtime.lastError.message, 'error');
+        return;
+      }
+      showStatus('API 密钥已保存', 'success');
+    });
+  });
+}
+
+// ====== Full Backup ======
+
+function exportFullData() {
+  chrome.storage.local.get(null, function (allData) {
+    var transientKeys = [
+      'contextExtractedLinks',
+      'contextExtractedUrl',
+      'contextSelection',
+      'contextAction',
+      'contextExtractUrl',
+      'exif_pending_url',
+      'ruoyiHookTabId',
+      'ruoyiHookEnabled',
+      'ruoyiHookOrigin',
+      'js_blocked_tabId',
+      'permInterceptTabId',
+      '__vk_ruoyi_event',
+    ];
+    var exportData = {};
+    for (var key in allData) {
+      if (!allData.hasOwnProperty(key)) continue;
+      if (transientKeys.indexOf(key) === -1) {
+        exportData[key] = allData[key];
+      }
+    }
+    var dataStr = JSON.stringify(exportData, null, 2);
+    var blob = new Blob([dataStr], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'lingmou-full-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showStatus('完整数据已导出', 'success');
+  });
+}
+
+function importFullData() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (evt) {
+      try {
+        var data = JSON.parse(evt.target.result);
+        if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+          showStatus('文件格式错误：需要 JSON 对象', 'error');
+          return;
+        }
+        var validKeys = [
+          'pentestSettings',
+          'pentest_keys',
+          'haeRules',
+          'gatherData',
+          'gatherDataUrl',
+          'gatherDataTabs',
+          'gatherDataTime',
+          'allLinks',
+          'allLinksUrl',
+          'pentest_spoof',
+          'pentest_ui_state',
+          'remotePayloads',
+          'payloadRemoteUrl',
+          'payloadVersion',
+        ];
+        var cleaned = {};
+        var imported = 0;
+        for (var key in data) {
+          if (!data.hasOwnProperty(key)) continue;
+          if (validKeys.indexOf(key) !== -1) {
+            cleaned[key] = data[key];
+            imported++;
+          }
+        }
+        if (imported === 0) {
+          showStatus('文件中没有找到有效的数据', 'error');
+          return;
+        }
+        chrome.storage.local.set(cleaned, function () {
+          if (chrome.runtime.lastError) {
+            showStatus('导入失败: ' + chrome.runtime.lastError.message, 'error');
+            return;
+          }
+          loadSettings();
+          renderStorageOverview();
+          loadApiKeys();
+          showStatus('已导入 ' + imported + ' 项数据', 'success');
+        });
+      } catch (err) {
+        showStatus('文件格式错误：无法解析 JSON', 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// ====== End Storage Management ======
 
 document.addEventListener('DOMContentLoaded', () => {
   // Sync theme from popup's localStorage preference
@@ -448,6 +794,58 @@ document.addEventListener('DOMContentLoaded', () => {
   if ((btn = $('hae-import-yaml'))) btn.addEventListener('click', importHaeYaml);
   if ((btn = $('hae-reset-rules'))) btn.addEventListener('click', resetHaeRules);
 
+  // Storage management
+  renderStorageOverview();
+  loadApiKeys();
+
+  if ((btn = $('save-api-keys'))) btn.addEventListener('click', saveApiKeys);
+  if ((btn = $('clear-api-keys')))
+    btn.addEventListener('click', function () {
+      clearStorageCategory(['pentest_keys'], 'API 密钥');
+    });
+  if ((btn = $('clear-api-keys-alt')))
+    btn.addEventListener('click', function () {
+      clearStorageCategory(['pentest_keys'], 'API 密钥');
+    });
+  if ((btn = $('clear-gather')))
+    btn.addEventListener('click', function () {
+      clearStorageCategory(
+        ['gatherData', 'gatherDataUrl', 'gatherDataTabs', 'gatherDataTime'],
+        '采集数据'
+      );
+    });
+  if ((btn = $('clear-links')))
+    btn.addEventListener('click', function () {
+      clearStorageCategory(['allLinks', 'allLinksUrl'], '链接数据');
+    });
+  if ((btn = $('clear-spoof')))
+    btn.addEventListener('click', function () {
+      clearStorageCategory(['pentest_spoof'], '伪装状态');
+    });
+  if ((btn = $('clear-payload')))
+    btn.addEventListener('click', function () {
+      clearStorageCategory(['remotePayloads', 'payloadRemoteUrl', 'payloadVersion'], '远程载荷');
+    });
+  if ((btn = $('clear-ui-state')))
+    btn.addEventListener('click', function () {
+      clearStorageCategory(['pentest_ui_state'], 'UI 状态');
+    });
+  if ((btn = $('clear-temp-state')))
+    btn.addEventListener('click', function () {
+      clearStorageCategory(
+        [
+          'ruoyiHookTabId',
+          'ruoyiHookEnabled',
+          'ruoyiHookOrigin',
+          'js_blocked_tabId',
+          'permInterceptTabId',
+        ],
+        '临时状态'
+      );
+    });
+  if ((btn = $('export-full-btn'))) btn.addEventListener('click', exportFullData);
+  if ((btn = $('import-full-btn'))) btn.addEventListener('click', importFullData);
+
   document.querySelectorAll('input, select').forEach(input => {
     input.addEventListener('change', saveSettings);
   });
@@ -475,4 +873,6 @@ document.addEventListener('DOMContentLoaded', () => {
       document.documentElement.setAttribute('data-theme', theme);
     });
   }
+
+  initScrollSpy();
 });

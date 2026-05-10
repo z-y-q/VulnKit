@@ -7,123 +7,320 @@
     <link rel="stylesheet" href="../styles/options.css">
 </head>
 <body>
-    <div class="container">
-        <h1>灵眸 设置</h1>
-        <p>版本: <span id="version"></span></p>
+    <div class="options-layout">
+        <aside class="options-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">灵眸</div>
+                <div class="sidebar-version" id="version"></div>
+            </div>
+            <nav class="sidebar-nav">
+                <a class="sidebar-nav-item active" href="#general">
+                    <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    通用设置
+                </a>
+                <a class="sidebar-nav-item" href="#privacy">
+                    <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    隐私设置
+                </a>
+                <a class="sidebar-nav-item" href="#tools">
+                    <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    工具设置
+                </a>
+                <a class="sidebar-nav-item" href="#hae">
+                    <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    规则管理
+                </a>
+                <a class="sidebar-nav-item" href="#filter">
+                    <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    采集过滤
+                </a>
+                <a class="sidebar-nav-item" href="#scan">
+                    <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    扫描设置
+                </a>
+                <a class="sidebar-nav-item" href="#toolbar">
+                    <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    工具栏配置
+                </a>
+                <a class="sidebar-nav-item" href="#storage">
+                    <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                    存储管理
+                </a>
+                <a class="sidebar-nav-item" href="#data">
+                    <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                    数据管理
+                </a>
+            </nav>
+        </aside>
+        <main class="options-content">
+            <section id="general" class="options-section content-card card-spacing">
+                <h3 class="card-title">通用设置</h3>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">启用通知提醒</div>
+                        <div class="setting-desc">扫描完成后发送浏览器通知</div>
+                    </div>
+                    <div class="setting-control">
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="enableNotifications" checked>
+                        </label>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">启用右键菜单</div>
+                        <div class="setting-desc">在网页右键菜单中显示灵眸功能</div>
+                    </div>
+                    <div class="setting-control">
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="enableContextMenu" checked>
+                        </label>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">主题选择</div>
+                        <div class="setting-desc">切换界面显示主题</div>
+                    </div>
+                    <div class="setting-control">
+                        <select id="theme">
+                            <option value="auto">自动</option>
+                            <option value="light">浅色</option>
+                            <option value="dark">深色</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
 
-        <div class="section">
-            <h3>通用设置</h3>
-            <div class="setting">
-                <label>
-                    <input type="checkbox" id="enableNotifications" checked>
-                    启用通知提醒
-                </label>
-            </div>
-            <div class="setting">
-                <label>
-                    <input type="checkbox" id="enableContextMenu" checked>
-                    启用右键菜单
-                </label>
-            </div>
-            <div class="setting">
-                <label for="theme">主题选择:</label>
-                <select id="theme">
-                    <option value="auto">自动</option>
-                    <option value="light">浅色</option>
-                    <option value="dark">深色</option>
-                </select>
-            </div>
-        </div>
+            <section id="privacy" class="options-section content-card card-spacing">
+                <h3 class="card-title">隐私设置</h3>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">保存操作历史</div>
+                        <div class="setting-desc">记录操作历史用于回溯查看</div>
+                    </div>
+                    <div class="setting-control">
+                        <label class="setting-toggle">
+                            <input type="checkbox" id="storeHistory" checked>
+                        </label>
+                    </div>
+                </div>
+            </section>
 
-        <div class="section">
-            <h3>隐私设置</h3>
-            <div class="setting">
-                <label>
-                    <input type="checkbox" id="storeHistory" checked>
-                    保存操作历史
-                </label>
-            </div>
-        </div>
+            <section id="tools" class="options-section content-card card-spacing">
+                <h3 class="card-title">工具设置</h3>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">默认编码类型</div>
+                        <div class="setting-desc">编码工具面板默认使用的编码方式</div>
+                    </div>
+                    <div class="setting-control">
+                        <select id="defaultEncoding">
+                            <option value="base64">Base64</option>
+                            <option value="url">URL编码</option>
+                            <option value="html">HTML实体</option>
+                            <option value="hex">十六进制</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">默认哈希算法</div>
+                        <div class="setting-desc">哈希计算默认使用的算法</div>
+                    </div>
+                    <div class="setting-control">
+                        <select id="defaultHash">
+                            <option value="SHA256">SHA-256</option>
+                            <option value="SHA1">SHA-1</option>
+                            <option value="MD5">MD5 (不推荐)</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
 
-        <div class="section">
-            <h3>工具设置</h3>
-            <div class="setting">
-                <label for="defaultEncoding">默认编码类型:</label>
-                <select id="defaultEncoding">
-                    <option value="base64">Base64</option>
-                    <option value="url">URL编码</option>
-                    <option value="html">HTML实体</option>
-                    <option value="hex">十六进制</option>
-                </select>
-            </div>
-            <div class="setting">
-                <label for="defaultHash">默认哈希算法:</label>
-                <select id="defaultHash">
-                    <option value="SHA256">SHA-256</option>
-                    <option value="SHA1">SHA-1</option>
-                    <option value="MD5">MD5 (不推荐)</option>
-                </select>
-            </div>
-        </div>
+            <section id="hae" class="options-section content-card card-spacing">
+                <h3 class="card-title">规则管理 (HaE)</h3>
+                <p class="section-desc">管理 HTTP Analyzer 规则，支持 YAML 导入/导出。</p>
+                <div class="section-actions">
+                    <button id="hae-export-yaml" class="btn btn-primary btn-sm">导出 YAML</button>
+                    <button id="hae-import-yaml" class="btn btn-primary btn-sm">导入 YAML</button>
+                    <button id="hae-reset-rules" class="btn btn-danger btn-sm">恢复默认规则</button>
+                </div>
+                <div id="hae-rules-container"></div>
+            </section>
 
-        <div class="section">
-            <h3>规则管理 (HaE)</h3>
-            <p style="font-size:12px;color:#999;margin-bottom:10px;">管理 HTTP Analyzer 规则，支持 YAML 导入/导出。</p>
-            <div style="display:flex;gap:8px;margin-bottom:10px;">
-                <button id="hae-export-yaml">导出 YAML</button>
-                <button id="hae-import-yaml">导入 YAML</button>
-                <button id="hae-reset-rules">恢复默认规则</button>
-            </div>
-            <div id="hae-rules-container"></div>
-        </div>
+            <section id="filter" class="options-section content-card card-spacing">
+                <h3 class="card-title">采集过滤</h3>
+                <p class="section-desc">自定义 Gather 信息收集时过滤的域名。每行一个域名关键词，匹配即排除。留空使用内置默认列表。</p>
+                <textarea id="domain-exclude-list" rows="6" placeholder="google&#10;facebook&#10;github.com&#10;jquery&#10;analytics&#10;doubleclick&#10;googletagmanager&#10;fontawesome&#10;bootstrapcdn&#10;unpkg.com&#10;cdn."></textarea>
+            </section>
 
-        <div class="section">
-            <h3>采集过滤</h3>
-            <p style="font-size:12px;color:#999;margin-bottom:10px;">
-                自定义 Gather 信息收集时过滤的域名。每行一个域名关键词，匹配即排除。留空使用内置默认列表。
-            </p>
-            <textarea id="domain-exclude-list" rows="6" placeholder="google&#10;facebook&#10;github.com&#10;jquery&#10;analytics&#10;doubleclick&#10;googletagmanager&#10;fontawesome&#10;bootstrapcdn&#10;unpkg.com&#10;cdn."></textarea>
-        </div>
+            <section id="scan" class="options-section content-card card-spacing">
+                <h3 class="card-title">扫描设置</h3>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">Fuzz 默认字典</div>
+                        <div class="setting-desc">目录扫描默认使用的字典类型</div>
+                    </div>
+                    <div class="setting-control">
+                        <select id="fuzz-default-wordlist">
+                            <option value="common">通用</option>
+                            <option value="backup">备份文件</option>
+                            <option value="api">API 路径</option>
+                            <option value="sensitive">敏感路径</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">Fuzz 默认并发数</div>
+                        <div class="setting-desc">目录扫描最大并发请求数</div>
+                    </div>
+                    <div class="setting-control">
+                        <input type="number" id="fuzz-default-concurrency" min="1" max="20" value="5">
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">XSS 探测超时</div>
+                        <div class="setting-desc">XSS 反射检测请求超时时间 (毫秒)</div>
+                    </div>
+                    <div class="setting-control">
+                        <input type="number" id="xss-default-timeout" min="3000" max="30000" step="1000" value="10000">
+                    </div>
+                </div>
+            </section>
 
-        <div class="section">
-            <h3>扫描设置</h3>
-            <div class="setting">
-                <label for="fuzz-default-wordlist">Fuzz 默认字典:</label>
-                <select id="fuzz-default-wordlist">
-                    <option value="common">通用</option>
-                    <option value="backup">备份文件</option>
-                    <option value="api">API 路径</option>
-                    <option value="sensitive">敏感路径</option>
-                </select>
-            </div>
-            <div class="setting">
-                <label for="fuzz-default-concurrency">Fuzz 默认并发数:</label>
-                <input type="number" id="fuzz-default-concurrency" min="1" max="20" value="5">
-            </div>
-            <div class="setting">
-                <label for="xss-default-timeout">XSS 探测超时 (ms):</label>
-                <input type="number" id="xss-default-timeout" min="3000" max="30000" step="1000" value="10000">
-            </div>
-        </div>
+            <section id="toolbar" class="options-section content-card card-spacing">
+                <h3 class="card-title">工具栏配置</h3>
+                <p class="section-desc">拖拽调整顺序，勾选控制显示。至少保留 1 个工具。</p>
+                <div id="toolbar-config-list"></div>
+                <div style="margin-top:12px;">
+                    <button id="toolbar-reset-order" class="btn btn-secondary btn-sm">恢复默认顺序</button>
+                </div>
+            </section>
 
-        <div class="section">
-            <h3>工具栏配置</h3>
-            <p style="font-size:12px;color:#999;margin-bottom:10px;">拖拽调整顺序，勾选控制显示。至少保留 1 个工具。</p>
-            <div id="toolbar-config-list"></div>
-            <div style="margin-top:10px;display:flex;gap:8px;">
-                <button id="toolbar-reset-order">恢复默认顺序</button>
-            </div>
-        </div>
+            <section id="storage" class="options-section content-card card-spacing">
+                <h3 class="card-title">存储管理</h3>
+                <p class="section-desc">查看各类数据的存储占用，按分类管理数据。</p>
 
-        <div class="section">
-            <h3>数据管理</h3>
-            <button id="export-btn">导出设置</button>
-            <button id="import-btn">导入设置</button>
-            <button id="clear-btn">清除所有数据</button>
-            <button id="reset-btn">重置为默认设置</button>
-        </div>
+                <h4 style="font-size:13px;font-weight:600;color:var(--opt-text);margin-bottom:8px;">存储概览</h4>
+                <div class="storage-overview" id="storage-overview"></div>
+                <div class="storage-total" id="storage-total"></div>
 
-        <div id="status" class="status status-hidden"></div>
+                <h4 style="font-size:13px;font-weight:600;color:var(--opt-text);margin-bottom:8px;">分类管理</h4>
+                <table class="storage-category-table">
+                    <thead>
+                        <tr><th>分类</th><th>说明</th><th>操作</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>API 密钥</td>
+                            <td>FOFA / ZoomEye / Shodan</td>
+                            <td><button id="clear-api-keys" class="btn btn-danger btn-sm">清除</button></td>
+                        </tr>
+                        <tr>
+                            <td>采集数据</td>
+                            <td>Gather 信息收集结果</td>
+                            <td><button id="clear-gather" class="btn btn-danger btn-sm">清除</button></td>
+                        </tr>
+                        <tr>
+                            <td>链接数据</td>
+                            <td>提取的链接列表</td>
+                            <td><button id="clear-links" class="btn btn-danger btn-sm">清除</button></td>
+                        </tr>
+                        <tr>
+                            <td>伪装状态</td>
+                            <td>UA / Header 伪造配置</td>
+                            <td><button id="clear-spoof" class="btn btn-danger btn-sm">清除</button></td>
+                        </tr>
+                        <tr>
+                            <td>远程载荷</td>
+                            <td>远程 Payload 缓存与配置</td>
+                            <td><button id="clear-payload" class="btn btn-danger btn-sm">清除</button></td>
+                        </tr>
+                        <tr>
+                            <td>UI 状态</td>
+                            <td>弹窗界面持久化数据</td>
+                            <td><button id="clear-ui-state" class="btn btn-danger btn-sm">清除</button></td>
+                        </tr>
+                        <tr>
+                            <td>临时状态</td>
+                            <td>RuoYi Hook / JS 控制等</td>
+                            <td><button id="clear-temp-state" class="btn btn-danger btn-sm">清除</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="api-keys-section">
+                    <h4 style="font-size:13px;font-weight:600;color:var(--opt-text);margin-bottom:12px;">API 密钥配置</h4>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="setting-label">FOFA Email</div>
+                            <div class="setting-desc">FOFA 账号邮箱</div>
+                        </div>
+                        <div class="setting-control">
+                            <input type="text" id="opt-key-fofa-email" placeholder="FOFA 邮箱">
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="setting-label">FOFA API Key</div>
+                            <div class="setting-desc">FOFA API 密钥</div>
+                        </div>
+                        <div class="setting-control">
+                            <input type="text" id="opt-key-fofa-key" placeholder="FOFA Key">
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="setting-label">ZoomEye API Key</div>
+                            <div class="setting-desc">ZoomEye API 密钥</div>
+                        </div>
+                        <div class="setting-control">
+                            <input type="text" id="opt-key-zoomeye" placeholder="ZoomEye Key">
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="setting-label">Shodan API Key</div>
+                            <div class="setting-desc">Shodan API 密钥</div>
+                        </div>
+                        <div class="setting-control">
+                            <input type="text" id="opt-key-shodan" placeholder="Shodan Key">
+                        </div>
+                    </div>
+                    <div class="section-actions">
+                        <button id="save-api-keys" class="btn btn-primary btn-sm">保存密钥</button>
+                        <button id="clear-api-keys-alt" class="btn btn-danger btn-sm">清除所有密钥</button>
+                    </div>
+                </div>
+
+                <div class="backup-section">
+                    <h4 style="font-size:13px;font-weight:600;color:var(--opt-text);margin-bottom:12px;">完整备份</h4>
+                    <p class="section-desc">导出或导入全部数据（设置 + 规则 + 密钥 + 采集数据等）。</p>
+                    <div class="section-actions">
+                        <button id="export-full-btn" class="btn btn-primary btn-sm">完整导出</button>
+                        <button id="import-full-btn" class="btn btn-primary btn-sm">完整导入</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="data" class="options-section card-spacing">
+                <div class="danger-zone">
+                    <h3 class="card-title">数据管理</h3>
+                    <p class="section-desc">导出或导入设置，清除所有数据，重置为默认。</p>
+                    <div class="section-actions">
+                        <button id="export-btn" class="btn btn-primary btn-sm">导出设置</button>
+                        <button id="import-btn" class="btn btn-primary btn-sm">导入设置</button>
+                    </div>
+                    <div class="danger-actions">
+                        <button id="clear-btn" class="btn btn-danger btn-sm">清除所有数据</button>
+                        <button id="reset-btn" class="btn btn-danger btn-sm">重置为默认设置</button>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
     <script src="hae-rules.js"></script>

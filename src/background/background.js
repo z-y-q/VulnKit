@@ -217,7 +217,12 @@ function createTimeoutController(timeoutMs) {
   var timer = setTimeout(function () {
     controller.abort();
   }, timeoutMs);
-  return { controller: controller, cleanup: function () { clearTimeout(timer); } };
+  return {
+    controller: controller,
+    cleanup: function () {
+      clearTimeout(timer);
+    },
+  };
 }
 
 function collectHeaders(resp) {
@@ -336,17 +341,27 @@ var handlers = {
     chrome.declarativeNetRequest
       .getDynamicRules()
       .then(function (rules) {
-        sendResponse({ blocked: rules.some(function (r) { return r.id === JS_BLOCK_RULE_ID; }) });
+        sendResponse({
+          blocked: rules.some(function (r) {
+            return r.id === JS_BLOCK_RULE_ID;
+          }),
+        });
       })
-      .catch(function () { sendResponse({ blocked: false }); });
+      .catch(function () {
+        sendResponse({ blocked: false });
+      });
     return true;
   },
 
   TOGGLE_JS: function (msg, _sender, sendResponse) {
     var promise = msg.enable ? removeJsBlockRule() : addJsBlockRule();
     promise
-      .then(function () { sendResponse({ success: true }); })
-      .catch(function (e) { sendResponse({ success: false, error: e.message }); });
+      .then(function () {
+        sendResponse({ success: true });
+      })
+      .catch(function (e) {
+        sendResponse({ success: false, error: e.message });
+      });
     return true;
   },
 
@@ -355,8 +370,12 @@ var handlers = {
       spoofState.ua = { enabled: true, current: msg.userAgent, url: msg.url };
       persistSpoofState();
       addUaRule(msg.tabId, msg.url, msg.userAgent)
-        .then(function () { sendResponse({ success: true }); })
-        .catch(function (e) { sendResponse({ success: false, error: e.message }); });
+        .then(function () {
+          sendResponse({ success: true });
+        })
+        .catch(function (e) {
+          sendResponse({ success: false, error: e.message });
+        });
     } else {
       sendResponse({ success: false, error: 'Missing url or userAgent' });
     }
@@ -367,8 +386,12 @@ var handlers = {
     spoofState.ua = { enabled: false, current: '', url: '' };
     persistSpoofState();
     removeUaRule()
-      .then(function () { sendResponse({ success: true }); })
-      .catch(function (e) { sendResponse({ success: false, error: e.message }); });
+      .then(function () {
+        sendResponse({ success: true });
+      })
+      .catch(function (e) {
+        sendResponse({ success: false, error: e.message });
+      });
     return true;
   },
 
@@ -377,8 +400,12 @@ var handlers = {
       spoofState.headers = Object.assign({}, msg.headers, { url: msg.url });
       persistSpoofState();
       addHeaderRules(msg.tabId, msg.url, msg.headers)
-        .then(function () { sendResponse({ success: true }); })
-        .catch(function (e) { sendResponse({ success: false, error: e.message }); });
+        .then(function () {
+          sendResponse({ success: true });
+        })
+        .catch(function (e) {
+          sendResponse({ success: false, error: e.message });
+        });
     } else {
       sendResponse({ success: false, error: 'Missing headers' });
     }
@@ -389,8 +416,12 @@ var handlers = {
     spoofState.headers = { xff: '', referer: '', clientIp: '', custom: [], url: '' };
     persistSpoofState();
     removeAllHeaderRules()
-      .then(function () { sendResponse({ success: true }); })
-      .catch(function (e) { sendResponse({ success: false, error: e.message }); });
+      .then(function () {
+        sendResponse({ success: true });
+      })
+      .catch(function (e) {
+        sendResponse({ success: false, error: e.message });
+      });
     return true;
   },
 
@@ -402,7 +433,9 @@ var handlers = {
         .then(function (result) {
           sendResponse(result.success ? { data: result.data } : { error: result.error });
         })
-        .catch(function (e) { sendResponse({ error: e.message || 'fetch failed' }); });
+        .catch(function (e) {
+          sendResponse({ error: e.message || 'fetch failed' });
+        });
     }
     return true;
   },
@@ -415,7 +448,9 @@ var handlers = {
         .then(function (result) {
           sendResponse(result.success ? { data: result.data } : { error: result.error });
         })
-        .catch(function (e) { sendResponse({ error: e.message || 'auth fetch failed' }); });
+        .catch(function (e) {
+          sendResponse({ error: e.message || 'auth fetch failed' });
+        });
     } else {
       sendResponse({ error: 'Unknown provider: ' + (msg.provider || '(none)') });
     }
@@ -424,7 +459,10 @@ var handlers = {
 
   FETCH_PROBE: function (msg, _sender, sendResponse) {
     var v = validateProbeUrl(msg.url);
-    if (v.error) { sendResponse({ error: v.error }); return true; }
+    if (v.error) {
+      sendResponse({ error: v.error });
+      return true;
+    }
     var tc = createTimeoutController(msg.timeout || 5000);
     var t0 = performance.now();
     fetch(v.parsed.href, {
@@ -445,11 +483,16 @@ var handlers = {
           time: elapsed,
         };
         if (msg.includeBody && resp.status >= 200 && resp.status < 300) {
-          return resp.text().then(function (body) { result.body = body; return result; });
+          return resp.text().then(function (body) {
+            result.body = body;
+            return result;
+          });
         }
         return result;
       })
-      .then(function (result) { sendResponse(result); })
+      .then(function (result) {
+        sendResponse(result);
+      })
       .catch(function (e) {
         tc.cleanup();
         sendResponse({ error: e.message, status: 0, body: '', headers: {}, time: 0 });
@@ -459,7 +502,10 @@ var handlers = {
 
   FETCH_CORS_PROBE: function (msg, _sender, sendResponse) {
     var v = validateProbeUrl(msg.url);
-    if (v.error) { sendResponse({ error: v.error }); return true; }
+    if (v.error) {
+      sendResponse({ error: v.error });
+      return true;
+    }
     if (!isAllowedUrl(v.parsed.href)) {
       sendResponse({ error: 'URL not allowed (no private IPs)' });
       return true;
@@ -482,9 +528,20 @@ var handlers = {
           headers: collectHeaders(resp),
           type: resp.type,
         };
-        return resp.text().then(function (body) { result.body = body; return result; }).catch(function () { result.body = ''; return result; });
+        return resp
+          .text()
+          .then(function (body) {
+            result.body = body;
+            return result;
+          })
+          .catch(function () {
+            result.body = '';
+            return result;
+          });
       })
-      .then(function (result) { sendResponse(result); })
+      .then(function (result) {
+        sendResponse(result);
+      })
       .catch(function (e) {
         tc.cleanup();
         sendResponse({ error: e.message, status: 0 });
@@ -494,7 +551,10 @@ var handlers = {
 
   FETCH_HEADER_PROBE: function (msg, _sender, sendResponse) {
     var v = validateProbeUrl(msg.url);
-    if (v.error) { sendResponse({ error: v.error }); return true; }
+    if (v.error) {
+      sendResponse({ error: v.error });
+      return true;
+    }
     if (!isAllowedUrl(v.parsed.href)) {
       sendResponse({ error: 'URL not allowed (no private IPs)' });
       return true;
@@ -508,7 +568,11 @@ var handlers = {
     })
       .then(function (resp) {
         tc.cleanup();
-        sendResponse({ status: resp.status, statusText: resp.statusText, headers: collectHeaders(resp) });
+        sendResponse({
+          status: resp.status,
+          statusText: resp.statusText,
+          headers: collectHeaders(resp),
+        });
       })
       .catch(function (e) {
         tc.cleanup();
@@ -520,7 +584,11 @@ var handlers = {
           credentials: 'omit',
         })
           .then(function (resp2) {
-            sendResponse({ status: resp2.status, statusText: resp2.statusText, headers: collectHeaders(resp2) });
+            sendResponse({
+              status: resp2.status,
+              statusText: resp2.statusText,
+              headers: collectHeaders(resp2),
+            });
           })
           .catch(function (e2) {
             sendResponse({ error: e2.message, status: 0 });
@@ -536,20 +604,31 @@ var handlers = {
       return true;
     }
     fetch('https://dns.google/resolve?name=' + encodeURIComponent(hostname) + '&type=A')
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function (data) {
         var addresses = (data.Answer || [])
-          .filter(function (a) { return a.type === 1; })
-          .map(function (a) { return a.data; });
+          .filter(function (a) {
+            return a.type === 1;
+          })
+          .map(function (a) {
+            return a.data;
+          });
         sendResponse({ addresses: addresses, resultCode: 0 });
       })
-      .catch(function (err) { sendResponse({ error: err.message, addresses: [] }); });
+      .catch(function (err) {
+        sendResponse({ error: err.message, addresses: [] });
+      });
     return true;
   },
 
   FETCH_DNS_PROBE: function (msg, _sender, sendResponse) {
     var v = validateProbeUrl(msg.url);
-    if (v.error) { sendResponse({ error: v.error }); return true; }
+    if (v.error) {
+      sendResponse({ error: v.error });
+      return true;
+    }
     if (!isAllowedUrl(v.parsed.href)) {
       sendResponse({ error: 'URL not allowed (no private IPs)' });
       return true;
@@ -574,7 +653,10 @@ var handlers = {
 
   FETCH_WAF_PROBE: function (msg, _sender, sendResponse) {
     var v = validateProbeUrl(msg.url);
-    if (v.error) { sendResponse({ error: v.error }); return true; }
+    if (v.error) {
+      sendResponse({ error: v.error });
+      return true;
+    }
     if (!isAllowedUrl(v.parsed.href)) {
       sendResponse({ error: 'URL not allowed (no private IPs)' });
       return true;
@@ -596,12 +678,20 @@ var handlers = {
           redirected: resp.redirected,
           url: resp.url,
         };
-        return resp.text().then(function (body) {
-          result.body = body.length > 50000 ? body.substring(0, 50000) : body;
-          return result;
-        }).catch(function () { result.body = ''; return result; });
+        return resp
+          .text()
+          .then(function (body) {
+            result.body = body.length > 50000 ? body.substring(0, 50000) : body;
+            return result;
+          })
+          .catch(function () {
+            result.body = '';
+            return result;
+          });
       })
-      .then(function (result) { sendResponse(result); })
+      .then(function (result) {
+        sendResponse(result);
+      })
       .catch(function (e) {
         tc.cleanup();
         sendResponse({ error: e.message, status: 0 });
@@ -617,23 +707,14 @@ var handlers = {
         .then(function (result) {
           sendResponse(result.success ? { data: result.data } : { error: result.error });
         })
-        .catch(function (e) { sendResponse({ error: e.message || 'image fetch failed' }); });
+        .catch(function (e) {
+          sendResponse({ error: e.message || 'image fetch failed' });
+        });
     }
     return true;
   },
 
-  VK_RUOYI_HOOK_EVENT: function (msg, _sender, _sendResponse) {
-    chrome.storage.local
-      .set({
-        __vk_ruoyi_event: {
-          event: msg.event,
-          augmented: msg.augmented || false,
-          ts: Date.now(),
-        },
-      })
-      .catch(function (e) {
-        console.debug('analytics event send failed', e);
-      });
+  VK_RUOYI_HOOK_EVENT: function (_msg, _sender, _sendResponse) {
     return false;
   },
 
@@ -764,13 +845,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       chrome.tabs.sendMessage(tab.id, { type: 'CONTEXT_EXTRACT_LINKS' }).catch(function (e) {
         console.debug('context extract links failed', e);
       });
-      chrome.storage.local.set({ contextExtractUrl: tab.url || '' }, function () {
-        setTimeout(function () {
-          chrome.tabs.create({
-            url: chrome.runtime.getURL('src/extracted-links/extracted-links.html'),
-          });
-        }, 500);
-      });
+      setTimeout(function () {
+        chrome.tabs.create({
+          url: chrome.runtime.getURL('src/extracted-links/extracted-links.html'),
+        });
+      }, 500);
       break;
     case 'vulnkit-encode':
     case 'vulnkit-decode':
