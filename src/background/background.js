@@ -770,7 +770,7 @@ async function unregisterRuoYiHook() {
   try {
     await chrome.scripting.unregisterContentScripts([RUOYI_HOOK_CS_ID]);
   } catch (e) {
-    // ignore
+    console.debug('[灵眸] unregisterRuoYiHook:', e);
   }
 }
 
