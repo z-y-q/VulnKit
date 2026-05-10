@@ -1,334 +1,34 @@
-// 灵眸 - XSS Scanner
+// 灵眸 - XSS Scanner (barrel)
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
 import { XSS_DATA } from './vk-payload-data.js';
 import { XSS_SCAN_PAYLOADS } from './vk-xss-data.js';
 import { analyzeDomSinks } from './vk-xss-sinks.js';
-
 import { COPY_SVG } from './vk-icons.js';
+
+import {
+  xssPoints,
+  xssFilterType,
+  xssSearchText,
+  lastVerifyResults,
+  setXssPointsVal,
+  appendXssPoints,
+  setXssFilterType as _setXssFilterType,
+  setXssSearchText as _setXssSearchText,
+  setLastVerifyResults,
+} from './vk-xss-state.js';
+import { verifySinglePoint, renderVerifyResults, updateVerifyStatus } from './vk-xss-verify.js';
+import {
+  startXssIntercept as _startXssIntercept,
+  stopXssIntercept as _stopXssIntercept,
+  updateXssInterceptStatus,
+  harvestXssParamsFromDom,
+} from './vk-xss-intercept.js';
 
 var REFLECTION_PROBE = 'vkprobe\'"><xyz';
 
-let xssPoints = [];
-let xssFilterType = 'all';
-let xssSearchText = '';
-let xssInterceptTimer = null;
-let xssInterceptActive = false;
-let xssInterceptCountdown = 0;
-let _xssDefaultTimeout = 10000;
-
-chrome.storage.local.get(['pentestSettings'], function (result) {
-  var t = (result.pentestSettings || {}).xssDefaultTimeout;
-  if (t && typeof t === 'number' && t >= 3000) _xssDefaultTimeout = t;
-});
-chrome.storage.onChanged.addListener(function (changes, area) {
-  if (area === 'local' && changes.pentestSettings) {
-    var t = (changes.pentestSettings.newValue || {}).xssDefaultTimeout;
-    if (t && typeof t === 'number' && t >= 3000) _xssDefaultTimeout = t;
-  }
-});
-
-async function fetchInTab(url, fetchOpts, timeoutMs) {
-  const tab = await utils.requireTabId();
-  if (!tab) return { error: '无法获取活动标签页' };
-  var ms = timeoutMs || _xssDefaultTimeout;
-  try {
-    var results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: function (urlStr, opts, timeout) {
-        var ac = new AbortController();
-        var t = setTimeout(function () {
-          ac.abort();
-        }, timeout);
-        var fo = Object.assign({ credentials: 'include', signal: ac.signal }, opts || {});
-        return fetch(urlStr, fo)
-          .then(function (r) {
-            clearTimeout(t);
-            return r.text();
-          })
-          .then(function (text) {
-            return { data: text };
-          })
-          .catch(function (e) {
-            clearTimeout(t);
-            return { error: e.message || 'fetch 失败' };
-          });
-      },
-      args: [url, fetchOpts || null, ms],
-    });
-    var data = results && results[0] && results[0].result;
-    return data !== undefined ? data : { error: '执行失败' };
-  } catch (e) {
-    return { error: e.message };
-  }
-}
-
-async function harvestXssParamsFromDom() {
-  const tab = await utils.requireTabId();
-  if (!tab) return [];
-  return (
-    (await utils.execInTabData(
-      tab.id,
-      () => {
-        const pageUrl = location.href;
-        const collected = [];
-        const seen = new Set();
-
-        function addPoint(source, url, param, method) {
-          if (!url || !param) return;
-          let fullUrl;
-          try {
-            fullUrl = new URL(url, pageUrl).href;
-          } catch (_) {
-            return;
-          }
-          const key = `${fullUrl}|${param}|${method}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-          collected.push({ source, url: fullUrl, param, method });
-        }
-
-        document.querySelectorAll('a[href]').forEach(a => {
-          try {
-            const href = new URL(a.href, pageUrl);
-            if (href.origin !== location.origin) return;
-            href.searchParams.forEach((_, key) => {
-              addPoint('link', href.pathname + href.search, key, 'GET');
-            });
-          } catch (_) {
-            console.debug('link URL parse skipped');
-          }
-        });
-
-        document.querySelectorAll('form').forEach(form => {
-          const action = form.getAttribute('action') || pageUrl;
-          const method = (form.getAttribute('method') || 'GET').toUpperCase();
-          form.querySelectorAll('input[name], select[name], textarea[name]').forEach(el => {
-            const name = el.getAttribute('name');
-            if (!name) return;
-            addPoint('form', action, name, method);
-          });
-        });
-
-        try {
-          const currentUrl = new URL(pageUrl);
-          currentUrl.searchParams.forEach((_, key) => {
-            addPoint('url', currentUrl.pathname + currentUrl.search, key, 'GET');
-          });
-        } catch (_) {
-          console.debug('URL parse skipped');
-        }
-
-        return collected;
-      },
-      { world: 'ISOLATED' }
-    )) || []
-  );
-}
-
-async function startXssIntercept() {
-  xssInterceptActive = true;
-  xssInterceptCountdown = 30;
-  utils.toggleBtnPair('xssscan-start-intercept-btn', 'xssscan-stop-intercept-btn', true);
-  updateXssInterceptStatus();
-
-  let tab = await utils.requireTabId();
-  if (!tab) return;
-  const tabId = tab.id;
-
-  await utils.execInTab(tabId, () => {
-    if (window.__XSS_INTERCEPT__) return 'already_injected';
-    window.__XSS_INTERCEPT__ = [];
-    window.__XSS_ORIGINAL__ = {
-      xhrOpen: XMLHttpRequest.prototype.open,
-      xhrSend: XMLHttpRequest.prototype.send,
-      fetch: window.fetch,
-    };
-    function extractJsonParams(body, urlBase, method) {
-      try {
-        let obj = JSON.parse(body);
-        if (typeof obj !== 'object' || obj === null) return;
-        Object.keys(obj).forEach(function (k) {
-          if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
-            Object.keys(obj[k]).forEach(function (nk) {
-              window.__XSS_INTERCEPT__.push({
-                url: urlBase,
-                param: `${k}.${nk}`,
-                method: method,
-              });
-            });
-          } else {
-            window.__XSS_INTERCEPT__.push({ url: urlBase, param: k, method: method });
-          }
-        });
-      } catch (e) {
-        console.debug('JSON parse failure in XSS intercept', e);
-      }
-    }
-    function collectQueryParams(rawUrl, method) {
-      try {
-        const u = new URL(rawUrl, location.href);
-        u.searchParams.forEach((_, k) => {
-          window.__XSS_INTERCEPT__.push({
-            url: u.origin + u.pathname + u.search,
-            param: k,
-            method: method,
-          });
-        });
-      } catch (_) {
-        console.debug('network request interception failed', _);
-      }
-    }
-    function collectBodyParams(body, rawUrl, method) {
-      try {
-        const params = new URLSearchParams(body);
-        params.forEach((_, k) => {
-          try {
-            const u = new URL(rawUrl, location.href);
-            window.__XSS_INTERCEPT__.push({
-              url: u.origin + u.pathname,
-              param: k,
-              method: method,
-            });
-          } catch (_) {
-            console.debug('URL construction failed', _);
-          }
-        });
-      } catch (_) {
-        console.debug('response param iteration failed', _);
-      }
-    }
-    function processRequest(rawUrl, method, body) {
-      collectQueryParams(rawUrl, method);
-      if (typeof body === 'string' && body) {
-        collectBodyParams(body, rawUrl, method);
-        try {
-          let u = new URL(rawUrl, location.href);
-          extractJsonParams(body, u.origin + u.pathname, method);
-        } catch (e) {
-          console.debug('malformed AJAX URL', e);
-        }
-      }
-    }
-    const origOpen = window.__XSS_ORIGINAL__.xhrOpen;
-    const origSend = window.__XSS_ORIGINAL__.xhrSend;
-    const origFetch = window.__XSS_ORIGINAL__.fetch;
-
-    XMLHttpRequest.prototype.open = function (method, url) {
-      this.__xss_method = method;
-      this.__xss_url = url;
-      return origOpen.apply(this, arguments);
-    };
-    XMLHttpRequest.prototype.send = function (body) {
-      processRequest(this.__xss_url || location.href, this.__xss_method || 'GET', body);
-      return origSend.apply(this, arguments);
-    };
-    window.fetch = function (input, init) {
-      let url =
-        typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-      let method = (init && init.method ? init.method : 'GET').toUpperCase();
-      processRequest(url, method, init && init.body);
-      return origFetch.apply(this, arguments);
-    };
-    return 'injected';
-  });
-
-  async function pollIntercept() {
-    if (!xssInterceptActive) return;
-    xssInterceptCountdown--;
-    updateXssInterceptStatus();
-    if (xssInterceptCountdown <= 0) {
-      stopXssIntercept();
-      return;
-    }
-    try {
-      const captured =
-        (await utils.execInTabData(tabId, () => {
-          const data = window.__XSS_INTERCEPT__ || [];
-          window.__XSS_INTERCEPT__ = [];
-          return data;
-        })) || [];
-      if (captured.length > 0) {
-        const existing = new Set(xssPoints.map(p => `${p.url}|${p.param}|${p.method}`));
-        const newPoints = captured
-          .map(p => ({ ...p, source: 'ajax' }))
-          .filter(p => !existing.has(`${p.url}|${p.param}|${p.method}`));
-        if (newPoints.length > 0) {
-          xssPoints = [...xssPoints, ...newPoints];
-          renderXssPoints();
-        }
-      }
-    } catch (_) {
-      console.debug('interceptor poll failed', _);
-    }
-    if (xssInterceptActive) {
-      xssInterceptTimer = setTimeout(pollIntercept, 2000);
-    }
-  }
-  pollIntercept();
-}
-
-async function stopXssIntercept() {
-  if (xssInterceptTimer) {
-    clearTimeout(xssInterceptTimer);
-    xssInterceptTimer = null;
-  }
-  xssInterceptActive = false;
-  utils.toggleBtnPair('xssscan-start-intercept-btn', 'xssscan-stop-intercept-btn', false);
-
-  let tab = await utils.requireTabId();
-  if (!tab) {
-    updateXssInterceptStatus();
-    return;
-  }
-
-  try {
-    const captured =
-      (await utils.execInTabData(tab.id, () => {
-        const data = window.__XSS_INTERCEPT__ || [];
-        if (window.__XSS_ORIGINAL__) {
-          if (window.__XSS_ORIGINAL__.xhrOpen)
-            XMLHttpRequest.prototype.open = window.__XSS_ORIGINAL__.xhrOpen;
-          if (window.__XSS_ORIGINAL__.xhrSend)
-            XMLHttpRequest.prototype.send = window.__XSS_ORIGINAL__.xhrSend;
-          if (window.__XSS_ORIGINAL__.fetch) window.fetch = window.__XSS_ORIGINAL__.fetch;
-        }
-        delete window.__XSS_INTERCEPT__;
-        delete window.__XSS_ORIGINAL__;
-        return data;
-      })) || [];
-    if (captured.length > 0) {
-      const existing = new Set(xssPoints.map(p => `${p.url}|${p.param}|${p.method}`));
-      const newPoints = captured
-        .map(p => ({ ...p, source: 'ajax' }))
-        .filter(p => !existing.has(`${p.url}|${p.param}|${p.method}`));
-      if (newPoints.length > 0) {
-        xssPoints = [...xssPoints, ...newPoints];
-        renderXssPoints();
-      }
-    }
-  } catch (e) {
-    console.debug('XSS intercept flush failed', e);
-  }
-
-  updateXssInterceptStatus();
-}
-
-function updateXssInterceptStatus() {
-  const el = utils.get('xssscan-status');
-  if (!el) return;
-  if (xssInterceptActive) {
-    el.textContent = `拦截监听中... 剩余 ${xssInterceptCountdown}s — 已捕获 ${xssPoints.length} 个参数点`;
-    el.style.color = '#e67e22';
-  } else {
-    el.textContent =
-      xssPoints.length > 0
-        ? `监听结束，共 ${xssPoints.length} 个参数点`
-        : '点击「采集参数」开始扫描当前页面';
-    el.style.color = '';
-  }
-}
+// ====== Filter / Render ======
 
 function getFilteredXssPoints() {
   let list = xssPoints;
@@ -437,6 +137,8 @@ function getSelectedXssPoints() {
   });
 }
 
+// ====== Payload encoding ======
+
 function encodePayload(payload, encoding) {
   switch (encoding) {
     case 'url':
@@ -486,6 +188,18 @@ function getEncodedPayload() {
   return encodePayload(raw, encoding);
 }
 
+// ====== Intercept wrappers (inject renderXssPoints to avoid circular deps) ======
+
+async function startXssIntercept() {
+  return _startXssIntercept(renderXssPoints);
+}
+
+async function stopXssIntercept() {
+  return _stopXssIntercept(renderXssPoints);
+}
+
+// ====== UI handlers ======
+
 async function handleXssHarvest() {
   const statusEl = utils.get('xssscan-status');
   if (statusEl) {
@@ -496,7 +210,7 @@ async function handleXssHarvest() {
     const domPoints = await harvestXssParamsFromDom();
     const existing = new Set(xssPoints.map(p => `${p.url}|${p.param}|${p.method}`));
     const newPoints = domPoints.filter(p => !existing.has(`${p.url}|${p.param}|${p.method}`));
-    xssPoints = [...xssPoints, ...newPoints];
+    appendXssPoints(newPoints);
     renderXssPoints();
     if (statusEl) {
       statusEl.textContent = `采集完成，新增 ${newPoints.length} 个注入点，共 ${xssPoints.length} 个`;
@@ -590,178 +304,6 @@ async function handleBatchOpenXss() {
   utils.showToast(`已打开 ${opened} 个测试页面${methodInfo}`, 'success');
 }
 
-function buildTestUrl(point, payload) {
-  if (point.method === 'POST') return null;
-  try {
-    let urlObj = new URL(point.url);
-    urlObj.searchParams.set(point.param, payload);
-    return urlObj.href;
-  } catch (_) {
-    console.debug('malformed URL in buildTestUrl', _);
-  }
-  return null;
-}
-
-function buildPostBody(point, payload) {
-  if (point.method !== 'POST') return null;
-  return `${encodeURIComponent(point.param)}=${encodeURIComponent(payload)}`;
-}
-
-function htmlDecode(str) {
-  if (!str) return '';
-  return str
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, '/')
-    .replace(/&#39;/g, "'")
-    .replace(/&#47;/g, '/')
-    .replace(/&#(\d+);/g, function (_, n) {
-      return String.fromCharCode(parseInt(n, 10));
-    });
-}
-
-function isReflected(body, rawPayload) {
-  if (!body || !rawPayload) return false;
-  if (body.indexOf(rawPayload) !== -1) return true;
-  var decoded = htmlDecode(body);
-  if (decoded !== body && decoded.indexOf(rawPayload) !== -1) return true;
-  try {
-    if (decodeURIComponent(body).indexOf(rawPayload) !== -1) return true;
-  } catch (_) {}
-  var stripped = body.replace(/\s+/g, '');
-  var rawStripped = rawPayload.replace(/\s+/g, '');
-  if (stripped.indexOf(rawStripped) !== -1) return true;
-  var decStripped = decoded.replace(/\s+/g, '');
-  if (decStripped !== stripped && decStripped.indexOf(rawStripped) !== -1) return true;
-  var marker = 'vkprobe';
-  if (rawPayload.indexOf(marker) !== -1) {
-    if (body.indexOf(marker) !== -1) return true;
-    if (decoded !== body && decoded.indexOf(marker) !== -1) return true;
-  }
-  return false;
-}
-
-async function verifySinglePoint(point, payload, rawPayload) {
-  let testUrl = buildTestUrl(point, payload);
-
-  if (!testUrl && point.method === 'POST') {
-    const postBody = buildPostBody(point, payload);
-    if (!postBody) {
-      return { point: point, status: 'skip', detail: '不支持的请求方法' };
-    }
-    try {
-      const resp = await fetchInTab(
-        point.url,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: postBody,
-        },
-        10000
-      );
-      if (resp.error) {
-        return { point: point, status: 'error', detail: resp.error };
-      }
-      const body = resp.data || '';
-      if (isReflected(body, rawPayload)) {
-        return {
-          point: point,
-          status: 'reflected',
-          detail: 'Payload 在 POST 响应中出现（输入反射，需验证可利用性）',
-          context: analyzeReflectionContext(body, rawPayload),
-          testUrl: point.url,
-        };
-      }
-      return {
-        point: point,
-        status: 'safe',
-        detail: 'Payload 未在 POST 响应中出现',
-        testUrl: point.url,
-      };
-    } catch (e) {
-      return { point: point, status: 'error', detail: e.message };
-    }
-  }
-
-  if (!testUrl) {
-    return { point: point, status: 'skip', detail: '不支持的请求方法' };
-  }
-
-  try {
-    let resp = await fetchInTab(testUrl, null, 10000);
-    if (!resp || resp.error) {
-      return { point: point, status: 'error', detail: (resp && resp.error) || '请求失败' };
-    }
-    let body = resp.data || '';
-    console.debug(
-      '[XSS verify]',
-      point.param,
-      testUrl,
-      'bodyLen:',
-      body.length,
-      'payloadLen:',
-      rawPayload.length
-    );
-    if (body.length < 500) console.debug('[XSS verify] full body:', body.substring(0, 500));
-    else console.debug('[XSS verify] body snippet:', body.substring(0, 500));
-    if (isReflected(body, rawPayload)) {
-      return {
-        point: point,
-        status: 'reflected',
-        detail: 'Payload 在响应中出现（输入反射，需验证可利用性）',
-        context: analyzeReflectionContext(body, rawPayload),
-        testUrl: testUrl,
-      };
-    }
-    return { point: point, status: 'safe', detail: 'Payload 未在响应中出现', testUrl: testUrl };
-  } catch (e) {
-    return { point: point, status: 'error', detail: e.message };
-  }
-}
-
-let VERIFY_BADGES = { reflected: '输入反射', safe: '未反射', skip: '跳过', error: '错误' };
-
-function renderVerifyResult(r) {
-  let badge = VERIFY_BADGES[r.status] || '错误';
-  let html = `<div class="xss-verify-item ${r.status}">
-<span class="xss-verify-badge ${r.status}">[${badge}]</span> ${utils.escapeHtml(r.point.param)} @ ${utils.escapeHtml(truncateUrl(r.point.url))}
-<div class="xss-verify-detail">${utils.escapeHtml(r.detail)}</div>`;
-  if (r.context) {
-    html += `<div class="xss-verify-context">上下文: ${utils.escapeHtml(r.context)}</div>`;
-  }
-  if (r.testUrl && /^https?:/.test(r.testUrl)) {
-    html += `<div class="xss-verify-link"><a href="${utils.escapeHtml(r.testUrl)}" target="_blank">打开测试 URL</a></div>`;
-  }
-  html += '</div>';
-  return html;
-}
-
-function renderVerifyResults(results, verifyList) {
-  if (!verifyList) return;
-  verifyList.innerHTML = results.map(renderVerifyResult).join('');
-}
-
-function updateVerifyStatus(results, statusEl) {
-  if (!statusEl) return;
-  let reflected = results.filter(function (r) {
-    return r.status === 'reflected';
-  }).length;
-  let safe = results.filter(function (r) {
-    return r.status === 'safe';
-  }).length;
-  let other = results.length - reflected - safe;
-  statusEl.textContent = `反射检查完成: ${reflected} 个输入反射 / ${safe} 个未反射 / ${other} 个其他`;
-  statusEl.style.color = reflected > 0 ? '#e74c3c' : '#27ae60';
-  if (reflected > 0) {
-    utils.showToast(`发现 ${reflected} 个输入反射点，需进一步验证可利用性`, 'warning');
-  } else {
-    utils.showToast('反射检查完成，未发现输入反射', 'success');
-  }
-}
-
 async function handleVerifyReflection() {
   let selected = getSelectedXssPoints();
   if (selected.length === 0) {
@@ -788,10 +330,8 @@ async function handleVerifyReflection() {
 
   renderVerifyResults(results, verifyList);
   updateVerifyStatus(results, statusEl);
-  lastVerifyResults = results;
+  setLastVerifyResults(results);
 }
-
-var lastVerifyResults = [];
 
 function handleOpenReflected() {
   var reflected = lastVerifyResults.filter(function (r) {
@@ -834,35 +374,6 @@ function handleOpenReflected() {
   utils.showToast('已打开 ' + opened + ' 个反射点测试页面', 'success');
 }
 
-function truncateUrl(url) {
-  if (url.length > 60) return `${url.substring(0, 57)}...`;
-  return url;
-}
-
-function analyzeReflectionContext(body, needle) {
-  let idx = body.indexOf(needle);
-  if (idx === -1) return 'unknown';
-
-  let start = Math.max(0, idx - 40);
-  let end = Math.min(body.length, idx + needle.length + 40);
-  let before = body.substring(start, idx);
-  let after = body.substring(idx + needle.length, end);
-
-  if (/<script[^>]*>[\s\S]*$/i.test(before) && /^[\s\S]*<\/script>/i.test(after)) {
-    return 'in <script> tag — high risk';
-  }
-  if (/<\w+[^>]*$/i.test(before)) {
-    return 'in HTML tag attribute — possible attribute injection';
-  }
-  if (/["'][^"'>]*$/i.test(before)) {
-    return 'in attribute value — check for quote breakout';
-  }
-  if (/<[^>]*$/.test(before)) {
-    return 'in HTML tag context — possible tag injection';
-  }
-  return 'in HTML text context';
-}
-
 function handleCopyXssUrls() {
   const selected = getSelectedXssPoints();
   if (selected.length === 0) {
@@ -887,6 +398,8 @@ function handleCopyXssUrls() {
   utils.copyText(lines.join('\n'));
   utils.showToast(`已复制 ${lines.length} 个URL`, 'success');
 }
+
+// ====== Init / Clear / Export ======
 
 function initXssScanPayloadSelect() {
   const select = utils.get('xssscan-payload-select');
@@ -913,7 +426,7 @@ function initXssScanPayloadSelect() {
 }
 
 function clearResults() {
-  xssPoints = [];
+  setXssPointsVal([]);
   renderXssPoints();
   updateXssInterceptStatus();
 }
@@ -929,12 +442,14 @@ function exportData() {
   utils.buildCsv(['Source', 'URL', 'Param', 'Method'], rows, `lingmou-xss-${Date.now()}.csv`);
 }
 
+// ====== Filter / Search setters ======
+
 function setXssFilterType(v) {
-  xssFilterType = v;
+  _setXssFilterType(v);
 }
 
 function setXssSearchText(v) {
-  xssSearchText = v;
+  _setXssSearchText(v);
   renderXssPoints();
 }
 
@@ -943,6 +458,8 @@ var setFilter = function (v) {
   renderXssPoints();
 };
 var setSearch = setXssSearchText;
+
+// ====== getFindings for unified report ======
 
 function getFindings() {
   return xssPoints.map(function (p) {
@@ -955,6 +472,8 @@ function getFindings() {
     };
   });
 }
+
+// ====== Export ======
 
 export {
   startXssIntercept,
