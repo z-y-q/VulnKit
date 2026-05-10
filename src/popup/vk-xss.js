@@ -6,9 +6,9 @@ import { XSS_DATA } from './vk-payload-data.js';
 import { XSS_SCAN_PAYLOADS } from './vk-xss-data.js';
 import { analyzeDomSinks } from './vk-xss-sinks.js';
 
+import { COPY_SVG } from './vk-icons.js';
+
 var REFLECTION_PROBE = 'vkprobe\'"><xyz';
-var COPY_SVG =
-  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 
 let xssPoints = [];
 let xssFilterType = 'all';
@@ -938,6 +938,12 @@ function setXssSearchText(v) {
   renderXssPoints();
 }
 
+var setFilter = function (v) {
+  setXssFilterType(v);
+  renderXssPoints();
+};
+var setSearch = setXssSearchText;
+
 function getFindings() {
   return xssPoints.map(function (p) {
     return {
@@ -969,5 +975,7 @@ export {
   xssSearchText,
   setXssFilterType,
   setXssSearchText,
+  setFilter,
+  setSearch,
   getFindings,
 };

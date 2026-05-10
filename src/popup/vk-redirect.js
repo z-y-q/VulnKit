@@ -239,15 +239,14 @@ function stopRedirectScan() {
   redirectState.aborted = true;
 }
 
-function setFilter(filter) {
-  redirectState.currentFilter = filter;
-  if (redirectState.lastResults) renderRedirectResults(redirectState.lastResults);
-}
-
-function setSearch(query) {
-  redirectState.currentSearch = (query || '').toLowerCase();
-  if (redirectState.lastResults) renderRedirectResults(redirectState.lastResults);
-}
+var filterSearch = utils.createFilterSearch(
+  redirectState,
+  'currentFilter',
+  'currentSearch',
+  renderRedirectResults
+);
+var setFilter = filterSearch.setFilter;
+var setSearch = filterSearch.setSearch;
 
 function applyFilter(item) {
   var f = redirectState.currentFilter;
@@ -269,8 +268,7 @@ function applyFilter(item) {
   return true;
 }
 
-var COPY_SVG =
-  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+import { COPY_SVG } from './vk-icons.js';
 
 var STATUS_LABELS = {
   200: 'OK',

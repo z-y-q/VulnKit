@@ -6,6 +6,24 @@ import { utilsProxy as utils } from './vk-namespace.js';
 
 const { getCurrentDomain, getActiveTab } = utils;
 
+function bindFilterSearch(btnSelector, searchId, mod, opts) {
+  var defaultFilter = (opts && opts.defaultFilter) != null ? opts.defaultFilter : 'all';
+  var attr = (opts && opts.filterAttr) || 'data-filter';
+  var btns = document.querySelectorAll(btnSelector);
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].addEventListener('click', function () {
+      for (var j = 0; j < btns.length; j++) btns[j].classList.remove('active');
+      this.classList.add('active');
+      mod.setFilter(this.getAttribute(attr) || defaultFilter);
+    });
+  }
+  var searchEl = utils.get(searchId);
+  if (searchEl)
+    searchEl.addEventListener('input', function () {
+      mod.setSearch(this.value);
+    });
+}
+
 function initEncodingJwtCrypto(savedState) {
   Promise.all([import('./vk-encoding.js'), import('./vk-jwt.js'), import('./vk-crypto.js')]).then(
     function (mods) {
@@ -629,19 +647,7 @@ function initXssAndSourcemap() {
       xss.clearResults();
       utils.showToast('已清空', 'info');
     });
-    document.querySelectorAll('.xssscan-filter-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        xss.setXssFilterType(btn.dataset.xfilter);
-        document.querySelectorAll('.xssscan-filter-btn').forEach(function (b) {
-          b.classList.remove('active');
-        });
-        btn.classList.add('active');
-        xss.renderXssPoints();
-      });
-    });
-    utils.on('xssscan-search', 'input', function () {
-      xss.setXssSearchText(this.value);
-    });
+    bindFilterSearch('.xssscan-filter-btn', 'xssscan-search', xss, { filterAttr: 'data-xfilter' });
     utils.bindClick('xssscan-selectall-btn', function () {
       var checks = document.querySelectorAll('.xssscan-point-check');
       var allChecked = Array.from(checks).every(function (cb) {
@@ -781,22 +787,7 @@ function initSecurityDetectors2() {
           headers.exportHeadersResults(format);
         });
 
-        var hFilterBtns = document.querySelectorAll('#headers-filter-row .filter-btn');
-        for (var hi = 0; hi < hFilterBtns.length; hi++) {
-          hFilterBtns[hi].addEventListener('click', function () {
-            for (var hj = 0; hj < hFilterBtns.length; hj++)
-              hFilterBtns[hj].classList.remove('active');
-            this.classList.add('active');
-            headers.setFilter(this.getAttribute('data-filter') || 'all');
-          });
-        }
-
-        var hSearch = utils.get('headers-search');
-        if (hSearch) {
-          hSearch.addEventListener('input', function () {
-            headers.setSearch(this.value);
-          });
-        }
+        bindFilterSearch('#headers-filter-row .filter-btn', 'headers-search', headers);
       })();
 
       // --- Open Redirect ---
@@ -851,22 +842,7 @@ function initSecurityDetectors2() {
           redirect.exportRedirectResults(format);
         });
 
-        var filterBtns = document.querySelectorAll('#redirect-filter-row .filter-btn');
-        for (var fi = 0; fi < filterBtns.length; fi++) {
-          filterBtns[fi].addEventListener('click', function () {
-            for (var fj = 0; fj < filterBtns.length; fj++)
-              filterBtns[fj].classList.remove('active');
-            this.classList.add('active');
-            redirect.setFilter(this.getAttribute('data-filter') || 'all');
-          });
-        }
-
-        var searchInput = utils.get('redirect-search');
-        if (searchInput) {
-          searchInput.addEventListener('input', function () {
-            redirect.setSearch(this.value);
-          });
-        }
+        bindFilterSearch('#redirect-filter-row .filter-btn', 'redirect-search', redirect);
       })();
 
       // --- Directory Fuzzing ---
@@ -953,22 +929,9 @@ function initSecurityDetectors2() {
           fuzz.stopFuzzScan();
         });
 
-        var filterBtns = document.querySelectorAll('#fuzz-filter-row .filter-btn');
-        for (var fi = 0; fi < filterBtns.length; fi++) {
-          filterBtns[fi].addEventListener('click', function () {
-            for (var fj = 0; fj < filterBtns.length; fj++)
-              filterBtns[fj].classList.remove('active');
-            this.classList.add('active');
-            fuzz.setFilter(this.getAttribute('data-filter'));
-          });
-        }
-
-        var fuzzSearch = utils.get('fuzz-search');
-        if (fuzzSearch) {
-          fuzzSearch.addEventListener('input', function () {
-            fuzz.setSearch(this.value);
-          });
-        }
+        bindFilterSearch('#fuzz-filter-row .filter-btn', 'fuzz-search', fuzz, {
+          defaultFilter: '',
+        });
 
         utils.bindClick('fuzz-export-btn', function () {
           var format = (utils.get('fuzz-export-format') || {}).value || 'txt';

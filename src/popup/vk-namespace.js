@@ -336,6 +336,21 @@ utils.bindTabSwitch = function (tabClass, dataAttr, handler) {
   });
 };
 
+utils.createFilterSearch = function (state, filterKey, searchKey, renderFn, opts) {
+  var noLowerCase = !!(opts && opts.noLowerCase);
+  var alwaysRender = !!(opts && opts.alwaysRender);
+  return {
+    setFilter: function (filter) {
+      state[filterKey] = filter;
+      if (alwaysRender || state.lastResults) renderFn(state.lastResults);
+    },
+    setSearch: function (query) {
+      state[searchKey] = noLowerCase ? query || '' : (query || '').toLowerCase();
+      if (alwaysRender || state.lastResults) renderFn(state.lastResults);
+    },
+  };
+};
+
 utils.filterByQuery = function (items, query, fields) {
   if (!query) return items;
   const lower = query.toLowerCase();
