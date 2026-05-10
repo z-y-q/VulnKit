@@ -176,14 +176,9 @@ function initRsaFaviconAsset() {
 }
 
 function initGatherAndRules() {
-  Promise.all([
-    import('./vk-gather.js'),
-    import('./vk-hae-rules.js'),
-    import('./vk-source-loader.js'),
-  ]).then(function (mods) {
+  Promise.all([import('./vk-gather.js'), import('./vk-source-loader.js')]).then(function (mods) {
     var gather = mods[0];
-    var haeRules = mods[1];
-    var sourceLoader = mods[2];
+    var sourceLoader = mods[1];
 
     gather.init();
     utils.bindClick('gather-btn', gather.gatherInfo);
@@ -203,111 +198,9 @@ function initGatherAndRules() {
       sourceLoader.setSourceUrls(urls);
       utils.showToast('已发送 ' + urls.length + ' 个链接到源码加载面板', 'success');
     });
-
-    var rulesBtn = utils.get('gather-rules-btn');
-    var rulesModal = utils.get('rules-modal');
-    var rulesModalClose = utils.get('rules-modal-close');
-    var rulesImportBtn = utils.get('rules-import-btn');
-    var rulesResetBtn = utils.get('rules-reset-btn');
-    var rulesFileInput = utils.get('rules-file-input');
-
-    function renderRulesList() {
-      var container = utils.get('rules-list');
-      if (!container) return;
-      var rules = gather.getActiveRules();
-      var html = '';
-      rules.forEach(function (group) {
-        html += '<div class="rules-group">';
-        html += '<div class="rules-group-header">' + utils.escapeHtml(group.group) + '</div>';
-        (group.rules || []).forEach(function (rule) {
-          var checked = rule.loaded ? ' checked' : '';
-          var scopeLabel =
-            ['response body', 'response', 'any'].indexOf(rule.scope) !== -1
-              ? ''
-              : ' <span class="rules-scope-na">[不适用]</span>';
-          html +=
-            '<label class="rules-item">' +
-            '<input type="checkbox"' +
-            checked +
-            ' data-group="' +
-            utils.escapeHtml(group.group) +
-            '" data-rule="' +
-            utils.escapeHtml(rule.name) +
-            '">' +
-            '<span class="rules-item-name type-' +
-            (rule.color || 'gray') +
-            '">' +
-            utils.escapeHtml(rule.name) +
-            '</span>' +
-            '<span class="rules-item-scope">' +
-            utils.escapeHtml(rule.scope) +
-            scopeLabel +
-            '</span>' +
-            '</label>';
-        });
-        html += '</div>';
-      });
-      container.innerHTML = html;
-
-      container.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
-        cb.addEventListener('change', function () {
-          var updated = haeRules.toggleRule(rules, cb.dataset.group, cb.dataset.rule);
-          gather.updateRules(updated);
-        });
-      });
-    }
-
-    if (rulesBtn && rulesModal) {
-      rulesBtn.addEventListener('click', function () {
-        renderRulesList();
-        rulesModal.style.display = 'flex';
-      });
-    }
-    if (rulesModalClose && rulesModal) {
-      var closeRulesModal = function () {
-        rulesModal.style.display = 'none';
-      };
-      rulesModalClose.addEventListener('click', closeRulesModal);
-      var overlay = rulesModal.querySelector('.modal-overlay');
-      if (overlay) overlay.addEventListener('click', closeRulesModal);
-    }
-    var applyRules = function (rules, msg) {
-      gather.updateRules(rules);
-      renderRulesList();
-      utils.showToast(msg, 'success');
-    };
-    if (rulesImportBtn && rulesFileInput) {
-      rulesImportBtn.addEventListener('click', function () {
-        rulesFileInput.click();
-      });
-      rulesFileInput.addEventListener('change', function () {
-        var file = rulesFileInput.files[0];
-        if (!file) return;
-        var reader = new FileReader();
-        reader.onload = function () {
-          var imported = haeRules.importRules(reader.result);
-          if (imported && imported.length > 0) {
-            applyRules(
-              imported,
-              '已导入 ' +
-                imported.reduce(function (s, g) {
-                  return s + (g.rules || []).length;
-                }, 0) +
-                ' 条规则'
-            );
-          } else {
-            utils.showToast('规则文件解析失败', 'error');
-          }
-        };
-        reader.readAsText(file);
-        rulesFileInput.value = '';
-      });
-    }
-    if (rulesResetBtn) {
-      rulesResetBtn.addEventListener('click', function () {
-        applyRules(haeRules.getDefaultRules(), '已恢复默认规则');
-      });
-    }
+    utils.bindClick('gather-rules-btn', function () {
+      chrome.runtime.openOptionsPage();
+    });
   });
 }
 

@@ -7,7 +7,6 @@
   const PANEL_FILES = [
     'encoding.html',
     'favicon-gather.html',
-    'rules-modal.html',
     'asset.html',
     'links-multiurl.html',
     'history.html',
