@@ -18,6 +18,7 @@ import {
   initXssAndSourcemap,
   initStatusBarAndKeyboard,
   initReport,
+  initSecurityDetectors2,
 } from './vk-init-panels.js';
 import {
   initVuePermissions,
@@ -105,6 +106,7 @@ async function initApp() {
   initXssAndSourcemap();
   initStatusBarAndKeyboard();
   initReport();
+  initSecurityDetectors2();
 }
 
 function startApp() {

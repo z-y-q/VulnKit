@@ -38,6 +38,9 @@ const DEFAULT_TABS = [
   { id: 'source-loader', label: '源码加载' },
   { id: 'sniff', label: '网站嗅探' },
   { id: 'report', label: '统一报告' },
+  { id: 'headers', label: '安全头' },
+  { id: 'redirect', label: '重定向' },
+  { id: 'fuzz', label: '目录扫描' },
 ];
 
 const TAB_CATEGORIES_OPT = [
@@ -47,7 +50,12 @@ const TAB_CATEGORIES_OPT = [
     color: '#4A90E2',
     tabs: ['favicon', 'gather', 'subdomain', 'sniff'],
   },
-  { id: 'scan', label: '扫描', color: '#e74c3c', tabs: ['xssscan', 'cors', 'waf', 'cookie-audit'] },
+  {
+    id: 'scan',
+    label: '扫描',
+    color: '#e74c3c',
+    tabs: ['xssscan', 'cors', 'waf', 'cookie-audit', 'headers', 'redirect', 'fuzz'],
+  },
   {
     id: 'exploit',
     label: '利用',

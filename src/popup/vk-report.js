@@ -28,6 +28,10 @@ const MODULE_LABELS = {
   sniff: '技术栈识别',
   leak: '信息泄露',
   subdomain: '子域名收集',
+  headers: '安全头检测',
+  redirect: '重定向检测',
+  fuzz: '目录扫描',
+  jwt: 'JWT 分析',
 };
 
 function normalizeSeverity(raw) {
@@ -46,6 +50,10 @@ async function collectAllFindings() {
     cookie: './vk-cookie-audit.js',
     sniff: './vk-sniff-scanner.js',
     subdomain: './vk-subdomain.js',
+    headers: './vk-headers.js',
+    redirect: './vk-redirect.js',
+    fuzz: './vk-fuzz.js',
+    jwt: './vk-jwt.js',
   };
 
   for (var key in moduleMap) {

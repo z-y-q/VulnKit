@@ -1,0 +1,65 @@
+/* fuzz.css -- 目录扫描面板样式 */
+
+.panel-select,
+.panel-input-sm {
+  padding: 4px 8px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 4px;
+  font-size: 12px;
+  background: var(--bg-input, #fff);
+  color: var(--text, #333);
+}
+
+.panel-select { width: 100px; }
+.panel-input-sm { width: 50px; text-align: center; }
+
+.fuzz-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border, #eee);
+  gap: 8px;
+}
+
+.fuzz-item:hover {
+  background: var(--bg-hover, #f5f5f5);
+}
+
+.fuzz-path {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1;
+  color: var(--text, #333);
+  word-break: break-all;
+}
+
+.fuzz-status-code {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.fuzz-status-code.s-200 { background: #e8f5e9; color: #27ae60; }
+.fuzz-status-code.s-301, .fuzz-status-code.s-302 { background: #fff3e0; color: #e67e22; }
+.fuzz-status-code.s-403 { background: #fce4ec; color: #e91e63; }
+.fuzz-status-code.s-404 { background: #f5f5f5; color: #999; }
+.fuzz-status-code.s-500 { background: #fdecea; color: #e74c3c; }
+.fuzz-status-code.s-other { background: #f5f5f5; color: #666; }
+
+.fuzz-size {
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  flex-shrink: 0;
+  width: 60px;
+  text-align: right;
+}
+
+.fuzz-time {
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  flex-shrink: 0;
+  width: 50px;
+  text-align: right;
+}

@@ -16,15 +16,27 @@
 [data-theme='dark'] .jwt-claim { border-color: var(--border-color); color: var(--text-secondary); }
 .jwt-verify-section { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
 .jwt-verify-section .form-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; display: block; }
-.jwt-verify-section .form-group { display: flex; gap: 6px; align-items: center; }
-.jwt-verify-section .input { flex: 1; }
+.jwt-verify-section .form-group { display: flex; gap: 6px; align-items: flex-start; flex-direction: column; }
+.jwt-verify-section .input { flex: 1; width: 100%; }
+.jwt-algo-select { width: 100%; }
+.jwt-key-input { width: 100%; font-family: 'Monaco', 'Menlo', monospace; font-size: 11px; resize: vertical; }
 .jwt-verify-result { margin-top: 6px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; }
 .jwt-verify-result.valid { background: #e8f8f0; color: #27ae60; }
 .jwt-verify-result.invalid { background: #fdecea; color: #e74c3c; }
 .jwt-verify-result.error { background: #fef9e7; color: #f39c12; }
+.jwt-warnings { margin-top: 8px; }
+.jwt-warning-item { display: flex; gap: 6px; padding: 5px 10px; margin-bottom: 4px; border-radius: 6px; font-size: 11px; align-items: flex-start; }
+.jwt-warning-item.critical { background: #fdecea; color: #c0392b; border-left: 3px solid #e74c3c; }
+.jwt-warning-item.high { background: #fef9e7; color: #d68910; border-left: 3px solid #f39c12; }
+.jwt-warning-item.medium { background: #eaf2fb; color: #2471a3; border-left: 3px solid #3498db; }
+.jwt-warning-item.low { background: #f0f0f0; color: #666; border-left: 3px solid #999; }
 [data-theme='dark'] .jwt-verify-section { border-color: var(--border-color); }
 [data-theme='dark'] .jwt-verify-result.valid { background: rgba(39,174,96,0.15); }
 [data-theme='dark'] .jwt-verify-result.invalid { background: rgba(231,76,60,0.15); }
+[data-theme='dark'] .jwt-warning-item.critical { background: rgba(231,76,60,0.15); color: #FF6B6B; }
+[data-theme='dark'] .jwt-warning-item.high { background: rgba(243,156,18,0.15); color: #f5b041; }
+[data-theme='dark'] .jwt-warning-item.medium { background: rgba(52,152,219,0.15); color: #5dade2; }
+[data-theme='dark'] .jwt-warning-item.low { background: var(--bg-tertiary); color: var(--text-secondary); }
 
 /* ====== Crypto Panel ====== */
 .crypto-algo-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }

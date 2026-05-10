@@ -66,6 +66,9 @@ import {
   exportModulesJSON,
   exportModulesCSV,
 } from './vk-sourcemap.js';
+import * as headers from './vk-headers.js';
+import * as redirect from './vk-redirect.js';
+import * as fuzz from './vk-fuzz.js';
 
 const { getCurrentDomain, getActiveTab } = utils;
 
@@ -902,6 +905,156 @@ function initReport() {
   });
 }
 
+// ====== Security Detectors 2: Headers + Redirect + Fuzz ======
+
+function initSecurityDetectors2() {
+  // --- Security Headers ---
+  (function () {
+    var urlInput = utils.get('headers-url');
+    if (urlInput) {
+      getActiveTab().then(function (tab) {
+        if (tab && tab.url) urlInput.value = tab.url;
+      });
+    }
+
+    utils.bindClick('headers-scan-btn', async function () {
+      var url = (urlInput && urlInput.value) || '';
+      if (!url || !/^https?:\/\//i.test(url)) {
+        utils.showToast('请输入有效的 HTTP(S) URL', 'warning');
+        return;
+      }
+      var btn = utils.get('headers-scan-btn');
+      if (btn) btn.disabled = true;
+      try {
+        var result = await headers.scanSecurityHeaders(url);
+        if (result) headers.renderHeadersResults(result);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
+
+    utils.bindClick('headers-export-btn', function () {
+      headers.exportHeadersResults();
+    });
+  })();
+
+  // --- Open Redirect ---
+  (function () {
+    var urlInput = utils.get('redirect-url');
+    if (urlInput) {
+      getActiveTab().then(function (tab) {
+        if (tab && tab.url) urlInput.value = tab.url;
+      });
+    }
+
+    utils.bindClick('redirect-scan-btn', async function () {
+      var url = (urlInput && urlInput.value) || '';
+      if (!url || !/^https?:\/\//i.test(url)) {
+        utils.showToast('请输入有效的 HTTP(S) URL', 'warning');
+        return;
+      }
+      var scanBtn = utils.get('redirect-scan-btn');
+      var stopBtn = utils.get('redirect-stop-btn');
+      var progressEl = utils.get('redirect-progress');
+      var progressFill = utils.get('redirect-progress-fill');
+      var progressText = utils.get('redirect-progress-text');
+      if (scanBtn) scanBtn.style.display = 'none';
+      if (stopBtn) stopBtn.style.display = '';
+      if (progressEl) progressEl.style.display = 'flex';
+
+      try {
+        var result = await redirect.scanRedirects(url, function (p) {
+          if (progressFill) progressFill.style.width = (p.completed / p.total) * 100 + '%';
+          if (progressText) progressText.textContent = p.completed + '/' + p.total;
+        });
+        if (result) redirect.renderRedirectResults(result);
+      } finally {
+        if (scanBtn) scanBtn.style.display = '';
+        if (stopBtn) stopBtn.style.display = 'none';
+      }
+    });
+
+    utils.bindClick('redirect-stop-btn', function () {
+      redirect.stopRedirectScan();
+    });
+
+    utils.bindClick('redirect-export-btn', function () {
+      redirect.exportRedirectResults();
+    });
+  })();
+
+  // --- Directory Fuzzing ---
+  (function () {
+    var urlInput = utils.get('fuzz-url');
+    if (urlInput) {
+      getActiveTab().then(function (tab) {
+        if (tab && tab.url) urlInput.value = tab.url.replace(/\/+$/, '');
+      });
+    }
+
+    utils.bindClick('fuzz-start-btn', async function () {
+      var url = (urlInput && urlInput.value) || '';
+      if (!url || !/^https?:\/\//i.test(url)) {
+        utils.showToast('请输入有效的 HTTP(S) URL', 'warning');
+        return;
+      }
+      var wordlist = (utils.get('fuzz-wordlist') || {}).value || 'common';
+      var concurrency = parseInt((utils.get('fuzz-concurrency') || {}).value || '5', 10);
+      var startBtn = utils.get('fuzz-start-btn');
+      var pauseBtn = utils.get('fuzz-pause-btn');
+      var stopBtn = utils.get('fuzz-stop-btn');
+      var progressEl = utils.get('fuzz-progress');
+      var progressFill = utils.get('fuzz-progress-fill');
+      var progressText = utils.get('fuzz-progress-text');
+      if (startBtn) startBtn.style.display = 'none';
+      if (pauseBtn) pauseBtn.style.display = '';
+      if (stopBtn) stopBtn.style.display = '';
+      if (progressEl) progressEl.style.display = 'flex';
+
+      try {
+        var result = await fuzz.runFuzzScan(
+          url,
+          wordlist,
+          concurrency,
+          function (s) {
+            if (progressFill) progressFill.style.width = (s.completed / s.total) * 100 + '%';
+            if (progressText)
+              progressText.textContent = s.completed + '/' + s.total + ' (发现 ' + s.found + ')';
+          },
+          function (entry) {
+            var container = utils.get('fuzz-results');
+            if (container && container.querySelector('.empty-state')) {
+              container.innerHTML = '';
+            }
+          }
+        );
+        if (result) fuzz.renderFuzzResults(result);
+      } finally {
+        if (startBtn) startBtn.style.display = '';
+        if (pauseBtn) {
+          pauseBtn.style.display = 'none';
+          pauseBtn.textContent = '暂停';
+        }
+        if (stopBtn) stopBtn.style.display = 'none';
+      }
+    });
+
+    utils.bindClick('fuzz-pause-btn', function () {
+      var paused = fuzz.pauseFuzzScan();
+      var pauseBtn = utils.get('fuzz-pause-btn');
+      if (pauseBtn) pauseBtn.textContent = paused ? '继续' : '暂停';
+    });
+
+    utils.bindClick('fuzz-stop-btn', function () {
+      fuzz.stopFuzzScan();
+    });
+
+    utils.bindClick('fuzz-export-btn', function () {
+      fuzz.exportFuzzResults();
+    });
+  })();
+}
+
 export {
   initTabPagination,
   initMainTabs,
@@ -915,4 +1068,5 @@ export {
   initXssAndSourcemap,
   initStatusBarAndKeyboard,
   initReport,
+  initSecurityDetectors2,
 };

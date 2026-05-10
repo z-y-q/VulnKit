@@ -27,6 +27,9 @@
     'subdomain.html',
     'source-loader.html',
     'sniff.html',
+    'headers.html',
+    'redirect.html',
+    'fuzz.html',
     'report.html',
   ];
 

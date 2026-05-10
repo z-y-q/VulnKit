@@ -1,0 +1,128 @@
+/* headers.css -- 安全头分析面板样式 */
+
+.headers-score-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: var(--bg-card, #fff);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.headers-grade {
+  font-size: 32px;
+  font-weight: 700;
+  width: 50px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.headers-grade.grade-a { color: #27ae60; }
+.headers-grade.grade-b { color: #2ecc71; }
+.headers-grade.grade-c { color: #f39c12; }
+.headers-grade.grade-d { color: #e67e22; }
+.headers-grade.grade-f { color: #e74c3c; }
+
+.headers-score-ring {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  flex-shrink: 0;
+}
+
+.score-ring-svg {
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+}
+
+.score-ring-bg {
+  fill: none;
+  stroke: var(--border, #e0e0e0);
+  stroke-width: 8;
+}
+
+.score-ring-fg {
+  fill: none;
+  stroke: #27ae60;
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 339.292;
+  stroke-dashoffset: 339.292;
+  transition: stroke-dashoffset 0.6s ease, stroke 0.3s ease;
+}
+
+.score-ring-fg.score-high { stroke: #27ae60; }
+.score-ring-fg.score-medium { stroke: #f39c12; }
+.score-ring-fg.score-low { stroke: #e74c3c; }
+
+.headers-score-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text, #333);
+}
+
+.headers-summary {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  line-height: 1.6;
+}
+
+.headers-results {
+  overflow-y: auto;
+  max-height: calc(100vh - 260px);
+}
+
+.headers-result-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border, #eee);
+  gap: 8px;
+}
+
+.headers-result-item:hover {
+  background: var(--bg-hover, #f5f5f5);
+}
+
+.headers-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.headers-status.pass { background: #27ae60; }
+.headers-status.warn { background: #f39c12; }
+.headers-status.miss { background: #e74c3c; }
+
+.headers-header-name {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 0 0 200px;
+  color: var(--text, #333);
+  word-break: break-all;
+}
+
+.headers-header-value {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  word-break: break-all;
+  max-height: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.headers-header-rec {
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  padding: 4px 12px 8px;
+  border-bottom: 1px solid var(--border, #eee);
+}

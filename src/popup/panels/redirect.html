@@ -1,0 +1,19 @@
+<!-- redirect.html -- 开放重定向检测面板 -->
+<div class="panel" id="panel-redirect">
+  <div class="panel-toolbar">
+    <input type="text" id="redirect-url" class="panel-input" placeholder="目标 URL（自动填充当前页面）">
+    <button class="panel-btn primary" id="redirect-scan-btn">开始扫描</button>
+    <button class="panel-btn" id="redirect-stop-btn" style="display:none">停止</button>
+  </div>
+  <div class="redirect-progress" id="redirect-progress" style="display:none">
+    <div class="progress-bar"><div class="progress-fill" id="redirect-progress-fill"></div></div>
+    <span class="progress-text" id="redirect-progress-text">0/0</span>
+  </div>
+  <div class="redirect-stats" id="redirect-stats" style="display:none"></div>
+  <div class="redirect-results" id="redirect-results">
+    <div class="empty-state">点击「开始扫描」检测 URL 中的开放重定向漏洞</div>
+  </div>
+  <div class="panel-footer">
+    <button class="panel-btn" id="redirect-export-btn" style="display:none">导出结果</button>
+  </div>
+</div>
