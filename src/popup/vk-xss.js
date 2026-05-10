@@ -2,7 +2,7 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
-import { XSS_DATA } from './vk-payload.js';
+import { XSS_DATA } from './vk-payload-data.js';
 import { XSS_SCAN_PAYLOADS } from './vk-xss-data.js';
 import { analyzeDomSinks } from './vk-xss-sinks.js';
 

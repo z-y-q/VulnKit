@@ -23,7 +23,6 @@ function persistSpoofState() {
 chrome.storage.local.get(['pentest_spoof'], result => {
   if (result.pentest_spoof) {
     spoofState = result.pentest_spoof;
-    // Re-create DNR rules after browser restart
     if (spoofState.ua.enabled && spoofState.ua.current) {
       addUaRule(null, spoofState.ua.url || null, spoofState.ua.current).catch(function (e) {
         console.debug('restore UA rule failed', e);
@@ -145,7 +144,6 @@ async function addHeaderRules(tabId, url, headers) {
 
   if (requestHeaders.length === 0) return;
 
-  // Remove all existing header rules
   const removeIds = [];
   for (let i = 0; i < MAX_HEADER_RULES; i++) {
     removeIds.push(HEADER_RULES_START + i);
@@ -199,6 +197,35 @@ function isAllowedUrl(url) {
   } catch {
     return false;
   }
+}
+
+// ====== Probe utilities ======
+function validateProbeUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { error: 'Invalid protocol' };
+    }
+    return { parsed: parsed };
+  } catch {
+    return { error: 'Invalid URL' };
+  }
+}
+
+function createTimeoutController(timeoutMs) {
+  var controller = new AbortController();
+  var timer = setTimeout(function () {
+    controller.abort();
+  }, timeoutMs);
+  return { controller: controller, cleanup: function () { clearTimeout(timer); } };
+}
+
+function collectHeaders(resp) {
+  var hdrs = {};
+  resp.headers.forEach(function (v, k) {
+    hdrs[k] = v;
+  });
+  return hdrs;
 }
 
 // ====== Fetch helpers ======
@@ -303,430 +330,337 @@ async function fetchZoomEyeAuth(url, apiKey) {
   }
 }
 
-// ====== Message handler ======
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || !message.type) return false;
+// ====== Message handler map ======
+var handlers = {
+  QUERY_JS_BLOCK: function (_msg, _sender, sendResponse) {
+    chrome.declarativeNetRequest
+      .getDynamicRules()
+      .then(function (rules) {
+        sendResponse({ blocked: rules.some(function (r) { return r.id === JS_BLOCK_RULE_ID; }) });
+      })
+      .catch(function () { sendResponse({ blocked: false }); });
+    return true;
+  },
 
-  switch (message.type) {
-    case 'QUERY_JS_BLOCK':
-      chrome.declarativeNetRequest
-        .getDynamicRules()
-        .then(rules => {
-          sendResponse({ blocked: rules.some(r => r.id === JS_BLOCK_RULE_ID) });
-        })
-        .catch(() => sendResponse({ blocked: false }));
-      return true;
+  TOGGLE_JS: function (msg, _sender, sendResponse) {
+    var promise = msg.enable ? removeJsBlockRule() : addJsBlockRule();
+    promise
+      .then(function () { sendResponse({ success: true }); })
+      .catch(function (e) { sendResponse({ success: false, error: e.message }); });
+    return true;
+  },
 
-    case 'TOGGLE_JS':
-      if (message.enable) {
-        removeJsBlockRule()
-          .then(() => sendResponse({ success: true }))
-          .catch(e => sendResponse({ success: false, error: e.message }));
-      } else {
-        addJsBlockRule()
-          .then(() => sendResponse({ success: true }))
-          .catch(e => sendResponse({ success: false, error: e.message }));
-      }
-      return true; // async sendResponse
-
-    case 'SPOOF_UA':
-      if (message.url && message.userAgent) {
-        spoofState.ua = { enabled: true, current: message.userAgent, url: message.url };
-        persistSpoofState();
-        addUaRule(message.tabId, message.url, message.userAgent)
-          .then(() => sendResponse({ success: true }))
-          .catch(e => sendResponse({ success: false, error: e.message }));
-      } else {
-        sendResponse({ success: false, error: 'Missing url or userAgent' });
-      }
-      return true;
-
-    case 'RESET_SPOOF_UA':
-      spoofState.ua = { enabled: false, current: '', url: '' };
+  SPOOF_UA: function (msg, _sender, sendResponse) {
+    if (msg.url && msg.userAgent) {
+      spoofState.ua = { enabled: true, current: msg.userAgent, url: msg.url };
       persistSpoofState();
-      removeUaRule()
-        .then(() => sendResponse({ success: true }))
-        .catch(e => sendResponse({ success: false, error: e.message }));
-      return true;
+      addUaRule(msg.tabId, msg.url, msg.userAgent)
+        .then(function () { sendResponse({ success: true }); })
+        .catch(function (e) { sendResponse({ success: false, error: e.message }); });
+    } else {
+      sendResponse({ success: false, error: 'Missing url or userAgent' });
+    }
+    return true;
+  },
 
-    case 'SPOOF_HEADERS':
-      if (message.headers) {
-        spoofState.headers = Object.assign({}, message.headers, { url: message.url });
-        persistSpoofState();
-        addHeaderRules(message.tabId, message.url, message.headers)
-          .then(() => sendResponse({ success: true }))
-          .catch(e => sendResponse({ success: false, error: e.message }));
-      } else {
-        sendResponse({ success: false, error: 'Missing headers' });
-      }
-      return true;
+  RESET_SPOOF_UA: function (_msg, _sender, sendResponse) {
+    spoofState.ua = { enabled: false, current: '', url: '' };
+    persistSpoofState();
+    removeUaRule()
+      .then(function () { sendResponse({ success: true }); })
+      .catch(function (e) { sendResponse({ success: false, error: e.message }); });
+    return true;
+  },
 
-    case 'RESET_SPOOF_HEADERS':
-      spoofState.headers = { xff: '', referer: '', clientIp: '', custom: [], url: '' };
+  SPOOF_HEADERS: function (msg, _sender, sendResponse) {
+    if (msg.headers) {
+      spoofState.headers = Object.assign({}, msg.headers, { url: msg.url });
       persistSpoofState();
-      removeAllHeaderRules()
-        .then(() => sendResponse({ success: true }))
-        .catch(e => sendResponse({ success: false, error: e.message }));
-      return true;
+      addHeaderRules(msg.tabId, msg.url, msg.headers)
+        .then(function () { sendResponse({ success: true }); })
+        .catch(function (e) { sendResponse({ success: false, error: e.message }); });
+    } else {
+      sendResponse({ success: false, error: 'Missing headers' });
+    }
+    return true;
+  },
 
-    case 'FETCH_URL':
-      if (!isAllowedUrl(message.url)) {
-        sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
-      } else {
-        fetchUrl(message.url, message.tailOnly, message.timeout)
-          .then(result => {
-            sendResponse(result.success ? { data: result.data } : { error: result.error });
-          })
-          .catch(e => sendResponse({ error: e.message || 'fetch failed' }));
-      }
-      return true;
+  RESET_SPOOF_HEADERS: function (_msg, _sender, sendResponse) {
+    spoofState.headers = { xff: '', referer: '', clientIp: '', custom: [], url: '' };
+    persistSpoofState();
+    removeAllHeaderRules()
+      .then(function () { sendResponse({ success: true }); })
+      .catch(function (e) { sendResponse({ success: false, error: e.message }); });
+    return true;
+  },
 
-    case 'FETCH_URL_AUTH':
-      if (!isAllowedUrl(message.url)) {
-        sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
-      } else if (message.provider === 'zoomeye') {
-        fetchZoomEyeAuth(message.url, message.key)
-          .then(result => {
-            sendResponse(result.success ? { data: result.data } : { error: result.error });
-          })
-          .catch(e => sendResponse({ error: e.message || 'auth fetch failed' }));
-      } else {
-        sendResponse({ error: 'Unknown provider: ' + (message.provider || '(none)') });
-      }
-      return true;
-
-    case 'FETCH_PROBE':
-      // Probing uses the tab's own origin — allow private IPs but validate protocol and sender origin
-      {
-        let probeUrl;
-        try {
-          probeUrl = new URL(message.url);
-          if (probeUrl.protocol !== 'http:' && probeUrl.protocol !== 'https:') {
-            sendResponse({ error: 'Invalid protocol' });
-            return true;
-          }
-        } catch {
-          sendResponse({ error: 'Invalid URL' });
-          return true;
-        }
-        // No origin check for FETCH_PROBE — user-initiated pentesting tool
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), message.timeout || 5000);
-        const t0 = performance.now();
-        fetch(probeUrl.href, {
-          method: message.method || 'GET',
-          redirect: message.followRedirect !== false ? 'follow' : 'manual',
-          signal: controller.signal,
-          headers: message.headers || {},
+  FETCH_URL: function (msg, _sender, sendResponse) {
+    if (!isAllowedUrl(msg.url)) {
+      sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
+    } else {
+      fetchUrl(msg.url, msg.tailOnly, msg.timeout)
+        .then(function (result) {
+          sendResponse(result.success ? { data: result.data } : { error: result.error });
         })
-          .then(async resp => {
-            clearTimeout(timer);
-            const elapsed = Math.round(performance.now() - t0);
-            const hdrs = {};
-            resp.headers.forEach((v, k) => {
-              hdrs[k] = v;
-            });
-            const result = {
-              status: resp.status,
-              statusText: resp.statusText,
-              headers: hdrs,
-              redirected: resp.redirected,
-              url: resp.url,
-              time: elapsed,
-            };
-            if (message.includeBody && resp.status >= 200 && resp.status < 300) {
-              try {
-                result.body = await resp.text();
-              } catch {
-                result.body = '';
-              }
-            }
-            sendResponse(result);
-          })
-          .catch(e => {
-            clearTimeout(timer);
-            sendResponse({ error: e.message, status: 0, body: '', headers: {}, time: 0 });
-          });
-      }
-      return true;
+        .catch(function (e) { sendResponse({ error: e.message || 'fetch failed' }); });
+    }
+    return true;
+  },
 
-    case 'FETCH_CORS_PROBE':
-      // CORS probe: background fetch can set Origin header (not forbidden in service worker)
-      {
-        let probeUrl;
-        try {
-          probeUrl = new URL(message.url);
-          if (probeUrl.protocol !== 'http:' && probeUrl.protocol !== 'https:') {
-            sendResponse({ error: 'Invalid protocol' });
-            return true;
-          }
-        } catch {
-          sendResponse({ error: 'Invalid URL' });
-          return true;
-        }
-        if (!isAllowedUrl(probeUrl.href)) {
-          sendResponse({ error: 'URL not allowed (no private IPs)' });
-          return true;
-        }
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), message.timeout || 10000);
-        const corsHeaders = message.headers || {};
-        // In service worker fetch, Origin is not a forbidden header — browser allows it
-        fetch(probeUrl.href, {
-          method: message.method || 'GET',
-          redirect: 'follow',
-          signal: controller.signal,
-          headers: corsHeaders,
-          credentials: message.credentials || 'omit',
-          body: message.body || undefined,
+  FETCH_URL_AUTH: function (msg, _sender, sendResponse) {
+    if (!isAllowedUrl(msg.url)) {
+      sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
+    } else if (msg.provider === 'zoomeye') {
+      fetchZoomEyeAuth(msg.url, msg.key)
+        .then(function (result) {
+          sendResponse(result.success ? { data: result.data } : { error: result.error });
         })
-          .then(async resp => {
-            clearTimeout(timer);
-            const hdrs = {};
-            resp.headers.forEach((v, k) => {
-              hdrs[k] = v;
-            });
-            const result = {
-              status: resp.status,
-              statusText: resp.statusText,
-              headers: hdrs,
-              type: resp.type,
-            };
-            try {
-              result.body = await resp.text();
-            } catch {
-              result.body = '';
-            }
-            sendResponse(result);
-          })
-          .catch(e => {
-            clearTimeout(timer);
-            sendResponse({ error: e.message, status: 0 });
-          });
-      }
-      return true;
+        .catch(function (e) { sendResponse({ error: e.message || 'auth fetch failed' }); });
+    } else {
+      sendResponse({ error: 'Unknown provider: ' + (msg.provider || '(none)') });
+    }
+    return true;
+  },
 
-    case 'FETCH_HEADER_PROBE':
-      {
-        let probeUrl;
-        try {
-          probeUrl = new URL(message.url);
-          if (probeUrl.protocol !== 'http:' && probeUrl.protocol !== 'https:') {
-            sendResponse({ error: 'Invalid protocol' });
-            return true;
-          }
-        } catch {
-          sendResponse({ error: 'Invalid URL' });
-          return true;
+  FETCH_PROBE: function (msg, _sender, sendResponse) {
+    var v = validateProbeUrl(msg.url);
+    if (v.error) { sendResponse({ error: v.error }); return true; }
+    var tc = createTimeoutController(msg.timeout || 5000);
+    var t0 = performance.now();
+    fetch(v.parsed.href, {
+      method: msg.method || 'GET',
+      redirect: msg.followRedirect !== false ? 'follow' : 'manual',
+      signal: tc.controller.signal,
+      headers: msg.headers || {},
+    })
+      .then(function (resp) {
+        tc.cleanup();
+        var elapsed = Math.round(performance.now() - t0);
+        var result = {
+          status: resp.status,
+          statusText: resp.statusText,
+          headers: collectHeaders(resp),
+          redirected: resp.redirected,
+          url: resp.url,
+          time: elapsed,
+        };
+        if (msg.includeBody && resp.status >= 200 && resp.status < 300) {
+          return resp.text().then(function (body) { result.body = body; return result; });
         }
-        if (!isAllowedUrl(probeUrl.href)) {
-          sendResponse({ error: 'URL not allowed (no private IPs)' });
-          return true;
-        }
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), message.timeout || 8000);
-        fetch(probeUrl.href, {
-          method: 'HEAD',
+        return result;
+      })
+      .then(function (result) { sendResponse(result); })
+      .catch(function (e) {
+        tc.cleanup();
+        sendResponse({ error: e.message, status: 0, body: '', headers: {}, time: 0 });
+      });
+    return true;
+  },
+
+  FETCH_CORS_PROBE: function (msg, _sender, sendResponse) {
+    var v = validateProbeUrl(msg.url);
+    if (v.error) { sendResponse({ error: v.error }); return true; }
+    if (!isAllowedUrl(v.parsed.href)) {
+      sendResponse({ error: 'URL not allowed (no private IPs)' });
+      return true;
+    }
+    var tc = createTimeoutController(msg.timeout || 10000);
+    var corsHeaders = msg.headers || {};
+    fetch(v.parsed.href, {
+      method: msg.method || 'GET',
+      redirect: 'follow',
+      signal: tc.controller.signal,
+      headers: corsHeaders,
+      credentials: msg.credentials || 'omit',
+      body: msg.body || undefined,
+    })
+      .then(function (resp) {
+        tc.cleanup();
+        var result = {
+          status: resp.status,
+          statusText: resp.statusText,
+          headers: collectHeaders(resp),
+          type: resp.type,
+        };
+        return resp.text().then(function (body) { result.body = body; return result; }).catch(function () { result.body = ''; return result; });
+      })
+      .then(function (result) { sendResponse(result); })
+      .catch(function (e) {
+        tc.cleanup();
+        sendResponse({ error: e.message, status: 0 });
+      });
+    return true;
+  },
+
+  FETCH_HEADER_PROBE: function (msg, _sender, sendResponse) {
+    var v = validateProbeUrl(msg.url);
+    if (v.error) { sendResponse({ error: v.error }); return true; }
+    if (!isAllowedUrl(v.parsed.href)) {
+      sendResponse({ error: 'URL not allowed (no private IPs)' });
+      return true;
+    }
+    var tc = createTimeoutController(msg.timeout || 8000);
+    fetch(v.parsed.href, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: tc.controller.signal,
+      credentials: 'omit',
+    })
+      .then(function (resp) {
+        tc.cleanup();
+        sendResponse({ status: resp.status, statusText: resp.statusText, headers: collectHeaders(resp) });
+      })
+      .catch(function (e) {
+        tc.cleanup();
+        // HEAD may be blocked, fallback to GET with body drain
+        fetch(v.parsed.href, {
+          method: 'GET',
           redirect: 'follow',
-          signal: controller.signal,
+          signal: AbortSignal.timeout(msg.timeout || 8000),
           credentials: 'omit',
         })
-          .then(async resp => {
-            clearTimeout(timer);
-            const hdrs = {};
-            resp.headers.forEach((v, k) => {
-              hdrs[k] = v;
-            });
-            sendResponse({
-              status: resp.status,
-              statusText: resp.statusText,
-              headers: hdrs,
-            });
+          .then(function (resp2) {
+            sendResponse({ status: resp2.status, statusText: resp2.statusText, headers: collectHeaders(resp2) });
           })
-          .catch(e => {
-            clearTimeout(timer);
-            // HEAD may be blocked, fallback to GET with body drain
-            fetch(probeUrl.href, {
-              method: 'GET',
-              redirect: 'follow',
-              signal: AbortSignal.timeout(message.timeout || 8000),
-              credentials: 'omit',
-            })
-              .then(resp => {
-                const hdrs = {};
-                resp.headers.forEach((v, k) => {
-                  hdrs[k] = v;
-                });
-                sendResponse({ status: resp.status, statusText: resp.statusText, headers: hdrs });
-              })
-              .catch(e2 => {
-                sendResponse({ error: e2.message, status: 0 });
-              });
+          .catch(function (e2) {
+            sendResponse({ error: e2.message, status: 0 });
           });
-      }
-      return true;
+      });
+    return true;
+  },
 
-    case 'FETCH_DNS_RESOLVE':
-      {
-        const hostname = message.hostname;
-        if (!hostname || typeof hostname !== 'string') {
-          sendResponse({ error: 'Invalid hostname' });
-          return true;
-        }
-        try {
-          fetch(`https://dns.google/resolve?name=${encodeURIComponent(hostname)}&type=A`)
-            .then(r => r.json())
-            .then(data => {
-              const addresses = (data.Answer || []).filter(a => a.type === 1).map(a => a.data);
-              sendResponse({ addresses: addresses, resultCode: 0 });
-            })
-            .catch(err => {
-              sendResponse({ error: err.message, addresses: [] });
-            });
-        } catch (e) {
-          sendResponse({ error: e.message, addresses: [] });
-        }
-      }
+  FETCH_DNS_RESOLVE: function (msg, _sender, sendResponse) {
+    var hostname = msg.hostname;
+    if (!hostname || typeof hostname !== 'string') {
+      sendResponse({ error: 'Invalid hostname' });
       return true;
+    }
+    fetch('https://dns.google/resolve?name=' + encodeURIComponent(hostname) + '&type=A')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var addresses = (data.Answer || [])
+          .filter(function (a) { return a.type === 1; })
+          .map(function (a) { return a.data; });
+        sendResponse({ addresses: addresses, resultCode: 0 });
+      })
+      .catch(function (err) { sendResponse({ error: err.message, addresses: [] }); });
+    return true;
+  },
 
-    case 'FETCH_DNS_PROBE':
-      // DNS subdomain probe: background fetch without CORS restrictions
-      {
-        let probeUrl;
-        try {
-          probeUrl = new URL(message.url);
-          if (probeUrl.protocol !== 'http:' && probeUrl.protocol !== 'https:') {
-            sendResponse({ error: 'Invalid protocol' });
-            return true;
-          }
-        } catch {
-          sendResponse({ error: 'Invalid URL' });
-          return true;
-        }
-        if (!isAllowedUrl(probeUrl.href)) {
-          sendResponse({ error: 'URL not allowed (no private IPs)' });
-          return true;
-        }
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), message.timeout || 5000);
-        fetch(probeUrl.href, {
-          method: message.method || 'HEAD',
-          redirect: 'follow',
-          signal: controller.signal,
-          mode: 'no-cors',
+  FETCH_DNS_PROBE: function (msg, _sender, sendResponse) {
+    var v = validateProbeUrl(msg.url);
+    if (v.error) { sendResponse({ error: v.error }); return true; }
+    if (!isAllowedUrl(v.parsed.href)) {
+      sendResponse({ error: 'URL not allowed (no private IPs)' });
+      return true;
+    }
+    var tc = createTimeoutController(msg.timeout || 5000);
+    fetch(v.parsed.href, {
+      method: msg.method || 'HEAD',
+      redirect: 'follow',
+      signal: tc.controller.signal,
+      mode: 'no-cors',
+    })
+      .then(function (resp) {
+        tc.cleanup();
+        sendResponse({ status: resp.type === 'opaque' ? 1 : resp.status, type: resp.type });
+      })
+      .catch(function (e) {
+        tc.cleanup();
+        sendResponse({ error: e.message, status: 0 });
+      });
+    return true;
+  },
+
+  FETCH_WAF_PROBE: function (msg, _sender, sendResponse) {
+    var v = validateProbeUrl(msg.url);
+    if (v.error) { sendResponse({ error: v.error }); return true; }
+    if (!isAllowedUrl(v.parsed.href)) {
+      sendResponse({ error: 'URL not allowed (no private IPs)' });
+      return true;
+    }
+    var tc = createTimeoutController(msg.timeout || 8000);
+    fetch(v.parsed.href, {
+      method: msg.method || 'GET',
+      redirect: 'follow',
+      signal: tc.controller.signal,
+      credentials: 'omit',
+      headers: msg.headers || {},
+    })
+      .then(function (resp) {
+        tc.cleanup();
+        var result = {
+          status: resp.status,
+          statusText: resp.statusText,
+          headers: collectHeaders(resp),
+          redirected: resp.redirected,
+          url: resp.url,
+        };
+        return resp.text().then(function (body) {
+          result.body = body.length > 50000 ? body.substring(0, 50000) : body;
+          return result;
+        }).catch(function () { result.body = ''; return result; });
+      })
+      .then(function (result) { sendResponse(result); })
+      .catch(function (e) {
+        tc.cleanup();
+        sendResponse({ error: e.message, status: 0 });
+      });
+    return true;
+  },
+
+  FETCH_IMAGE: function (msg, _sender, sendResponse) {
+    if (!isAllowedUrl(msg.url)) {
+      sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
+    } else {
+      fetchImage(msg.url)
+        .then(function (result) {
+          sendResponse(result.success ? { data: result.data } : { error: result.error });
         })
-          .then(resp => {
-            clearTimeout(timer);
-            // no-cors mode: opaque response, status=0 means reachable, error means unreachable
-            sendResponse({ status: resp.type === 'opaque' ? 1 : resp.status, type: resp.type });
-          })
-          .catch(e => {
-            clearTimeout(timer);
-            sendResponse({ error: e.message, status: 0 });
-          });
-      }
-      return true;
+        .catch(function (e) { sendResponse({ error: e.message || 'image fetch failed' }); });
+    }
+    return true;
+  },
 
-    case 'FETCH_WAF_PROBE':
-      // WAF probe: background fetch without cookies/session to trigger WAF blocks
-      {
-        let probeUrl;
-        try {
-          probeUrl = new URL(message.url);
-          if (probeUrl.protocol !== 'http:' && probeUrl.protocol !== 'https:') {
-            sendResponse({ error: 'Invalid protocol' });
-            return true;
-          }
-        } catch {
-          sendResponse({ error: 'Invalid URL' });
-          return true;
-        }
-        if (!isAllowedUrl(probeUrl.href)) {
-          sendResponse({ error: 'URL not allowed (no private IPs)' });
-          return true;
-        }
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), message.timeout || 8000);
-        fetch(probeUrl.href, {
-          method: message.method || 'GET',
-          redirect: 'follow',
-          signal: controller.signal,
-          credentials: 'omit',
-          headers: message.headers || {},
-        })
-          .then(async resp => {
-            clearTimeout(timer);
-            const hdrs = {};
-            resp.headers.forEach((v, k) => {
-              hdrs[k] = v;
-            });
-            const result = {
-              status: resp.status,
-              statusText: resp.statusText,
-              headers: hdrs,
-              redirected: resp.redirected,
-              url: resp.url,
-            };
-            try {
-              const body = await resp.text();
-              result.body = body.length > 50000 ? body.substring(0, 50000) : body;
-            } catch {
-              result.body = '';
-            }
-            sendResponse(result);
-          })
-          .catch(e => {
-            clearTimeout(timer);
-            sendResponse({ error: e.message, status: 0 });
-          });
-      }
-      return true;
+  VK_RUOYI_HOOK_EVENT: function (msg, _sender, _sendResponse) {
+    chrome.storage.local
+      .set({
+        __vk_ruoyi_event: {
+          event: msg.event,
+          augmented: msg.augmented || false,
+          ts: Date.now(),
+        },
+      })
+      .catch(function (e) {
+        console.debug('analytics event send failed', e);
+      });
+    return false;
+  },
 
-    case 'FETCH_IMAGE':
-      if (!isAllowedUrl(message.url)) {
-        sendResponse({ error: 'URL not allowed (must be http/https, no private IPs)' });
-      } else {
-        fetchImage(message.url)
-          .then(result => {
-            sendResponse(result.success ? { data: result.data } : { error: result.error });
-          })
-          .catch(e => sendResponse({ error: e.message || 'image fetch failed' }));
-      }
-      return true;
-
-    case 'VK_RUOYI_HOOK_EVENT':
-      chrome.storage.local
-        .set({
-          __vk_ruoyi_event: {
-            event: message.event,
-            augmented: message.augmented || false,
-            ts: Date.now(),
-          },
-        })
-        .catch(function (e) {
-          console.debug('analytics event send failed', e);
-        });
-      return false;
-
-    case 'REGISTER_RUOYI_HOOK':
-      if (message.origin) {
-        registerRuoYiHook(message.origin).then(function () {
-          sendResponse({ success: true });
-        });
-      } else {
-        sendResponse({ success: false, error: 'Missing origin' });
-      }
-      return true;
-
-    case 'UNREGISTER_RUOYI_HOOK':
-      unregisterRuoYiHook().then(function () {
+  REGISTER_RUOYI_HOOK: function (msg, _sender, sendResponse) {
+    if (msg.origin) {
+      registerRuoYiHook(msg.origin).then(function () {
         sendResponse({ success: true });
       });
-      return true;
+    } else {
+      sendResponse({ success: false, error: 'Missing origin' });
+    }
+    return true;
+  },
 
-    default:
-      return false;
-  }
+  UNREGISTER_RUOYI_HOOK: function (_msg, _sender, sendResponse) {
+    unregisterRuoYiHook().then(function () {
+      sendResponse({ success: true });
+    });
+    return true;
+  },
+};
+
+chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+  if (!message || !message.type) return false;
+  var handler = handlers[message.type];
+  if (!handler) return false;
+  return handler(message, sender, sendResponse);
 });
 
 // ====== RuoYi Route Hook auto re-injection ======
@@ -759,12 +693,16 @@ async function unregisterRuoYiHook() {
   }
 }
 
+function restoreRuoYiHook() {
+  chrome.storage.local.get(['ruoyiHookEnabled', 'ruoyiHookOrigin'], function (result) {
+    if (result.ruoyiHookEnabled && result.ruoyiHookOrigin) {
+      registerRuoYiHook(result.ruoyiHookOrigin);
+    }
+  });
+}
+
 // Restore hook content script on service worker startup
-chrome.storage.local.get(['ruoyiHookEnabled', 'ruoyiHookOrigin'], function (result) {
-  if (result.ruoyiHookEnabled && result.ruoyiHookOrigin) {
-    registerRuoYiHook(result.ruoyiHookOrigin);
-  }
-});
+restoreRuoYiHook();
 
 // Clean up tab-specific tracking when tab closes (hook persists for the origin)
 chrome.tabs.onRemoved.addListener(function (tabId) {
@@ -809,12 +747,7 @@ function createContextMenus() {
 
 chrome.runtime.onInstalled.addListener(function () {
   createContextMenus();
-  // Restore RuoYi hook content script if it was active
-  chrome.storage.local.get(['ruoyiHookEnabled', 'ruoyiHookOrigin'], function (result) {
-    if (result.ruoyiHookEnabled && result.ruoyiHookOrigin) {
-      registerRuoYiHook(result.ruoyiHookOrigin);
-    }
-  });
+  restoreRuoYiHook();
 });
 
 // Rebuild menus when settings change
