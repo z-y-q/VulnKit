@@ -2,6 +2,7 @@
 <div class="panel" id="panel-redirect">
   <div class="panel-toolbar">
     <input type="text" id="redirect-url" class="panel-input" placeholder="目标 URL（自动填充当前页面）">
+    <input type="number" id="redirect-concurrency" class="panel-input-sm" value="5" min="1" max="20" title="并发数">
     <button class="panel-btn primary" id="redirect-scan-btn">开始扫描</button>
     <button class="panel-btn" id="redirect-stop-btn" style="display:none">停止</button>
   </div>
@@ -10,10 +11,22 @@
     <span class="progress-text" id="redirect-progress-text">0/0</span>
   </div>
   <div class="redirect-stats" id="redirect-stats" style="display:none"></div>
+  <div class="redirect-filter-row" id="redirect-filter-row">
+    <div class="redirect-filter-btns">
+      <button class="redirect-filter-btn active" data-filter="all">全部</button>
+      <button class="redirect-filter-btn" data-filter="vulnerable">可利用</button>
+      <button class="redirect-filter-btn" data-filter="safe">安全</button>
+    </div>
+    <input type="text" id="redirect-search" class="filter-search" placeholder="搜索参数/URL...">
+  </div>
   <div class="redirect-results" id="redirect-results">
     <div class="empty-state">点击「开始扫描」检测 URL 中的开放重定向漏洞</div>
   </div>
   <div class="panel-footer">
+    <select id="redirect-export-format" class="export-format-select">
+      <option value="txt">TXT</option>
+      <option value="csv">CSV</option>
+    </select>
     <button class="panel-btn" id="redirect-export-btn" style="display:none">导出结果</button>
   </div>
 </div>

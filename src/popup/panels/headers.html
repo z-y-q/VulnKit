@@ -15,10 +15,23 @@
     </div>
     <div class="headers-summary" id="headers-summary"></div>
   </div>
+  <div class="headers-filter-row" id="headers-filter-row">
+    <div class="headers-filter-btns">
+      <button class="headers-filter-btn active" data-filter="all">全部</button>
+      <button class="headers-filter-btn" data-filter="missing">缺失</button>
+      <button class="headers-filter-btn" data-filter="warn">警告</button>
+      <button class="headers-filter-btn" data-filter="pass">通过</button>
+    </div>
+    <input type="text" id="headers-search" class="filter-search" placeholder="搜索安全头...">
+  </div>
   <div class="headers-results" id="headers-results">
     <div class="empty-state">点击「扫描安全头」分析当前页面的 HTTP 安全响应头</div>
   </div>
   <div class="panel-footer">
+    <select id="headers-export-format" class="export-format-select">
+      <option value="txt">TXT</option>
+      <option value="csv">CSV</option>
+    </select>
     <button class="panel-btn" id="headers-export-btn" style="display:none">导出结果</button>
   </div>
 </div>

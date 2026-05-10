@@ -43,10 +43,26 @@ var ALL_ALGO_MAP = Object.assign({}, JWT_HMAC_MAP, JWT_RSA_MAP, JWT_ECDSA_MAP);
 
 var lastDecodedJwt = { header: null, payload: null, token: '' };
 
-var SENSITIVE_CLAIMS = ['email', 'password', 'secret', 'token', 'api_key', 'apikey', 'admin', 'role', 'privilege', 'credit_card', 'ssn', 'phone'];
+var SENSITIVE_CLAIMS = [
+  'email',
+  'password',
+  'secret',
+  'token',
+  'api_key',
+  'apikey',
+  'admin',
+  'role',
+  'privilege',
+  'credit_card',
+  'ssn',
+  'phone',
+];
 
 function pemToArrayBuffer(pem) {
-  var b64 = pem.replace(/-----BEGIN[^-]+-----/, '').replace(/-----END[^-]+-----/, '').replace(/\s/g, '');
+  var b64 = pem
+    .replace(/-----BEGIN[^-]+-----/, '')
+    .replace(/-----END[^-]+-----/, '')
+    .replace(/\s/g, '');
   var raw = atob(b64);
   var buf = new Uint8Array(raw.length);
   for (var i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
@@ -117,7 +133,13 @@ function detectAlgorithmConfusion(header, payload) {
     vulnerabilities.push({
       severity: 'medium',
       title: 'Token 已过期',
-      detail: 'exp=' + payload.exp + ' (' + new Date(payload.exp * 1000).toLocaleString('zh-CN') + ')，当前时间戳=' + now,
+      detail:
+        'exp=' +
+        payload.exp +
+        ' (' +
+        new Date(payload.exp * 1000).toLocaleString('zh-CN') +
+        ')，当前时间戳=' +
+        now,
     });
   }
 
@@ -133,7 +155,10 @@ function detectAlgorithmConfusion(header, payload) {
     vulnerabilities.push({
       severity: 'low',
       title: 'Token 有效期过长',
-      detail: '有效期超过 1 年（' + Math.round((payload.exp - payload.nbf) / 86400) + ' 天），建议缩短有效期。',
+      detail:
+        '有效期超过 1 年（' +
+        Math.round((payload.exp - payload.nbf) / 86400) +
+        ' 天），建议缩短有效期。',
     });
   }
 
@@ -156,9 +181,15 @@ function analyzeJwtClaims(header, payload) {
     var key = keys[k].toLowerCase();
     if (SENSITIVE_CLAIMS.indexOf(key) !== -1) {
       var val = payload[keys[k]];
-      var displayVal = typeof val === 'string' ? val.substring(0, 20) + (val.length > 20 ? '...' : '') : JSON.stringify(val);
+      var displayVal =
+        typeof val === 'string'
+          ? val.substring(0, 20) + (val.length > 20 ? '...' : '')
+          : JSON.stringify(val);
       findings.push({
-        severity: key === 'password' || key === 'secret' || key === 'credit_card' || key === 'ssn' ? 'high' : 'medium',
+        severity:
+          key === 'password' || key === 'secret' || key === 'credit_card' || key === 'ssn'
+            ? 'high'
+            : 'medium',
         title: '敏感 Claim: ' + keys[k],
         detail: 'Payload 包含敏感字段 "' + keys[k] + '"，值: ' + displayVal,
       });
@@ -166,7 +197,9 @@ function analyzeJwtClaims(header, payload) {
   }
 
   var registered = ['iss', 'sub', 'aud', 'exp', 'nbf', 'iat', 'jti'];
-  var privateClaims = keys.filter(function (k) { return registered.indexOf(k) === -1; });
+  var privateClaims = keys.filter(function (k) {
+    return registered.indexOf(k) === -1;
+  });
   if (privateClaims.length > 15) {
     findings.push({
       severity: 'low',
@@ -176,6 +209,113 @@ function analyzeJwtClaims(header, payload) {
   }
 
   return findings;
+}
+
+function buildTimeline(payload) {
+  var now = Math.floor(Date.now() / 1000);
+  var points = [];
+
+  if (payload.iat) points.push({ ts: payload.iat, label: 'iat 签发', type: 'info' });
+  if (payload.nbf)
+    points.push({ ts: payload.nbf, label: 'nbf 生效', type: payload.nbf <= now ? 'ok' : 'warn' });
+  if (payload.exp)
+    points.push({ ts: payload.exp, label: 'exp 过期', type: payload.exp < now ? 'danger' : 'ok' });
+
+  if (points.length < 2) return '';
+
+  points.sort(function (a, b) {
+    return a.ts - b.ts;
+  });
+  var minTs = points[0].ts;
+  var maxTs = points[points.length - 1].ts;
+  var range = maxTs - minTs;
+  if (range <= 0) range = 1;
+
+  var nowPct = Math.max(0, Math.min(100, ((now - minTs) / range) * 100));
+
+  var html = '<div class="jwt-timeline">';
+  html += '<div class="jwt-tl-bar">';
+  for (var i = 0; i < points.length; i++) {
+    var pct = ((points[i].ts - minTs) / range) * 100;
+    html +=
+      '<div class="jwt-tl-dot jwt-tl-' +
+      points[i].type +
+      '" style="left:' +
+      pct +
+      '%" title="' +
+      utils.escapeHtml(points[i].label) +
+      ' — ' +
+      new Date(points[i].ts * 1000).toLocaleString('zh-CN') +
+      '"></div>';
+  }
+  html += '<div class="jwt-tl-dot jwt-tl-now" style="left:' + nowPct + '%" title="当前时间"></div>';
+  html += '</div>';
+  html += '<div class="jwt-tl-labels">';
+  for (var j = 0; j < points.length; j++) {
+    var p = ((points[j].ts - minTs) / range) * 100;
+    var align = p < 30 ? 'left' : p > 70 ? 'right' : 'center';
+    html +=
+      '<div class="jwt-tl-label" style="left:' +
+      p +
+      '%;text-align:' +
+      align +
+      '">' +
+      utils.escapeHtml(points[j].label) +
+      '</div>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+function groupWarningsHtml(allWarnings) {
+  if (!allWarnings || allWarnings.length === 0) return '';
+  var groups = { critical: [], high: [], medium: [], low: [] };
+  var labels = { critical: '严重', high: '高危', medium: '中危', low: '低危' };
+  for (var i = 0; i < allWarnings.length; i++) {
+    var w = allWarnings[i];
+    if (groups[w.severity]) groups[w.severity].push(w);
+    else groups.low.push(w);
+  }
+  var html = '';
+  var keys = ['critical', 'high', 'medium', 'low'];
+  for (var k = 0; k < keys.length; k++) {
+    var key = keys[k];
+    if (groups[key].length === 0) continue;
+    html += '<div class="jwt-warn-group">';
+    html +=
+      '<div class="jwt-warn-group-title jwt-warn-' +
+      key +
+      '-title">' +
+      utils.escapeHtml(labels[key]) +
+      ' (' +
+      groups[key].length +
+      ')</div>';
+    for (var g = 0; g < groups[key].length; g++) {
+      var item = groups[key][g];
+      html += '<div class="jwt-warning-item ' + item.severity + '">';
+      html += '<strong>' + utils.escapeHtml(item.title) + '</strong>';
+      html += '<span>' + utils.escapeHtml(item.detail) + '</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  return html;
+}
+
+function copyJwtAll() {
+  if (!lastDecodedJwt.header || !lastDecodedJwt.payload) {
+    utils.showToast('请先解码 JWT', 'warning');
+    return;
+  }
+  var parts = lastDecodedJwt.token.split('.');
+  var text =
+    'Header:\n' +
+    JSON.stringify(lastDecodedJwt.header, null, 2) +
+    '\n\nPayload:\n' +
+    JSON.stringify(lastDecodedJwt.payload, null, 2) +
+    '\n\nSignature:\n' +
+    (parts[2] || '');
+  utils.copyAndToast(text, '已复制全部');
 }
 
 function decodeJwt(token) {
@@ -229,27 +369,54 @@ function decodeJwt(token) {
   if (payload.exp) {
     var expDate = new Date(payload.exp * 1000);
     var isExpired = payload.exp < now;
-    claimsHtml += '<div class="jwt-claim ' + (isExpired ? 'jwt-claim-expired' : 'jwt-claim-valid') + '"><span>过期时间 (exp)</span><span>' + expDate.toLocaleString('zh-CN') + (isExpired ? ' — 已过期' : ' — 有效') + '</span></div>';
+    claimsHtml +=
+      '<div class="jwt-claim ' +
+      (isExpired ? 'jwt-claim-expired' : 'jwt-claim-valid') +
+      '"><span>过期时间 (exp)</span><span>' +
+      expDate.toLocaleString('zh-CN') +
+      (isExpired ? ' — 已过期' : ' — 有效') +
+      '</span></div>';
   }
   if (payload.iat) {
-    claimsHtml += '<div class="jwt-claim"><span>签发时间 (iat)</span><span>' + new Date(payload.iat * 1000).toLocaleString('zh-CN') + '</span></div>';
+    claimsHtml +=
+      '<div class="jwt-claim"><span>签发时间 (iat)</span><span>' +
+      new Date(payload.iat * 1000).toLocaleString('zh-CN') +
+      '</span></div>';
   }
   if (payload.nbf) {
     var isNbfValid = payload.nbf <= now;
-    claimsHtml += '<div class="jwt-claim ' + (isNbfValid ? 'jwt-claim-valid' : 'jwt-claim-expired') + '"><span>生效时间 (nbf)</span><span>' + new Date(payload.nbf * 1000).toLocaleString('zh-CN') + (isNbfValid ? ' — 已生效' : ' — 尚未生效') + '</span></div>';
+    claimsHtml +=
+      '<div class="jwt-claim ' +
+      (isNbfValid ? 'jwt-claim-valid' : 'jwt-claim-expired') +
+      '"><span>生效时间 (nbf)</span><span>' +
+      new Date(payload.nbf * 1000).toLocaleString('zh-CN') +
+      (isNbfValid ? ' — 已生效' : ' — 尚未生效') +
+      '</span></div>';
   }
 
   if (payload.iss) {
-    claimsHtml += '<div class="jwt-claim"><span>签发者 (iss)</span><span>' + utils.escapeHtml(String(payload.iss)) + '</span></div>';
+    claimsHtml +=
+      '<div class="jwt-claim"><span>签发者 (iss)</span><span>' +
+      utils.escapeHtml(String(payload.iss)) +
+      '</span></div>';
   }
   if (payload.sub) {
-    claimsHtml += '<div class="jwt-claim"><span>主题 (sub)</span><span>' + utils.escapeHtml(String(payload.sub)) + '</span></div>';
+    claimsHtml +=
+      '<div class="jwt-claim"><span>主题 (sub)</span><span>' +
+      utils.escapeHtml(String(payload.sub)) +
+      '</span></div>';
   }
   if (payload.aud) {
-    claimsHtml += '<div class="jwt-claim"><span>受众 (aud)</span><span>' + utils.escapeHtml(JSON.stringify(payload.aud)) + '</span></div>';
+    claimsHtml +=
+      '<div class="jwt-claim"><span>受众 (aud)</span><span>' +
+      utils.escapeHtml(JSON.stringify(payload.aud)) +
+      '</span></div>';
   }
   if (payload.jti) {
-    claimsHtml += '<div class="jwt-claim"><span>JWT ID (jti)</span><span>' + utils.escapeHtml(String(payload.jti)) + '</span></div>';
+    claimsHtml +=
+      '<div class="jwt-claim"><span>JWT ID (jti)</span><span>' +
+      utils.escapeHtml(String(payload.jti)) +
+      '</span></div>';
   }
 
   claimsEl.innerHTML = claimsHtml;
@@ -258,16 +425,14 @@ function decodeJwt(token) {
   var claimFindings = analyzeJwtClaims(header, payload);
   var allWarnings = confusions.concat(claimFindings);
 
-  if (warningsEl && allWarnings.length > 0) {
-    var warnHtml = '';
-    for (var w = 0; w < allWarnings.length; w++) {
-      var warn = allWarnings[w];
-      warnHtml += '<div class="jwt-warning-item ' + warn.severity + '">';
-      warnHtml += '<strong>' + utils.escapeHtml(warn.title) + '</strong>';
-      warnHtml += '<span>' + utils.escapeHtml(warn.detail) + '</span>';
-      warnHtml += '</div>';
-    }
-    warningsEl.innerHTML = warnHtml;
+  var timelineEl = utils.get('jwt-timeline');
+  if (timelineEl) {
+    timelineEl.innerHTML = buildTimeline(payload);
+    timelineEl.style.display = '';
+  }
+
+  if (warningsEl) {
+    warningsEl.innerHTML = groupWarningsHtml(allWarnings);
   }
 
   resultEl.classList.remove('hidden');
@@ -447,4 +612,12 @@ function getFindings() {
   return findings;
 }
 
-export { decodeJwt, clearJwt, copyJwtHeader, copyJwtPayload, verifyJwtSignature, getFindings };
+export {
+  decodeJwt,
+  clearJwt,
+  copyJwtHeader,
+  copyJwtPayload,
+  copyJwtAll,
+  verifyJwtSignature,
+  getFindings,
+};

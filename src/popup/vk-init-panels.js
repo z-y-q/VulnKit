@@ -232,6 +232,7 @@ function initEncodingJwtCrypto(savedState) {
   utils.bindClick('jwt-clear-btn', jwt.clearJwt);
   utils.bindClick('jwt-copy-header-btn', jwt.copyJwtHeader);
   utils.bindClick('jwt-copy-payload-btn', jwt.copyJwtPayload);
+  utils.bindClick('jwt-copy-all-btn', jwt.copyJwtAll);
   utils.bindClick('jwt-verify-btn', jwt.verifyJwtSignature);
 
   utils.bindTabSwitch('crypto-algo-btn', 'algo', crypto.switchCryptoAlgo);
@@ -934,8 +935,25 @@ function initSecurityDetectors2() {
     });
 
     utils.bindClick('headers-export-btn', function () {
-      headers.exportHeadersResults();
+      var format = (utils.get('headers-export-format') || {}).value || 'txt';
+      headers.exportHeadersResults(format);
     });
+
+    var hFilterBtns = document.querySelectorAll('#headers-filter-row .headers-filter-btn');
+    for (var hi = 0; hi < hFilterBtns.length; hi++) {
+      hFilterBtns[hi].addEventListener('click', function () {
+        for (var hj = 0; hj < hFilterBtns.length; hj++) hFilterBtns[hj].classList.remove('active');
+        this.classList.add('active');
+        headers.setFilter(this.getAttribute('data-filter') || 'all');
+      });
+    }
+
+    var hSearch = utils.get('headers-search');
+    if (hSearch) {
+      hSearch.addEventListener('input', function () {
+        headers.setSearch(this.value);
+      });
+    }
   })();
 
   // --- Open Redirect ---
@@ -963,7 +981,8 @@ function initSecurityDetectors2() {
       if (progressEl) progressEl.style.display = 'flex';
 
       try {
-        var result = await redirect.scanRedirects(url, function (p) {
+        var concurrency = parseInt((utils.get('redirect-concurrency') || {}).value, 10) || 5;
+        var result = await redirect.scanRedirects(url, concurrency, function (p) {
           if (progressFill) progressFill.style.width = (p.completed / p.total) * 100 + '%';
           if (progressText) progressText.textContent = p.completed + '/' + p.total;
         });
@@ -979,8 +998,25 @@ function initSecurityDetectors2() {
     });
 
     utils.bindClick('redirect-export-btn', function () {
-      redirect.exportRedirectResults();
+      var format = (utils.get('redirect-export-format') || {}).value || 'txt';
+      redirect.exportRedirectResults(format);
     });
+
+    var filterBtns = document.querySelectorAll('#redirect-filter-row .redirect-filter-btn');
+    for (var fi = 0; fi < filterBtns.length; fi++) {
+      filterBtns[fi].addEventListener('click', function () {
+        for (var fj = 0; fj < filterBtns.length; fj++) filterBtns[fj].classList.remove('active');
+        this.classList.add('active');
+        redirect.setFilter(this.getAttribute('data-filter') || 'all');
+      });
+    }
+
+    var searchInput = utils.get('redirect-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        redirect.setSearch(this.value);
+      });
+    }
   })();
 
   // --- Directory Fuzzing ---
@@ -1028,7 +1064,14 @@ function initSecurityDetectors2() {
             }
           }
         );
-        if (result) fuzz.renderFuzzResults(result);
+        if (result) {
+          var filterRow = utils.get('fuzz-filter-row');
+          if (filterRow) filterRow.style.display = 'flex';
+          fuzz.renderFuzzResults(result);
+        }
+      } catch (e) {
+        console.debug('fuzz scan error:', e);
+        utils.showToast('扫描出错: ' + (e.message || e), 'error');
       } finally {
         if (startBtn) startBtn.style.display = '';
         if (pauseBtn) {
@@ -1049,8 +1092,25 @@ function initSecurityDetectors2() {
       fuzz.stopFuzzScan();
     });
 
+    var filterBtns = document.querySelectorAll('#fuzz-filter-row .fuzz-filter-btn');
+    for (var fi = 0; fi < filterBtns.length; fi++) {
+      filterBtns[fi].addEventListener('click', function () {
+        for (var fj = 0; fj < filterBtns.length; fj++) filterBtns[fj].classList.remove('active');
+        this.classList.add('active');
+        fuzz.setFilter(this.getAttribute('data-filter'));
+      });
+    }
+
+    var fuzzSearch = utils.get('fuzz-search');
+    if (fuzzSearch) {
+      fuzzSearch.addEventListener('input', function () {
+        fuzz.setSearch(this.value);
+      });
+    }
+
     utils.bindClick('fuzz-export-btn', function () {
-      fuzz.exportFuzzResults();
+      var format = (utils.get('fuzz-export-format') || {}).value || 'txt';
+      fuzz.exportFuzzResults(format);
     });
   })();
 }

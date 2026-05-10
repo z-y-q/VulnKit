@@ -24,6 +24,16 @@ var REDIRECT_PAYLOADS = [
   { param: 'logout', pattern: '?logout={URL}' },
   { param: 'login', pattern: '?login={URL}' },
   { param: 'ref', pattern: '?ref={URL}' },
+  { param: 'redirect_url', pattern: '?redirect_url={URL}' },
+  { param: 'target_url', pattern: '?target_url={URL}' },
+  { param: 'next_url', pattern: '?next_url={URL}' },
+  { param: 'redirection', pattern: '?redirection={URL}' },
+  { param: 'return_to', pattern: '?return_to={URL}' },
+  { param: 'returnPath', pattern: '?returnPath={URL}' },
+  { param: 'checkout_url', pattern: '?checkout_url={URL}' },
+  { param: 'success_url', pattern: '?success_url={URL}' },
+  { param: 'cancel_url', pattern: '?cancel_url={URL}' },
+  { param: 'origin', pattern: '?origin={URL}' },
 ];
 
 var PROTOCOL_VARIANTS = [
@@ -31,6 +41,12 @@ var PROTOCOL_VARIANTS = [
   '//evil.com',
   '/\\/evil.com',
   'https://evil.com',
+  'https:///evil.com',
+  '/evil.com',
+  '\\\\evil.com',
+  'http://evil.com',
+  'https://evil.com%00.example.com',
+  'javascript://evil.com',
 ];
 
 var TEST_DOMAIN = 'example.com';
@@ -40,6 +56,8 @@ var redirectState = {
   aborted: false,
   results: [],
   lastResults: null,
+  currentFilter: 'all',
+  currentSearch: '',
 };
 
 function buildTestUrls(baseUrl) {
@@ -62,41 +80,62 @@ function buildTestUrls(baseUrl) {
 
 function probeRedirect(testUrl) {
   return new Promise(function (resolve) {
-    chrome.runtime.sendMessage({ type: 'FETCH_PROBE', url: testUrl }, function (resp) {
-      if (chrome.runtime.lastError) {
-        resolve({ status: 0, headers: {}, body: '' });
-        return;
+    chrome.runtime.sendMessage(
+      { type: 'FETCH_PROBE', url: testUrl, includeBody: true },
+      function (resp) {
+        if (chrome.runtime.lastError) {
+          resolve({ status: 0, headers: {}, body: '', time: 0 });
+          return;
+        }
+        resolve(resp || { status: 0, headers: {}, body: '', time: 0 });
       }
-      resolve(resp || { status: 0, headers: {}, body: '' });
-    });
+    );
   });
+}
+
+function extractLocation(headers) {
+  if (!headers) return '';
+  if (Array.isArray(headers)) {
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i].name && headers[i].name.toLowerCase() === 'location') {
+        return headers[i].value || '';
+      }
+    }
+    return '';
+  }
+  if (typeof headers === 'object') {
+    return headers['location'] || headers['Location'] || '';
+  }
+  return '';
 }
 
 function isRedirectVulnerable(response, variant) {
   if (!response) return false;
 
   var status = response.status || 0;
+
   if (status >= 300 && status < 400) {
-    var location = '';
-    var headers = response.headers || {};
-    if (Array.isArray(headers)) {
-      for (var i = 0; i < headers.length; i++) {
-        if (headers[i].name && headers[i].name.toLowerCase() === 'location') {
-          location = headers[i].value || '';
-          break;
-        }
-      }
-    } else if (typeof headers === 'object') {
-      location = headers['location'] || headers['Location'] || '';
-    }
+    var location = extractLocation(response.headers);
     if (location.indexOf(TEST_DOMAIN) !== -1 || location.indexOf('evil.com') !== -1) {
+      return true;
+    }
+  }
+
+  if (response.redirected && response.url) {
+    var finalUrl = response.url;
+    if (finalUrl.indexOf('evil.com') !== -1 || finalUrl.indexOf(TEST_DOMAIN) !== -1) {
       return true;
     }
   }
 
   var body = response.body || response.responseText || '';
   if (body.indexOf('evil.com') !== -1 || body.indexOf(TEST_DOMAIN) !== -1) {
-    if (body.indexOf('http-equiv="refresh"') !== -1 || body.indexOf('location.replace') !== -1 || body.indexOf('location.href') !== -1 || body.indexOf('location =') !== -1) {
+    if (
+      body.indexOf('http-equiv="refresh"') !== -1 ||
+      body.indexOf('location.replace') !== -1 ||
+      body.indexOf('location.href') !== -1 ||
+      body.indexOf('location =') !== -1
+    ) {
       return true;
     }
   }
@@ -104,7 +143,11 @@ function isRedirectVulnerable(response, variant) {
   return false;
 }
 
-async function scanRedirects(baseUrl, onProgress) {
+function delay(ms) {
+  return new Promise(function (resolve) { setTimeout(resolve, ms); });
+}
+
+async function scanRedirects(baseUrl, concurrency, onProgress) {
   if (redirectState.scanning) return null;
   redirectState.scanning = true;
   redirectState.aborted = false;
@@ -117,50 +160,64 @@ async function scanRedirects(baseUrl, onProgress) {
     var vulnerable = [];
     var safe = [];
     var errors = [];
+    var batchSize = concurrency || 5;
 
-    for (var i = 0; i < tests.length; i++) {
+    for (var i = 0; i < tests.length; i += batchSize) {
       if (redirectState.aborted) break;
 
-      var test = tests[i];
-      var response;
-      try {
-        response = await probeRedirect(test.url);
-      } catch (e) {
-        errors.push(Object.assign({}, test, { error: e.message }));
-        completed++;
-        if (onProgress) onProgress({ completed: completed, total: total, vulnerable: vulnerable.length, safe: safe.length });
-        continue;
+      var batch = tests.slice(i, Math.min(i + batchSize, tests.length));
+      var promises = [];
+
+      for (var b = 0; b < batch.length; b++) {
+        promises.push(
+          probeRedirect(batch[b].url).catch(function (e) {
+            return { _error: e.message };
+          })
+        );
       }
 
-      var isVuln = isRedirectVulnerable(response, test.variant);
-      if (isVuln) {
-        var vulnEntry = {
-          param: test.param,
-          variant: test.variant,
-          url: test.url,
-          status: response.status || 0,
-          location: '',
-        };
-        var respHeaders = response.headers || {};
-        if (Array.isArray(respHeaders)) {
-          for (var h = 0; h < respHeaders.length; h++) {
-            if (respHeaders[h].name && respHeaders[h].name.toLowerCase() === 'location') {
-              vulnEntry.location = respHeaders[h].value || '';
-              break;
-            }
+      var batchResults = await Promise.all(promises);
+
+      for (var r = 0; r < batchResults.length; r++) {
+        var test = batch[r];
+        var response = batchResults[r];
+
+        if (response._error) {
+          errors.push(Object.assign({}, test, { error: response._error }));
+        } else {
+          var isVuln = isRedirectVulnerable(response, test.variant);
+          if (isVuln) {
+            var vulnEntry = {
+              param: test.param,
+              variant: test.variant,
+              url: test.url,
+              status: response.status || 0,
+              location: extractLocation(response.headers),
+            };
+            vulnerable.push(vulnEntry);
+            redirectState.results.push(Object.assign({}, vulnEntry, { type: 'vulnerable' }));
+          } else {
+            safe.push({ param: test.param, variant: test.variant, status: response.status || 0 });
+            redirectState.results.push(
+              Object.assign({}, test, { type: 'safe', status: response.status || 0 })
+            );
           }
-        } else if (typeof respHeaders === 'object') {
-          vulnEntry.location = respHeaders['location'] || respHeaders['Location'] || '';
         }
-        vulnerable.push(vulnEntry);
-        redirectState.results.push(Object.assign({}, vulnEntry, { type: 'vulnerable' }));
-      } else {
-        safe.push({ param: test.param, variant: test.variant });
-        redirectState.results.push(Object.assign({}, test, { type: 'safe', status: response.status || 0 }));
+
+        completed++;
+        if (onProgress) {
+          onProgress({
+            completed: completed,
+            total: total,
+            vulnerable: vulnerable.length,
+            safe: safe.length,
+          });
+        }
       }
 
-      completed++;
-      if (onProgress) onProgress({ completed: completed, total: total, vulnerable: vulnerable.length, safe: safe.length });
+      if (i + batchSize < tests.length) {
+        await delay(150);
+      }
     }
 
     redirectState.lastResults = {
@@ -180,6 +237,28 @@ function stopRedirectScan() {
   redirectState.aborted = true;
 }
 
+function setFilter(filter) {
+  redirectState.currentFilter = filter;
+  if (redirectState.lastResults) renderRedirectResults(redirectState.lastResults);
+}
+
+function setSearch(query) {
+  redirectState.currentSearch = (query || '').toLowerCase();
+  if (redirectState.lastResults) renderRedirectResults(redirectState.lastResults);
+}
+
+function applyFilter(item) {
+  var f = redirectState.currentFilter;
+  if (f === 'vulnerable' && item.type !== 'vulnerable') return false;
+  if (f === 'safe' && item.type !== 'safe') return false;
+  var q = redirectState.currentSearch;
+  if (q) {
+    var text = ((item.param || '') + ' ' + (item.variant || '') + ' ' + (item.url || '') + ' ' + (item.location || '')).toLowerCase();
+    return text.indexOf(q) !== -1;
+  }
+  return true;
+}
+
 function renderRedirectResults(result) {
   var container = utils.get('redirect-results');
   var statsEl = utils.get('redirect-stats');
@@ -193,43 +272,92 @@ function renderRedirectResults(result) {
       '<span>总计: ' + result.total + '</span>' +
       '<span class="stat-badge stat-vuln">可利用: ' + result.vulnerable.length + '</span>' +
       '<span class="stat-badge stat-safe">安全: ' + result.safe.length + '</span>' +
-      (result.errors.length > 0 ? '<span class="stat-badge stat-error">错误: ' + result.errors.length + '</span>' : '');
+      (result.errors.length > 0
+        ? '<span class="stat-badge stat-error">错误: ' + result.errors.length + '</span>'
+        : '');
+  }
+
+  var filtered = redirectState.results.filter(applyFilter);
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-state">无匹配结果</div>';
+    if (exportBtn) exportBtn.style.display = '';
+    return;
   }
 
   var html = '';
   var seenParams = {};
-  for (var i = 0; i < result.vulnerable.length; i++) {
-    var v = result.vulnerable[i];
-    if (seenParams[v.param]) continue;
-    seenParams[v.param] = true;
+  for (var i = 0; i < filtered.length; i++) {
+    var item = filtered[i];
+    if (item.type === 'vulnerable' && seenParams[item.param]) continue;
+    if (item.type === 'vulnerable') seenParams[item.param] = true;
+
     html += '<div class="redirect-item">';
-    html += '<div><span class="redirect-param">' + utils.escapeHtml(v.param) + '</span>';
-    html += '<span class="redirect-status vulnerable">可利用</span></div>';
-    html += '<div class="redirect-payload">' + utils.escapeHtml(v.url) + '</div>';
-    if (v.location) {
-      html += '<div class="redirect-payload">Location: ' + utils.escapeHtml(v.location) + '</div>';
+    html += '<div class="redirect-item-header">';
+    html += '<span class="redirect-param">' + utils.escapeHtml(item.param) + '</span>';
+    if (item.type === 'vulnerable') {
+      html += '<span class="redirect-status vulnerable">可利用</span>';
+    } else {
+      html += '<span class="redirect-status safe">安全 [' + (item.status || '-') + ']</span>';
     }
     html += '</div>';
-  }
-
-  if (result.vulnerable.length === 0) {
-    html += '<div class="empty-state">未发现开放重定向漏洞</div>';
+    html += '<div class="redirect-variant">变体: ' + utils.escapeHtml(item.variant) + '</div>';
+    html += '<div class="redirect-payload">' + utils.escapeHtml(item.url) + '</div>';
+    if (item.location) {
+      html += '<div class="redirect-location">Location: ' + utils.escapeHtml(item.location) + '</div>';
+    }
+    html += '</div>';
   }
 
   container.innerHTML = html;
   if (exportBtn) exportBtn.style.display = '';
 }
 
-function exportRedirectResults() {
+function exportTxt() {
   if (!redirectState.lastResults) return;
   var r = redirectState.lastResults;
-  var lines = ['开放重定向检测报告', '=', '目标: ' + r.url, '可利用: ' + r.vulnerable.length + ' | 安全: ' + r.safe.length + ' | 错误: ' + r.errors.length, ''];
+  var lines = [
+    '开放重定向检测报告',
+    '==================',
+    '目标: ' + r.url,
+    '可利用: ' + r.vulnerable.length + ' | 安全: ' + r.safe.length + ' | 错误: ' + r.errors.length,
+    '',
+  ];
   for (var i = 0; i < r.vulnerable.length; i++) {
     var v = r.vulnerable[i];
     lines.push('[可利用] ' + v.param + ' -> ' + v.url);
     if (v.location) lines.push('  Location: ' + v.location);
   }
   utils.downloadBlob(new Blob([lines.join('\n')], { type: 'text/plain' }), 'redirect-scan-' + Date.now() + '.txt');
+  utils.showToast('TXT 报告已导出', 'success');
+}
+
+function exportCsv() {
+  if (!redirectState.lastResults) return;
+  var r = redirectState.lastResults;
+  var rows = [['Parameter', 'Variant', 'URL', 'Status', 'Location', 'Type']];
+  for (var i = 0; i < r.vulnerable.length; i++) {
+    var v = r.vulnerable[i];
+    rows.push([v.param, v.variant, v.url, v.status, v.location, 'vulnerable']);
+  }
+  for (var j = 0; j < r.safe.length; j++) {
+    var s = r.safe[j];
+    rows.push([s.param, s.variant, '', s.status, '', 'safe']);
+  }
+  for (var k = 0; k < r.errors.length; k++) {
+    var e = r.errors[k];
+    rows.push([e.param, e.variant, '', 0, e.error || '', 'error']);
+  }
+  utils.downloadBlob(new Blob([utils.buildCsv(rows)], { type: 'text/csv;charset=utf-8' }), 'redirect-scan-' + Date.now() + '.csv');
+  utils.showToast('CSV 报告已导出', 'success');
+}
+
+function exportRedirectResults(format) {
+  if (format === 'csv') {
+    exportCsv();
+  } else {
+    exportTxt();
+  }
 }
 
 function getFindings() {
@@ -251,4 +379,13 @@ function getFindings() {
   return findings;
 }
 
-export { redirectState, scanRedirects, stopRedirectScan, renderRedirectResults, exportRedirectResults, getFindings };
+export {
+  redirectState,
+  scanRedirects,
+  stopRedirectScan,
+  renderRedirectResults,
+  exportRedirectResults,
+  getFindings,
+  setFilter,
+  setSearch,
+};

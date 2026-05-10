@@ -409,22 +409,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ error: 'Invalid URL' });
           return true;
         }
-        if (sender.tab && sender.tab.url) {
-          try {
-            const senderOrigin = new URL(sender.tab.url).origin;
-            if (
-              probeUrl.origin !== senderOrigin &&
-              probeUrl.hostname !== new URL(sender.tab.url).hostname
-            ) {
-              sendResponse({ error: 'Origin mismatch' });
-              return true;
-            }
-          } catch (e) {
-            console.debug('URL origin check failed', e);
-          }
-        }
+        // No origin check for FETCH_PROBE — user-initiated pentesting tool
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), message.timeout || 5000);
+        const t0 = performance.now();
         fetch(probeUrl.href, {
           method: message.method || 'GET',
           redirect: message.followRedirect !== false ? 'follow' : 'manual',
@@ -433,6 +421,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         })
           .then(async resp => {
             clearTimeout(timer);
+            const elapsed = Math.round(performance.now() - t0);
             const hdrs = {};
             resp.headers.forEach((v, k) => {
               hdrs[k] = v;
@@ -443,6 +432,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               headers: hdrs,
               redirected: resp.redirected,
               url: resp.url,
+              time: elapsed,
             };
             if (message.includeBody && resp.status >= 200 && resp.status < 300) {
               try {
@@ -455,7 +445,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           })
           .catch(e => {
             clearTimeout(timer);
-            sendResponse({ error: e.message, status: 0 });
+            sendResponse({ error: e.message, status: 0, body: '', headers: {}, time: 0 });
           });
       }
       return true;

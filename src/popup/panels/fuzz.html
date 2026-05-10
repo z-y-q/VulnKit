@@ -18,10 +18,24 @@
     <span class="progress-text" id="fuzz-progress-text">0/0</span>
   </div>
   <div class="fuzz-stats" id="fuzz-stats" style="display:none"></div>
+  <div class="fuzz-filter-row" id="fuzz-filter-row" style="display:none">
+    <div class="fuzz-filter-btns">
+      <button class="fuzz-filter-btn active" data-filter="all">全部</button>
+      <button class="fuzz-filter-btn" data-filter="2xx">2xx</button>
+      <button class="fuzz-filter-btn" data-filter="3xx">3xx</button>
+      <button class="fuzz-filter-btn" data-filter="403">403</button>
+      <button class="fuzz-filter-btn" data-filter="interesting">感兴趣的</button>
+    </div>
+    <input type="text" id="fuzz-search" class="filter-search" placeholder="搜索路径...">
+  </div>
   <div class="fuzz-results" id="fuzz-results">
     <div class="empty-state">输入目标 URL，选择字典后开始目录扫描</div>
   </div>
   <div class="panel-footer">
+    <select id="fuzz-export-format" class="export-format-select">
+      <option value="txt">TXT</option>
+      <option value="csv">CSV</option>
+    </select>
     <button class="panel-btn" id="fuzz-export-btn" style="display:none">导出结果</button>
   </div>
 </div>

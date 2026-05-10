@@ -77,6 +77,17 @@ var DEFAULT_WORDLISTS = {
   ],
 };
 
+var CONTENT_PATTERNS = [
+  { regex: /<title[^>]*>(.*?)<\/title>/i, tag: 'HTML 页面', group: 'title' },
+  { regex: /(?:login|sign.?in|登录|authenticat)/i, tag: '登录页面', group: 'feature' },
+  { regex: /(?:admin|管理|dashboard|控制台|后台)/i, tag: '管理界面', group: 'feature' },
+  { regex: /(?:api|endpoint|swagger|openapi)/i, tag: 'API 接口', group: 'feature' },
+  { regex: /(?:error|exception|stack.?trace|错误)/i, tag: '错误信息', group: 'feature' },
+  { regex: /(?:config|配置|setting|参数)/i, tag: '配置信息', group: 'feature' },
+  { regex: /(?:database|mysql|postgres|mongodb|redis)/i, tag: '数据库', group: 'feature' },
+  { regex: /(?:password|passwd|secret|token|key=)/i, tag: '敏感信息', group: 'feature' },
+];
+
 var fuzzState = {
   scanning: false,
   paused: false,
@@ -84,7 +95,42 @@ var fuzzState = {
   results: [],
   lastResults: null,
   stats: { total: 0, completed: 0, found: 0, errors: 0 },
+  currentFilter: 'all',
+  currentSearch: '',
 };
+
+function extractHeader(headers, name) {
+  if (!headers) return '';
+  if (Array.isArray(headers)) {
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i].name && headers[i].name.toLowerCase() === name) return headers[i].value || '';
+    }
+    return '';
+  }
+  return headers[name] || headers[name.toLowerCase()] || '';
+}
+
+function extractContentLength(headers) {
+  var val = extractHeader(headers, 'content-length');
+  return val ? parseInt(val, 10) : 0;
+}
+
+function analyzeContent(body) {
+  if (!body || body.length < 10) return null;
+  var result = { title: '', tags: [] };
+  for (var i = 0; i < CONTENT_PATTERNS.length; i++) {
+    var pat = CONTENT_PATTERNS[i];
+    var match = body.match(pat.regex);
+    if (match) {
+      if (pat.group === 'title') {
+        result.title = match[1] ? match[1].trim().substring(0, 100) : '';
+      } else {
+        if (result.tags.indexOf(pat.tag) === -1) result.tags.push(pat.tag);
+      }
+    }
+  }
+  return result;
+}
 
 function probePath(fullUrl) {
   return new Promise(function (resolve) {
@@ -93,7 +139,21 @@ function probePath(fullUrl) {
         resolve({ status: 0, body: '', headers: {}, time: 0 });
         return;
       }
-      resolve(resp || { status: 0, body: '', headers: {}, time: 0 });
+      if (resp && resp.status === 405) {
+        chrome.runtime.sendMessage({ type: 'FETCH_PROBE', url: fullUrl, method: 'GET', includeBody: true }, function (getResp) {
+          if (chrome.runtime.lastError) {
+            resolve({ status: 405, body: '', headers: resp.headers || {}, time: 0, _method: 'HEAD' });
+            return;
+          }
+          var r = getResp || { status: 0, body: '', headers: {}, time: 0 };
+          r._method = 'GET';
+          resolve(r);
+        });
+        return;
+      }
+      var r = resp || { status: 0, body: '', headers: {}, time: 0 };
+      r._method = 'HEAD';
+      resolve(r);
     });
   });
 }
@@ -115,9 +175,9 @@ async function runFuzzScan(baseUrl, wordlistKey, concurrency, onProgress, onResu
     var cleanBase = baseUrl.replace(/\/+$/, '');
     var total = words.length;
     fuzzState.stats.total = total;
-
     var batchSize = concurrency || 5;
     var batchDelay = 200;
+    var seenKeys = {};
 
     for (var i = 0; i < words.length; i += batchSize) {
       if (fuzzState.aborted) break;
@@ -134,10 +194,8 @@ async function runFuzzScan(baseUrl, wordlistKey, concurrency, onProgress, onResu
         var path = batch[b];
         var fullUrl = cleanBase + path;
         promises.push(
-          probePath(fullUrl).then(function (resp) {
-            return resp;
-          }).catch(function () {
-            return { status: 0, body: '', headers: {}, time: 0 };
+          probePath(fullUrl).catch(function () {
+            return { status: 0, body: '', headers: {}, time: 0, _method: 'HEAD' };
           })
         );
       }
@@ -149,15 +207,34 @@ async function runFuzzScan(baseUrl, wordlistKey, concurrency, onProgress, onResu
         var response = batchResults[r];
         var status = response.status || 0;
         var bodyLen = (response.body || '').length;
+        var headerCL = extractContentLength(response.headers);
+        var size = bodyLen > 0 ? bodyLen : headerCL;
         var time = response.time || 0;
+        var method = response._method || 'HEAD';
 
+        var content = method === 'GET' ? analyzeContent(response.body) : null;
+        var title = content ? content.title : '';
+        var tags = content ? content.tags : [];
+
+        var dedupKey = status + ':' + size;
         var entry = {
           path: path,
           status: status,
-          size: bodyLen,
+          size: size,
           time: time,
           url: cleanBase + path,
+          method: method,
+          title: title,
+          tags: tags,
+          interesting: title.length > 0 || tags.length > 0,
         };
+
+        if (seenKeys[dedupKey]) {
+          entry.duplicate = true;
+          entry.duplicateOf = seenKeys[dedupKey];
+        } else if (status > 0 && status !== 404) {
+          seenKeys[dedupKey] = path;
+        }
 
         fuzzState.stats.completed++;
         fuzzState.results.push(entry);
@@ -199,6 +276,31 @@ function stopFuzzScan() {
   fuzzState.aborted = true;
 }
 
+function setFilter(filter) {
+  fuzzState.currentFilter = filter;
+  if (fuzzState.lastResults) renderFuzzResults(fuzzState.lastResults);
+}
+
+function setSearch(query) {
+  fuzzState.currentSearch = (query || '').toLowerCase();
+  if (fuzzState.lastResults) renderFuzzResults(fuzzState.lastResults);
+}
+
+function applyFuzzFilter(item) {
+  if (item.status <= 0 || item.status === 404) return false;
+  var f = fuzzState.currentFilter;
+  if (f === '2xx' && (item.status < 200 || item.status >= 300)) return false;
+  if (f === '3xx' && (item.status < 300 || item.status >= 400)) return false;
+  if (f === '403' && item.status !== 403) return false;
+  if (f === 'interesting' && !item.interesting) return false;
+  var q = fuzzState.currentSearch;
+  if (q) {
+    var text = ((item.path || '') + ' ' + (item.title || '') + ' ' + (item.tags || []).join(' ')).toLowerCase();
+    return text.indexOf(q) !== -1;
+  }
+  return true;
+}
+
 function renderFuzzResults(result) {
   var container = utils.get('fuzz-results');
   var statsEl = utils.get('fuzz-stats');
@@ -215,9 +317,11 @@ function renderFuzzResults(result) {
       (s.errors > 0 ? '<span>错误: ' + s.errors + '</span>' : '');
   }
 
-  var found = result.results.filter(function (r) { return r.status > 0 && r.status !== 404; });
+  var found = result.results.filter(applyFuzzFilter);
+
   if (found.length === 0) {
-    container.innerHTML = '<div class="empty-state">未发现有效路径</div>';
+    container.innerHTML = '<div class="empty-state">无匹配结果</div>';
+    if (exportBtn) exportBtn.style.display = '';
     return;
   }
 
@@ -233,30 +337,74 @@ function renderFuzzResults(result) {
     if (r.status >= 200 && r.status < 300) statusClass = 's-200';
     else if (r.status >= 300 && r.status < 400) statusClass = r.status === 301 ? 's-301' : 's-302';
     else if (r.status === 403) statusClass = 's-403';
-    else if (r.status === 404) statusClass = 's-404';
     else if (r.status >= 500) statusClass = 's-500';
 
-    html += '<div class="fuzz-item">';
+    var dupClass = r.duplicate ? ' fuzz-item-duplicate' : '';
+    var interestClass = r.interesting ? ' fuzz-item-interesting' : '';
+
+    html += '<div class="fuzz-item' + dupClass + interestClass + '">';
     html += '<span class="fuzz-path">' + utils.escapeHtml(r.path) + '</span>';
     html += '<span class="fuzz-status-code ' + statusClass + '">' + r.status + '</span>';
     html += '<span class="fuzz-size">' + (r.size > 1024 ? (r.size / 1024).toFixed(1) + 'K' : r.size + 'B') + '</span>';
     html += '<span class="fuzz-time">' + r.time + 'ms</span>';
     html += '</div>';
+
+    if (r.title) {
+      html += '<div class="fuzz-item-title">Title: ' + utils.escapeHtml(r.title) + '</div>';
+    }
+    if (r.tags.length > 0) {
+      html += '<div class="fuzz-item-tags">';
+      for (var t = 0; t < r.tags.length; t++) {
+        html += '<span class="fuzz-tag">' + utils.escapeHtml(r.tags[t]) + '</span>';
+      }
+      html += '</div>';
+    }
+    if (r.method === 'GET') {
+      html += '<div class="fuzz-item-method">GET (HEAD 405 fallback)</div>';
+    }
   }
+
   container.innerHTML = html;
   if (exportBtn) exportBtn.style.display = '';
 }
 
-function exportFuzzResults() {
+function exportTxt() {
   if (!fuzzState.lastResults) return;
   var r = fuzzState.lastResults;
   var found = r.results.filter(function (e) { return e.status > 0 && e.status !== 404; });
-  var lines = ['目录扫描报告', '=', '目标: ' + r.url, '字典: ' + r.wordlist, '发现: ' + found.length, ''];
+  var lines = ['目录扫描报告', '==================', '目标: ' + r.url, '字典: ' + r.wordlist, '发现: ' + found.length, ''];
   for (var i = 0; i < found.length; i++) {
     var e = found[i];
-    lines.push('[' + e.status + '] ' + e.path + ' (' + e.size + 'B, ' + e.time + 'ms)');
+    var line = '[' + e.status + '] ' + e.path + ' (' + e.size + 'B, ' + e.time + 'ms';
+    if (e.method === 'GET') line += ', GET)';
+    else line += ')';
+    lines.push(line);
+    if (e.title) lines.push('  Title: ' + e.title);
+    if (e.tags.length > 0) lines.push('  Tags: ' + e.tags.join(', '));
   }
   utils.downloadBlob(new Blob([lines.join('\n')], { type: 'text/plain' }), 'fuzz-scan-' + Date.now() + '.txt');
+  utils.showToast('TXT 报告已导出', 'success');
+}
+
+function exportCsv() {
+  if (!fuzzState.lastResults) return;
+  var r = fuzzState.lastResults;
+  var found = r.results.filter(function (e) { return e.status > 0 && e.status !== 404; });
+  var rows = [['Path', 'Status', 'Size', 'Time(ms)', 'Method', 'Title', 'Tags']];
+  for (var i = 0; i < found.length; i++) {
+    var e = found[i];
+    rows.push([e.path, String(e.status), String(e.size), String(e.time), e.method, e.title, (e.tags || []).join(', ')]);
+  }
+  utils.downloadBlob(new Blob([utils.buildCsv(rows)], { type: 'text/csv;charset=utf-8' }), 'fuzz-scan-' + Date.now() + '.csv');
+  utils.showToast('CSV 报告已导出', 'success');
+}
+
+function exportFuzzResults(format) {
+  if (format === 'csv') {
+    exportCsv();
+  } else {
+    exportTxt();
+  }
 }
 
 function getFindings() {
@@ -278,10 +426,13 @@ function getFindings() {
     } else {
       severity = 'low';
     }
+    var detail = '状态码 ' + r.status + ' | 大小 ' + r.size + 'B | 响应时间 ' + r.time + 'ms';
+    if (r.title) detail += ' | Title: ' + r.title;
+    if (r.tags.length > 0) detail += ' | ' + r.tags.join(', ');
     findings.push({
       severity: severity,
       title: '目录发现: ' + r.path,
-      detail: '状态码 ' + r.status + ' | 大小 ' + r.size + 'B | 响应时间 ' + r.time + 'ms',
+      detail: detail,
       module: 'fuzz',
       url: fuzzState.lastResults.url + r.path,
     });
@@ -289,4 +440,15 @@ function getFindings() {
   return findings;
 }
 
-export { DEFAULT_WORDLISTS, fuzzState, runFuzzScan, pauseFuzzScan, stopFuzzScan, renderFuzzResults, exportFuzzResults, getFindings };
+export {
+  DEFAULT_WORDLISTS,
+  fuzzState,
+  runFuzzScan,
+  pauseFuzzScan,
+  stopFuzzScan,
+  renderFuzzResults,
+  exportFuzzResults,
+  getFindings,
+  setFilter,
+  setSearch,
+};
