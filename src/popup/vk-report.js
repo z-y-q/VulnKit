@@ -249,22 +249,14 @@ function renderReport(findings) {
     var sevKeys = ['critical', 'high', 'medium', 'low', 'info'];
     for (var s = 0; s < sevKeys.length; s++) {
       var sk = sevKeys[s];
-      if (summary[sk] > 0) {
-        html +=
-          '<div class="report-severity-card" style="background:' +
-          SEV_BG[sk] +
-          ';border-left:3px solid ' +
-          SEV_COLORS[sk] +
-          '">' +
-          '<div class="report-severity-count" style="color:' +
-          SEV_COLORS[sk] +
-          '">' +
-          summary[sk] +
-          '</div>' +
-          '<div class="report-severity-label">' +
-          SEV_LABELS[sk] +
-          '</div></div>';
-      }
+      html +=
+        '<span class="stat-badge stat-' +
+        (sk === 'info' ? 'total' : sk === 'low' ? 'safe' : sk === 'medium' ? 'warn' : 'vuln') +
+        '">' +
+        SEV_LABELS[sk] +
+        ' ' +
+        summary[sk] +
+        '</span>';
     }
     if (findings.length === 0) {
       html +=
@@ -279,11 +271,16 @@ function renderReport(findings) {
     return;
   }
 
-  var listHtml = '<div class="report-findings-list">';
+  var listHtml =
+    '<div class="report-findings-header"><span class="stat-badge stat-total">共 ' +
+    findings.length +
+    ' 项发现</span></div>';
+  listHtml += '<div class="report-findings-list">';
   for (var i = 0; i < findings.length; i++) {
     var f = findings[i];
     listHtml +=
       '<div class="report-finding-item">' +
+      '<div class="report-finding-header">' +
       '<span class="report-finding-sev" style="color:' +
       SEV_COLORS[f.severity] +
       '">' +
@@ -292,6 +289,7 @@ function renderReport(findings) {
       '<span class="report-finding-module">' +
       utils.escapeHtml(MODULE_LABELS[f.module] || f.module) +
       '</span>' +
+      '</div>' +
       '<div class="report-finding-title">' +
       utils.escapeHtml(f.title) +
       '</div>' +

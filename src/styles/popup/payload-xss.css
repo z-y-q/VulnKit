@@ -205,29 +205,77 @@
 .xssscan-results::-webkit-scrollbar { width: 4px; }
 .xssscan-results::-webkit-scrollbar-track { background: transparent; }
 .xssscan-results::-webkit-scrollbar-thumb { background: #D0D0D0; border-radius: 2px; }
-.xssscan-table {
-  width: 100%;
-  border-collapse: collapse;
+.xssscan-check-all-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  margin-bottom: 4px;
   font-size: 11px;
-}
-.xssscan-table th {
-  text-align: left;
-  padding: 4px 6px;
-  background: #F5F7FA;
   color: #666;
-  font-weight: 500;
-  border-bottom: 1px solid #E0E0E0;
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  background: #F5F7FA;
+  border-radius: 4px;
 }
-.xssscan-table td {
-  padding: 4px 6px;
-  border-bottom: 1px solid #F0F0F0;
-  vertical-align: middle;
+.xssscan-check-all-row input[type="checkbox"] { cursor: pointer; }
+.xssscan-card {
+  padding: 6px 8px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  margin-bottom: 4px;
+  background: #fff;
+  transition: all 0.15s;
 }
-.xssscan-table tr:hover { background: #F8FAFE; }
-.xssscan-table input[type="checkbox"] { cursor: pointer; }
+.xssscan-card:hover { border-color: #ccc; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+.xssscan-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.xssscan-card-top input[type="checkbox"] { cursor: pointer; flex-shrink: 0; }
+.xssscan-method-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #EEF1F5;
+  color: #555;
+}
+.xssscan-copy-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+.xssscan-card:hover .xssscan-copy-btn { opacity: 1; }
+.xssscan-copy-btn:hover { color: #4A90E2; }
+.xssscan-card-param {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Monaco', 'Menlo', monospace;
+  color: #E74C3C;
+  margin-bottom: 2px;
+}
+.xssscan-param-label {
+  font-weight: 400;
+  color: #999;
+  font-size: 10px;
+}
+.xssscan-card-url {
+  font-size: 10px;
+  color: #888;
+  font-family: 'Monaco', 'Menlo', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .xssscan-source-tag {
   display: inline-block;
   padding: 1px 6px;
@@ -235,19 +283,6 @@
   font-size: 10px;
   color: #fff;
   font-weight: 500;
-}
-.xssscan-url-cell {
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #555;
-}
-.xssscan-param-cell {
-  font-family: 'Monaco', 'Menlo', monospace;
-  color: #E74C3C;
-  font-weight: 500;
-  font-size: 11px;
 }
 .xssscan-payload-row { margin-bottom: 6px; }
 .xssscan-payload-row .select-filter { width: 100%; }
@@ -295,11 +330,14 @@
 [data-theme='dark'] .xssscan-filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 [data-theme='dark'] .xssscan-status { color: var(--text-secondary); }
 [data-theme='dark'] .xssscan-count { color: var(--text-secondary); }
-[data-theme='dark'] .xssscan-table th { background: var(--bg-tertiary); color: var(--text-secondary); border-color: var(--border-color); }
-[data-theme='dark'] .xssscan-table td { border-color: var(--border-color); }
-[data-theme='dark'] .xssscan-table tr:hover { background: var(--bg-tertiary); }
-[data-theme='dark'] .xssscan-url-cell { color: var(--text-primary); }
-[data-theme='dark'] .xssscan-param-cell { color: #FF6B6B; }
+[data-theme='dark'] .xssscan-check-all-row { background: var(--bg-tertiary); color: var(--text-secondary); }
+[data-theme='dark'] .xssscan-card { border-color: var(--border-color); background: var(--bg-card); }
+[data-theme='dark'] .xssscan-card:hover { border-color: #555; }
+[data-theme='dark'] .xssscan-method-tag { background: var(--bg-tertiary); color: var(--text-secondary); }
+[data-theme='dark'] .xssscan-copy-btn { color: var(--text-secondary); }
+[data-theme='dark'] .xssscan-copy-btn:hover { color: var(--accent); }
+[data-theme='dark'] .xssscan-card-param { color: #FF6B6B; }
+[data-theme='dark'] .xssscan-card-url { color: var(--text-secondary); }
 [data-theme='dark'] .xssscan-results::-webkit-scrollbar-thumb { background: #3A3A5E; }
 
 /* ====== DOM Sink Analysis ====== */

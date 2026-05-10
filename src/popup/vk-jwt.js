@@ -25,6 +25,9 @@ var CLAIM_ICONS = {
   user: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
 };
 
+var COPY_SVG =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
 function getClaimIcon(claimKey) {
   var key = claimKey.toLowerCase();
   if (TIME_CLAIMS.indexOf(key) !== -1) return CLAIM_ICONS.clock;
@@ -473,6 +476,20 @@ function decodeJwt(token) {
 
   resultEl.classList.remove('hidden');
   utils.showToast('JWT 解码成功', 'success');
+
+  // Copy buttons for JWT blocks
+  var jwtBlocks = resultEl.querySelectorAll('.jwt-block-header');
+  jwtBlocks.forEach(function (block) {
+    var copyBtn = document.createElement('button');
+    copyBtn.className = 'jwt-copy-btn';
+    copyBtn.title = '复制';
+    copyBtn.innerHTML = COPY_SVG;
+    block.appendChild(copyBtn);
+    copyBtn.addEventListener('click', function () {
+      var pre = block.parentElement.querySelector('.jwt-pre');
+      if (pre) utils.copyText(pre.textContent);
+    });
+  });
 }
 
 function clearJwt() {

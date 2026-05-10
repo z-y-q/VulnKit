@@ -3,6 +3,9 @@
 import { utilsProxy as utils } from './vk-namespace.js';
 import { smState } from './vk-sourcemap-state.js';
 
+var COPY_SVG =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
 function renderSourcemapModules() {
   const container = utils.get('sourcemap-results');
   if (!container) return;
@@ -45,14 +48,27 @@ function renderSourcemapModules() {
       return m.resolved;
     }).length,
   };
-  let html = `<div class="sm-stats-bar">
-    <span class="sm-stat-item sm-stat-total">共 ${stats.total} 个模块</span>
-    ${stats.runtime > 0 ? `<span class="sm-stat-item sm-stat-rt">运行时 ${stats.runtime}</span>` : ''}
-    ${stats.sourcemap > 0 ? `<span class="sm-stat-item sm-stat-sm">SourceMap ${stats.sourcemap}</span>` : ''}
-    ${stats.chunk > 0 ? `<span class="sm-stat-item sm-stat-ch">JS解析 ${stats.chunk}</span>` : ''}
-    ${stats.resolved > 0 ? `<span class="sm-stat-item sm-stat-src">可查看源码 ${stats.resolved}</span>` : ''}
-    ${filtered.length !== smState.sourcemapModules.length ? `<span class="sm-stat-item">显示 ${filtered.length}</span>` : ''}
-  </div>`;
+  let html =
+    '<div class="sm-stats-bar">' +
+    '<span class="stat-badge stat-total">共 ' +
+    stats.total +
+    ' 个模块</span>' +
+    (stats.runtime > 0
+      ? '<span class="stat-badge stat-found">运行时 ' + stats.runtime + '</span>'
+      : '') +
+    (stats.sourcemap > 0
+      ? '<span class="stat-badge stat-safe">SourceMap ' + stats.sourcemap + '</span>'
+      : '') +
+    (stats.chunk > 0
+      ? '<span class="stat-badge stat-warn">JS解析 ' + stats.chunk + '</span>'
+      : '') +
+    (stats.resolved > 0
+      ? '<span class="stat-badge stat-found">可查看源码 ' + stats.resolved + '</span>'
+      : '') +
+    (filtered.length !== smState.sourcemapModules.length
+      ? '<span class="stat-badge stat-total">显示 ' + filtered.length + '</span>'
+      : '') +
+    '</div>';
 
   const groupLabels = smState.SOURCE_TYPE_LABELS;
   const groupClasses = {
@@ -77,15 +93,34 @@ function renderSourcemapModules() {
         extBadge = `<span class="sm-ext-badge" data-ext="${extName}">${extName}</span>`;
       }
       let badges = `<span class="sourcemap-item-source">${m.source === 'runtime' ? 'RT' : m.source === 'sourcemap' ? 'SM' : 'CH'}</span>`;
-      if (m.resolved) badges += '<span class="sourcemap-item-resolved">SRC</span>';
+      if (m.resolved) badges += '<span class="sourcemap-card-resolved">SRC</span>';
       let meta = '';
       if (m.deps && m.deps.length > 0) meta += `(${m.deps.length} deps)`;
       if (m.reverseDeps && m.reverseDeps.length > 0)
         meta += (meta ? ' ' : '') + `(${m.reverseDeps.length} used)`;
-      html += `<div class="sourcemap-item" data-idx="${item.index}">
-        <span class="sourcemap-item-name" title="${utils.escapeHtml(m.path)}">${utils.escapeHtml(m.path)}${extBadge}</span>
-        <span class="sourcemap-item-meta">${badges} ${utils.escapeHtml(meta)}</span>
-      </div>`;
+      html +=
+        '<div class="sourcemap-card" data-idx="' +
+        item.index +
+        '">' +
+        '<div class="sourcemap-card-header">' +
+        '<span class="sourcemap-card-name" title="' +
+        utils.escapeHtml(m.path) +
+        '">' +
+        utils.escapeHtml(m.path) +
+        extBadge +
+        '</span>' +
+        '<button class="sourcemap-copy-btn" data-copy="' +
+        utils.escapeHtml(m.path) +
+        '" title="复制路径">' +
+        COPY_SVG +
+        '</button>' +
+        '</div>' +
+        '<div class="sourcemap-card-meta">' +
+        badges +
+        ' ' +
+        utils.escapeHtml(meta) +
+        '</div>' +
+        '</div>';
     });
     html += '</div>';
   });
@@ -98,10 +133,19 @@ function renderSourcemapModules() {
   container.classList.remove('hidden');
 
   // Bind click handlers
-  container.querySelectorAll('.sourcemap-item').forEach(function (el) {
-    el.addEventListener('click', function () {
-      const idx = parseInt(this.dataset.idx);
+  container.querySelectorAll('.sourcemap-card').forEach(function (el) {
+    el.addEventListener('click', function (e) {
+      if (e.target.closest('.sourcemap-copy-btn')) return;
+      var idx = parseInt(this.dataset.idx);
       if (!isNaN(idx)) showSourcemapModuleDetail(idx);
+    });
+  });
+
+  container.querySelectorAll('.sourcemap-copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var text = this.dataset.copy;
+      if (text) utils.copyText(text);
     });
   });
 }

@@ -2,19 +2,37 @@
 
 /* ====== JWT Panel ====== */
 .jwt-block { margin-bottom: 10px; border: 1px solid #E0E0E0; border-radius: 8px; overflow: hidden; }
-.jwt-block-header { padding: 6px 10px; font-size: 12px; font-weight: 600; background: #F5F7FA; display: flex; align-items: center; gap: 6px; }
+.jwt-block-header { position: relative; padding: 6px 10px; font-size: 12px; font-weight: 600; background: #F5F7FA; display: flex; align-items: center; gap: 6px; }
 .jwt-color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .jwt-pre { margin: 0; padding: 8px 10px; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; background: #FAFBFC; }
 .jwt-sig { font-family: monospace; word-break: break-all; }
 .jwt-claims { margin-top: 8px; }
-.jwt-claim { display: flex; justify-content: space-between; padding: 4px 10px; font-size: 11px; border-bottom: 1px solid #f0f0f0; }
-.jwt-claim-valid { color: #27ae60; }
-.jwt-claim-expired { color: #e74c3c; }
+.jwt-claim { display: flex; justify-content: space-between; padding: 5px 10px; font-size: 11px; border-bottom: 1px solid #f0f0f0; border-left: 3px solid transparent; transition: background 0.15s; }
+.jwt-claim:hover { background: #FAFBFC; }
+.jwt-claim-valid { color: #27ae60; border-left-color: #27ae60; }
+.jwt-claim-expired { color: #e74c3c; border-left-color: #e74c3c; }
+.jwt-copy-btn {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+.jwt-block:hover .jwt-copy-btn { opacity: 1; }
+.jwt-copy-btn:hover { color: #4A90E2; }
 
 [data-theme='dark'] .jwt-block { border-color: var(--border-color); }
 [data-theme='dark'] .jwt-block-header { background: var(--bg-secondary); color: var(--text-primary); }
 [data-theme='dark'] .jwt-pre { background: var(--bg-secondary); color: var(--text-primary); }
 [data-theme='dark'] .jwt-claim { border-color: var(--border-color); color: var(--text-secondary); }
+[data-theme='dark'] .jwt-claim:hover { background: var(--bg-tertiary); }
+[data-theme='dark'] .jwt-copy-btn { color: var(--text-secondary); }
+[data-theme='dark'] .jwt-copy-btn:hover { color: var(--accent); }
 .jwt-verify-section { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
 .jwt-verify-section .form-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; display: block; }
 .jwt-verify-section .form-group { display: flex; gap: 6px; align-items: flex-start; flex-direction: column; }

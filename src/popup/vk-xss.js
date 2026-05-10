@@ -7,6 +7,8 @@ import { XSS_SCAN_PAYLOADS } from './vk-xss-data.js';
 import { analyzeDomSinks } from './vk-xss-sinks.js';
 
 var REFLECTION_PROBE = 'vkprobe\'"><xyz';
+var COPY_SVG =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 
 let xssPoints = [];
 let xssFilterType = 'all';
@@ -343,7 +345,11 @@ function renderXssPoints() {
   const filtered = getFilteredXssPoints();
   if (countEl) {
     let hasFilter = xssFilterType !== 'all' || xssSearchText;
-    countEl.textContent = `共发现 ${xssPoints.length} 个注入点${hasFilter ? `（显示: ${filtered.length}）` : ''}`;
+    countEl.innerHTML =
+      '<span class="stat-badge stat-total">共 ' +
+      xssPoints.length +
+      ' 个注入点</span>' +
+      (hasFilter ? '<span class="stat-badge stat-found">显示 ' + filtered.length + '</span>' : '');
   }
   if (filtered.length === 0) {
     utils.setEmpty('xssscan-results', '暂无注入点');
@@ -351,23 +357,63 @@ function renderXssPoints() {
   }
   const sourceLabels = { link: '链接', form: '表单', url: 'URL', ajax: 'AJAX' };
   const sourceColors = { link: '#4A90E2', form: '#e67e22', url: '#27ae60', ajax: '#e74c3c' };
+
   let html =
-    '<table class="xssscan-table"><thead><tr><th><input type="checkbox" id="xssscan-check-all" checked></th><th>来源</th><th>URL</th><th>参数</th><th>方法</th></tr></thead><tbody>';
-  filtered.forEach((p, i) => {
-    const shortUrl = p.url.length > 40 ? `${p.url.substring(0, 37)}...` : p.url;
-    html += `<tr><td><input type="checkbox" class="xssscan-point-check" data-idx="${i}" checked></td><td><span class="xssscan-source-tag" style="background:${sourceColors[p.source] || '#999'}">${sourceLabels[p.source] || p.source}</span></td><td class="xssscan-url-cell" title="${utils.escapeHtml(p.url)}">${utils.escapeHtml(shortUrl)}</td><td class="xssscan-param-cell">${utils.escapeHtml(p.param)}</td><td>${utils.escapeHtml(p.method)}</td></tr>`;
+    '<div class="xssscan-check-all-row"><label><input type="checkbox" id="xssscan-check-all" checked> 全选</label></div>';
+  filtered.forEach(function (p, i) {
+    var shortUrl = p.url.length > 40 ? p.url.substring(0, 37) + '...' : p.url;
+    html +=
+      '<div class="xssscan-card">' +
+      '<div class="xssscan-card-top">' +
+      '<input type="checkbox" class="xssscan-point-check" data-idx="' +
+      i +
+      '" checked>' +
+      '<span class="xssscan-source-tag" style="background:' +
+      (sourceColors[p.source] || '#999') +
+      '">' +
+      (sourceLabels[p.source] || p.source) +
+      '</span>' +
+      '<span class="xssscan-method-tag">' +
+      utils.escapeHtml(p.method) +
+      '</span>' +
+      '<button class="xssscan-copy-btn" data-copy="' +
+      utils.escapeHtml(p.url) +
+      '" title="复制URL">' +
+      COPY_SVG +
+      '</button>' +
+      '</div>' +
+      '<div class="xssscan-card-param"><span class="xssscan-param-label">参数:</span> ' +
+      utils.escapeHtml(p.param) +
+      '</div>' +
+      '<div class="xssscan-card-url" title="' +
+      utils.escapeHtml(p.url) +
+      '">' +
+      utils.escapeHtml(shortUrl) +
+      '</div>' +
+      '</div>';
   });
-  html += '</tbody></table>';
   container.innerHTML = html;
 
   const checkAll = container.querySelector('#xssscan-check-all');
   if (checkAll) {
-    checkAll.addEventListener('change', () => {
-      container.querySelectorAll('.xssscan-point-check').forEach(cb => {
+    checkAll.addEventListener('change', function () {
+      container.querySelectorAll('.xssscan-point-check').forEach(function (cb) {
         cb.checked = checkAll.checked;
       });
     });
   }
+
+  container.querySelectorAll('.xssscan-copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var url = btn.getAttribute('data-copy');
+      if (url) {
+        utils.copyText(url);
+        utils.showToast('URL 已复制', 'success');
+      }
+    });
+  });
 }
 
 function getSelectedXssPoints() {

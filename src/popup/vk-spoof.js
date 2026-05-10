@@ -3,6 +3,9 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 
+var COPY_SVG =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
 let currentSpoofTab = 'ua';
 let lastCookies = [];
 let lastCookieDomain = '';
@@ -174,29 +177,37 @@ function renderUaList(category) {
   let html = '';
   presets.forEach((preset, idx) => {
     const isSelected = spoofState.ua.current === preset.value;
-    html += `<div class="ua-item${isSelected ? ' ua-selected' : ''}" data-idx="${idx}">
-  <span class="ua-item-label">${preset.label}</span>
-  <span class="ua-item-value" title="${preset.value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(
-      /"/g,
-      '&quot;'
-    )}">${preset.value.length > 80 ? `${preset.value.substring(0, 80)}...` : preset.value}</span></div>`;
+    const safeValue = preset.value
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    html += `<div class="ua-card${isSelected ? ' ua-selected' : ''}" data-idx="${idx}">
+  <div class="ua-card-header">
+    <span class="ua-card-label">${preset.label}</span>
+    <button class="ua-copy-btn" data-copy="${safeValue}" title="复制">${COPY_SVG}</button>
+  </div>
+  <span class="ua-card-value">${preset.value.length > 80 ? `${preset.value.substring(0, 80)}...` : preset.value}</span>
+</div>`;
   });
   container.innerHTML = html;
 
-  container.querySelectorAll('.ua-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const i = parseInt(item.dataset.idx, 10);
-      const preset = presets[i];
-      if (preset) {
-        utils.get('ua-custom-input').value = preset.value;
-        container.querySelectorAll('.ua-item').forEach(el => el.classList.remove('ua-selected'));
-        item.classList.add('ua-selected');
-      }
-    });
+  container.addEventListener('click', function (e) {
+    var copyBtn = e.target.closest('.ua-copy-btn');
+    if (copyBtn) {
+      e.stopPropagation();
+      utils.copyText(copyBtn.dataset.copy);
+      return;
+    }
+    var card = e.target.closest('.ua-card');
+    if (!card) return;
+    var i = parseInt(card.dataset.idx, 10);
+    var preset = presets[i];
+    if (preset) {
+      utils.get('ua-custom-input').value = preset.value;
+      container.querySelectorAll('.ua-card').forEach(el => el.classList.remove('ua-selected'));
+      card.classList.add('ua-selected');
+    }
   });
 }
 
@@ -288,31 +299,48 @@ function renderCookieList(cookies, domain) {
     return;
   }
 
-  let html = `<div class="cookie-count">共 ${cookies.length} 个 Cookie</div>`;
+  let html =
+    '<div class="cookie-stats"><span class="stat-badge stat-total">共 ' +
+    cookies.length +
+    ' 个 Cookie</span></div>';
   cookies.forEach(cookie => {
-    html += `<div class="cookie-item" data-name="${utils.escapeHtml(cookie.name)}">
-  <div class="cookie-item-main">
-    <span class="cookie-item-name">${utils.escapeHtml(cookie.name)}</span>
-    <span class="cookie-item-value" title="${utils.escapeHtml(cookie.value)}">${utils.escapeHtml(
+    html += `<div class="cookie-card" data-name="${utils.escapeHtml(cookie.name)}">
+  <div class="cookie-card-main">
+    <span class="cookie-card-name">${utils.escapeHtml(cookie.name)}</span>
+    <span class="cookie-card-value" title="${utils.escapeHtml(cookie.value)}">${utils.escapeHtml(
       cookie.value.length > 60 ? `${cookie.value.substring(0, 60)}...` : cookie.value
     )}</span>
+    <button class="cookie-copy-btn" data-copy="${utils.escapeHtml(cookie.name + '=' + cookie.value)}" title="复制">${COPY_SVG}</button>
   </div>
-  <div class="cookie-item-meta">
+  <div class="cookie-card-meta">
     <span>${utils.escapeHtml(cookie.domain || '')}${utils.escapeHtml(cookie.path || '')}</span>${cookie.httpOnly ? '<span class="cookie-badge">HttpOnly</span>' : ''}${cookie.secure ? '<span class="cookie-badge">Secure</span>' : ''}
     <span class="cookie-badge">${utils.escapeHtml(cookie.sameSite || 'unspecified')}</span>
   </div>
-  <div class="cookie-item-actions">
+  <div class="cookie-card-actions">
     <button class="btn btn-sm btn-outline cookie-edit-btn" data-name="${utils.escapeHtml(cookie.name)}">编辑</button>
     <button class="btn btn-sm btn-outline cookie-delete-btn" data-name="${utils.escapeHtml(cookie.name)}">删除</button>
-  </div></div>`;
+  </div>
+</div>`;
   });
   listEl.innerHTML = html;
 
-  listEl.querySelectorAll('.cookie-edit-btn').forEach(btn => {
-    btn.addEventListener('click', () => showCookieEditor(btn.dataset.name, cookies));
-  });
-  listEl.querySelectorAll('.cookie-delete-btn').forEach(btn => {
-    btn.addEventListener('click', () => deleteCookie(btn.dataset.name, domain));
+  listEl.addEventListener('click', function (e) {
+    var copyBtn = e.target.closest('.cookie-copy-btn');
+    if (copyBtn) {
+      e.stopPropagation();
+      utils.copyText(copyBtn.dataset.copy);
+      return;
+    }
+    var editBtn = e.target.closest('.cookie-edit-btn');
+    if (editBtn) {
+      showCookieEditor(editBtn.dataset.name, cookies);
+      return;
+    }
+    var deleteBtn = e.target.closest('.cookie-delete-btn');
+    if (deleteBtn) {
+      deleteCookie(deleteBtn.dataset.name, domain);
+      return;
+    }
   });
 }
 

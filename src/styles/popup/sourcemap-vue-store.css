@@ -45,19 +45,25 @@
   margin-bottom: 4px;
 }
 
-.sourcemap-item {
+.sourcemap-card {
+  padding: 6px 8px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  margin-bottom: 4px;
+  background: #fff;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.sourcemap-card:hover { border-color: #ccc; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+
+.sourcemap-card-header {
   display: flex;
   align-items: center;
-  padding: 5px 8px;
-  border-bottom: 1px solid #f0f0f0;
-  font-size: 12px;
-  transition: background 0.15s;
+  gap: 6px;
+  margin-bottom: 2px;
 }
 
-.sourcemap-item:last-child { border-bottom: none; }
-.sourcemap-item:hover { background: #F5F7FA; }
-
-.sourcemap-item-name {
+.sourcemap-card-name {
   flex: 1;
   min-width: 0;
   color: #333;
@@ -65,6 +71,31 @@
   font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourcemap-copy-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+.sourcemap-card:hover .sourcemap-copy-btn { opacity: 1; }
+.sourcemap-copy-btn:hover { color: #4A90E2; }
+
+.sourcemap-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #4A90E2;
+  font-family: 'Monaco', 'Menlo', monospace;
   white-space: nowrap;
 }
 
@@ -93,9 +124,12 @@
 
 [data-theme='dark'] .sourcemap-status { color: var(--text-secondary); }
 [data-theme='dark'] .sourcemap-section-title { background: var(--bg-tertiary); color: var(--accent); }
-[data-theme='dark'] .sourcemap-item { border-color: var(--border-color); }
-[data-theme='dark'] .sourcemap-item:hover { background: var(--bg-tertiary); }
-[data-theme='dark'] .sourcemap-item-name { color: var(--text-primary); }
+[data-theme='dark'] .sourcemap-card { border-color: var(--border-color); background: var(--bg-card); }
+[data-theme='dark'] .sourcemap-card:hover { border-color: #555; }
+[data-theme='dark'] .sourcemap-card-name { color: var(--text-primary); }
+[data-theme='dark'] .sourcemap-copy-btn { color: var(--text-secondary); }
+[data-theme='dark'] .sourcemap-copy-btn:hover { color: var(--accent); }
+[data-theme='dark'] .sourcemap-card-meta { color: var(--accent); }
 [data-theme='dark'] .sourcemap-item-source { color: var(--text-secondary); }
 [data-theme='dark'] .sourcemap-results::-webkit-scrollbar-thumb { background: #3A3A5E; }
 
@@ -192,23 +226,6 @@
   background: var(--bg-tertiary);
   border-color: var(--border-color);
 }
-.sm-stat-item {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: #E8E8E8;
-  color: #555;
-}
-.sm-stat-total { background: #E0E0E0; color: #333; }
-.sm-stat-rt { background: #E6F0FA; color: #1565C0; }
-.sm-stat-sm { background: #E8F5E9; color: #2E7D32; }
-.sm-stat-ch { background: #FFF3E0; color: #E65100; }
-.sm-stat-src { background: #F3E5F5; color: #7B1FA2; }
-[data-theme='dark'] .sm-stat-item { background: #2a2a3e; color: #ccc; }
-[data-theme='dark'] .sm-stat-rt { background: #1E3A5F; color: #90CAF9; }
-[data-theme='dark'] .sm-stat-sm { background: #1a3a2a; color: #81C784; }
-[data-theme='dark'] .sm-stat-ch { background: #3a2e1a; color: #FFB74D; }
-[data-theme='dark'] .sm-stat-src { background: #2D1B3D; color: #CE93D8; }
 
 /* ====== Webpack Security Analysis ====== */
 .sm-analysis-severity { font-size: 10px; padding: 1px 5px; border-radius: 2px; color: #fff; font-weight: 600; }
@@ -381,14 +398,6 @@
 [data-theme='dark'] .sm-breadcrumb-source { background: #1E3A5F; color: #90CAF9; }
 
 /* ====== Webpack Module Meta (deps count, source map badge) ====== */
-.sourcemap-item-meta {
-  flex-shrink: 0;
-  font-size: 10px;
-  color: #4A90E2;
-  margin-left: 6px;
-  font-family: 'Monaco', 'Menlo', monospace;
-  white-space: nowrap;
-}
 .sourcemap-section-numeric {
   background: #FFF3E0 !important;
   color: #E65100 !important;
@@ -405,7 +414,7 @@
   background: var(--bg-tertiary) !important;
   color: #81C784 !important;
 }
-.sourcemap-item-resolved { opacity: 0.85; }
+.sourcemap-card-resolved { opacity: 0.85; }
 
 /* ====== Webpack Dependency Info ====== */
 .sourcemap-deps-section {
