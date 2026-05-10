@@ -224,6 +224,8 @@ function renderToolbarConfig() {
 
 // ====== End Toolbar Configuration ======
 
+// HaE rules management loaded from hae-rules.js
+
 function saveSettings() {
   let el;
   const settings = {
@@ -231,9 +233,12 @@ function saveSettings() {
     enableContextMenu: (el = $('enableContextMenu')) ? el.checked : true,
     theme: (el = $('theme')) ? el.value : 'auto',
     storeHistory: (el = $('storeHistory')) ? el.checked : true,
-    analytics: (el = $('analytics')) ? el.checked : false,
     defaultEncoding: (el = $('defaultEncoding')) ? el.value : 'base64',
     defaultHash: (el = $('defaultHash')) ? el.value : 'SHA256',
+    domainExcludeList: (el = $('domain-exclude-list')) ? el.value : '',
+    fuzzDefaultWordlist: (el = $('fuzz-default-wordlist')) ? el.value : 'common',
+    fuzzDefaultConcurrency: (el = $('fuzz-default-concurrency')) ? parseInt(el.value, 10) || 5 : 5,
+    xssDefaultTimeout: (el = $('xss-default-timeout')) ? parseInt(el.value, 10) || 10000 : 10000,
   };
 
   chrome.storage.local.set({ pentestSettings: settings }, () => {
@@ -253,9 +258,12 @@ function loadSettings() {
     if ((el = $('enableContextMenu'))) el.checked = settings.enableContextMenu !== false;
     if ((el = $('theme'))) el.value = settings.theme || 'auto';
     if ((el = $('storeHistory'))) el.checked = settings.storeHistory !== false;
-    if ((el = $('analytics'))) el.checked = settings.analytics || false;
     if ((el = $('defaultEncoding'))) el.value = settings.defaultEncoding || 'base64';
     if ((el = $('defaultHash'))) el.value = settings.defaultHash || 'SHA256';
+    if ((el = $('domain-exclude-list'))) el.value = settings.domainExcludeList || '';
+    if ((el = $('fuzz-default-wordlist'))) el.value = settings.fuzzDefaultWordlist || 'common';
+    if ((el = $('fuzz-default-concurrency'))) el.value = settings.fuzzDefaultConcurrency || 5;
+    if ((el = $('xss-default-timeout'))) el.value = settings.xssDefaultTimeout || 10000;
   });
 }
 
@@ -307,10 +315,13 @@ function importSettings() {
           enableContextMenu: 'boolean',
           theme: 'string',
           storeHistory: 'boolean',
-          analytics: 'boolean',
           defaultEncoding: 'string',
           defaultHash: 'string',
           toolbarConfig: 'object',
+          domainExcludeList: 'string',
+          fuzzDefaultWordlist: 'string',
+          fuzzDefaultConcurrency: 'number',
+          xssDefaultTimeout: 'number',
         };
         const cleaned = {};
         let skipped = 0;
@@ -352,12 +363,27 @@ function importSettings() {
 function clearData() {
   if (confirm('确定要清除所有数据吗？此操作不可恢复。')) {
     chrome.storage.local.remove(
-      ['pentestSettings', 'pentest_history', 'pentest_spoof', 'pentest_keys'],
+      [
+        'pentestSettings',
+        'pentest_history',
+        'pentest_spoof',
+        'pentest_keys',
+        'haeRules',
+        'gatherData',
+        'gatherDataUrl',
+        'gatherDataTabs',
+        'gatherDataTime',
+        'allLinks',
+        'allLinksUrl',
+        'pentest_ui_state',
+      ],
       () => {
         if (chrome.runtime.lastError) {
           showStatus('清除失败: ' + chrome.runtime.lastError.message, 'error');
           return;
         }
+        loadSettings();
+        renderToolbarConfig();
         showStatus('所有数据已清除', 'success');
       }
     );
@@ -397,6 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadSettings();
   renderToolbarConfig();
+  renderHaeRules();
 
   let btn;
   if ((btn = $('toolbar-reset-order')))
@@ -417,10 +444,22 @@ document.addEventListener('DOMContentLoaded', () => {
   if ((btn = $('import-btn'))) btn.addEventListener('click', importSettings);
   if ((btn = $('clear-btn'))) btn.addEventListener('click', clearData);
   if ((btn = $('reset-btn'))) btn.addEventListener('click', resetSettings);
+  if ((btn = $('hae-export-yaml'))) btn.addEventListener('click', exportHaeYaml);
+  if ((btn = $('hae-import-yaml'))) btn.addEventListener('click', importHaeYaml);
+  if ((btn = $('hae-reset-rules'))) btn.addEventListener('click', resetHaeRules);
 
   document.querySelectorAll('input, select').forEach(input => {
     input.addEventListener('change', saveSettings);
   });
+
+  var domainListEl = $('domain-exclude-list');
+  if (domainListEl) {
+    var _domainSaveTimer = null;
+    domainListEl.addEventListener('input', function () {
+      clearTimeout(_domainSaveTimer);
+      _domainSaveTimer = setTimeout(saveSettings, 500);
+    });
+  }
 
   // Theme select also syncs to localStorage so popup picks it up
   const themeSelect = $('theme');

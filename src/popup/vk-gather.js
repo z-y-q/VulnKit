@@ -252,14 +252,44 @@ const API_PATTERNS = [
   },
 ];
 
+var DEFAULT_EXCLUDE_REGEX =
+  /^(https?:)?\/\/([^/]+\.)?(?:google|facebook|github\.com|jquery|analytics|doubleclick|googletagmanager|fontawesome|bootstrapcdn|unpkg\.com|cdn\.)/i;
+var _customExcludeRegex = null;
+
+function refreshExcludeRegex() {
+  chrome.storage.local.get(['pentestSettings'], function (result) {
+    var list = (result.pentestSettings || {}).domainExcludeList || '';
+    var domains = list
+      .split('\n')
+      .map(function (d) {
+        return d.trim();
+      })
+      .filter(Boolean);
+    if (domains.length === 0) {
+      _customExcludeRegex = null;
+    } else {
+      _customExcludeRegex = new RegExp(
+        '^(https?:)?\\/\\/([^\\/]+\\.)?(?:' +
+          domains
+            .map(function (d) {
+              return d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            })
+            .join('|') +
+          ')',
+        'i'
+      );
+    }
+  });
+}
+refreshExcludeRegex();
+chrome.storage.onChanged.addListener(function (changes, area) {
+  if (area === 'local' && changes.pentestSettings) refreshExcludeRegex();
+});
+
 function isValidApiPath(path) {
   if (!path || path.length < 3 || path.length > 200) return false;
-  if (
-    /^(https?:)?\/\/([^/]+\.)?(?:google|facebook|github\.com|jquery|analytics|doubleclick|googletagmanager|fontawesome|bootstrapcdn|unpkg\.com|cdn\.)/i.test(
-      path
-    )
-  )
-    return false;
+  if (_customExcludeRegex && _customExcludeRegex.test(path)) return false;
+  if (DEFAULT_EXCLUDE_REGEX.test(path)) return false;
   if (/^\.\//.test(path) && !/api|route|endpoint|action/i.test(path)) return false;
   if (/^(\/\/)/.test(path) && /\.js(\?|$)/i.test(path)) return false;
   if (/\.(js|css|png|jpg|jpeg|gif|svg|woff|ttf|eot|ico)(\?|$)/i.test(path)) return false;

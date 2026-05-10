@@ -171,3 +171,101 @@ p { color: #666; transition: color 0.2s; }
 [data-theme='dark'] .toolbar-drag-handle {
     color: #8E8E9E;
 }
+
+/* HaE Rules Management */
+.hae-group {
+    margin-bottom: 4px;
+}
+.hae-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    margin-top: 12px;
+    font-weight: 600;
+    font-size: 14px;
+    border-bottom: 1px solid #e5e7eb;
+}
+.hae-group:first-child .hae-group-header {
+    margin-top: 0;
+}
+.hae-rule-count {
+    font-size: 12px;
+    font-weight: normal;
+    color: #888;
+}
+.hae-rule-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0 4px 24px;
+    font-size: 13px;
+}
+.hae-rule-scope {
+    font-size: 11px;
+    color: #999;
+    margin-left: auto;
+}
+.hae-color-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.hae-rules-loading {
+    text-align: center;
+    padding: 20px;
+    color: #888;
+}
+[data-theme='dark'] .hae-group-header {
+    border-color: #2a3a5c;
+}
+[data-theme='dark'] .hae-rule-count {
+    color: #666;
+}
+[data-theme='dark'] .hae-rule-scope {
+    color: #555;
+}
+[data-theme='dark'] .hae-rules-loading {
+    color: #666;
+}
+
+/* Shared form elements */
+textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    resize: vertical;
+    box-sizing: border-box;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+textarea:focus {
+    outline: none;
+    border-color: #007bff;
+}
+[data-theme='dark'] textarea {
+    background: #1a2744;
+    color: #e0e0e0;
+    border-color: #2a3a5c;
+}
+input[type="number"] {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 120px;
+    box-sizing: border-box;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+input[type="number"]:focus {
+    outline: none;
+    border-color: #007bff;
+}
+[data-theme='dark'] input[type="number"] {
+    background: #1a2744;
+    color: #e0e0e0;
+    border-color: #2a3a5c;
+}

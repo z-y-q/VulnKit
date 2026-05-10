@@ -16,11 +16,23 @@ let xssSearchText = '';
 let xssInterceptTimer = null;
 let xssInterceptActive = false;
 let xssInterceptCountdown = 0;
+let _xssDefaultTimeout = 10000;
+
+chrome.storage.local.get(['pentestSettings'], function (result) {
+  var t = (result.pentestSettings || {}).xssDefaultTimeout;
+  if (t && typeof t === 'number' && t >= 3000) _xssDefaultTimeout = t;
+});
+chrome.storage.onChanged.addListener(function (changes, area) {
+  if (area === 'local' && changes.pentestSettings) {
+    var t = (changes.pentestSettings.newValue || {}).xssDefaultTimeout;
+    if (t && typeof t === 'number' && t >= 3000) _xssDefaultTimeout = t;
+  }
+});
 
 async function fetchInTab(url, fetchOpts, timeoutMs) {
   const tab = await utils.requireTabId();
   if (!tab) return { error: '无法获取活动标签页' };
-  var ms = timeoutMs || 10000;
+  var ms = timeoutMs || _xssDefaultTimeout;
   try {
     var results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },

@@ -877,6 +877,13 @@ function initSecurityDetectors2() {
             if (tab && tab.url) urlInput.value = tab.url.replace(/\/+$/, '');
           });
         }
+        chrome.storage.local.get(['pentestSettings'], function (result) {
+          var s = result.pentestSettings || {};
+          var wl = utils.get('fuzz-wordlist');
+          if (wl && s.fuzzDefaultWordlist) wl.value = s.fuzzDefaultWordlist;
+          var cc = utils.get('fuzz-concurrency');
+          if (cc && s.fuzzDefaultConcurrency) cc.value = s.fuzzDefaultConcurrency;
+        });
 
         utils.bindClick('fuzz-start-btn', async function () {
           var url = (urlInput && urlInput.value) || '';
