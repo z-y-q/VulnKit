@@ -256,4 +256,4 @@ async function analyzeDomSinks() {
   }
 }
 
-export { analyzeDomSinks, domSinks };
+export { analyzeSingleSink, getContextPayloads, analyzeDomSinks, domSinks };

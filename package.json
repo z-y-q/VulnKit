@@ -45,12 +45,15 @@
   },
   "homepage": "https://pentest-tools.com",
   "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.5",
     "@types/chrome": "^0.0.260",
     "@types/jest": "^29.5.5",
     "@types/node": "^20.8.0",
     "@types/webpack-env": "^1.18.2",
     "@typescript-eslint/eslint-plugin": "^6.7.4",
     "@typescript-eslint/parser": "^6.7.4",
+    "babel-jest": "^29.7.0",
     "copy-webpack-plugin": "^11.0.0",
     "css-loader": "^6.8.1",
     "eslint": "^8.50.0",
@@ -85,36 +88,33 @@
     "Safari >= 16"
   ],
   "jest": {
-    "preset": "ts-jest",
     "testEnvironment": "jsdom",
     "roots": [
-      "<rootDir>/src",
       "<rootDir>/test"
     ],
     "testMatch": [
-      "**/__tests__/**/*.ts",
-      "**/?(*.)+(spec|test).ts"
+      "**/*.test.js"
     ],
     "transform": {
+      "^.+\\.js$": "babel-jest",
       "^.+\\.css$": "jest-transform-stub"
     },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!exifr)"
+    ],
     "collectCoverageFrom": [
-      "src/**/*.{ts,tsx}",
-      "!src/**/*.d.ts",
-      "!src/**/index.ts"
+      "src/popup/**/*.js",
+      "!src/popup/vk-init*.js",
+      "!src/popup/vk-namespace.js"
     ],
     "coverageDirectory": "coverage",
     "coverageReporters": [
       "text",
-      "lcov",
-      "html"
+      "lcov"
     ],
-    "setupFilesAfterEnv": [
-      "<rootDir>/test/setup.ts"
+    "setupFiles": [
+      "<rootDir>/test/setup.js"
     ],
-    "moduleNameMapping": {
-      "^@/(.*)$": "<rootDir>/src/$1"
-    },
     "testTimeout": 10000
   },
   "eslintConfig": {

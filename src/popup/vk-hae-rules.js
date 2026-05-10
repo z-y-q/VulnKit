@@ -247,6 +247,8 @@ function importRules(yamlText) {
 }
 
 export {
+  applyFormat,
+  matchSingleRule,
   getDefaultRules,
   matchRules,
   getGroups,

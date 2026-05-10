@@ -739,6 +739,7 @@ export {
   spoofState,
   switchSpoofTab,
   renderUaList,
+  renderCookieList,
   updateUaStatus,
   applyUserAgent,
   resetUserAgent,

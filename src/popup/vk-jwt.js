@@ -666,6 +666,12 @@ function getFindings() {
 }
 
 export {
+  highlightJson,
+  base64UrlDecode,
+  base64UrlToUint8,
+  detectAlgorithmConfusion,
+  analyzeJwtClaims,
+  getClaimIcon,
   decodeJwt,
   clearJwt,
   copyJwtHeader,

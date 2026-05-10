@@ -150,6 +150,7 @@ function switchEncodingTab(type) {
 
 export {
   ENCODING_NAMES,
+  encodingTools,
   handleEncode,
   handleDecode,
   clearEncodingFields,

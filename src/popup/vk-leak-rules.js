@@ -1550,6 +1550,7 @@ export {
   MAX_STORAGE_ITEMS,
   MAX_GLOBAL_SCANS,
   b64urlToStr,
+  luhnOk,
   shannonEntropy,
   isPlaceholder,
   inCryptoContext,

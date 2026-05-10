@@ -466,6 +466,10 @@ function pemToArrayBuffer(pem) {
 }
 
 export {
+  padOrTruncate,
+  toHex,
+  pemToArrayBuffer,
+  ab2pem,
   switchCryptoAlgo,
   toggleIvVisibility,
   doCryptoEncrypt,
