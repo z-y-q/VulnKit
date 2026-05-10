@@ -85,6 +85,7 @@ body {
 }
 
 .tab-btn {
+  position: relative;
   padding: 6px 4px;
   border: 1px solid transparent;
   background: #f8f8f8;
@@ -574,10 +575,6 @@ body {
   background: #fff;
 }
 
-.tab-btn {
-  position: relative;
-}
-
 .tab-btn::after {
   content: '';
   position: absolute;
@@ -816,9 +813,7 @@ body {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
-.btn:focus,
-.input:focus,
-.textarea:focus {
+.btn:focus-visible {
   outline: 2px solid #4A90E2;
   outline-offset: 2px;
 }

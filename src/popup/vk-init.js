@@ -8,6 +8,7 @@ import { TAB_TO_CATEGORY } from './vk-categories.js';
 const { getCurrentDomain, getActiveTab } = utils;
 
 // ====== Pagination state (moved from vk-init-panels.js) ======
+const TABS_PER_PAGE = 8;
 let tabBtns, tabsPerPage, totalPages, currentPage;
 let scrollLeftBtn, scrollRightBtn;
 
@@ -43,7 +44,7 @@ function recalcPagination() {
 
 function initTabPagination() {
   tabBtns = Array.from(document.querySelectorAll('.tab-btn:not(.toolbar-hidden)'));
-  tabsPerPage = 8;
+  tabsPerPage = TABS_PER_PAGE;
   totalPages = Math.max(1, Math.ceil(tabBtns.length / tabsPerPage));
   currentPage = 0;
 
@@ -208,6 +209,8 @@ function initMainTabs(savedState) {
     return source === 'panels' ? panelsModule : detectorsModule;
   }
 
+  var loadedLibs = new Set();
+
   var onTabClick = function onTabClick() {
     var panel = this.dataset.panel;
     document.querySelectorAll('.tab-btn').forEach(function (b) {
@@ -233,8 +236,8 @@ function initMainTabs(savedState) {
     }
 
     // Exif lib lazy-load (no module needed)
-    if (panel === 'exif' && !onTabClick._exifLoaded) {
-      onTabClick._exifLoaded = true;
+    if (panel === 'exif' && !loadedLibs.has('exifr')) {
+      loadedLibs.add('exifr');
       utils.loadLibs(['lib/exifr.full.js']).catch(function (e) {
         console.debug('exifr load failed', e);
       });
