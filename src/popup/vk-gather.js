@@ -3,9 +3,9 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 import * as haeRules from './vk-hae-rules.js';
-import { LEAK_SCAN_GROUP, runDeepLeakScan } from './vk-leakscan-scanner.js';
 
 const DOM_GROUP = 'DOM Analysis';
+const LEAK_SCAN_GROUP = 'Deep Leak Scan';
 const STORAGE_KEY = 'gatherData';
 const URL_KEY = 'gatherDataUrl';
 const TABS_KEY = 'gatherDataTabs';
@@ -608,7 +608,8 @@ async function gatherInfo() {
 
       if (!gatherAbortFlag) {
         utils.setStatus('gather-status', '深度泄漏扫描中...');
-        var leakItems = await runDeepLeakScan(gatherData, tab.id);
+        var leakscan = await import('./vk-leakscan-scanner.js');
+        var leakItems = await leakscan.runDeepLeakScan(gatherData, tab.id);
         gatherData[LEAK_SCAN_GROUP] = leakItems;
       }
 

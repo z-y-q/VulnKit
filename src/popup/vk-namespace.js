@@ -506,6 +506,20 @@ utils.loadLibs = function (srcs) {
   });
 };
 
+var _moduleCache = new Map();
+utils.loadModule = function (path) {
+  if (!_moduleCache.has(path)) {
+    _moduleCache.set(
+      path,
+      import(path).catch(function (err) {
+        console.error('[VulnKit] Module load failed:', path, err);
+        throw err;
+      })
+    );
+  }
+  return _moduleCache.get(path);
+};
+
 utils.fetchWithTimeout = function (url, timeoutMs) {
   return new Promise(function (resolve) {
     const timer = setTimeout(function () {
