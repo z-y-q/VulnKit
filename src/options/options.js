@@ -44,11 +44,36 @@ const DEFAULT_TABS = [
 ];
 
 const TAB_CATEGORIES_OPT = [
-  { id: 'recon', label: '侦察', color: '#4A90E2', tabs: ['favicon', 'gather', 'subdomain', 'sniff'] },
-  { id: 'scan', label: '扫描', color: '#e74c3c', tabs: ['xssscan', 'cors', 'waf', 'cookie-audit', 'headers', 'redirect', 'fuzz'] },
-  { id: 'exploit', label: '利用', color: '#e67e22', tabs: ['jsctrl', 'payload', 'encoding', 'spoof'] },
-  { id: 'framework', label: '框架分析', color: '#27ae60', tabs: ['vue', 'ruoyi', 'react', 'angular', 'sourcemap'] },
-  { id: 'tools', label: '工具', color: '#9b59b6', tabs: ['asset', 'links', 'multiurl', 'history', 'exif', 'source-loader'] },
+  {
+    id: 'recon',
+    label: '侦察',
+    color: '#4A90E2',
+    tabs: ['favicon', 'gather', 'subdomain', 'sniff'],
+  },
+  {
+    id: 'scan',
+    label: '扫描',
+    color: '#e74c3c',
+    tabs: ['xssscan', 'cors', 'waf', 'cookie-audit', 'headers', 'redirect', 'fuzz'],
+  },
+  {
+    id: 'exploit',
+    label: '利用',
+    color: '#e67e22',
+    tabs: ['jsctrl', 'payload', 'encoding', 'spoof'],
+  },
+  {
+    id: 'framework',
+    label: '框架分析',
+    color: '#27ae60',
+    tabs: ['vue', 'ruoyi', 'react', 'angular', 'sourcemap'],
+  },
+  {
+    id: 'tools',
+    label: '工具',
+    color: '#9b59b6',
+    tabs: ['asset', 'links', 'multiurl', 'history', 'exif', 'source-loader'],
+  },
   { id: 'report', label: '统一报告', color: '#999', tabs: ['report'] },
 ];
 
@@ -155,7 +180,9 @@ function renderToolbarConfig() {
         const header = document.createElement('div');
         header.className = 'toolbar-config-category';
         header.innerHTML =
-          '<span class="toolbar-cat-dot" style="background:' + cat.color + '"></span>' +
+          '<span class="toolbar-cat-dot" style="background:' +
+          cat.color +
+          '"></span>' +
           escapeHtml(cat.label);
         container.appendChild(header);
       }
@@ -223,7 +250,7 @@ function saveSettings() {
 }
 
 function loadSettings() {
-  chrome.storage.local.get(['pentestSettings'], (result) => {
+  chrome.storage.local.get(['pentestSettings'], result => {
     const settings = result.pentestSettings || {};
     let el;
     if ((el = $('enableNotifications'))) el.checked = settings.enableNotifications !== false;
@@ -261,7 +288,7 @@ function showStatus(message, type) {
 }
 
 function exportSettings() {
-  chrome.storage.local.get(['pentestSettings'], (result) => {
+  chrome.storage.local.get(['pentestSettings'], result => {
     const dataStr = JSON.stringify(result.pentestSettings || {}, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
@@ -348,12 +375,25 @@ function clearData() {
         return !key.startsWith('context');
       });
       const known = [
-        'pentestSettings', 'pentest_keys', 'haeRules',
-        'gatherData', 'gatherDataUrl', 'gatherDataTabs', 'gatherDataTime',
-        'allLinks', 'allLinksUrl', 'pentest_spoof', 'pentest_ui_state',
-        'remotePayloads', 'payloadRemoteUrl', 'payloadVersion',
-        'ruoyiHookTabId', 'ruoyiHookEnabled', 'ruoyiHookOrigin',
-        'js_blocked_tabId', 'permInterceptTabId',
+        'pentestSettings',
+        'pentest_keys',
+        'haeRules',
+        'gatherData',
+        'gatherDataUrl',
+        'gatherDataTabs',
+        'gatherDataTime',
+        'allLinks',
+        'allLinksUrl',
+        'pentest_spoof',
+        'pentest_ui_state',
+        'remotePayloads',
+        'payloadRemoteUrl',
+        'payloadVersion',
+        'ruoyiHookTabId',
+        'ruoyiHookEnabled',
+        'ruoyiHookOrigin',
+        'js_blocked_tabId',
+        'permInterceptTabId',
       ];
       known.forEach(function (k) {
         if (keysToRemove.indexOf(k) === -1) keysToRemove.push(k);
@@ -460,6 +500,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
   // HaE rules
+  if ((btn = $('hae-add-rule'))) btn.addEventListener('click', addHaeRule);
+  if ((btn = $('hae-add-group'))) btn.addEventListener('click', addHaeGroup);
+  if ((btn = $('hae-validate-all'))) btn.addEventListener('click', validateAllHaeRules);
   if ((btn = $('hae-export-yaml'))) btn.addEventListener('click', exportHaeYaml);
   if ((btn = $('hae-import-yaml'))) btn.addEventListener('click', importHaeYaml);
   if ((btn = $('hae-reset-rules'))) btn.addEventListener('click', resetHaeRules);
@@ -481,7 +524,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Storage management — category clear
   if ((btn = $('clear-gather')))
     btn.addEventListener('click', function () {
-      clearStorageCategory(['gatherData', 'gatherDataUrl', 'gatherDataTabs', 'gatherDataTime'], '采集数据');
+      clearStorageCategory(
+        ['gatherData', 'gatherDataUrl', 'gatherDataTabs', 'gatherDataTime'],
+        '采集数据'
+      );
     });
   if ((btn = $('clear-links')))
     btn.addEventListener('click', function () {
@@ -502,7 +548,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if ((btn = $('clear-temp-state')))
     btn.addEventListener('click', function () {
       clearStorageCategory(
-        ['ruoyiHookTabId', 'ruoyiHookEnabled', 'ruoyiHookOrigin', 'js_blocked_tabId', 'permInterceptTabId'],
+        [
+          'ruoyiHookTabId',
+          'ruoyiHookEnabled',
+          'ruoyiHookOrigin',
+          'js_blocked_tabId',
+          'permInterceptTabId',
+        ],
         '临时状态'
       );
     });
@@ -512,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if ((btn = $('import-full-btn'))) btn.addEventListener('click', importFullData);
 
   // Auto-save on change
-  document.querySelectorAll('input, select').forEach((input) => {
+  document.querySelectorAll('input, select').forEach(input => {
     input.addEventListener('change', saveSettings);
   });
 
