@@ -30,3 +30,4 @@ lingmou.svg
 *.pem
 *.zip
 dist/
+coverage/
