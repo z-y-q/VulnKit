@@ -3,6 +3,36 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 
+var TIME_CLAIMS = ['exp', 'iat', 'nbf'];
+var ID_CLAIMS = ['sub', 'iss', 'jti'];
+
+function highlightJson(obj) {
+  var raw = JSON.stringify(obj, null, 2);
+  var escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return escaped
+    .replace(/("(?:\\.|[^"\\])*")\s*:/g, '<span style="color:#9b59b6">$1</span>:')
+    .replace(/:\s*("(?:\\.|[^"\\])*")/g, function (m, val) {
+      return ': <span style="color:#27ae60">' + val + '</span>';
+    })
+    .replace(/:\s*(\d+\.?\d*)/g, ': <span style="color:#e67e22">$1</span>')
+    .replace(/:\s*(true|false|null)/g, ': <span style="color:#3498db">$1</span>');
+}
+
+var CLAIM_ICONS = {
+  clock:
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3498db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  key: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9b59b6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>',
+  user: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+};
+
+function getClaimIcon(claimKey) {
+  var key = claimKey.toLowerCase();
+  if (TIME_CLAIMS.indexOf(key) !== -1) return CLAIM_ICONS.clock;
+  if (ID_CLAIMS.indexOf(key) !== -1) return CLAIM_ICONS.key;
+  if (key === 'aud') return CLAIM_ICONS.user;
+  return '';
+}
+
 function base64UrlDecode(str) {
   let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
   while (base64.length % 4 !== 0) base64 += '=';
@@ -343,7 +373,7 @@ function decodeJwt(token) {
   var header;
   try {
     header = JSON.parse(base64UrlDecode(parts[0]));
-    headerEl.textContent = JSON.stringify(header, null, 2);
+    headerEl.innerHTML = highlightJson(header);
   } catch (e) {
     errorEl.textContent = 'Header 解析失败: ' + e.message;
     errorEl.classList.remove('hidden');
@@ -353,11 +383,25 @@ function decodeJwt(token) {
   var payload;
   try {
     payload = JSON.parse(base64UrlDecode(parts[1]));
-    payloadEl.textContent = JSON.stringify(payload, null, 2);
+    payloadEl.innerHTML = highlightJson(payload);
   } catch (e) {
     errorEl.textContent = 'Payload 解析失败: ' + e.message;
     errorEl.classList.remove('hidden');
     return;
+  }
+
+  var algoBadge = utils.get('jwt-algo-badge');
+  if (algoBadge && header.alg) {
+    var algFamily = header.alg.substring(0, 2);
+    var algClass =
+      algFamily === 'HS'
+        ? 'stat-badge stat-safe'
+        : algFamily === 'RS'
+          ? 'stat-badge stat-vuln'
+          : 'stat-badge stat-warn';
+    algoBadge.className = algClass;
+    algoBadge.textContent = header.alg;
+    algoBadge.hidden = false;
   }
 
   sigEl.textContent = parts[2];
@@ -366,56 +410,48 @@ function decodeJwt(token) {
   var now = Math.floor(Date.now() / 1000);
   var claimsHtml = '';
 
-  if (payload.exp) {
-    var expDate = new Date(payload.exp * 1000);
-    var isExpired = payload.exp < now;
+  var claimEntries = [
+    { key: 'exp', label: '过期时间' },
+    { key: 'iat', label: '签发时间' },
+    { key: 'nbf', label: '生效时间' },
+    { key: 'iss', label: '签发者' },
+    { key: 'sub', label: '主题' },
+    { key: 'aud', label: '受众' },
+    { key: 'jti', label: 'JWT ID' },
+  ];
+  for (var c = 0; c < claimEntries.length; c++) {
+    var entry = claimEntries[c];
+    if (!payload[entry.key]) continue;
+    var icon = getClaimIcon(entry.key);
+    var statusClass = '';
+    var statusText = '';
+    if (entry.key === 'exp') {
+      var expDate = new Date(payload.exp * 1000);
+      var isExpired = payload.exp < now;
+      statusClass = isExpired ? 'jwt-claim-expired' : 'jwt-claim-valid';
+      statusText = expDate.toLocaleString('zh-CN') + (isExpired ? ' — 已过期' : ' — 有效');
+    } else if (entry.key === 'nbf') {
+      var isNbfValid = payload.nbf <= now;
+      statusClass = isNbfValid ? 'jwt-claim-valid' : 'jwt-claim-expired';
+      statusText =
+        new Date(payload.nbf * 1000).toLocaleString('zh-CN') +
+        (isNbfValid ? ' — 已生效' : ' — 尚未生效');
+    } else if (entry.key === 'iat') {
+      statusText = new Date(payload.iat * 1000).toLocaleString('zh-CN');
+    } else {
+      statusText = utils.escapeHtml(JSON.stringify(payload[entry.key]));
+    }
     claimsHtml +=
       '<div class="jwt-claim ' +
-      (isExpired ? 'jwt-claim-expired' : 'jwt-claim-valid') +
-      '"><span>过期时间 (exp)</span><span>' +
-      expDate.toLocaleString('zh-CN') +
-      (isExpired ? ' — 已过期' : ' — 有效') +
-      '</span></div>';
-  }
-  if (payload.iat) {
-    claimsHtml +=
-      '<div class="jwt-claim"><span>签发时间 (iat)</span><span>' +
-      new Date(payload.iat * 1000).toLocaleString('zh-CN') +
-      '</span></div>';
-  }
-  if (payload.nbf) {
-    var isNbfValid = payload.nbf <= now;
-    claimsHtml +=
-      '<div class="jwt-claim ' +
-      (isNbfValid ? 'jwt-claim-valid' : 'jwt-claim-expired') +
-      '"><span>生效时间 (nbf)</span><span>' +
-      new Date(payload.nbf * 1000).toLocaleString('zh-CN') +
-      (isNbfValid ? ' — 已生效' : ' — 尚未生效') +
-      '</span></div>';
-  }
-
-  if (payload.iss) {
-    claimsHtml +=
-      '<div class="jwt-claim"><span>签发者 (iss)</span><span>' +
-      utils.escapeHtml(String(payload.iss)) +
-      '</span></div>';
-  }
-  if (payload.sub) {
-    claimsHtml +=
-      '<div class="jwt-claim"><span>主题 (sub)</span><span>' +
-      utils.escapeHtml(String(payload.sub)) +
-      '</span></div>';
-  }
-  if (payload.aud) {
-    claimsHtml +=
-      '<div class="jwt-claim"><span>受众 (aud)</span><span>' +
-      utils.escapeHtml(JSON.stringify(payload.aud)) +
-      '</span></div>';
-  }
-  if (payload.jti) {
-    claimsHtml +=
-      '<div class="jwt-claim"><span>JWT ID (jti)</span><span>' +
-      utils.escapeHtml(String(payload.jti)) +
+      statusClass +
+      '"><span>' +
+      icon +
+      ' ' +
+      entry.label +
+      ' (' +
+      entry.key +
+      ')</span><span>' +
+      statusText +
       '</span></div>';
   }
 

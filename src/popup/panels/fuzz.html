@@ -1,41 +1,44 @@
 <!-- fuzz.html -- 目录扫描面板 -->
 <div class="panel" id="panel-fuzz">
-  <div class="panel-toolbar">
-    <input type="text" id="fuzz-url" class="panel-input" placeholder="目标 URL（如 https://example.com）">
-    <select id="fuzz-wordlist" class="panel-select">
-      <option value="common">通用目录</option>
-      <option value="backup">备份文件</option>
-      <option value="api">API 路径</option>
-      <option value="sensitive">敏感路径</option>
-    </select>
-    <input type="number" id="fuzz-concurrency" class="panel-input-sm" value="5" min="1" max="20" title="并发数">
-    <button class="panel-btn primary" id="fuzz-start-btn">开始扫描</button>
-    <button class="panel-btn" id="fuzz-pause-btn" style="display:none">暂停</button>
-    <button class="panel-btn" id="fuzz-stop-btn" style="display:none">停止</button>
-  </div>
-  <div class="fuzz-progress" id="fuzz-progress" style="display:none">
-    <div class="progress-bar"><div class="progress-fill" id="fuzz-progress-fill"></div></div>
-    <span class="progress-text" id="fuzz-progress-text">0/0</span>
-  </div>
-  <div class="fuzz-stats" id="fuzz-stats" style="display:none"></div>
-  <div class="fuzz-filter-row" id="fuzz-filter-row" style="display:none">
-    <div class="fuzz-filter-btns">
-      <button class="fuzz-filter-btn active" data-filter="all">全部</button>
-      <button class="fuzz-filter-btn" data-filter="2xx">2xx</button>
-      <button class="fuzz-filter-btn" data-filter="3xx">3xx</button>
-      <button class="fuzz-filter-btn" data-filter="403">403</button>
-      <button class="fuzz-filter-btn" data-filter="interesting">感兴趣的</button>
+  <div class="content-card">
+    <div class="card-title">目录扫描</div>
+    <div class="module-desc">基于多字典对目标路径进行枚举，自动分析响应内容识别敏感目录</div>
+    <div class="panel-toolbar">
+      <input type="text" id="fuzz-url" class="input" placeholder="目标 URL（如 https://example.com）">
+      <select id="fuzz-wordlist" class="panel-select">
+        <option value="common">通用目录</option>
+        <option value="backup">备份文件</option>
+        <option value="api">API 路径</option>
+        <option value="sensitive">敏感路径</option>
+      </select>
+      <input type="number" id="fuzz-concurrency" class="panel-input-sm" value="5" min="1" max="20" title="并发数">
+      <button class="btn btn-primary" id="fuzz-start-btn">开始扫描</button>
+      <button class="btn btn-outline" id="fuzz-pause-btn" hidden>暂停</button>
+      <button class="btn btn-outline" id="fuzz-stop-btn" hidden>停止</button>
     </div>
-    <input type="text" id="fuzz-search" class="filter-search" placeholder="搜索路径...">
-  </div>
-  <div class="fuzz-results" id="fuzz-results">
-    <div class="empty-state">输入目标 URL，选择字典后开始目录扫描</div>
-  </div>
-  <div class="panel-footer">
-    <select id="fuzz-export-format" class="export-format-select">
-      <option value="txt">TXT</option>
-      <option value="csv">CSV</option>
-    </select>
-    <button class="panel-btn" id="fuzz-export-btn" style="display:none">导出结果</button>
+    <div class="fuzz-progress" id="fuzz-progress" hidden>
+      <div class="progress-bar"><div class="progress-fill" id="fuzz-progress-fill"></div></div>
+      <span class="progress-text" id="fuzz-progress-text">0/0</span>
+    </div>
+    <div class="fuzz-stats" id="fuzz-stats" hidden></div>
+    <div class="filter-row" id="fuzz-filter-row" hidden>
+      <span class="filter-label">状态码:</span>
+      <button class="filter-btn active" data-filter="all">全部</button>
+      <button class="filter-btn" data-filter="2xx">2xx</button>
+      <button class="filter-btn" data-filter="3xx">3xx</button>
+      <button class="filter-btn" data-filter="403">403</button>
+      <button class="filter-btn" data-filter="interesting">感兴趣的</button>
+      <input type="text" id="fuzz-search" class="filter-search" placeholder="搜索路径...">
+    </div>
+    <div class="fuzz-results" id="fuzz-results">
+      <div class="empty-state">输入目标 URL，选择字典后开始目录扫描</div>
+    </div>
+    <div class="panel-footer">
+      <select id="fuzz-export-format" class="export-format-select">
+        <option value="txt">TXT</option>
+        <option value="csv">CSV</option>
+      </select>
+      <button class="btn btn-outline" id="fuzz-export-btn" hidden>导出结果</button>
+    </div>
   </div>
 </div>

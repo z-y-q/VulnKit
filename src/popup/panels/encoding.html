@@ -41,6 +41,9 @@
             <button class="btn btn-outline" id="jwt-clear-btn">清空</button>
           </div>
           <div id="jwt-result" class="hidden">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <span id="jwt-algo-badge" class="stat-badge" hidden></span>
+            </div>
             <div class="jwt-block">
               <div class="jwt-block-header">Header <span class="jwt-color-dot" style="background:#e74c3c"></span></div>
               <pre class="jwt-pre" id="jwt-header"></pre>

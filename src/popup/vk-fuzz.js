@@ -5,75 +5,231 @@ import { utilsProxy as utils } from './vk-namespace.js';
 
 var DEFAULT_WORDLISTS = {
   common: [
-    '/admin/', '/admin/login', '/admin/dashboard', '/login/', '/console/',
-    '/debug/', '/test/', '/tmp/', '/uploads/', '/upload/', '/backup/',
-    '/config/', '/status/', '/info/', '/health', '/metrics/', '/api/',
-    '/api/v1/', '/api/v2/', '/swagger-ui.html', '/swagger-ui/',
-    '/doc.html', '/docs/', '/api-docs', '/graphiql', '/graphql',
-    '/wp-admin/', '/wp-login.php', '/wp-json/', '/phpmyadmin/',
-    '/manager/html', '/server-status', '/server-info',
-    '/.env', '/.git/', '/.git/config', '/.svn/', '/.DS_Store',
-    '/robots.txt', '/sitemap.xml', '/crossdomain.xml',
-    '/WEB-INF/', '/WEB-INF/web.xml', '/actuator/', '/actuator/health',
-    '/actuator/env', '/actuator/mappings', '/trace',
-    '/console/', '/administrator/', '/manage/', '/user/', '/users/',
-    '/setup/', '/install/', '/phpinfo.php', '/.htaccess', '/.htpasswd',
-    '/web.config', '/config.php', '/config.yml', '/config.json',
-    '/database.sql', '/db.sql', '/backup.sql', '/dump.sql',
-    '/assets/', '/static/', '/public/', '/media/', '/files/',
-    '/download/', '/export/', '/import/', '/log/', '/logs/',
-    '/error/', '/errors/', '/exception/', '/trace/',
+    '/admin/',
+    '/admin/login',
+    '/admin/dashboard',
+    '/login/',
+    '/console/',
+    '/debug/',
+    '/test/',
+    '/tmp/',
+    '/uploads/',
+    '/upload/',
+    '/backup/',
+    '/config/',
+    '/status/',
+    '/info/',
+    '/health',
+    '/metrics/',
+    '/api/',
+    '/api/v1/',
+    '/api/v2/',
+    '/swagger-ui.html',
+    '/swagger-ui/',
+    '/doc.html',
+    '/docs/',
+    '/api-docs',
+    '/graphiql',
+    '/graphql',
+    '/wp-admin/',
+    '/wp-login.php',
+    '/wp-json/',
+    '/phpmyadmin/',
+    '/manager/html',
+    '/server-status',
+    '/server-info',
+    '/.env',
+    '/.git/',
+    '/.git/config',
+    '/.svn/',
+    '/.DS_Store',
+    '/robots.txt',
+    '/sitemap.xml',
+    '/crossdomain.xml',
+    '/WEB-INF/',
+    '/WEB-INF/web.xml',
+    '/actuator/',
+    '/actuator/health',
+    '/actuator/env',
+    '/actuator/mappings',
+    '/trace',
+    '/console/',
+    '/administrator/',
+    '/manage/',
+    '/user/',
+    '/users/',
+    '/setup/',
+    '/install/',
+    '/phpinfo.php',
+    '/.htaccess',
+    '/.htpasswd',
+    '/web.config',
+    '/config.php',
+    '/config.yml',
+    '/config.json',
+    '/database.sql',
+    '/db.sql',
+    '/backup.sql',
+    '/dump.sql',
+    '/assets/',
+    '/static/',
+    '/public/',
+    '/media/',
+    '/files/',
+    '/download/',
+    '/export/',
+    '/import/',
+    '/log/',
+    '/logs/',
+    '/error/',
+    '/errors/',
+    '/exception/',
+    '/trace/',
   ],
   backup: [
-    '/.bak', '/.zip', '/.tar.gz', '/.tgz', '/.rar', '/.7z',
-    '/backup.zip', '/backup.tar.gz', '/backup.sql', '/backup.gz',
-    '/www.zip', '/www.tar.gz', '/web.zip', '/site.zip',
-    '/db_backup.sql', '/database.sql', '/dump.sql', '/data.sql',
-    '/backup/', '/backups/', '/old/', '/archive/',
-    '/.git/HEAD', '/.git/config', '/.gitignore',
-    '/.svn/entries', '/.hg/store',
-    '/.env', '/.env.bak', '/.env.local', '/.env.production',
-    '/.env.development', '/.env.staging',
-    '/web.config.bak', '/web.config.old', '/web.config.save',
-    '/config.php.bak', '/config.php.old', '/config.php.save',
-    '/config.yml.bak', '/config.yml.old',
-    '/wp-config.php.bak', '/wp-config.php~',
-    '/source.zip', '/src.zip', '/code.zip', '/project.zip',
-    '/1.zip', '/2.zip', '/wwwroot.zip',
+    '/.bak',
+    '/.zip',
+    '/.tar.gz',
+    '/.tgz',
+    '/.rar',
+    '/.7z',
+    '/backup.zip',
+    '/backup.tar.gz',
+    '/backup.sql',
+    '/backup.gz',
+    '/www.zip',
+    '/www.tar.gz',
+    '/web.zip',
+    '/site.zip',
+    '/db_backup.sql',
+    '/database.sql',
+    '/dump.sql',
+    '/data.sql',
+    '/backup/',
+    '/backups/',
+    '/old/',
+    '/archive/',
+    '/.git/HEAD',
+    '/.git/config',
+    '/.gitignore',
+    '/.svn/entries',
+    '/.hg/store',
+    '/.env',
+    '/.env.bak',
+    '/.env.local',
+    '/.env.production',
+    '/.env.development',
+    '/.env.staging',
+    '/web.config.bak',
+    '/web.config.old',
+    '/web.config.save',
+    '/config.php.bak',
+    '/config.php.old',
+    '/config.php.save',
+    '/config.yml.bak',
+    '/config.yml.old',
+    '/wp-config.php.bak',
+    '/wp-config.php~',
+    '/source.zip',
+    '/src.zip',
+    '/code.zip',
+    '/project.zip',
+    '/1.zip',
+    '/2.zip',
+    '/wwwroot.zip',
   ],
   api: [
-    '/api/', '/api/v1/', '/api/v2/', '/api/v3/',
-    '/api/docs', '/api-docs', '/api/swagger', '/api/json',
-    '/swagger-ui.html', '/swagger-ui/', '/swagger-ui/index.html',
-    '/swagger.json', '/swagger.yaml', '/openapi.json', '/openapi.yaml',
-    '/graphql', '/graphiql', '/playground',
-    '/wp-json/', '/wp-json/wp/v2/', '/rest/',
-    '/actuator/', '/actuator/health', '/actuator/info',
-    '/actuator/env', '/actuator/mappings', '/actuator/beans',
-    '/actuator/configprops', '/actuator/metrics',
-    '/healthz', '/ready', '/livez', '/api/health',
-    '/v1/', '/v2/', '/v3/', '/version',
-    '/api/status', '/api/ping', '/api/version',
-    '/rest/api', '/rest/v1/', '/services/',
+    '/api/',
+    '/api/v1/',
+    '/api/v2/',
+    '/api/v3/',
+    '/api/docs',
+    '/api-docs',
+    '/api/swagger',
+    '/api/json',
+    '/swagger-ui.html',
+    '/swagger-ui/',
+    '/swagger-ui/index.html',
+    '/swagger.json',
+    '/swagger.yaml',
+    '/openapi.json',
+    '/openapi.yaml',
+    '/graphql',
+    '/graphiql',
+    '/playground',
+    '/wp-json/',
+    '/wp-json/wp/v2/',
+    '/rest/',
+    '/actuator/',
+    '/actuator/health',
+    '/actuator/info',
+    '/actuator/env',
+    '/actuator/mappings',
+    '/actuator/beans',
+    '/actuator/configprops',
+    '/actuator/metrics',
+    '/healthz',
+    '/ready',
+    '/livez',
+    '/api/health',
+    '/v1/',
+    '/v2/',
+    '/v3/',
+    '/version',
+    '/api/status',
+    '/api/ping',
+    '/api/version',
+    '/rest/api',
+    '/rest/v1/',
+    '/services/',
   ],
   sensitive: [
-    '/etc/passwd', '/etc/shadow', '/etc/hosts',
-    '/proc/self/environ', '/proc/self/cmdline',
-    '/.DS_Store', '/Thumbs.db', '/desktop.ini',
-    '/server-status', '/server-info', '/server-config',
-    '/phpmyadmin/', '/pma/', '/adminer/', '/adminer.php',
-    '/manager/html', '/manager/status',
-    '/.env.bak', '/.env.local', '/.env.production',
-    '/config.php.bak', '/config.yml.bak',
-    '/database.sql', '/db.sql', '/dump.sql',
-    '/WEB-INF/', '/WEB-INF/web.xml', '/META-INF/',
-    '/.idea/', '/.vscode/', '/.github/',
-    '/debug/default/view', '/actuator/heapdump',
-    '/.dockerenv', '/Dockerfile', '/docker-compose.yml',
-    '/.travis.yml', '/.gitlab-ci.yml',
-    '/webpack.config.js', '/package.json',
-    '/.npmrc', '/.yarnrc', '/.pypirc',
-    '/credentials.json', '/secrets.json', '/keys.json',
+    '/etc/passwd',
+    '/etc/shadow',
+    '/etc/hosts',
+    '/proc/self/environ',
+    '/proc/self/cmdline',
+    '/.DS_Store',
+    '/Thumbs.db',
+    '/desktop.ini',
+    '/server-status',
+    '/server-info',
+    '/server-config',
+    '/phpmyadmin/',
+    '/pma/',
+    '/adminer/',
+    '/adminer.php',
+    '/manager/html',
+    '/manager/status',
+    '/.env.bak',
+    '/.env.local',
+    '/.env.production',
+    '/config.php.bak',
+    '/config.yml.bak',
+    '/database.sql',
+    '/db.sql',
+    '/dump.sql',
+    '/WEB-INF/',
+    '/WEB-INF/web.xml',
+    '/META-INF/',
+    '/.idea/',
+    '/.vscode/',
+    '/.github/',
+    '/debug/default/view',
+    '/actuator/heapdump',
+    '/.dockerenv',
+    '/Dockerfile',
+    '/docker-compose.yml',
+    '/.travis.yml',
+    '/.gitlab-ci.yml',
+    '/webpack.config.js',
+    '/package.json',
+    '/.npmrc',
+    '/.yarnrc',
+    '/.pypirc',
+    '/credentials.json',
+    '/secrets.json',
+    '/keys.json',
   ],
 };
 
@@ -134,32 +290,46 @@ function analyzeContent(body) {
 
 function probePath(fullUrl) {
   return new Promise(function (resolve) {
-    chrome.runtime.sendMessage({ type: 'FETCH_PROBE', url: fullUrl, method: 'HEAD' }, function (resp) {
-      if (chrome.runtime.lastError) {
-        resolve({ status: 0, body: '', headers: {}, time: 0 });
-        return;
+    chrome.runtime.sendMessage(
+      { type: 'FETCH_PROBE', url: fullUrl, method: 'HEAD' },
+      function (resp) {
+        if (chrome.runtime.lastError) {
+          resolve({ status: 0, body: '', headers: {}, time: 0 });
+          return;
+        }
+        if (resp && resp.status === 405) {
+          chrome.runtime.sendMessage(
+            { type: 'FETCH_PROBE', url: fullUrl, method: 'GET', includeBody: true },
+            function (getResp) {
+              if (chrome.runtime.lastError) {
+                resolve({
+                  status: 405,
+                  body: '',
+                  headers: resp.headers || {},
+                  time: 0,
+                  _method: 'HEAD',
+                });
+                return;
+              }
+              var r = getResp || { status: 0, body: '', headers: {}, time: 0 };
+              r._method = 'GET';
+              resolve(r);
+            }
+          );
+          return;
+        }
+        var r = resp || { status: 0, body: '', headers: {}, time: 0 };
+        r._method = 'HEAD';
+        resolve(r);
       }
-      if (resp && resp.status === 405) {
-        chrome.runtime.sendMessage({ type: 'FETCH_PROBE', url: fullUrl, method: 'GET', includeBody: true }, function (getResp) {
-          if (chrome.runtime.lastError) {
-            resolve({ status: 405, body: '', headers: resp.headers || {}, time: 0, _method: 'HEAD' });
-            return;
-          }
-          var r = getResp || { status: 0, body: '', headers: {}, time: 0 };
-          r._method = 'GET';
-          resolve(r);
-        });
-        return;
-      }
-      var r = resp || { status: 0, body: '', headers: {}, time: 0 };
-      r._method = 'HEAD';
-      resolve(r);
-    });
+    );
   });
 }
 
 function delay(ms) {
-  return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  return new Promise(function (resolve) {
+    setTimeout(resolve, ms);
+  });
 }
 
 async function runFuzzScan(baseUrl, wordlistKey, concurrency, onProgress, onResult) {
@@ -295,10 +465,24 @@ function applyFuzzFilter(item) {
   if (f === 'interesting' && !item.interesting) return false;
   var q = fuzzState.currentSearch;
   if (q) {
-    var text = ((item.path || '') + ' ' + (item.title || '') + ' ' + (item.tags || []).join(' ')).toLowerCase();
+    var text = (
+      (item.path || '') +
+      ' ' +
+      (item.title || '') +
+      ' ' +
+      (item.tags || []).join(' ')
+    ).toLowerCase();
     return text.indexOf(q) !== -1;
   }
   return true;
+}
+
+var COPY_SVG =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+function formatSize(bytes) {
+  if (bytes > 1024) return (bytes / 1024).toFixed(1) + 'K';
+  return bytes + 'B';
 }
 
 function renderFuzzResults(result) {
@@ -309,19 +493,25 @@ function renderFuzzResults(result) {
   if (!container || !result) return;
 
   if (statsEl) {
-    statsEl.style.display = 'flex';
+    statsEl.hidden = false;
     var s = result.stats;
     statsEl.innerHTML =
-      '<span>扫描: ' + s.completed + '/' + s.total + '</span>' +
-      '<span>发现: ' + s.found + '</span>' +
-      (s.errors > 0 ? '<span>错误: ' + s.errors + '</span>' : '');
+      '<span class="stat-badge stat-total">扫描 ' +
+      s.completed +
+      '/' +
+      s.total +
+      '</span> ' +
+      '<span class="stat-badge stat-found">发现 ' +
+      s.found +
+      '</span>' +
+      (s.errors > 0 ? ' <span class="stat-badge stat-error">错误 ' + s.errors + '</span>' : '');
   }
 
   var found = result.results.filter(applyFuzzFilter);
 
   if (found.length === 0) {
     container.innerHTML = '<div class="empty-state">无匹配结果</div>';
-    if (exportBtn) exportBtn.style.display = '';
+    if (exportBtn) exportBtn.hidden = false;
     return;
   }
 
@@ -339,40 +529,63 @@ function renderFuzzResults(result) {
     else if (r.status === 403) statusClass = 's-403';
     else if (r.status >= 500) statusClass = 's-500';
 
-    var dupClass = r.duplicate ? ' fuzz-item-duplicate' : '';
-    var interestClass = r.interesting ? ' fuzz-item-interesting' : '';
+    var cardClass = 'fuzz-card';
+    if (r.duplicate) cardClass += ' fuzz-card-duplicate';
+    if (r.interesting) cardClass += ' fuzz-card-interesting';
 
-    html += '<div class="fuzz-item' + dupClass + interestClass + '">';
+    var hasDetail = r.title || r.tags.length > 0 || r.method === 'GET';
+
+    html += '<div class="' + cardClass + '">';
+    html += '<div class="fuzz-card-row">';
     html += '<span class="fuzz-path">' + utils.escapeHtml(r.path) + '</span>';
-    html += '<span class="fuzz-status-code ' + statusClass + '">' + r.status + '</span>';
-    html += '<span class="fuzz-size">' + (r.size > 1024 ? (r.size / 1024).toFixed(1) + 'K' : r.size + 'B') + '</span>';
-    html += '<span class="fuzz-time">' + r.time + 'ms</span>';
+    html +=
+      '<button class="fuzz-copy-btn" data-copy="' +
+      utils.escapeHtml(r.url || r.path) +
+      '" title="复制路径">' +
+      COPY_SVG +
+      '</button>';
     html += '</div>';
-
-    if (r.title) {
-      html += '<div class="fuzz-item-title">Title: ' + utils.escapeHtml(r.title) + '</div>';
-    }
-    if (r.tags.length > 0) {
-      html += '<div class="fuzz-item-tags">';
-      for (var t = 0; t < r.tags.length; t++) {
-        html += '<span class="fuzz-tag">' + utils.escapeHtml(r.tags[t]) + '</span>';
+    html += '<div class="fuzz-card-meta">';
+    html += '<span class="fuzz-status-code ' + statusClass + '">' + r.status + '</span>';
+    html += '<span class="fuzz-size">' + formatSize(r.size) + '</span>';
+    html += '<span class="fuzz-time">' + r.time + 'ms</span>';
+    if (r.duplicate) html += '<span class="fuzz-dup-label">重复</span>';
+    html += '</div>';
+    if (hasDetail) {
+      html += '<div class="fuzz-card-detail">';
+      if (r.title)
+        html += '<div class="fuzz-card-title">Title: ' + utils.escapeHtml(r.title) + '</div>';
+      if (r.tags.length > 0) {
+        html += '<div class="fuzz-card-tags">';
+        for (var t = 0; t < r.tags.length; t++) {
+          html += '<span class="fuzz-tag">' + utils.escapeHtml(r.tags[t]) + '</span>';
+        }
+        html += '</div>';
       }
+      if (r.method === 'GET') html += '<div class="fuzz-card-method">GET (HEAD 405 fallback)</div>';
       html += '</div>';
     }
-    if (r.method === 'GET') {
-      html += '<div class="fuzz-item-method">GET (HEAD 405 fallback)</div>';
-    }
+    html += '</div>';
   }
 
   container.innerHTML = html;
-  if (exportBtn) exportBtn.style.display = '';
+  if (exportBtn) exportBtn.hidden = false;
 }
 
 function exportTxt() {
   if (!fuzzState.lastResults) return;
   var r = fuzzState.lastResults;
-  var found = r.results.filter(function (e) { return e.status > 0 && e.status !== 404; });
-  var lines = ['目录扫描报告', '==================', '目标: ' + r.url, '字典: ' + r.wordlist, '发现: ' + found.length, ''];
+  var found = r.results.filter(function (e) {
+    return e.status > 0 && e.status !== 404;
+  });
+  var lines = [
+    '目录扫描报告',
+    '==================',
+    '目标: ' + r.url,
+    '字典: ' + r.wordlist,
+    '发现: ' + found.length,
+    '',
+  ];
   for (var i = 0; i < found.length; i++) {
     var e = found[i];
     var line = '[' + e.status + '] ' + e.path + ' (' + e.size + 'B, ' + e.time + 'ms';
@@ -382,20 +595,36 @@ function exportTxt() {
     if (e.title) lines.push('  Title: ' + e.title);
     if (e.tags.length > 0) lines.push('  Tags: ' + e.tags.join(', '));
   }
-  utils.downloadBlob(new Blob([lines.join('\n')], { type: 'text/plain' }), 'fuzz-scan-' + Date.now() + '.txt');
+  utils.downloadBlob(
+    new Blob([lines.join('\n')], { type: 'text/plain' }),
+    'fuzz-scan-' + Date.now() + '.txt'
+  );
   utils.showToast('TXT 报告已导出', 'success');
 }
 
 function exportCsv() {
   if (!fuzzState.lastResults) return;
   var r = fuzzState.lastResults;
-  var found = r.results.filter(function (e) { return e.status > 0 && e.status !== 404; });
+  var found = r.results.filter(function (e) {
+    return e.status > 0 && e.status !== 404;
+  });
   var rows = [['Path', 'Status', 'Size', 'Time(ms)', 'Method', 'Title', 'Tags']];
   for (var i = 0; i < found.length; i++) {
     var e = found[i];
-    rows.push([e.path, String(e.status), String(e.size), String(e.time), e.method, e.title, (e.tags || []).join(', ')]);
+    rows.push([
+      e.path,
+      String(e.status),
+      String(e.size),
+      String(e.time),
+      e.method,
+      e.title,
+      (e.tags || []).join(', '),
+    ]);
   }
-  utils.downloadBlob(new Blob([utils.buildCsv(rows)], { type: 'text/csv;charset=utf-8' }), 'fuzz-scan-' + Date.now() + '.csv');
+  utils.downloadBlob(
+    new Blob([utils.buildCsv(rows)], { type: 'text/csv;charset=utf-8' }),
+    'fuzz-scan-' + Date.now() + '.csv'
+  );
   utils.showToast('CSV 报告已导出', 'success');
 }
 
@@ -410,13 +639,20 @@ function exportFuzzResults(format) {
 function getFindings() {
   if (!fuzzState.lastResults) return [];
   var findings = [];
-  var found = fuzzState.lastResults.results.filter(function (r) { return r.status > 0 && r.status !== 404; });
+  var found = fuzzState.lastResults.results.filter(function (r) {
+    return r.status > 0 && r.status !== 404;
+  });
   for (var i = 0; i < found.length; i++) {
     var r = found[i];
     var severity;
     if (r.status === 200) {
       severity = 'medium';
-      if (r.path.indexOf('backup') !== -1 || r.path.indexOf('.sql') !== -1 || r.path.indexOf('.env') !== -1 || r.path.indexOf('config') !== -1) {
+      if (
+        r.path.indexOf('backup') !== -1 ||
+        r.path.indexOf('.sql') !== -1 ||
+        r.path.indexOf('.env') !== -1 ||
+        r.path.indexOf('config') !== -1
+      ) {
         severity = 'high';
       }
     } else if (r.status === 403) {

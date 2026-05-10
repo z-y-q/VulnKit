@@ -645,6 +645,27 @@ function applyHeaderFilter(result) {
 
 // ====== Render ======
 
+var CATEGORY_ICONS = {
+  security:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  privacy:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+  'cross-origin':
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+  caching:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>',
+  legacy:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  monitoring:
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+};
+
+var STATUS_ICONS = {
+  pass: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#27ae60" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  warn: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f39c12" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  miss: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+};
+
 function renderHeadersResults(analysis) {
   var container = utils.get('headers-results');
   var scoreContainer = utils.get('headers-score-container');
@@ -656,7 +677,7 @@ function renderHeadersResults(analysis) {
 
   if (!container || !analysis) return;
 
-  scoreContainer.style.display = 'flex';
+  scoreContainer.hidden = false;
 
   var gradeClass = 'grade-' + analysis.grade.toLowerCase();
   gradeEl.className = 'headers-grade ' + gradeClass;
@@ -672,9 +693,16 @@ function renderHeadersResults(analysis) {
     analysis.score >= 75 ? 'score-high' : analysis.score >= 50 ? 'score-medium' : 'score-low'
   );
 
-  summaryEl.innerHTML = utils.escapeHtml(
-    '通过 ' + analysis.passed + ' | 警告 ' + analysis.warning + ' | 缺失 ' + analysis.missing
-  );
+  summaryEl.innerHTML =
+    '<span class="stat-badge stat-found">通过 ' +
+    analysis.passed +
+    '</span> ' +
+    '<span class="stat-badge stat-warn">警告 ' +
+    analysis.warning +
+    '</span> ' +
+    '<span class="stat-badge stat-vuln">缺失 ' +
+    analysis.missing +
+    '</span>';
 
   var filtered = analysis.results.filter(applyHeaderFilter);
   var grouped = groupByCategory(filtered);
@@ -688,53 +716,67 @@ function renderHeadersResults(analysis) {
     html += '<div class="headers-category">';
     html +=
       '<div class="headers-category-title">' +
+      (CATEGORY_ICONS[cat] || '') +
+      ' ' +
       utils.escapeHtml(CATEGORY_LABELS[cat] || cat) +
       '</div>';
     for (var i = 0; i < items.length; i++) {
       var r = items[i];
-      html += '<div class="headers-result-item">';
-      html += '<span class="headers-status ' + r.status + '"></span>';
+      html += '<div class="headers-result-card">';
+      html += '<div class="headers-result-row">';
+      html +=
+        '<span class="headers-status-icon">' +
+        (STATUS_ICONS[r.status] || STATUS_ICONS.miss) +
+        '</span>';
       html += '<span class="headers-header-name">' + utils.escapeHtml(r.name) + '</span>';
-      html += '<span class="headers-header-value">' + utils.escapeHtml(r.detail || '-') + '</span>';
       html += '</div>';
+      html +=
+        '<div class="headers-header-value" data-truncate="true">' +
+        utils.escapeHtml(r.detail || '-') +
+        '</div>';
       if (r.recommendation) {
         html += '<div class="headers-header-rec">' + utils.escapeHtml(r.recommendation) + '</div>';
       }
+      html += '</div>';
     }
     html += '</div>';
   }
 
-  // Info leaks section
   if (
     lastAnalysisResult &&
     lastAnalysisResult.infoLeaks &&
     lastAnalysisResult.infoLeaks.length > 0
   ) {
     html += '<div class="headers-category">';
-    html += '<div class="headers-category-title headers-category-infoleak">信息泄露</div>';
+    html +=
+      '<div class="headers-category-title headers-category-infoleak">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/></svg> 信息泄露</div>';
     for (var li = 0; li < lastAnalysisResult.infoLeaks.length; li++) {
       var leak = lastAnalysisResult.infoLeaks[li];
-      html += '<div class="headers-result-item headers-infoleak-item">';
-      html += '<span class="headers-status warn"></span>';
+      html += '<div class="headers-result-card headers-infoleak-card">';
+      html += '<div class="headers-result-row">';
+      html += '<span class="headers-status-icon">' + STATUS_ICONS.warn + '</span>';
       html += '<span class="headers-header-name">' + utils.escapeHtml(leak.name) + '</span>';
-      html += '<span class="headers-header-value">' + utils.escapeHtml(leak.detail) + '</span>';
       html += '</div>';
+      html += '<div class="headers-header-value">' + utils.escapeHtml(leak.detail) + '</div>';
       html += '<div class="headers-header-rec">' + utils.escapeHtml(leak.info) + '</div>';
+      html += '</div>';
     }
     html += '</div>';
   }
 
-  // Cookie analysis section
   if (
     lastAnalysisResult &&
     lastAnalysisResult.cookieAnalysis &&
     lastAnalysisResult.cookieAnalysis.length > 0
   ) {
     html += '<div class="headers-category">';
-    html += '<div class="headers-category-title headers-category-cookie">Cookie 安全</div>';
+    html +=
+      '<div class="headers-category-title headers-category-cookie">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Cookie 安全</div>';
     for (var ci = 0; ci < lastAnalysisResult.cookieAnalysis.length; ci++) {
       var cf = lastAnalysisResult.cookieAnalysis[ci];
-      html += '<div class="headers-cookie-item">';
+      html += '<div class="headers-result-card">';
       html += '<div class="headers-cookie-name">' + utils.escapeHtml(cf.name) + '</div>';
       html += '<div class="headers-cookie-flags">';
       for (var fi = 0; fi < cf.issues.length; fi++) {
@@ -743,11 +785,12 @@ function renderHeadersResults(analysis) {
       }
       if (cf.flags.secure) html += '<span class="headers-cookie-flag pass">Secure</span>';
       if (cf.flags.httponly) html += '<span class="headers-cookie-flag pass">HttpOnly</span>';
-      if (cf.flags.samesite)
+      if (cf.flags.samesite) {
         html +=
           '<span class="headers-cookie-flag pass">SameSite=' +
           utils.escapeHtml(cf.flags.samesite) +
           '</span>';
+      }
       html += '</div></div>';
     }
     html += '</div>';
@@ -758,7 +801,7 @@ function renderHeadersResults(analysis) {
   }
 
   container.innerHTML = html;
-  if (exportBtn) exportBtn.style.display = '';
+  if (exportBtn) exportBtn.hidden = false;
 }
 
 // ====== Export ======

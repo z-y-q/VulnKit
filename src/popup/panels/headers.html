@@ -1,37 +1,40 @@
 <!-- headers.html -- 安全头分析面板 -->
 <div class="panel" id="panel-headers">
-  <div class="panel-toolbar">
-    <input type="text" id="headers-url" class="panel-input" placeholder="目标 URL（自动填充当前页面）">
-    <button class="panel-btn primary" id="headers-scan-btn">扫描安全头</button>
-  </div>
-  <div class="headers-score-container" id="headers-score-container" style="display:none">
-    <div class="headers-grade" id="headers-grade">-</div>
-    <div class="headers-score-ring">
-      <svg viewBox="0 0 120 120" class="score-ring-svg">
-        <circle cx="60" cy="60" r="54" class="score-ring-bg"/>
-        <circle cx="60" cy="60" r="54" class="score-ring-fg" id="headers-score-ring"/>
-      </svg>
-      <div class="headers-score-text" id="headers-score-text">0</div>
+  <div class="content-card">
+    <div class="card-title">安全头分析</div>
+    <div class="module-desc">检测目标 HTTP 安全响应头配置，评估 CSP、Cookie 安全、信息泄露等风险</div>
+    <div class="panel-toolbar">
+      <input type="text" id="headers-url" class="input" placeholder="目标 URL（自动填充当前页面）">
+      <button class="btn btn-primary" id="headers-scan-btn">扫描安全头</button>
     </div>
-    <div class="headers-summary" id="headers-summary"></div>
-  </div>
-  <div class="headers-filter-row" id="headers-filter-row">
-    <div class="headers-filter-btns">
-      <button class="headers-filter-btn active" data-filter="all">全部</button>
-      <button class="headers-filter-btn" data-filter="missing">缺失</button>
-      <button class="headers-filter-btn" data-filter="warn">警告</button>
-      <button class="headers-filter-btn" data-filter="pass">通过</button>
+    <div class="headers-score-container" id="headers-score-container" hidden>
+      <div class="headers-grade" id="headers-grade">-</div>
+      <div class="headers-score-ring">
+        <svg viewBox="0 0 120 120" class="score-ring-svg">
+          <circle cx="60" cy="60" r="54" class="score-ring-bg"/>
+          <circle cx="60" cy="60" r="54" class="score-ring-fg" id="headers-score-ring"/>
+        </svg>
+        <div class="headers-score-text" id="headers-score-text">0</div>
+      </div>
+      <div class="headers-summary" id="headers-summary"></div>
     </div>
-    <input type="text" id="headers-search" class="filter-search" placeholder="搜索安全头...">
-  </div>
-  <div class="headers-results" id="headers-results">
-    <div class="empty-state">点击「扫描安全头」分析当前页面的 HTTP 安全响应头</div>
-  </div>
-  <div class="panel-footer">
-    <select id="headers-export-format" class="export-format-select">
-      <option value="txt">TXT</option>
-      <option value="csv">CSV</option>
-    </select>
-    <button class="panel-btn" id="headers-export-btn" style="display:none">导出结果</button>
+    <div class="filter-row" id="headers-filter-row">
+      <span class="filter-label">状态:</span>
+      <button class="filter-btn active" data-filter="all">全部</button>
+      <button class="filter-btn" data-filter="missing">缺失</button>
+      <button class="filter-btn" data-filter="warn">警告</button>
+      <button class="filter-btn" data-filter="pass">通过</button>
+      <input type="text" id="headers-search" class="filter-search" placeholder="搜索安全头...">
+    </div>
+    <div class="headers-results" id="headers-results">
+      <div class="empty-state">点击「扫描安全头」分析当前页面的 HTTP 安全响应头</div>
+    </div>
+    <div class="panel-footer">
+      <select id="headers-export-format" class="export-format-select">
+        <option value="txt">TXT</option>
+        <option value="csv">CSV</option>
+      </select>
+      <button class="btn btn-outline" id="headers-export-btn" hidden>导出结果</button>
+    </div>
   </div>
 </div>

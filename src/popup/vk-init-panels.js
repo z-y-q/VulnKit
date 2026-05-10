@@ -925,12 +925,16 @@ function initSecurityDetectors2() {
         return;
       }
       var btn = utils.get('headers-scan-btn');
-      if (btn) btn.disabled = true;
+      if (!btn) return;
+      var origText = btn.textContent;
+      btn.innerHTML = '<span class="spinner"></span> 扫描中...';
+      btn.disabled = true;
       try {
         var result = await headers.scanSecurityHeaders(url);
         if (result) headers.renderHeadersResults(result);
       } finally {
-        if (btn) btn.disabled = false;
+        btn.textContent = origText;
+        btn.disabled = false;
       }
     });
 
@@ -939,7 +943,7 @@ function initSecurityDetectors2() {
       headers.exportHeadersResults(format);
     });
 
-    var hFilterBtns = document.querySelectorAll('#headers-filter-row .headers-filter-btn');
+    var hFilterBtns = document.querySelectorAll('#headers-filter-row .filter-btn');
     for (var hi = 0; hi < hFilterBtns.length; hi++) {
       hFilterBtns[hi].addEventListener('click', function () {
         for (var hj = 0; hj < hFilterBtns.length; hj++) hFilterBtns[hj].classList.remove('active');
@@ -977,7 +981,10 @@ function initSecurityDetectors2() {
       var progressFill = utils.get('redirect-progress-fill');
       var progressText = utils.get('redirect-progress-text');
       if (scanBtn) scanBtn.style.display = 'none';
-      if (stopBtn) stopBtn.style.display = '';
+      if (stopBtn) {
+        stopBtn.style.display = '';
+        stopBtn.innerHTML = '<span class="spinner"></span> 扫描中...';
+      }
       if (progressEl) progressEl.style.display = 'flex';
 
       try {
@@ -989,7 +996,10 @@ function initSecurityDetectors2() {
         if (result) redirect.renderRedirectResults(result);
       } finally {
         if (scanBtn) scanBtn.style.display = '';
-        if (stopBtn) stopBtn.style.display = 'none';
+        if (stopBtn) {
+          stopBtn.textContent = '停止';
+          stopBtn.style.display = 'none';
+        }
       }
     });
 
@@ -1002,7 +1012,7 @@ function initSecurityDetectors2() {
       redirect.exportRedirectResults(format);
     });
 
-    var filterBtns = document.querySelectorAll('#redirect-filter-row .redirect-filter-btn');
+    var filterBtns = document.querySelectorAll('#redirect-filter-row .filter-btn');
     for (var fi = 0; fi < filterBtns.length; fi++) {
       filterBtns[fi].addEventListener('click', function () {
         for (var fj = 0; fj < filterBtns.length; fj++) filterBtns[fj].classList.remove('active');
@@ -1043,7 +1053,10 @@ function initSecurityDetectors2() {
       var progressFill = utils.get('fuzz-progress-fill');
       var progressText = utils.get('fuzz-progress-text');
       if (startBtn) startBtn.style.display = 'none';
-      if (pauseBtn) pauseBtn.style.display = '';
+      if (pauseBtn) {
+        pauseBtn.style.display = '';
+        pauseBtn.innerHTML = '<span class="spinner"></span> 扫描中...';
+      }
       if (stopBtn) stopBtn.style.display = '';
       if (progressEl) progressEl.style.display = 'flex';
 
@@ -1076,7 +1089,7 @@ function initSecurityDetectors2() {
         if (startBtn) startBtn.style.display = '';
         if (pauseBtn) {
           pauseBtn.style.display = 'none';
-          pauseBtn.textContent = '暂停';
+          pauseBtn.innerHTML = '暂停';
         }
         if (stopBtn) stopBtn.style.display = 'none';
       }
@@ -1092,7 +1105,7 @@ function initSecurityDetectors2() {
       fuzz.stopFuzzScan();
     });
 
-    var filterBtns = document.querySelectorAll('#fuzz-filter-row .fuzz-filter-btn');
+    var filterBtns = document.querySelectorAll('#fuzz-filter-row .filter-btn');
     for (var fi = 0; fi < filterBtns.length; fi++) {
       filterBtns[fi].addEventListener('click', function () {
         for (var fj = 0; fj < filterBtns.length; fj++) filterBtns[fj].classList.remove('active');
@@ -1111,6 +1124,27 @@ function initSecurityDetectors2() {
     utils.bindClick('fuzz-export-btn', function () {
       var format = (utils.get('fuzz-export-format') || {}).value || 'txt';
       fuzz.exportFuzzResults(format);
+    });
+  })();
+
+  // --- Shared event delegation for copy buttons and expand/collapse ---
+  (function () {
+    document.addEventListener('click', function (e) {
+      var copyBtn = e.target.closest('.redirect-copy-btn, .fuzz-copy-btn, .headers-copy-btn');
+      if (copyBtn) {
+        var text = copyBtn.getAttribute('data-copy');
+        if (text) {
+          utils.copyText(text);
+          utils.showToast('已复制到剪贴板', 'success');
+        }
+        return;
+      }
+
+      var headerVal = e.target.closest('.headers-header-value');
+      if (headerVal) {
+        headerVal.classList.toggle('expanded');
+        return;
+      }
     });
   })();
 }

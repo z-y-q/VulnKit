@@ -144,7 +144,9 @@ function isRedirectVulnerable(response, variant) {
 }
 
 function delay(ms) {
-  return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  return new Promise(function (resolve) {
+    setTimeout(resolve, ms);
+  });
 }
 
 async function scanRedirects(baseUrl, concurrency, onProgress) {
@@ -253,10 +255,35 @@ function applyFilter(item) {
   if (f === 'safe' && item.type !== 'safe') return false;
   var q = redirectState.currentSearch;
   if (q) {
-    var text = ((item.param || '') + ' ' + (item.variant || '') + ' ' + (item.url || '') + ' ' + (item.location || '')).toLowerCase();
+    var text = (
+      (item.param || '') +
+      ' ' +
+      (item.variant || '') +
+      ' ' +
+      (item.url || '') +
+      ' ' +
+      (item.location || '')
+    ).toLowerCase();
     return text.indexOf(q) !== -1;
   }
   return true;
+}
+
+var COPY_SVG =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+var STATUS_LABELS = {
+  200: 'OK',
+  201: 'Created',
+  301: 'Moved',
+  302: 'Found',
+  303: 'See Other',
+  307: 'Temp Redirect',
+  308: 'Perm Redirect',
+};
+
+function getStatusLabel(code) {
+  return STATUS_LABELS[code] || String(code);
 }
 
 function renderRedirectResults(result) {
@@ -267,13 +294,19 @@ function renderRedirectResults(result) {
   if (!container || !result) return;
 
   if (statsEl) {
-    statsEl.style.display = 'flex';
+    statsEl.hidden = false;
     statsEl.innerHTML =
-      '<span>总计: ' + result.total + '</span>' +
-      '<span class="stat-badge stat-vuln">可利用: ' + result.vulnerable.length + '</span>' +
-      '<span class="stat-badge stat-safe">安全: ' + result.safe.length + '</span>' +
+      '<span class="stat-badge stat-total">总计 ' +
+      result.total +
+      '</span> ' +
+      '<span class="stat-badge stat-vuln">可利用 ' +
+      result.vulnerable.length +
+      '</span> ' +
+      '<span class="stat-badge stat-safe">安全 ' +
+      result.safe.length +
+      '</span>' +
       (result.errors.length > 0
-        ? '<span class="stat-badge stat-error">错误: ' + result.errors.length + '</span>'
+        ? ' <span class="stat-badge stat-error">错误 ' + result.errors.length + '</span>'
         : '');
   }
 
@@ -281,7 +314,7 @@ function renderRedirectResults(result) {
 
   if (filtered.length === 0) {
     container.innerHTML = '<div class="empty-state">无匹配结果</div>';
-    if (exportBtn) exportBtn.style.display = '';
+    if (exportBtn) exportBtn.hidden = false;
     return;
   }
 
@@ -292,25 +325,39 @@ function renderRedirectResults(result) {
     if (item.type === 'vulnerable' && seenParams[item.param]) continue;
     if (item.type === 'vulnerable') seenParams[item.param] = true;
 
-    html += '<div class="redirect-item">';
-    html += '<div class="redirect-item-header">';
+    html += '<div class="redirect-card">';
+    html += '<div class="redirect-card-header">';
     html += '<span class="redirect-param">' + utils.escapeHtml(item.param) + '</span>';
     if (item.type === 'vulnerable') {
-      html += '<span class="redirect-status vulnerable">可利用</span>';
+      html += '<span class="stat-badge stat-vuln">可利用</span>';
     } else {
-      html += '<span class="redirect-status safe">安全 [' + (item.status || '-') + ']</span>';
+      html += '<span class="stat-badge stat-safe">安全</span>';
     }
     html += '</div>';
-    html += '<div class="redirect-variant">变体: ' + utils.escapeHtml(item.variant) + '</div>';
-    html += '<div class="redirect-payload">' + utils.escapeHtml(item.url) + '</div>';
+    html +=
+      '<div class="redirect-card-variant"><code>' +
+      utils.escapeHtml(item.variant) +
+      '</code></div>';
+    html += '<div class="redirect-card-payload">';
+    html += '<span class="redirect-card-url">' + utils.escapeHtml(item.url) + '</span>';
+    html +=
+      '<button class="redirect-copy-btn" data-copy="' +
+      utils.escapeHtml(item.url) +
+      '" title="复制 URL">' +
+      COPY_SVG +
+      '</button>';
+    html += '</div>';
     if (item.location) {
-      html += '<div class="redirect-location">Location: ' + utils.escapeHtml(item.location) + '</div>';
+      html +=
+        '<div class="redirect-card-location">Location: ' +
+        utils.escapeHtml(item.location) +
+        '</div>';
     }
     html += '</div>';
   }
 
   container.innerHTML = html;
-  if (exportBtn) exportBtn.style.display = '';
+  if (exportBtn) exportBtn.hidden = false;
 }
 
 function exportTxt() {
@@ -328,7 +375,10 @@ function exportTxt() {
     lines.push('[可利用] ' + v.param + ' -> ' + v.url);
     if (v.location) lines.push('  Location: ' + v.location);
   }
-  utils.downloadBlob(new Blob([lines.join('\n')], { type: 'text/plain' }), 'redirect-scan-' + Date.now() + '.txt');
+  utils.downloadBlob(
+    new Blob([lines.join('\n')], { type: 'text/plain' }),
+    'redirect-scan-' + Date.now() + '.txt'
+  );
   utils.showToast('TXT 报告已导出', 'success');
 }
 
@@ -348,7 +398,10 @@ function exportCsv() {
     var e = r.errors[k];
     rows.push([e.param, e.variant, '', 0, e.error || '', 'error']);
   }
-  utils.downloadBlob(new Blob([utils.buildCsv(rows)], { type: 'text/csv;charset=utf-8' }), 'redirect-scan-' + Date.now() + '.csv');
+  utils.downloadBlob(
+    new Blob([utils.buildCsv(rows)], { type: 'text/csv;charset=utf-8' }),
+    'redirect-scan-' + Date.now() + '.csv'
+  );
   utils.showToast('CSV 报告已导出', 'success');
 }
 
