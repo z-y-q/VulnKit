@@ -242,8 +242,8 @@ const API_PATTERNS = [
     regex: /(?:url|endpoint|api|baseUrl|baseURL|apiUrl|apiURL)["']?\s*[:=]\s*["']([^"']+)["']/gi,
     label: 'config',
   },
-  { regex: /["']\/api\/[a-zA-Z0-9_\-./{}:?&=]*["']/gi, label: 'api-path' },
-  { regex: /["']\/v\d+(?:\/[a-zA-Z0-9_\-./{}:?&=]*)*["']/gi, label: 'versioned' },
+  { regex: /["'](\/api\/[a-zA-Z0-9_\-./{}:?&=]*)["']/gi, label: 'api-path' },
+  { regex: /["'](\/v\d+(?:\/[a-zA-Z0-9_\-./{}:?&=]*)*)["']/gi, label: 'versioned' },
   { regex: /path:\s*["']([^"']+)["']/gi, label: 'route-path' },
   { regex: /@(?:Get|Post|Put|Delete|Patch|Route)\s*\(\s*["']([^"']+)["']/gi, label: 'decorator' },
   {

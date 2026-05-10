@@ -264,7 +264,7 @@ function copyResults() {
   }
   const lines = lastResult.map(function (r) {
     const c = r.cookie;
-    let line = `${c.name}=${(c.value || '').substring(0, 50)}`;
+    let line = `${c.name}=[已隐藏]`;
     line += ` | Secure:${c.secure ? 'Y' : 'N'}`;
     line += ` HttpOnly:${c.httpOnly ? 'Y' : 'N'}`;
     line += ` SameSite:${c.sameSite || 'none'}`;

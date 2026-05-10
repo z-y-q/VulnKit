@@ -141,7 +141,8 @@ function matchRules(sources) {
 
 async function runDeepLeakScan(existingGatherData, tabId) {
   var inspectResult = await collectPageData(tabId);
-  var sources = buildTextSources(inspectResult, []);
+  var apiEntries = Array.isArray(existingGatherData) ? existingGatherData : [];
+  var sources = buildTextSources(inspectResult, apiEntries);
   console.debug('[Deep Leak Scan] text sources:', sources.length);
 
   if (sources.length === 0) return [];

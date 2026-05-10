@@ -390,7 +390,7 @@ async function scanWaf() {
 
   try {
     let tab = await utils.requireTabId();
-    if (!tab || !tab.url || tab.url.startsWith('chrome')) {
+    if (!tab || !tab.url || !/^https?:\/\//i.test(tab.url)) {
       statusEl.textContent = '无法扫描此页面';
       return;
     }
@@ -447,24 +447,26 @@ async function scanWaf() {
             let name = found[d].name;
             if (detectedMap[name]) {
               let existingEvidence = detectedMap[name].evidence;
-              for (let ev = 0; ev < found[d].evidence.length; ev++) {
-                let evVal = found[d].evidence[ev].value;
-                let alreadySeen = false;
-                for (let ex = 0; ex < existingEvidence.length; ex++) {
-                  if (existingEvidence[ex].value === evVal) {
-                    alreadySeen = true;
-                    break;
-                  }
-                }
-                if (!alreadySeen) {
-                  existingEvidence.push(found[d].evidence[ev]);
-                }
+              let existingValues = new Set(
+                existingEvidence.map(function (e) {
+                  return e.value;
+                })
+              );
+              let newEvidence = found[d].evidence.filter(function (e) {
+                return !existingValues.has(e.value);
+              });
+              let updates = {};
+              if (newEvidence.length > 0) {
+                updates.evidence = existingEvidence.concat(newEvidence);
               }
               let sevOrder = { high: 3, medium: 2, low: 1 };
               if (
                 (sevOrder[found[d].severity] || 0) > (sevOrder[detectedMap[name].severity] || 0)
               ) {
-                detectedMap[name].severity = found[d].severity;
+                updates.severity = found[d].severity;
+              }
+              if (Object.keys(updates).length > 0) {
+                detectedMap[name] = Object.assign({}, detectedMap[name], updates);
               }
             } else {
               detectedMap[name] = Object.assign({}, found[d], { _probe: probe.desc });

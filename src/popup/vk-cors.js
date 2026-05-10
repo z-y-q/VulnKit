@@ -121,6 +121,7 @@ async function probeEndpointMethods(ep, epUrl, methods, origins, ctx) {
       if (scanAborted) break;
       const origin = origins[oi];
       let resp = await sendCorsProbe(epUrl, method, origin.value);
+      if (scanAborted) break;
       ctx.completed++;
       updateScanStatus(ctx.statusEl, ctx.completed, ctx.totalTasks);
       if (resp && resp.error) {

@@ -220,7 +220,8 @@ async function startXssIntercept() {
     return 'injected';
   });
 
-  xssInterceptTimer = setInterval(async () => {
+  async function pollIntercept() {
+    if (!xssInterceptActive) return;
     xssInterceptCountdown--;
     updateXssInterceptStatus();
     if (xssInterceptCountdown <= 0) {
@@ -245,36 +246,59 @@ async function startXssIntercept() {
         }
       }
     } catch (_) {
-      console.debug('interceptor setup failed', _);
+      console.debug('interceptor poll failed', _);
     }
-  }, 2000);
+    if (xssInterceptActive) {
+      xssInterceptTimer = setTimeout(pollIntercept, 2000);
+    }
+  }
+  pollIntercept();
 }
 
 async function stopXssIntercept() {
   if (xssInterceptTimer) {
-    clearInterval(xssInterceptTimer);
+    clearTimeout(xssInterceptTimer);
     xssInterceptTimer = null;
   }
   xssInterceptActive = false;
   utils.toggleBtnPair('xssscan-start-intercept-btn', 'xssscan-stop-intercept-btn', false);
-  updateXssInterceptStatus();
 
   let tab = await utils.requireTabId();
-  if (!tab) return;
-  utils
-    .execInTab(tab.id, () => {
-      if (!window.__XSS_ORIGINAL__) return;
-      if (window.__XSS_ORIGINAL__.xhrOpen)
-        XMLHttpRequest.prototype.open = window.__XSS_ORIGINAL__.xhrOpen;
-      if (window.__XSS_ORIGINAL__.xhrSend)
-        XMLHttpRequest.prototype.send = window.__XSS_ORIGINAL__.xhrSend;
-      if (window.__XSS_ORIGINAL__.fetch) window.fetch = window.__XSS_ORIGINAL__.fetch;
-      delete window.__XSS_INTERCEPT__;
-      delete window.__XSS_ORIGINAL__;
-    })
-    .catch(function (e) {
-      console.debug('XSS intercept stop failed', e);
-    });
+  if (!tab) {
+    updateXssInterceptStatus();
+    return;
+  }
+
+  try {
+    const captured =
+      (await utils.execInTabData(tab.id, () => {
+        const data = window.__XSS_INTERCEPT__ || [];
+        if (window.__XSS_ORIGINAL__) {
+          if (window.__XSS_ORIGINAL__.xhrOpen)
+            XMLHttpRequest.prototype.open = window.__XSS_ORIGINAL__.xhrOpen;
+          if (window.__XSS_ORIGINAL__.xhrSend)
+            XMLHttpRequest.prototype.send = window.__XSS_ORIGINAL__.xhrSend;
+          if (window.__XSS_ORIGINAL__.fetch) window.fetch = window.__XSS_ORIGINAL__.fetch;
+        }
+        delete window.__XSS_INTERCEPT__;
+        delete window.__XSS_ORIGINAL__;
+        return data;
+      })) || [];
+    if (captured.length > 0) {
+      const existing = new Set(xssPoints.map(p => `${p.url}|${p.param}|${p.method}`));
+      const newPoints = captured
+        .map(p => ({ ...p, source: 'ajax' }))
+        .filter(p => !existing.has(`${p.url}|${p.param}|${p.method}`));
+      if (newPoints.length > 0) {
+        xssPoints = [...xssPoints, ...newPoints];
+        renderXssPoints();
+      }
+    }
+  } catch (e) {
+    console.debug('XSS intercept flush failed', e);
+  }
+
+  updateXssInterceptStatus();
 }
 
 function updateXssInterceptStatus() {

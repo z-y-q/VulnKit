@@ -152,41 +152,47 @@ function collectSubdomains() {
 
     // Method 1: Certificate Transparency via crt.sh
     const ctUrl = `https://crt.sh/?q=%.${encodeURIComponent(baseDomain)}&output=json`;
-    utils.fetchWithTimeout(ctUrl, CT_TIMEOUT_MS).then(function (resp) {
-      let ctFailed = false;
-      if (resp && resp.data) {
-        try {
-          const entries = JSON.parse(resp.data);
-          if (Array.isArray(entries)) {
-            entries.forEach(function (entry) {
-              let name = (entry.name_value || entry.name || '').trim();
-              name.split('\n').forEach(function (n) {
-                n = n.trim().toLowerCase().replace(/^\*\./, '');
-                if (n && n.endsWith(baseDomain) && !seen[n]) {
-                  seen[n] = true;
-                  lastSubdomains.push({ host: n, source: 'ct' });
-                }
+    utils
+      .fetchWithTimeout(ctUrl, CT_TIMEOUT_MS)
+      .then(function (resp) {
+        let ctFailed = false;
+        if (resp && resp.data) {
+          try {
+            const entries = JSON.parse(resp.data);
+            if (Array.isArray(entries)) {
+              entries.forEach(function (entry) {
+                let name = (entry.name_value || entry.name || '').trim();
+                name.split('\n').forEach(function (n) {
+                  n = n.trim().toLowerCase().replace(/^\*\./, '');
+                  if (n && n.endsWith(baseDomain) && !seen[n]) {
+                    seen[n] = true;
+                    lastSubdomains.push({ host: n, source: 'ct' });
+                  }
+                });
               });
-            });
+            }
+          } catch (e) {
+            ctFailed = true;
           }
-        } catch (e) {
+        } else {
           ctFailed = true;
         }
-      } else {
-        ctFailed = true;
-      }
 
-      let statusText = `CT 收集完成: ${lastSubdomains.length} 个子域名`;
-      if (ctFailed) {
-        statusText += ' — crt.sh 查询超时或失败，请稍后重试';
-      } else if (lastSubdomains.length === 0) {
-        statusText += ' — 该域名在证书透明度日志中未发现子域名';
-      }
-      if (statusEl) statusEl.textContent = statusText;
-      renderSubdomains(lastSubdomains, baseDomain);
-      if (copyBtn) copyBtn.hidden = false;
-      if (exportBtn) exportBtn.hidden = false;
-    });
+        let statusText = `CT 收集完成: ${lastSubdomains.length} 个子域名`;
+        if (ctFailed) {
+          statusText += ' — crt.sh 查询超时或失败，请稍后重试';
+        } else if (lastSubdomains.length === 0) {
+          statusText += ' — 该域名在证书透明度日志中未发现子域名';
+        }
+        if (statusEl) statusEl.textContent = statusText;
+        renderSubdomains(lastSubdomains, baseDomain);
+        if (copyBtn) copyBtn.hidden = false;
+        if (exportBtn) exportBtn.hidden = false;
+      })
+      .catch(function (e) {
+        console.debug('collectSubdomains error', e);
+        if (statusEl) statusEl.textContent = 'CT 收集失败: ' + (e.message || e);
+      });
   });
 }
 
@@ -208,59 +214,65 @@ function extractFromPage() {
     const baseDomain = extractBaseDomain(domain);
     lastBaseDomain = baseDomain;
 
-    utils.requireTabId().then(function (tab) {
-      if (!tab) return;
+    utils
+      .requireTabId()
+      .then(function (tab) {
+        if (!tab) return;
 
-      chrome.tabs.sendMessage(tab.id, { type: 'CONTEXT_EXTRACT_LINKS' }, function (resp) {
-        if (chrome.runtime.lastError || !resp) {
-          if (statusEl) statusEl.textContent = '提取失败';
-          return;
-        }
+        chrome.tabs.sendMessage(tab.id, { type: 'CONTEXT_EXTRACT_LINKS' }, function (resp) {
+          if (chrome.runtime.lastError || !resp) {
+            if (statusEl) statusEl.textContent = '提取失败';
+            return;
+          }
 
-        chrome.storage.local.get(['contextExtractedLinks'], function (result) {
-          const links = result.contextExtractedLinks || [];
-          const seen = {};
-          const pageSubdomains = [];
+          chrome.storage.local.get(['contextExtractedLinks'], function (result) {
+            const links = result.contextExtractedLinks || [];
+            const seen = {};
+            const pageSubdomains = [];
 
-          links.forEach(function (link) {
-            try {
-              let hostname = new URL(link.href, `https://${baseDomain}`).hostname.toLowerCase();
-              if (
-                hostname !== baseDomain &&
-                hostname.endsWith(`.${baseDomain}`) &&
-                !seen[hostname]
-              ) {
-                seen[hostname] = true;
-                pageSubdomains.push({ host: hostname, source: 'page' });
+            links.forEach(function (link) {
+              try {
+                let hostname = new URL(link.href, `https://${baseDomain}`).hostname.toLowerCase();
+                if (
+                  hostname !== baseDomain &&
+                  hostname.endsWith(`.${baseDomain}`) &&
+                  !seen[hostname]
+                ) {
+                  seen[hostname] = true;
+                  pageSubdomains.push({ host: hostname, source: 'page' });
+                }
+              } catch (_) {
+                /* malformed link href */
               }
-            } catch (_) {
-              /* malformed link href */
-            }
-          });
+            });
 
-          // Merge with existing
-          let existingMap = {};
-          lastSubdomains.forEach(function (s) {
-            existingMap[s.host] = true;
-          });
-          pageSubdomains.forEach(function (s) {
-            if (!existingMap[s.host]) {
+            // Merge with existing
+            let existingMap = {};
+            lastSubdomains.forEach(function (s) {
               existingMap[s.host] = true;
-              lastSubdomains.push(s);
-            }
-          });
+            });
+            pageSubdomains.forEach(function (s) {
+              if (!existingMap[s.host]) {
+                existingMap[s.host] = true;
+                lastSubdomains.push(s);
+              }
+            });
 
-          lastSubdomains.sort(function (a, b) {
-            return a.host.localeCompare(b.host);
+            lastSubdomains.sort(function (a, b) {
+              return a.host.localeCompare(b.host);
+            });
+            if (statusEl)
+              statusEl.textContent = `页面提取完成: 新增 ${pageSubdomains.length}，共 ${lastSubdomains.length} 个子域名`;
+            renderSubdomains(lastSubdomains, baseDomain);
+            if (copyBtn) copyBtn.hidden = false;
+            if (exportBtn) exportBtn.hidden = false;
           });
-          if (statusEl)
-            statusEl.textContent = `页面提取完成: 新增 ${pageSubdomains.length}，共 ${lastSubdomains.length} 个子域名`;
-          renderSubdomains(lastSubdomains, baseDomain);
-          if (copyBtn) copyBtn.hidden = false;
-          if (exportBtn) exportBtn.hidden = false;
         });
+      })
+      .catch(function (e) {
+        console.debug('extractFromPage error', e);
+        if (statusEl) statusEl.textContent = '页面提取失败: ' + (e.message || e);
       });
-    });
   });
 }
 
@@ -634,10 +646,16 @@ async function bruteForceHttpProbe() {
 
 function collectSubdomainsAsync() {
   return new Promise(function (resolve) {
-    const origSubdomains = lastSubdomains;
-    const origBase = lastBaseDomain;
     collectSubdomains();
+    const ASYNC_TIMEOUT_MS = 30000;
+    const startTime = Date.now();
     function checkDone() {
+      if (Date.now() - startTime > ASYNC_TIMEOUT_MS) {
+        let statusEl = utils.get('subdomain-status');
+        if (statusEl) statusEl.textContent += ' (异步等待超时)';
+        resolve();
+        return;
+      }
       let statusEl = utils.get('subdomain-status');
       if (statusEl && statusEl.textContent.indexOf('CT 收集完成') !== -1) {
         resolve();
@@ -658,7 +676,13 @@ function collectSubdomainsAsync() {
 function extractFromPageAsync() {
   return new Promise(function (resolve) {
     extractFromPage();
+    const ASYNC_TIMEOUT_MS = 15000;
+    const startTime = Date.now();
     function checkDone() {
+      if (Date.now() - startTime > ASYNC_TIMEOUT_MS) {
+        resolve();
+        return;
+      }
       let statusEl = utils.get('subdomain-status');
       if (statusEl && statusEl.textContent.indexOf('页面提取完成') !== -1) {
         resolve();

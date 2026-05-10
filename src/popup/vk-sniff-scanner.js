@@ -30,12 +30,16 @@ async function collectRuntimeSignals(tabId) {
 
 async function collectHeaderSignals(tabId) {
   return new Promise(function (resolve) {
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      if (!tabs[0] || !tabs[0].url) {
+    if (!tabId) {
+      resolve(null);
+      return;
+    }
+    chrome.tabs.get(tabId, function (tab) {
+      if (chrome.runtime.lastError || !tab || !tab.url) {
         resolve(null);
         return;
       }
-      chrome.runtime.sendMessage({ type: 'FETCH_HEADER_PROBE', url: tabs[0].url }, function (resp) {
+      chrome.runtime.sendMessage({ type: 'FETCH_HEADER_PROBE', url: tab.url }, function (resp) {
         if (chrome.runtime.lastError) {
           resolve(null);
           return;
