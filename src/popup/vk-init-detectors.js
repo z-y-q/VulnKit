@@ -7,10 +7,7 @@ import { utilsProxy as utils } from './vk-namespace.js';
 const { getActiveTab } = utils;
 
 function initVuePermissions() {
-  Promise.all([
-    import('./vk-vue.js'),
-    import('./vk-vue-detect.js'),
-  ]).then(function (mods) {
+  Promise.all([import('./vk-vue.js'), import('./vk-vue-detect.js')]).then(function (mods) {
     var vue = mods[0];
     var vueDetect = mods[1];
 
@@ -60,7 +57,13 @@ function initVuePermissions() {
             utils.showToast('无静态路由路径', 'warning');
             return;
           }
-          utils.copyText(paths.map(function (p) { return p.url; }).join('\n'));
+          utils.copyText(
+            paths
+              .map(function (p) {
+                return p.url;
+              })
+              .join('\n')
+          );
           utils.showToast('已复制 ' + paths.length + ' 条 ' + mode + ' URL', 'success');
         } catch (err) {
           utils.showToast('复制失败', 'error');
@@ -154,10 +157,7 @@ function restorePermState(vue, vueDetect) {
 }
 
 function initJsSearchAndTraverse() {
-  Promise.all([
-    import('./vk-vue.js'),
-    import('./vk-jsctrl.js'),
-  ]).then(function (mods) {
+  Promise.all([import('./vk-vue.js'), import('./vk-jsctrl.js')]).then(function (mods) {
     var vue = mods[0];
     var jsctrl = mods[1];
 
@@ -303,22 +303,25 @@ function initSecurityDetectors() {
 }
 
 function restoreRuoYiHookState(ruoyi) {
-  chrome.storage.local.get(['ruoyiHookEnabled', 'ruoyiHookOrigin', 'ruoyiHookTabId'], function (result) {
-    getActiveTab().then(function (tab) {
-      if (!tab) return;
-      var tabOrigin = tab.url ? new URL(tab.url).origin : '';
-      var hookEnabled = result.ruoyiHookEnabled && result.ruoyiHookOrigin;
+  chrome.storage.local.get(
+    ['ruoyiHookEnabled', 'ruoyiHookOrigin', 'ruoyiHookTabId'],
+    function (result) {
+      getActiveTab().then(function (tab) {
+        if (!tab) return;
+        var tabOrigin = tab.url ? new URL(tab.url).origin : '';
+        var hookEnabled = result.ruoyiHookEnabled && result.ruoyiHookOrigin;
 
-      if (hookEnabled && tabOrigin === result.ruoyiHookOrigin) {
-        ruoyi.ruoyiState.ruoyiHookActive = true;
-        ruoyi.ruoyiState.ruoyiTabId = tab.id;
-        utils.toggleBtnPair('ruoyi-hook-install-btn', 'ruoyi-hook-remove-btn', true);
-        ruoyi.checkHookStatus();
-      } else if (tab.url && /^https?:/.test(tab.url)) {
-        ruoyi.checkHookStatus();
-      }
-    });
-  });
+        if (hookEnabled && tabOrigin === result.ruoyiHookOrigin) {
+          ruoyi.ruoyiState.ruoyiHookActive = true;
+          ruoyi.ruoyiState.ruoyiTabId = tab.id;
+          utils.toggleBtnPair('ruoyi-hook-install-btn', 'ruoyi-hook-remove-btn', true);
+          ruoyi.checkHookStatus();
+        } else if (tab.url && /^https?:/.test(tab.url)) {
+          ruoyi.checkHookStatus();
+        }
+      });
+    }
+  );
 }
 
 function initNetworkTools() {
@@ -327,11 +330,13 @@ function initNetworkTools() {
     import('./vk-subdomain.js'),
     import('./vk-source-loader.js'),
     import('./vk-ruoyi.js'),
+    import('./vk-graphql.js'),
   ]).then(function (mods) {
     var cors = mods[0];
     var subdomain = mods[1];
     var sourceLoader = mods[2];
     var ruoyi = mods[3];
+    var graphql = mods[4];
 
     utils.bindClick('cors-scan-btn', cors.scanCors);
     utils.bindClick('cors-copy-btn', cors.copyResults);
@@ -376,14 +381,16 @@ function initNetworkTools() {
     utils.bindClick('mar-inject-btn', ruoyi.marInjectToRouter);
     utils.bindClick('mar-selectall-btn', ruoyi.marToggleSelectAll);
     utils.bindClick('mar-copy-btn', ruoyi.marCopyHiddenPaths);
+
+    utils.bindClick('graphql-scan-btn', graphql.scanGraphQL);
+    utils.bindClick('graphql-exec-btn', graphql.executeCustomQuery);
+    utils.bindClick('graphql-copy-btn', graphql.copyResults);
+    utils.bindClick('graphql-export-btn', graphql.exportResults);
   });
 }
 
 function initSniff() {
-  Promise.all([
-    import('./vk-sniff.js'),
-    import('./vk-leakscan-scanner.js'),
-  ]).then(function (mods) {
+  Promise.all([import('./vk-sniff.js'), import('./vk-leakscan-scanner.js')]).then(function (mods) {
     var sniff = mods[0];
     var leakscan = mods[1];
 
@@ -443,8 +450,12 @@ function initSniff() {
           return;
         }
 
-        var critCount = results.filter(function (r) { return r.severity === 'critical'; }).length;
-        var highCount = results.filter(function (r) { return r.severity === 'high'; }).length;
+        var critCount = results.filter(function (r) {
+          return r.severity === 'critical';
+        }).length;
+        var highCount = results.filter(function (r) {
+          return r.severity === 'high';
+        }).length;
         var statusText = '扫描完成 — 发现 ' + results.length + ' 项';
         if (critCount > 0) statusText += '（严重 ' + critCount + '）';
         else if (highCount > 0) statusText += '（高危 ' + highCount + '）';
@@ -469,10 +480,7 @@ function initSniff() {
 // Vue perm and RuoYi hook restoration are deferred to their panel init functions.
 // Gather/Links state restoration is triggered on their first tab click.
 function initStateRestoration() {
-  Promise.all([
-    import('./vk-gather.js'),
-    import('./vk-links.js'),
-  ]).then(function (mods) {
+  Promise.all([import('./vk-gather.js'), import('./vk-links.js')]).then(function (mods) {
     var gather = mods[0];
     var links = mods[1];
 

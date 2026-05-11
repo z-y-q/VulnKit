@@ -190,6 +190,7 @@ var PANEL_REGISTRY = {
   cors: { source: 'detectors', init: 'initNetworkTools' },
   subdomain: { source: 'detectors', init: 'initNetworkTools' },
   'source-loader': { source: 'detectors', init: 'initNetworkTools' },
+  graphql: { source: 'detectors', init: 'initNetworkTools' },
   sniff: { source: 'detectors', init: 'initSniff' },
 };
 

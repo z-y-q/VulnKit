@@ -53,6 +53,7 @@ async function collectAllFindings() {
     headers: './vk-headers.js',
     redirect: './vk-redirect.js',
     fuzz: './vk-fuzz.js',
+    graphql: './vk-graphql.js',
     jwt: './vk-jwt.js',
   };
 

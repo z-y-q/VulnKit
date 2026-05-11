@@ -1,0 +1,29 @@
+<div id="panel-graphql" class="panel">
+  <div class="content-card">
+    <div class="card-title">GraphQL 安全测试</div>
+    <div class="graphql-module-desc">探测 GraphQL 端点、Introspection 泄露、批量查询攻击面</div>
+
+    <div class="panel-actions">
+      <input type="text" id="graphql-url" class="input-field" placeholder="自定义端点 URL（留空自动探测）">
+      <button class="btn btn-primary" id="graphql-scan-btn">Introspection 探测</button>
+    </div>
+
+    <div class="graphql-quick-actions">
+      <button class="btn btn-sm" id="graphql-batch-btn" disabled>批量查询测试</button>
+      <button class="btn btn-sm" id="graphql-copy-btn" disabled>复制结果</button>
+      <button class="btn btn-sm" id="graphql-export-btn" disabled>导出 JSON</button>
+    </div>
+
+    <div class="status-bar" id="graphql-status">就绪</div>
+
+    <div class="graphql-results" id="graphql-results"></div>
+
+    <div class="graphql-query-section">
+      <div class="graphql-query-label">自定义查询</div>
+      <textarea id="graphql-query" class="graphql-query-input" rows="4" placeholder="输入 GraphQL 查询，例如: { __typename }"></textarea>
+      <button class="btn btn-sm btn-primary" id="graphql-exec-btn">执行查询</button>
+    </div>
+
+    <pre class="graphql-response" id="graphql-response"></pre>
+  </div>
+</div>

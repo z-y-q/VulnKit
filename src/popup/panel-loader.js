@@ -29,6 +29,7 @@
     'headers.html',
     'redirect.html',
     'fuzz.html',
+    'graphql.html',
     'report.html',
   ];
 

@@ -470,6 +470,7 @@ var handlers = {
       redirect: msg.followRedirect !== false ? 'follow' : 'manual',
       signal: tc.controller.signal,
       headers: msg.headers || {},
+      body: msg.body || undefined,
     })
       .then(function (resp) {
         tc.cleanup();

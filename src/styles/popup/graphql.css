@@ -1,0 +1,239 @@
+/* graphql.css — GraphQL Security Testing Module */
+
+.graphql-module-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.graphql-quick-actions {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.graphql-quick-actions .btn-sm {
+  font-size: 11px;
+  padding: 3px 10px;
+}
+
+.graphql-quick-actions .btn-sm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.graphql-results {
+  margin-top: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.graphql-section {
+  margin-bottom: 12px;
+}
+
+.graphql-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.graphql-endpoint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.graphql-endpoint-row:nth-child(odd) {
+  background: var(--bg-secondary);
+}
+
+.graphql-endpoint-path {
+  font-family: monospace;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.graphql-status-tag {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.graphql-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.graphql-badge.badge-critical {
+  background: #e74c3c;
+  color: #fff;
+}
+
+.graphql-badge.badge-high {
+  background: #e67e22;
+  color: #fff;
+}
+
+.graphql-badge.badge-medium {
+  background: #f39c12;
+  color: #fff;
+}
+
+.graphql-badge.badge-low {
+  background: #3498db;
+  color: #fff;
+}
+
+.graphql-badge.badge-info {
+  background: var(--bg-tertiary, #ecf0f1);
+  color: var(--text-secondary);
+}
+
+.graphql-schema-summary {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.graphql-type-group {
+  margin-bottom: 6px;
+}
+
+.graphql-type-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 3px;
+}
+
+.graphql-type-item {
+  display: inline-block;
+  font-size: 11px;
+  font-family: monospace;
+  padding: 1px 6px;
+  margin: 2px 3px 2px 0;
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.graphql-type-item.query {
+  border-left: 2px solid #27ae60;
+}
+
+.graphql-type-item.mutation {
+  border-left: 2px solid #e74c3c;
+}
+
+.graphql-type-item.subscription {
+  border-left: 2px solid #9b59b6;
+}
+
+.graphql-finding-row {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.graphql-finding-row.high {
+  background: rgba(230, 126, 34, 0.1);
+  border-left: 3px solid #e67e22;
+}
+
+.graphql-finding-row.medium {
+  background: rgba(243, 156, 18, 0.1);
+  border-left: 3px solid #f39c12;
+}
+
+.graphql-finding-row.low {
+  background: rgba(52, 152, 219, 0.1);
+  border-left: 3px solid #3498db;
+}
+
+.graphql-finding-row.info {
+  background: var(--bg-secondary);
+  border-left: 3px solid var(--text-secondary);
+}
+
+.graphql-finding-title {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.graphql-finding-detail {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.graphql-info-tag {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  display: inline-block;
+  margin-bottom: 4px;
+}
+
+.graphql-query-section {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.graphql-query-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.graphql-query-input {
+  width: 100%;
+  font-family: monospace;
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--input-bg, var(--bg-primary));
+  color: var(--text-primary);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.graphql-query-input:focus {
+  outline: none;
+  border-color: var(--accent-color, #4A90E2);
+}
+
+.graphql-response {
+  margin-top: 8px;
+  padding: 8px;
+  font-family: monospace;
+  font-size: 11px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  display: none;
+}
+
+.graphql-response.has-response {
+  display: block;
+}
