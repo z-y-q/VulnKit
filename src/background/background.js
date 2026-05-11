@@ -604,19 +604,27 @@ var handlers = {
       sendResponse({ error: 'Invalid hostname' });
       return true;
     }
-    fetch('https://dns.google/resolve?name=' + encodeURIComponent(hostname) + '&type=A')
+    var rtype = msg.recordType || 'A';
+    fetch('https://dns.google/resolve?name=' + encodeURIComponent(hostname) + '&type=' + rtype)
       .then(function (r) {
         return r.json();
       })
       .then(function (data) {
-        var addresses = (data.Answer || [])
-          .filter(function (a) {
-            return a.type === 1;
-          })
-          .map(function (a) {
-            return a.data;
-          });
-        sendResponse({ addresses: addresses, resultCode: 0 });
+        var answers = (data.Answer || []).map(function (a) {
+          return { type: a.type, data: a.data, name: a.name };
+        });
+        if (rtype === 'A') {
+          var addresses = answers
+            .filter(function (a) {
+              return a.type === 1;
+            })
+            .map(function (a) {
+              return a.data;
+            });
+          sendResponse({ addresses: addresses, resultCode: data.Status });
+        } else {
+          sendResponse({ answers: answers, resultCode: data.Status });
+        }
       })
       .catch(function (err) {
         sendResponse({ error: err.message, addresses: [] });

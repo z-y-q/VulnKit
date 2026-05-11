@@ -276,6 +276,175 @@ function extractFromPage() {
   });
 }
 
+async function collectFromCertspotter() {
+  var statusEl = utils.get('subdomain-status');
+  var copyBtn = utils.get('subdomain-copy-btn');
+  var exportBtn = utils.get('subdomain-export-btn');
+
+  if (statusEl) statusEl.textContent = '正在通过 CertSpotter 收集子域名...';
+  if (!lastBaseDomain) {
+    var domain = await utils.getCurrentDomain();
+    if (!domain) {
+      if (statusEl) statusEl.textContent = '无法获取当前域名';
+      return;
+    }
+    lastBaseDomain = extractBaseDomain(domain);
+  }
+
+  try {
+    var apiUrl =
+      'https://api.certspotter.com/v1/issuances?domain=' +
+      encodeURIComponent(lastBaseDomain) +
+      '&expand=dns_names';
+    var resp = await utils.fetchWithTimeout(apiUrl, CT_TIMEOUT_MS);
+    var items = resp && resp.data ? JSON.parse(resp.data) : [];
+    if (!Array.isArray(items)) items = [];
+
+    var seen = {};
+    lastSubdomains.forEach(function (s) {
+      seen[s.host] = true;
+    });
+    var newDomains = [];
+
+    items.forEach(function (item) {
+      var names = item.dns_names || [];
+      names.forEach(function (name) {
+        var n = name.trim().toLowerCase().replace(/^\*\./, '');
+        if (n && n.endsWith(lastBaseDomain) && !seen[n]) {
+          seen[n] = true;
+          newDomains.push({ host: n, source: 'certspotter' });
+        }
+      });
+    });
+
+    mergeScanResults(newDomains);
+    if (statusEl)
+      statusEl.textContent =
+        'CertSpotter 完成: 新增 ' +
+        newDomains.length +
+        '，共 ' +
+        lastSubdomains.length +
+        ' 个子域名';
+    renderSubdomains(lastSubdomains, lastBaseDomain);
+    if (copyBtn) copyBtn.hidden = false;
+    if (exportBtn) exportBtn.hidden = false;
+  } catch (e) {
+    if (statusEl) statusEl.textContent = 'CertSpotter 查询失败: ' + (e.message || e);
+  }
+}
+
+async function collectFromWebArchive() {
+  var statusEl = utils.get('subdomain-status');
+  var copyBtn = utils.get('subdomain-copy-btn');
+  var exportBtn = utils.get('subdomain-export-btn');
+
+  if (statusEl) statusEl.textContent = '正在通过 Wayback Machine 收集子域名...';
+  if (!lastBaseDomain) {
+    var domain = await utils.getCurrentDomain();
+    if (!domain) {
+      if (statusEl) statusEl.textContent = '无法获取当前域名';
+      return;
+    }
+    lastBaseDomain = extractBaseDomain(domain);
+  }
+
+  try {
+    var apiUrl =
+      'https://web.archive.org/cdx/search/cdx?url=*.' +
+      encodeURIComponent(lastBaseDomain) +
+      '/*&output=json&fl=original&collapse=urlkey&limit=1000';
+    var resp = await utils.fetchWithTimeout(apiUrl, CT_TIMEOUT_MS);
+    var rows = resp && resp.data ? JSON.parse(resp.data) : [];
+    if (!Array.isArray(rows)) rows = [];
+
+    var seen = {};
+    lastSubdomains.forEach(function (s) {
+      seen[s.host] = true;
+    });
+    var newDomains = [];
+
+    for (var i = 0; i < rows.length; i++) {
+      if (i === 0 && Array.isArray(rows[0]) && rows[0][0] === 'original') continue;
+      var url = Array.isArray(rows[i]) ? rows[i][0] : rows[i];
+      try {
+        var hostname = new URL(url).hostname.toLowerCase();
+        if (hostname.endsWith(lastBaseDomain) && hostname !== lastBaseDomain && !seen[hostname]) {
+          seen[hostname] = true;
+          newDomains.push({ host: hostname, source: 'archive' });
+        }
+      } catch (_) {
+        /* malformed url */
+      }
+    }
+
+    mergeScanResults(newDomains);
+    if (statusEl)
+      statusEl.textContent =
+        'Wayback 完成: 新增 ' + newDomains.length + '，共 ' + lastSubdomains.length + ' 个子域名';
+    renderSubdomains(lastSubdomains, lastBaseDomain);
+    if (copyBtn) copyBtn.hidden = false;
+    if (exportBtn) exportBtn.hidden = false;
+  } catch (e) {
+    if (statusEl) statusEl.textContent = 'Wayback 查询失败: ' + (e.message || e);
+  }
+}
+
+async function collectFromDnsRecords() {
+  var statusEl = utils.get('subdomain-status');
+  var copyBtn = utils.get('subdomain-copy-btn');
+  var exportBtn = utils.get('subdomain-export-btn');
+
+  if (statusEl) statusEl.textContent = '正在枚举 DNS 记录...';
+  if (!lastBaseDomain) {
+    var domain = await utils.getCurrentDomain();
+    if (!domain) {
+      if (statusEl) statusEl.textContent = '无法获取当前域名';
+      return;
+    }
+    lastBaseDomain = extractBaseDomain(domain);
+  }
+
+  var recordTypes = ['NS', 'MX'];
+  var seen = {};
+  lastSubdomains.forEach(function (s) {
+    seen[s.host] = true;
+  });
+  var newDomains = [];
+
+  for (var r = 0; r < recordTypes.length; r++) {
+    var rtype = recordTypes[r];
+    if (statusEl) statusEl.textContent = 'DNS 记录查询: ' + rtype + '...';
+    try {
+      var result = await dnsResolveRecord(lastBaseDomain, rtype);
+      if (!result || !result.answers || result.resultCode !== 0) continue;
+
+      result.answers.forEach(function (answer) {
+        var value = (answer.data || '').toLowerCase();
+        if (rtype === 'MX') {
+          var parts = value.split(/\s+/);
+          value = parts[parts.length - 1];
+        }
+        value = value.replace(/\.$/, '');
+        if (!value || value === lastBaseDomain) return;
+        if (value.endsWith('.' + lastBaseDomain) && !seen[value]) {
+          seen[value] = true;
+          newDomains.push({ host: value, source: 'dns' });
+        }
+      });
+    } catch (e) {
+      console.debug('[Subdomain] DNS record query failed:', rtype, e.message);
+    }
+  }
+
+  mergeScanResults(newDomains);
+  if (statusEl)
+    statusEl.textContent =
+      'DNS 记录枚举完成: 新增 ' + newDomains.length + '，共 ' + lastSubdomains.length + ' 个子域名';
+  renderSubdomains(lastSubdomains, lastBaseDomain);
+  if (copyBtn) copyBtn.hidden = false;
+  if (exportBtn) exportBtn.hidden = false;
+}
+
 let MULTI_PART_TLDS = [
   'co.uk',
   'com.cn',
@@ -377,16 +546,44 @@ function renderSubdomains(subdomains, baseDomain) {
   let dnsCount = subdomains.filter(function (s) {
     return s.source === 'dns';
   }).length;
+  let csCount = subdomains.filter(function (s) {
+    return s.source === 'certspotter';
+  }).length;
+  let waCount = subdomains.filter(function (s) {
+    return s.source === 'archive';
+  }).length;
 
   if (statsEl) {
-    statsEl.innerHTML =
-      `<div class="subdomain-stat-item"><span class="subdomain-stat-count">${subdomains.length}</span> 子域名</div>` +
-      `<div class="subdomain-stat-item"><span class="subdomain-stat-count">${ctCount}</span> CT</div>` +
-      `<div class="subdomain-stat-item"><span class="subdomain-stat-count">${pageCount}</span> 页面</div>` +
-      `<div class="subdomain-stat-item"><span class="subdomain-stat-count">${httpCount}</span> HTTP</div>` +
-      (dnsCount > 0
-        ? `<div class="subdomain-stat-item"><span class="subdomain-stat-count">${dnsCount}</span> DNS</div>`
-        : '');
+    var statsHtml =
+      '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+      subdomains.length +
+      '</span> 子域名</div>' +
+      '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+      ctCount +
+      '</span> CT</div>' +
+      '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+      pageCount +
+      '</span> 页面</div>';
+    if (csCount > 0)
+      statsHtml +=
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+        csCount +
+        '</span> CS</div>';
+    if (waCount > 0)
+      statsHtml +=
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+        waCount +
+        '</span> WA</div>';
+    statsHtml +=
+      '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+      httpCount +
+      '</span> HTTP</div>';
+    if (dnsCount > 0)
+      statsHtml +=
+        '<div class="subdomain-stat-item"><span class="subdomain-stat-count">' +
+        dnsCount +
+        '</span> DNS</div>';
+    statsEl.innerHTML = statsHtml;
     statsEl.hidden = false;
   }
 
@@ -412,7 +609,14 @@ function renderSubdomains(subdomains, baseDomain) {
 }
 
 function sourceLabel(src) {
-  let labels = { ct: 'CT', page: '页面', http: 'HTTP', dns: 'DNS' };
+  let labels = {
+    ct: 'CT',
+    page: '页面',
+    http: 'HTTP',
+    dns: 'DNS',
+    certspotter: 'CS',
+    archive: 'WA',
+  };
   return labels[src] || src;
 }
 
@@ -458,6 +662,21 @@ function dnsResolve(hostname) {
       }
       resolve(resp);
     });
+  });
+}
+
+function dnsResolveRecord(hostname, recordType) {
+  return new Promise(function (resolve) {
+    chrome.runtime.sendMessage(
+      { type: 'FETCH_DNS_RESOLVE', hostname: hostname, recordType: recordType },
+      function (resp) {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
+        resolve(resp || null);
+      }
+    );
   });
 }
 
@@ -696,6 +915,50 @@ function extractFromPageAsync() {
   });
 }
 
+function collectFromCertspotterAsync() {
+  return new Promise(function (resolve) {
+    collectFromCertspotter();
+    var startTime = Date.now();
+    function checkDone() {
+      if (Date.now() - startTime > CT_TIMEOUT_MS) {
+        resolve();
+        return;
+      }
+      var statusEl = utils.get('subdomain-status');
+      if (statusEl && statusEl.textContent.indexOf('CertSpotter 完成') !== -1) {
+        resolve();
+      } else if (statusEl && statusEl.textContent.indexOf('查询失败') !== -1) {
+        resolve();
+      } else {
+        setTimeout(checkDone, 500);
+      }
+    }
+    setTimeout(checkDone, 500);
+  });
+}
+
+function collectFromWebArchiveAsync() {
+  return new Promise(function (resolve) {
+    collectFromWebArchive();
+    var startTime = Date.now();
+    function checkDone() {
+      if (Date.now() - startTime > CT_TIMEOUT_MS) {
+        resolve();
+        return;
+      }
+      var statusEl = utils.get('subdomain-status');
+      if (statusEl && statusEl.textContent.indexOf('Wayback 完成') !== -1) {
+        resolve();
+      } else if (statusEl && statusEl.textContent.indexOf('查询失败') !== -1) {
+        resolve();
+      } else {
+        setTimeout(checkDone, 500);
+      }
+    }
+    setTimeout(checkDone, 500);
+  });
+}
+
 async function runAllScans() {
   if (dnsScanActive) {
     utils.showToast('探测进行中，请等待完成', 'warning');
@@ -714,11 +977,19 @@ async function runAllScans() {
   await collectSubdomainsAsync();
   await delay(300);
 
-  if (statusEl) statusEl.textContent = '② 页面提取中...';
+  if (statusEl) statusEl.textContent = '② CertSpotter 查询中...';
+  await collectFromCertspotterAsync();
+  await delay(300);
+
+  if (statusEl) statusEl.textContent = '③ Wayback Machine 查询中...';
+  await collectFromWebArchiveAsync();
+  await delay(300);
+
+  if (statusEl) statusEl.textContent = '④ 页面提取中...';
   await extractFromPageAsync();
   await delay(300);
 
-  if (statusEl) statusEl.textContent = '③ DNS/HTTP 探测中...';
+  if (statusEl) statusEl.textContent = '⑤ DNS/HTTP 探测中...';
   await bruteForceHttpProbe();
 
   if (statusEl) {
@@ -753,6 +1024,9 @@ function getFindings() {
 export {
   collectSubdomains,
   extractFromPage,
+  collectFromCertspotter,
+  collectFromWebArchive,
+  collectFromDnsRecords,
   bruteForceHttpProbe as bruteForceDns,
   bruteForceHttpProbe,
   copyResults,

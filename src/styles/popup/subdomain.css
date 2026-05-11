@@ -116,6 +116,9 @@
 .subdomain-source-badge.ct { background: #27ae60; }
 .subdomain-source-badge.page { background: #3498db; }
 .subdomain-source-badge.dns { background: #9b59b6; }
+.subdomain-source-badge.http { background: #e67e22; }
+.subdomain-source-badge.certspotter { background: #e67e22; }
+.subdomain-source-badge.archive { background: #1abc9c; }
 .subdomain-copy-single {
   margin-left: auto;
   background: none;
