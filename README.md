@@ -1,6 +1,6 @@
 # 灵眸 v6.0 使用说明
 
-Chrome 渗透测试辅助工具包，集成 22 个功能模块，覆盖编码解码、加密解密、Payload 工具、信息收集、资产测绘、网站嗅探、Vue 权限绕过、XSS 扫描、Source Map 分析、RuoYi 路由检测、WAF/CORS/子域名扫描等常见安全测试场景。
+Chrome 渗透测试辅助工具包，集成 28 个功能模块，覆盖编码解码、加密解密、Payload 工具、信息收集、资产测绘、网站嗅探、Vue 权限绕过、XSS 扫描、Source Map 分析、RuoYi 路由检测、WAF/CORS/子域名扫描、安全头检测、重定向检测、目录扫描、GraphQL 测试、存储检查、统一报告等常见安全测试场景。
 
 ---
 
@@ -30,6 +30,12 @@ Chrome 渗透测试辅助工具包，集成 22 个功能模块，覆盖编码解
 - [React/Angular 检测](#20-reactangular-检测)
 - [Source Loader](#21-source-loader)
 - [网站嗅探](#22-网站嗅探)
+- [安全头检测](#23-安全头检测)
+- [重定向检测](#24-重定向检测)
+- [目录扫描](#25-目录扫描)
+- [GraphQL 测试](#26-graphql-测试)
+- [存储检查](#27-存储检查)
+- [统一报告](#28-统一报告)
 - [权限说明](#权限说明)
 - [常见问题](#常见问题)
 
@@ -54,8 +60,8 @@ src/
 │   └── page-inspect.js            # 页面结构检测辅助
 ├── popup/
 │   ├── popup.html                 # Shell：头部 + 标签栏 + 状态栏，面板由 JS 加载
-│   ├── panel-loader.js            # 并行加载 22 个面板 HTML 片段到 #app-main
-│   ├── panels/                    # 面板 HTML 片段（22 个文件）
+│   ├── panel-loader.js            # 并行加载 27 个面板 HTML 片段到 #app-main
+│   ├── panels/                    # 面板 HTML 片段（27 个文件）
 │   │   ├── encoding.html          # 编码工具 + 加密解密
 │   │   ├── favicon-gather.html    # 图标识别 + 信息收集 + HaE 规则
 │   │   ├── rules-modal.html       # HaE 规则弹窗
@@ -77,7 +83,13 @@ src/
 │   │   ├── react.html             # React 检测
 │   │   ├── angular.html           # Angular 检测
 │   │   ├── source-loader.html     # Source Loader
-│   │   └── sniff.html             # 网站嗅探（技术指纹 + 泄露扫描）
+│   │   ├── sniff.html             # 网站嗅探（技术指纹 + 泄露扫描）
+│   │   ├── headers.html           # 安全头检测
+│   │   ├── redirect.html          # 重定向检测
+│   │   ├── fuzz.html              # 目录扫描
+│   │   ├── graphql.html           # GraphQL 测试
+│   │   ├── storage-check.html     # 存储检查
+│   │   └── report.html            # 统一报告
 │   │
 │   ├── vk-namespace.js            # ES module 入口：全局工具函数 + utilsProxy
 │   ├── vk-init.js                 # 应用入口，加载设置并调用初始化函数
@@ -145,9 +157,15 @@ src/
 │   ├── vk-react.js                # React 框架检测
 │   ├── vk-angular.js              # Angular 框架检测
 │   ├── vk-source-loader.js        # Source Loader（源码加载到 DevTools Sources）
+│   ├── vk-headers.js              # 安全头检测（19 项安全头分析 + 加权评分）
+│   ├── vk-redirect.js             # 重定向检测（29 种参数 + 10 种协议载荷）
+│   ├── vk-fuzz.js                 # 目录扫描（4 个字典 + 智能内容分析）
+│   ├── vk-graphql.js              # GraphQL 端点探测 + 安全检查
+│   ├── vk-storage-check.js        # 存储检查（localStorage/sessionStorage/IndexedDB）
+│   ├── vk-report.js               # 统一报告（聚合 12 模块发现 + 一键审计）
 │   └── lib/                       # 第三方库（crypto-js, jsrsasign, sm2, sm4, bcrypt, exifr）
 ├── styles/
-│   ├── popup/                     # Popup 样式（21 个文件，按模块拆分）
+│   ├── popup/                     # Popup 样式（27 个文件，按模块拆分）
 │   │   ├── base.css               # 全局样式、暗色变量、Toast、确认弹窗、无障碍
 │   │   ├── favicon.css            # 图标识别
 │   │   ├── info-gather.css        # 信息收集
@@ -168,7 +186,13 @@ src/
 │   │   ├── react.css              # React 检测
 │   │   ├── angular.css            # Angular 检测
 │   │   ├── source-loader.css      # Source Loader
-│   │   └── sniff.css              # 网站嗅探 + 泄露扫描
+│   │   ├── sniff.css              # 网站嗅探 + 泄露扫描
+│   │   ├── headers.css            # 安全头检测
+│   │   ├── redirect.css           # 重定向检测
+│   │   ├── fuzz.css               # 目录扫描
+│   │   ├── graphql.css            # GraphQL 测试
+│   │   ├── storage-check.css      # 存储检查
+│   │   └── report.css             # 统一报告
 │   └── options.css                # 选项页样式
 └── options/
     ├── options.html               # 选项页
@@ -954,6 +978,166 @@ RuoYi 后台管理系统的路由分析与权限测试工具。发现被权限�
 - 按分类过滤
 - 展开查看详情（描述、利用方式、修复建议、完整值）
 - 一键复制/导出 JSON
+
+---
+
+## 23. 安全头检测
+
+分析目标网站 HTTP 响应头中的安全配置，覆盖 19 项安全头，加权评分（0-100 分，A-F 等级）。
+
+**检测的安全头（7 大类）：**
+
+| 类别 | 安全头 | 作用 |
+|------|--------|------|
+| 传输安全 | `Strict-Transport-Security` (HSTS) | 强制 HTTPS 连接 |
+| 点击劫持防护 | `X-Frame-Options`、`Content-Security-Policy: frame-ancestors` | 防止页面被 iframe 嵌套 |
+| 内容注入防护 | `Content-Security-Policy` (CSP)、`X-Content-Type-Options`、`X-XSS-Protection` | 防止 XSS 和 MIME 嗅探 |
+| 信息泄露防护 | `X-Powered-By`、`Server` | 隐藏服务器/框架指纹 |
+| Cookie 安全 | `Set-Cookie` (Secure/HttpOnly/SameSite) | Cookie 传输安全 |
+| 引用策略 | `Referrer-Policy` | 控制 Referer 头泄露 |
+| 权限策略 | `Permissions-Policy` | 限制浏览器 API 使用 |
+
+**功能：**
+- 一键扫描，自动获取响应头并逐项检测
+- 加权评分系统，A-F 等级评定
+- CSP 深度分析（script-src/style-src 策略详情）
+- 信息泄露检测（Server、X-Powered-By 暴露）
+- 导出 TXT / CSV 报告
+
+---
+
+## 24. 重定向检测
+
+检测目标网站是否存在开放重定向（Open Redirect）漏洞，自动测试常见重定向参数。
+
+**测试方式：**
+- 发送带有重定向载荷的请求，检查响应状态码（3xx）、Location 头、响应体中的跳转模式
+- 支持 Chromium 的 `redirect` 标志检测客户端重定向
+
+**测试参数（29 种）：**
+`url`、`redirect`、`redirect_uri`、`redirect_url`、`return`、`return_url`、`returnTo`、`next`、`next_url`、`target`、`dest`、`destination`、`rurl`、`redir`、`goto`、`continue`、`link`、`out`、`url_redirect`、`view`、`callback`、`jump`、`forward`、`RelayState`、`gotoUrl`、`ReturnUrl`、`successUrl`、`failUrl`、`backurl`
+
+**载荷协议（10 种）：**
+`//evil.com`、`https://evil.com`、`\\evil.com`、`https://evil.com%00`、`/\\evil.com` 等
+
+**功能：**
+- 自定义并发数（1-20）
+- 进度条显示扫描进度
+- 按状态筛选（重定向/可疑/正常）
+- 复制/导出结果
+
+---
+
+## 25. 目录扫描
+
+对目标网站进行目录和文件枚举，发现隐藏的敏感路径和备份文件。
+
+**内置字典（4 组 217 条）：**
+
+| 字典 | 路径数 | 内容 |
+|------|--------|------|
+| 常见目录 | 87 | admin、login、api、backup、config、upload、test、debug 等 |
+| 备份文件 | 43 | .bak、.sql、.zip、.tar.gz、.swp、web.config.bak、database.sql 等 |
+| API 路径 | 43 | /api/v1/、/graphql、/swagger、/actuator、/debug/pprof 等 |
+| 敏感文件 | 44 | .env、.git/HEAD、.DS_Store、WEB-INF/web.xml、phpinfo.php 等 |
+
+**智能内容分析：**
+- 8 种正则模式识别有效响应（登录表单、403/401 页面、API 响应等）
+- 自动排除 404 响应
+- 去重检测（相同状态码 + 响应长度视为重复）
+
+**功能：**
+- HEAD 请求优先，失败自动 GET 回退
+- 自定义并发数
+- 暂停/继续扫描
+- 按状态码筛选
+- 复制/导出结果
+
+---
+
+## 26. GraphQL 测试
+
+检测目标网站是否存在 GraphQL 端点，并测试常见安全问题。
+
+**端点探测（9 个常见路径）：**
+`/graphql`、`/graphql.php`、`/graphiql`、`/api/graphql`、`/query`、`/gql`、`/api/gql`、`/altair`、`/playground`
+
+**安全检查（3 项）：**
+
+| 检查项 | 说明 | 风险 |
+|--------|------|------|
+| Introspection 查询 | 发送 `__schema` 查询测试是否暴露完整 schema | 高 — 可获取所有类型、字段、查询定义 |
+| Batch 查询 | 发送数组格式查询测试是否支持批量请求 | 高 — 可用于 DoS 放大或绕过限速 |
+| 字段建议 | 发送带错误的查询测试是否返回字段名称建议 | 中 — 可用于 schema 信息枚举 |
+
+**功能：**
+- 自定义端点输入
+- 自定义 GraphQL 查询执行
+- JSON 导出结果
+
+---
+
+## 27. 存储检查
+
+检查目标页面的浏览器存储，发现敏感数据和高风险配置。
+
+### 27.1 localStorage / sessionStorage
+
+浏览页面中存储的所有键值对，自动检测敏感数据。
+
+**敏感数据检测规则：**
+- **键名匹配** — `token`、`auth`、`session`、`password`、`secret`、`api_key`、`bearer`、`access_token`、`refresh_token`、`private_key`、`credential`、`jwt`、`id_token`
+- **值模式匹配** — JWT 格式、Bearer 前缀、OpenAI `sk-*` 密钥、AWS `AKIA` 密钥、PEM 私钥、Hex 哈希
+
+**功能：**
+- 一键读取（最多 500 项）
+- 敏感项红色高亮 + 匹配规则徽章
+- 筛选：全部 / 仅敏感
+- 关键词搜索
+- 单条删除、清空全部
+- 复制完整 JSON
+
+### 27.2 IndexedDB
+
+浏览页面中 IndexedDB 的数据库和仓库结构。
+
+**功能：**
+- 列出所有数据库、版本、仓库
+- 显示每个仓库的记录数和内容（≤100 条/仓库）
+- 值截断 500 字符防止内存溢出
+- 复制完整数据为 JSON
+
+---
+
+## 28. 统一报告
+
+聚合所有扫描模块的发现，生成综合渗透测试报告。
+
+**聚合模块（12 个）：**
+
+| 模块 | 来源 |
+|------|------|
+| XSS 扫描 | `vk-xss.js` |
+| CORS 检测 | `vk-cors.js` |
+| WAF 检测 | `vk-waf.js` |
+| Cookie 审计 | `vk-cookie-audit.js` |
+| 技术栈识别 | `vk-sniff-scanner.js` |
+| 信息泄露 | 泄露扫描发现 |
+| 子域名收集 | `vk-subdomain.js` |
+| 安全头检测 | `vk-headers.js` |
+| 重定向检测 | `vk-redirect.js` |
+| 目录扫描 | `vk-fuzz.js` |
+| JWT 分析 | `vk-jwt.js` |
+| 存储检查 | `vk-storage-check.js` |
+
+**一键审计：**
+自动执行 5 个核心扫描（技术栈识别 → XSS 注入点采集 → CORS 配置检测 → WAF 指纹检测 → Cookie 安全审计），进度条实时显示。
+
+**报告功能：**
+- 严重性分级（严重/高危/中危/低危/信息）自动排序
+- 内置仪表盘（彩色统计卡片）
+- 导出 HTML 报告（独立文件，含样式，可打印）
+- 导出 Markdown 报告
 
 ---
 
