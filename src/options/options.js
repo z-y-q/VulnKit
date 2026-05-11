@@ -471,15 +471,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  const version = chrome.runtime.getManifest().version;
-  const versionEl = $('version');
-  if (versionEl) versionEl.textContent = version;
+  const isExtension = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
 
-  loadSettings();
-  renderToolbarConfig();
-  renderHaeRules();
-  renderStorageOverview();
-  loadApiKeys();
+  if (isExtension) {
+    try {
+      const version = chrome.runtime.getManifest().version;
+      const versionEl = $('version');
+      if (versionEl) versionEl.textContent = version;
+    } catch (_) {}
+
+    loadSettings();
+    renderToolbarConfig();
+    renderHaeRules();
+    renderStorageOverview();
+    loadApiKeys();
+  }
+
+  initAllRuleSections();
 
   let btn;
 

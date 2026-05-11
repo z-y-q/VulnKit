@@ -934,6 +934,237 @@ body {
   border-top: 1px solid var(--opt-border);
 }
 
+/* ====== Extended Rule Manager ====== */
+.rule-type-selector {
+  min-width: 240px;
+  padding: 8px 14px;
+  border: 1px solid var(--opt-border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--opt-bg-input);
+  color: var(--opt-text);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.rule-type-selector:focus {
+  outline: none;
+  border-color: var(--opt-accent);
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+}
+
+.rule-group {
+  margin-bottom: 4px;
+}
+
+.rule-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  margin-top: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--opt-text);
+  border-bottom: 1px solid var(--opt-border-light);
+  cursor: pointer;
+  user-select: none;
+}
+
+.rule-group:first-child .rule-group-header {
+  margin-top: 0;
+}
+
+.rule-group-header .rule-count {
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--opt-text-muted);
+}
+
+.rule-group-header .rule-group-toggle {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--opt-text-muted);
+  transition: transform 0.2s;
+}
+
+.rule-group.collapsed .rule-group-toggle {
+  transform: rotate(-90deg);
+}
+
+.rule-group.collapsed .rule-group-items {
+  display: none;
+}
+
+.rule-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0 5px 24px;
+  font-size: 13px;
+  color: var(--opt-text);
+  transition: background 0.1s;
+}
+
+.rule-item:hover {
+  background: var(--opt-bg-hover);
+  border-radius: 6px;
+}
+
+.rule-item-label {
+  cursor: pointer;
+  text-decoration: underline dashed var(--opt-border);
+  text-underline-offset: 3px;
+  transition: color 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rule-item-label:hover {
+  color: var(--opt-accent);
+  text-decoration-color: var(--opt-accent);
+}
+
+.rule-item-badge {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--opt-bg-hover);
+  color: var(--opt-text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.rule-item-badge.severity-critical,
+.rule-item-badge.severity-high {
+  background: rgba(231, 76, 60, 0.12);
+  color: #e74c3c;
+}
+
+.rule-item-badge.severity-medium {
+  background: rgba(230, 126, 34, 0.12);
+  color: #e67e22;
+}
+
+.rule-item-badge.severity-low,
+.rule-item-badge.severity-info {
+  background: rgba(74, 144, 226, 0.1);
+  color: var(--opt-accent);
+}
+
+.rule-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.rule-item:hover .rule-actions,
+.rule-group-header:hover .rule-actions {
+  opacity: 1;
+}
+
+.rule-item-string {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0 3px 24px;
+  font-size: 13px;
+  color: var(--opt-text);
+  font-family: 'SF Mono', 'Consolas', 'Monaco', 'Menlo', monospace;
+}
+
+.rule-item-string:hover {
+  background: var(--opt-bg-hover);
+  border-radius: 4px;
+}
+
+.rule-string-text {
+  cursor: pointer;
+  transition: color 0.15s;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rule-string-text:hover {
+  color: var(--opt-accent);
+}
+
+.rule-inline-input {
+  padding: 3px 8px;
+  border: 1px solid var(--opt-accent);
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', 'Menlo', monospace;
+  background: var(--opt-bg-input);
+  color: var(--opt-text);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.12);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.rule-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--opt-text-muted);
+  font-size: 13px;
+}
+
+.rule-loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--opt-text-muted);
+}
+
+/* Sub-object array (matchers) in modal */
+.rule-sub-form {
+  border: 1px solid var(--opt-border);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: var(--opt-bg-input);
+}
+
+.rule-sub-form-row {
+  display: grid;
+  grid-template-columns: 1fr 100px 2fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.rule-sub-form-row:last-child {
+  margin-bottom: 0;
+}
+
+.rule-sub-form-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px dashed var(--opt-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--opt-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-top: 6px;
+}
+
+.rule-sub-form-add:hover {
+  border-color: var(--opt-accent);
+  color: var(--opt-accent);
+  background: var(--opt-bg-hover);
+}
+
 /* ====== Scrollbar ====== */
 .options-sidebar::-webkit-scrollbar,
 .options-content::-webkit-scrollbar {
