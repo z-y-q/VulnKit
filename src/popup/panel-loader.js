@@ -30,6 +30,7 @@
     'redirect.html',
     'fuzz.html',
     'graphql.html',
+    'storage-check.html',
     'report.html',
   ];
 

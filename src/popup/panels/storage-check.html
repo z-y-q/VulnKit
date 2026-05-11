@@ -1,0 +1,61 @@
+    <!-- 存储检查面板 -->
+    <div id="panel-storage-check" class="panel">
+      <div class="content-card">
+        <div class="card-title">存储检查</div>
+        <div class="sc-sub-tabs">
+          <button class="sc-stab active" data-scstab="local">localStorage</button>
+          <button class="sc-stab" data-scstab="session">sessionStorage</button>
+          <button class="sc-stab" data-scstab="idb">IndexedDB</button>
+        </div>
+
+        <!-- localStorage -->
+        <div id="scstab-local" class="scstab-subpanel active">
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="sc-local-read-btn">读取</button>
+            <button class="btn btn-outline" id="sc-local-clear-btn">清空</button>
+            <button class="btn btn-outline" id="sc-local-copy-btn" style="display:none">复制 JSON</button>
+          </div>
+          <div class="status-bar" id="sc-local-status"></div>
+          <div class="sc-stats" id="sc-local-stats" style="display:none"></div>
+          <div class="sc-filter-bar" id="sc-local-filter" style="display:none">
+            <button class="sc-filter-chip active" data-scfilter="all">全部</button>
+            <button class="sc-filter-chip" data-scfilter="sensitive">敏感</button>
+            <input type="text" class="sc-search-input" id="sc-local-search" placeholder="搜索键名或值...">
+          </div>
+          <div class="sc-results" id="sc-local-results">
+            <div class="empty-state">点击「读取」查看当前页面 localStorage</div>
+          </div>
+        </div>
+
+        <!-- sessionStorage -->
+        <div id="scstab-session" class="scstab-subpanel">
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="sc-session-read-btn">读取</button>
+            <button class="btn btn-outline" id="sc-session-clear-btn">清空</button>
+            <button class="btn btn-outline" id="sc-session-copy-btn" style="display:none">复制 JSON</button>
+          </div>
+          <div class="status-bar" id="sc-session-status"></div>
+          <div class="sc-stats" id="sc-session-stats" style="display:none"></div>
+          <div class="sc-filter-bar" id="sc-session-filter" style="display:none">
+            <button class="sc-filter-chip active" data-scfilter="all">全部</button>
+            <button class="sc-filter-chip" data-scfilter="sensitive">敏感</button>
+            <input type="text" class="sc-search-input" id="sc-session-search" placeholder="搜索键名或值...">
+          </div>
+          <div class="sc-results" id="sc-session-results">
+            <div class="empty-state">点击「读取」查看当前页面 sessionStorage</div>
+          </div>
+        </div>
+
+        <!-- IndexedDB -->
+        <div id="scstab-idb" class="scstab-subpanel">
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="sc-idb-read-btn">读取</button>
+            <button class="btn btn-outline" id="sc-idb-copy-btn" style="display:none">复制 JSON</button>
+          </div>
+          <div class="status-bar" id="sc-idb-status"></div>
+          <div class="sc-results sc-idb-results" id="sc-idb-results">
+            <div class="empty-state">点击「读取」查看当前页面 IndexedDB</div>
+          </div>
+        </div>
+      </div>
+    </div>

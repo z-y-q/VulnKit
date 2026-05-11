@@ -32,6 +32,7 @@ const MODULE_LABELS = {
   redirect: '重定向检测',
   fuzz: '目录扫描',
   jwt: 'JWT 分析',
+  'storage-check': '存储检查',
 };
 
 function normalizeSeverity(raw) {
@@ -55,6 +56,7 @@ async function collectAllFindings() {
     fuzz: './vk-fuzz.js',
     graphql: './vk-graphql.js',
     jwt: './vk-jwt.js',
+    'storage-check': './vk-storage-check.js',
   };
 
   for (var key in moduleMap) {

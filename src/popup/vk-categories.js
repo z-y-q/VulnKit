@@ -12,7 +12,17 @@ var TAB_CATEGORIES = [
     id: 'scan',
     label: '扫描',
     color: '#e74c3c',
-    tabs: ['xssscan', 'cors', 'waf', 'cookie-audit', 'headers', 'redirect', 'fuzz', 'graphql'],
+    tabs: [
+      'xssscan',
+      'cors',
+      'waf',
+      'cookie-audit',
+      'headers',
+      'redirect',
+      'fuzz',
+      'graphql',
+      'storage-check',
+    ],
   },
   {
     id: 'exploit',

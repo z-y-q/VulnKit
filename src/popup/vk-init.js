@@ -192,6 +192,7 @@ var PANEL_REGISTRY = {
   'source-loader': { source: 'detectors', init: 'initNetworkTools' },
   graphql: { source: 'detectors', init: 'initNetworkTools' },
   sniff: { source: 'detectors', init: 'initSniff' },
+  'storage-check': { source: 'detectors', init: 'initStorageChecker' },
 };
 
 // ====== Main tabs with lazy loading ======

@@ -501,11 +501,92 @@ function initStateRestoration() {
   });
 }
 
+function initStorageChecker() {
+  import('./vk-storage-check.js').then(function (sc) {
+    utils.bindTabSwitch('sc-stab', 'scstab', function (tab) {
+      utils.switchSubTabs('sc-stab', 'scstab', 'scstab', tab);
+    });
+
+    sc.bindFilterSearch('local');
+    sc.bindFilterSearch('session');
+    sc.bindEventDelegation('local');
+    sc.bindEventDelegation('session');
+
+    utils.bindClick('sc-local-read-btn', async function () {
+      utils.setStatus('sc-local-status', '正在读取 localStorage...');
+      utils.get('sc-local-read-btn').disabled = true;
+      try {
+        var items = await sc.readWebStorage('local');
+        sc.renderStorageResults('local');
+        sc.renderStats('local', items);
+        utils.setStatus('sc-local-status', '读取完成 — ' + items.length + ' 项');
+        utils.get('sc-local-copy-btn').style.display = items.length > 0 ? '' : 'none';
+        utils.get('sc-local-filter').style.display = items.length > 0 ? '' : 'none';
+      } catch (err) {
+        utils.setStatus('sc-local-status', '读取失败: ' + (err.message || '未知错误'));
+      } finally {
+        utils.get('sc-local-read-btn').disabled = false;
+      }
+    });
+
+    utils.bindClick('sc-session-read-btn', async function () {
+      utils.setStatus('sc-session-status', '正在读取 sessionStorage...');
+      utils.get('sc-session-read-btn').disabled = true;
+      try {
+        var items = await sc.readWebStorage('session');
+        sc.renderStorageResults('session');
+        sc.renderStats('session', items);
+        utils.setStatus('sc-session-status', '读取完成 — ' + items.length + ' 项');
+        utils.get('sc-session-copy-btn').style.display = items.length > 0 ? '' : 'none';
+        utils.get('sc-session-filter').style.display = items.length > 0 ? '' : 'none';
+      } catch (err) {
+        utils.setStatus('sc-session-status', '读取失败: ' + (err.message || '未知错误'));
+      } finally {
+        utils.get('sc-session-read-btn').disabled = false;
+      }
+    });
+
+    utils.bindClick('sc-idb-read-btn', async function () {
+      utils.setStatus('sc-idb-status', '正在读取 IndexedDB...');
+      utils.get('sc-idb-read-btn').disabled = true;
+      try {
+        var info = await sc.readIndexedDB();
+        sc.renderIDBResults();
+        var dbCount = info.databases ? info.databases.length : 0;
+        utils.setStatus(
+          'sc-idb-status',
+          info.error ? '读取失败: ' + info.error : '读取完成 — ' + dbCount + ' 个数据库'
+        );
+        utils.get('sc-idb-copy-btn').style.display = dbCount > 0 ? '' : 'none';
+      } catch (err) {
+        utils.setStatus('sc-idb-status', '读取失败: ' + (err.message || '未知错误'));
+      } finally {
+        utils.get('sc-idb-read-btn').disabled = false;
+      }
+    });
+
+    utils.bindClick('sc-local-clear-btn', function () {
+      sc.clearStorage('local');
+    });
+    utils.bindClick('sc-session-clear-btn', function () {
+      sc.clearStorage('session');
+    });
+    utils.bindClick('sc-local-copy-btn', function () {
+      sc.copyAllData('local');
+    });
+    utils.bindClick('sc-session-copy-btn', function () {
+      sc.copyAllData('session');
+    });
+    utils.bindClick('sc-idb-copy-btn', sc.copyIDBData);
+  });
+}
+
 export {
   initVuePermissions,
   initJsSearchAndTraverse,
   initSecurityDetectors,
   initNetworkTools,
   initSniff,
+  initStorageChecker,
   initStateRestoration,
 };
