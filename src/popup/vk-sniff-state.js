@@ -18,7 +18,11 @@ const TECH_SIGNATURES = [
     category: 'CMS',
     matchers: [
       { source: 'meta', type: 'regex', value: /generator.*drupal/i },
-      { source: 'body', type: 'regex', value: /Drupal\.settings|drupal\.js|sites\/default\/files/i },
+      {
+        source: 'body',
+        type: 'regex',
+        value: /Drupal\.settings|drupal\.js|sites\/default\/files/i,
+      },
       { source: 'headers', type: 'regex', value: /X-Drupal-Cache|X-Generator.*Drupal/i },
     ],
   },
@@ -53,8 +57,16 @@ const TECH_SIGNATURES = [
     category: 'CMS',
     matchers: [
       { source: 'meta', type: 'regex', value: /magento/i },
-      { source: 'body', type: 'regex', value: /mage\/cache|skin\/frontend\/|Magento_GoogleAnalytics/i },
-      { source: 'cookies', type: 'regex', value: /mage-cache-storage-session|product_data_storage/i },
+      {
+        source: 'body',
+        type: 'regex',
+        value: /mage\/cache|skin\/frontend\/|Magento_GoogleAnalytics/i,
+      },
+      {
+        source: 'cookies',
+        type: 'regex',
+        value: /mage-cache-storage-session|product_data_storage/i,
+      },
     ],
   },
   {
@@ -157,6 +169,7 @@ const TECH_SIGNATURES = [
     matchers: [
       { source: 'headers', type: 'regex', value: /x-nextjs-data|x-nextjs-version/im },
       { source: 'globals', type: 'equals', value: '__next' },
+      { source: 'globals', type: 'equals', value: '__NEXT_DATA__' },
       { source: 'body', type: 'regex', value: /__next\//i },
       { source: 'scriptSrc', type: 'regex', value: /_next\//i },
     ],
@@ -166,6 +179,7 @@ const TECH_SIGNATURES = [
     category: '框架',
     matchers: [
       { source: 'globals', type: 'equals', value: '__nuxt' },
+      { source: 'globals', type: 'equals', value: '__NUXT__' },
       { source: 'meta', type: 'regex', value: /nuxt/i },
       { source: 'body', type: 'regex', value: /__nuxt\//i },
     ],
@@ -269,7 +283,41 @@ const TECH_SIGNATURES = [
   {
     name: 'Svelte',
     category: 'JS 框架',
-    matchers: [{ source: 'body', type: 'regex', value: /svelte-\w+|__svelte/i }],
+    matchers: [
+      { source: 'globals', type: 'equals', value: '__svelte' },
+      { source: 'globals', type: 'equals', value: '__sveltekit' },
+      { source: 'body', type: 'regex', value: /class="[^"]*svelte-[^"]*"/i },
+      { source: 'body', type: 'regex', value: /data-sveltekit-|__sveltekit/i },
+      { source: 'scriptSrc', type: 'regex', value: /svelte\/internal|svelte\//i },
+    ],
+  },
+  {
+    name: 'Solid.js',
+    category: 'JS 框架',
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'Solid' },
+      { source: 'globals', type: 'equals', value: 'SolidMeta' },
+      { source: 'body', type: 'regex', value: /data-solidjs|solid-[^-]/i },
+      { source: 'scriptSrc', type: 'regex', value: /solid-js|solid\//i },
+    ],
+  },
+  {
+    name: 'Astro',
+    category: '框架',
+    matchers: [
+      { source: 'body', type: 'regex', value: /astro-island|data-astro/i },
+      { source: 'scriptSrc', type: 'regex', value: /_astro\//i },
+      { source: 'meta', type: 'regex', value: /generator.*astro/i },
+    ],
+  },
+  {
+    name: 'Blazor',
+    category: '框架',
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'Blazor' },
+      { source: 'body', type: 'regex', value: /blazor\.webassembly|_framework\/blazor/i },
+      { source: 'scriptSrc', type: 'regex', value: /_framework\/blazor/i },
+    ],
   },
   {
     name: 'Ember',
@@ -383,7 +431,11 @@ const TECH_SIGNATURES = [
     name: 'Tailwind CSS',
     category: 'UI 框架',
     matchers: [
-      { source: 'classNames', type: 'regex', value: /\bflex\b.*\bp-\d+\b|\bgrid\b.*\bcol-\w+-\d+\b|\btext-(?:xs|sm|base|lg|xl)\b/i },
+      {
+        source: 'classNames',
+        type: 'regex',
+        value: /\bflex\b.*\bp-\d+\b|\bgrid\b.*\bcol-\w+-\d+\b|\btext-(?:xs|sm|base|lg|xl)\b/i,
+      },
       { source: 'body', type: 'regex', value: /tailwindcss/i },
       { source: 'scriptSrc', type: 'regex', value: /tailwindcss/i },
     ],
@@ -722,12 +774,24 @@ function scoreConfidence(matchedMatchers) {
   var totalScore = Math.min(100, Math.round(baseScore * bonusMultiplier + sourceBonus));
 
   if (totalScore >= CONFIDENCE_LEVELS.strong.min) {
-    return { score: totalScore, label: CONFIDENCE_LEVELS.strong.label, color: CONFIDENCE_LEVELS.strong.color };
+    return {
+      score: totalScore,
+      label: CONFIDENCE_LEVELS.strong.label,
+      color: CONFIDENCE_LEVELS.strong.color,
+    };
   }
   if (totalScore >= CONFIDENCE_LEVELS.moderate.min) {
-    return { score: totalScore, label: CONFIDENCE_LEVELS.moderate.label, color: CONFIDENCE_LEVELS.moderate.color };
+    return {
+      score: totalScore,
+      label: CONFIDENCE_LEVELS.moderate.label,
+      color: CONFIDENCE_LEVELS.moderate.color,
+    };
   }
-  return { score: totalScore, label: CONFIDENCE_LEVELS.weak.label, color: CONFIDENCE_LEVELS.weak.color };
+  return {
+    score: totalScore,
+    label: CONFIDENCE_LEVELS.weak.label,
+    color: CONFIDENCE_LEVELS.weak.color,
+  };
 }
 
 function extractVersion(techName, versions) {

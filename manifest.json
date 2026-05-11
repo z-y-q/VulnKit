@@ -27,7 +27,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/inject/vue-detect.js", "src/inject/ruoyi-route-hook.js", "src/inject/vue-store-explorer.js", "src/inject/react-detect.js", "src/inject/react-store-explorer.js", "src/inject/angular-detect.js", "src/inject/sourcemap-detect.js", "src/inject/page-inspect.js"],
+      "resources": ["src/inject/vue-detect.js", "src/inject/ruoyi-route-hook.js", "src/inject/vue-store-explorer.js", "src/inject/react-detect.js", "src/inject/react-store-explorer.js", "src/inject/angular-detect.js", "src/inject/angular-store-explorer.js", "src/inject/svelte-detect.js", "src/inject/sourcemap-detect.js", "src/inject/page-inspect.js"],
       "matches": ["<all_urls>"]
     }
   ],

@@ -22,6 +22,10 @@
   let pageInspectToken = null;
   let reactStoreResolve = null;
   let reactStoreToken = null;
+  let angularStoreResolve = null;
+  let angularStoreToken = null;
+  let svelteDetectResolve = null;
+  let svelteDetectToken = null;
 
   // Window message relay
   window.addEventListener('message', function (e) {
@@ -101,6 +105,24 @@
         reactStoreResolve(e.data.result);
         reactStoreResolve = null;
         reactStoreToken = null;
+      }
+      return;
+    }
+
+    if (e.data && e.data.__vk_angular_store && angularStoreResolve) {
+      if (angularStoreToken && e.data.__vk_token === angularStoreToken) {
+        angularStoreResolve(e.data.result);
+        angularStoreResolve = null;
+        angularStoreToken = null;
+      }
+      return;
+    }
+
+    if (e.data && e.data.__vk_svelte_detect && svelteDetectResolve) {
+      if (svelteDetectToken && e.data.__vk_token === svelteDetectToken) {
+        svelteDetectResolve(e.data.result);
+        svelteDetectResolve = null;
+        svelteDetectToken = null;
       }
       return;
     }
@@ -320,6 +342,55 @@
         .catch(function (err) {
           sendResponse({ error: err.message || 'React store explore failed' });
         });
+      return true;
+    }
+    if (message.type === 'VK_ANGULAR_STORE_EXPLORE') {
+      angularStoreResolve = null;
+      angularStoreToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      new Promise(function (resolve) {
+        angularStoreResolve = resolve;
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL('src/inject/angular-store-explorer.js');
+        script.dataset.vkToken = angularStoreToken;
+        script.onload = function () {
+          script.remove();
+          setTimeout(function () {
+            if (angularStoreResolve) {
+              angularStoreResolve({ error: 'Angular store explorer timeout' });
+              angularStoreResolve = null;
+            }
+          }, 5000);
+        };
+        script.onerror = function () {
+          script.remove();
+          if (angularStoreResolve) {
+            angularStoreResolve({ error: 'Failed to load angular store explorer' });
+            angularStoreResolve = null;
+          }
+        };
+        (document.head || document.documentElement).appendChild(script);
+      })
+        .then(function (result) {
+          sendResponse(result);
+        })
+        .catch(function (err) {
+          sendResponse({ error: err.message || 'Angular store explore failed' });
+        });
+      return true;
+    }
+    if (message.type === 'VK_SVELTE_DETECT') {
+      injectScript(
+        'src/inject/svelte-detect.js',
+        function (r) {
+          svelteDetectResolve = r;
+        },
+        3000,
+        function (t) {
+          svelteDetectToken = t;
+        }
+      ).then(function (result) {
+        sendResponse(result);
+      });
       return true;
     }
     if (message.type === 'VK_PAGE_INSPECT') {

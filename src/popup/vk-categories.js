@@ -34,7 +34,7 @@ var TAB_CATEGORIES = [
     id: 'framework',
     label: '框架分析',
     color: '#27ae60',
-    tabs: ['vue', 'ruoyi', 'react', 'angular', 'sourcemap'],
+    tabs: ['vue', 'ruoyi', 'react', 'angular', 'svelte', 'sourcemap'],
   },
   {
     id: 'tools',

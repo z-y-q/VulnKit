@@ -187,6 +187,7 @@ var PANEL_REGISTRY = {
   'cookie-audit': { source: 'detectors', init: 'initSecurityDetectors' },
   react: { source: 'detectors', init: 'initSecurityDetectors' },
   angular: { source: 'detectors', init: 'initSecurityDetectors' },
+  svelte: { source: 'detectors', init: 'initSecurityDetectors' },
   cors: { source: 'detectors', init: 'initNetworkTools' },
   subdomain: { source: 'detectors', init: 'initNetworkTools' },
   'source-loader': { source: 'detectors', init: 'initNetworkTools' },

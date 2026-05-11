@@ -14,17 +14,26 @@
       return JSON.parse(
         JSON.stringify(obj, function (key, value) {
           if (typeof value === 'function') return '[Function]';
-          if (value instanceof HTMLElement) return '[HTMLElement: ' + (value.tagName || 'unknown') + ']';
+          if (value instanceof HTMLElement)
+            return '[HTMLElement: ' + (value.tagName || 'unknown') + ']';
           if (value instanceof Window) return '[Window]';
           if (value instanceof Error) return '[Error: ' + value.message + ']';
           if (typeof value === 'symbol') return value.toString();
           if (typeof value === 'bigint') return '[BigInt: ' + value.toString() + ']';
           if (value instanceof Promise) return '[Promise]';
           if (value instanceof Map) {
-            try { return { __type__: 'Map', size: value.size }; } catch (_) { return '[Map]'; }
+            try {
+              return { __type__: 'Map', size: value.size };
+            } catch (_) {
+              return '[Map]';
+            }
           }
           if (value instanceof Set) {
-            try { return { __type__: 'Set', size: value.size }; } catch (_) { return '[Set]'; }
+            try {
+              return { __type__: 'Set', size: value.size };
+            } catch (_) {
+              return '[Set]';
+            }
           }
           if (value instanceof WeakMap || value instanceof WeakSet) return '[WeakRef]';
           return value;
@@ -67,14 +76,20 @@
         var s = fiber.memoizedProps.store;
         if (s && typeof s.getState === 'function') return s;
       }
-      if (fiber.stateNode && fiber.stateNode.store && typeof fiber.stateNode.store.getState === 'function') {
+      if (
+        fiber.stateNode &&
+        fiber.stateNode.store &&
+        typeof fiber.stateNode.store.getState === 'function'
+      ) {
         return fiber.stateNode.store;
       }
       if (fiber.type && fiber.type._context && fiber.stateNode) {
         var ctxValue = fiber.stateNode;
         if (ctxValue && typeof ctxValue.getState === 'function') return ctxValue;
       }
-    } catch (e) { /* skip */ }
+    } catch (e) {
+      /* skip */
+    }
     var r = walkFiberForStore(fiber.child, depth + 1);
     if (r) return r;
     return walkFiberForStore(fiber.sibling, depth + 1);
@@ -124,7 +139,9 @@
     stores.forEach(function (entry) {
       try {
         var state = entry.store.getState();
-        var stateKey = Object.keys(state || {}).sort().join(',');
+        var stateKey = Object.keys(state || {})
+          .sort()
+          .join(',');
         if (seenStates[stateKey]) return;
         seenStates[stateKey] = true;
 
@@ -146,7 +163,9 @@
               });
             }
           }
-        } catch (_) { /* no middleware access */ }
+        } catch (_) {
+          /* no middleware access */
+        }
       } catch (e) {
         errors.push(entry.name + ': ' + (e.message || String(e)));
       }
@@ -180,11 +199,20 @@
     // Fallback: scan window for common Zustand patterns
     try {
       var zustandKeys = Object.keys(window).filter(function (k) {
-        if (k.startsWith('__') || k.startsWith('_') || k.startsWith('webkit') || k.startsWith('on')) return false;
+        if (k.startsWith('__') || k.startsWith('_') || k.startsWith('webkit') || k.startsWith('on'))
+          return false;
         try {
           var v = window[k];
-          return v && typeof v === 'object' && typeof v.getState === 'function' && typeof v.setState === 'function' && typeof v.subscribe === 'function';
-        } catch (_) { return false; }
+          return (
+            v &&
+            typeof v === 'object' &&
+            typeof v.getState === 'function' &&
+            typeof v.setState === 'function' &&
+            typeof v.subscribe === 'function'
+          );
+        } catch (_) {
+          return false;
+        }
       });
       zustandKeys.forEach(function (key) {
         if (result[key]) return;
@@ -194,7 +222,9 @@
             state: safeClone(state),
             type: 'zustand',
           };
-        } catch (_) { /* skip */ }
+        } catch (_) {
+          /* skip */
+        }
       });
     } catch (e) {
       errors.push('Zustand window scan: ' + (e.message || String(e)));
@@ -205,30 +235,215 @@
 
   function extractJotaiAtoms() {
     var result = {};
+    var atoms = [];
+
+    // Strategy 1: __JOTAI_DEFAULT_STORE__ / __JOTAI_STORE__ on Fiber nodes
     try {
-      if (typeof jotai !== 'undefined' && jotai.useStore) {
-        // Jotai atoms are accessed via useStore hooks — limited extraction
-        result['jotai'] = {
-          state: { note: 'Jotai atoms accessed via React hooks, direct state extraction limited' },
-          type: 'jotai',
-        };
+      var rootEl =
+        document.getElementById('__next') ||
+        document.getElementById('root') ||
+        document.getElementById('app') ||
+        document.body.firstElementChild;
+      if (rootEl && rootEl._reactRootContainer) {
+        var fiberKey = Object.keys(rootEl._reactRootContainer).find(function (k) {
+          return k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$');
+        });
+        if (fiberKey) {
+          walkFiberForJotai(rootEl._reactRootContainer[fiberKey], atoms, 0);
+        }
       }
-    } catch (_) { /* skip */ }
+      // Also try React 18 createRoot pattern on __nextFiber
+      if (atoms.length === 0 && rootEl) {
+        var fiberKey2 = Object.keys(rootEl).find(function (k) {
+          return k.startsWith('__nextFiber$');
+        });
+        if (fiberKey2) {
+          walkFiberForJotai(rootEl[fiberKey2], atoms, 0);
+        }
+      }
+    } catch (_) {
+      /* skip */
+    }
+
+    // Strategy 2: window.__JOTAI_DEFAULT_STORE__
+    try {
+      if (window.__JOTAI_DEFAULT_STORE__) {
+        var store = window.__JOTAI_DEFAULT_STORE__;
+        if (store.map instanceof Map) {
+          store.map.forEach(function (value, atom) {
+            var name =
+              atom.debugLabel ||
+              (atom.key ? atom.key.substring(0, 60) : String(atom).substring(0, 60));
+            atoms.push({ name: name, value: safeClone(value) });
+          });
+        }
+      }
+      if (window.__JOTAI_STORE__) {
+        var store2 = window.__JOTAI_STORE__;
+        if (store2.map instanceof Map) {
+          store2.map.forEach(function (value, atom) {
+            var name =
+              atom.debugLabel ||
+              (atom.key ? atom.key.substring(0, 60) : String(atom).substring(0, 60));
+            atoms.push({ name: name, value: safeClone(value) });
+          });
+        }
+      }
+    } catch (_) {
+      /* skip */
+    }
+
+    // Strategy 3: useAtom hook memoizedState traversal on Fiber
+    try {
+      if (atoms.length === 0) {
+        var allElements = document.querySelectorAll('*');
+        for (var i = 0; i < Math.min(allElements.length, 200); i++) {
+          var el = allElements[i];
+          var fk = Object.keys(el).find(function (k) {
+            return k.startsWith('__reactFiber$');
+          });
+          if (fk) {
+            walkFiberForJotai(el[fk], atoms, 0);
+            if (atoms.length > 0) break;
+          }
+        }
+      }
+    } catch (_) {
+      /* skip */
+    }
+
+    if (atoms.length > 0) {
+      var state = {};
+      atoms.forEach(function (a) {
+        state[a.name] = a.value;
+      });
+      result['jotai'] = { state: state, type: 'jotai' };
+    }
     return result;
+  }
+
+  function walkFiberForJotai(fiber, atoms, depth) {
+    if (!fiber || depth > 8 || atoms.length > 50) return;
+    try {
+      var memoized = fiber.memoizedState;
+      while (memoized) {
+        if (memoized.queue && memoized.queue.lastRenderedState !== undefined) {
+          var name = '';
+          if (
+            memoized.queue.lastRenderedState &&
+            typeof memoized.queue.lastRenderedState === 'object'
+          ) {
+            var val = memoized.queue.lastRenderedState;
+            if (val.debugLabel) {
+              name = String(val.debugLabel);
+            } else if (val.key) {
+              name = String(val.key).substring(0, 60);
+            } else {
+              name = 'atom-' + atoms.length;
+            }
+            atoms.push({ name: name, value: safeClone(val.read !== undefined ? val.read : val) });
+          }
+        }
+        // Check for __JOTAI_STORE__ on the queue
+        if (memoized.queue && memoized.queue.__JOTAI_STORE__) {
+          var js = memoized.queue.__JOTAI_STORE__;
+          if (js.map instanceof Map) {
+            js.map.forEach(function (v, atom) {
+              var n =
+                atom.debugLabel || (atom.key ? atom.key.substring(0, 60) : 'atom-' + atoms.length);
+              atoms.push({ name: n, value: safeClone(v) });
+            });
+          }
+        }
+        memoized = memoized.next;
+      }
+    } catch (_) {
+      /* skip */
+    }
+    walkFiberForJotai(fiber.child, atoms, depth + 1);
+    walkFiberForJotai(fiber.sibling, atoms, depth + 1);
   }
 
   function extractRecoilState() {
     var result = {};
+
+    // Strategy 1: __RECOIL_DEVTOOLS_GLOBAL_HOOK__
     try {
-      var recoilRoot = document.querySelector('[data-recoil-root]');
-      if (recoilRoot || typeof Recoil !== 'undefined') {
-        result['recoil'] = {
-          state: { note: 'Recoil state accessed via React hooks, direct state extraction limited' },
-          type: 'recoil',
-        };
+      var hook = window.__RECOIL_DEVTOOLS_GLOBAL_HOOK__;
+      if (hook && hook.nodes) {
+        var state = {};
+        var atomKeys = Object.keys(hook.nodes);
+        for (var i = 0; i < Math.min(atomKeys.length, 100); i++) {
+          var key = atomKeys[i];
+          try {
+            var node = hook.nodes[key];
+            var name = node && node.className ? node.className : key;
+            state[name] = safeClone(node);
+          } catch (_) {
+            state[key] = { error: 'extraction failed' };
+          }
+        }
+        if (Object.keys(state).length > 0) {
+          result['recoil'] = { state: state, type: 'recoil', atomCount: atomKeys.length };
+        }
       }
-    } catch (_) { /* skip */ }
+    } catch (_) {
+      /* skip */
+    }
+
+    // Strategy 2: React fiber scan for Recoil_RecoilValue
+    try {
+      if (Object.keys(result).length === 0) {
+        var rootEl =
+          document.getElementById('__next') ||
+          document.getElementById('root') ||
+          document.getElementById('app') ||
+          document.body.firstElementChild;
+        if (rootEl) {
+          var fiberKey = Object.keys(rootEl).find(function (k) {
+            return k.startsWith('__reactFiber$') || k.startsWith('__nextFiber$');
+          });
+          if (fiberKey) {
+            var recoilAtoms = [];
+            walkFiberForRecoil(rootEl[fiberKey], recoilAtoms, 0);
+            if (recoilAtoms.length > 0) {
+              var state2 = {};
+              recoilAtoms.forEach(function (a) {
+                state2[a.name] = a.value;
+              });
+              result['recoil'] = { state: state2, type: 'recoil', atomCount: recoilAtoms.length };
+            }
+          }
+        }
+      }
+    } catch (_) {
+      /* skip */
+    }
+
     return result;
+  }
+
+  function walkFiberForRecoil(fiber, atoms, depth) {
+    if (!fiber || depth > 8 || atoms.length > 50) return;
+    try {
+      // Recoil stores state on the fiber in memoizedProps or memoizedState
+      if (fiber.memoizedProps && fiber.memoizedProps.__recoilValue) {
+        atoms.push({
+          name: String(fiber.memoizedProps.key || 'recoil-' + atoms.length),
+          value: safeClone(fiber.memoizedProps.defaultValue),
+        });
+      }
+      // Check for RecoilRoot store in memoizedState
+      if (fiber.stateNode && fiber.stateNode.storeState instanceof Map) {
+        fiber.stateNode.storeState.forEach(function (v, k) {
+          atoms.push({ name: String(k), value: safeClone(v) });
+        });
+      }
+    } catch (_) {
+      /* skip */
+    }
+    walkFiberForRecoil(fiber.child, atoms, depth + 1);
+    walkFiberForRecoil(fiber.sibling, atoms, depth + 1);
   }
 
   function extractRoutes() {
@@ -260,7 +475,11 @@
         function walkForRoutes(fiber, depth) {
           if (!fiber || depth > 25) return;
           try {
-            if (fiber.memoizedProps && fiber.memoizedProps.path && typeof fiber.memoizedProps.path === 'string') {
+            if (
+              fiber.memoizedProps &&
+              fiber.memoizedProps.path &&
+              typeof fiber.memoizedProps.path === 'string'
+            ) {
               var p = fiber.memoizedProps.path;
               if (p.charAt(0) === '/' || p === '*') {
                 routePaths[p] = routePaths[p] || { path: p, source: 'React Router (fiber)' };
@@ -268,20 +487,30 @@
               }
             }
             // React Router v6 data router: route objects in routeLoader
-            if (fiber.memoizedProps && fiber.memoizedProps.routes && Array.isArray(fiber.memoizedProps.routes)) {
+            if (
+              fiber.memoizedProps &&
+              fiber.memoizedProps.routes &&
+              Array.isArray(fiber.memoizedProps.routes)
+            ) {
               fiber.memoizedProps.routes.forEach(function (r) {
                 if (r && r.path) {
                   routePaths[r.path] = { path: r.path, source: 'React Router data router' };
                 }
               });
             }
-          } catch (_) { /* skip */ }
+          } catch (_) {
+            /* skip */
+          }
           walkForRoutes(fiber.child, depth + 1);
           walkForRoutes(fiber.sibling, depth + 1);
         }
         walkForRoutes(fiberRoot.current, 0);
         Object.values(routePaths).forEach(function (r) {
-          if (!routes.some(function (existing) { return existing.path === r.path; })) {
+          if (
+            !routes.some(function (existing) {
+              return existing.path === r.path;
+            })
+          ) {
             routes.push(r);
           }
         });
@@ -302,7 +531,9 @@
           routes.push({ path: clean, source: 'anchor href' });
         }
       });
-    } catch (_) { /* skip */ }
+    } catch (_) {
+      /* skip */
+    }
 
     // Limit
     if (routes.length > 80) routes = routes.slice(0, 80);
@@ -324,10 +555,14 @@
           var srcList = [];
           try {
             if (store.__INITIAL_ACTION__) srcList.push(JSON.stringify(store.__INITIAL_ACTION__));
-          } catch (_) { /* skip */ }
+          } catch (_) {
+            /* skip */
+          }
         }
       }
-    } catch (_) { /* skip */ }
+    } catch (_) {
+      /* skip */
+    }
 
     // Scan window globals for fetch/axios interceptors
     var urlPatterns = [
@@ -352,7 +587,9 @@
           }
         });
       });
-    } catch (_) { /* skip */ }
+    } catch (_) {
+      /* skip */
+    }
 
     // Scan Redux dispatch calls in inline scripts
     try {
@@ -370,7 +607,9 @@
           }
         }
       });
-    } catch (_) { /* skip */ }
+    } catch (_) {
+      /* skip */
+    }
 
     if (endpoints.length > 100) endpoints = endpoints.slice(0, 100);
     return endpoints;
@@ -412,7 +651,9 @@
     Object.keys(jotaiResult).forEach(function (k) {
       result.stores[k] = jotaiResult[k];
     });
-  } catch (_) { /* skip */ }
+  } catch (_) {
+    /* skip */
+  }
 
   // Recoil
   try {
@@ -420,7 +661,9 @@
     Object.keys(recoilResult).forEach(function (k) {
       result.stores[k] = recoilResult[k];
     });
-  } catch (_) { /* skip */ }
+  } catch (_) {
+    /* skip */
+  }
 
   // Routes
   try {

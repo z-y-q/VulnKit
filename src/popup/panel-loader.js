@@ -22,6 +22,7 @@
     'cookie-audit.html',
     'react.html',
     'angular.html',
+    'svelte.html',
     'cors.html',
     'subdomain.html',
     'source-loader.html',

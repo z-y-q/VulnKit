@@ -1,0 +1,267 @@
+/* Angular Store Explorer */
+.angular-sub-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  margin-bottom: 12px;
+}
+[data-theme='dark'] .angular-sub-tabs {
+  border-color: var(--border-color, #333);
+}
+.angular-stab {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #666);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.angular-stab:hover {
+  color: var(--accent, #0066cc);
+}
+.angular-stab.active {
+  color: #dd0031;
+  border-bottom-color: #dd0031;
+}
+.angular-stab-panel {
+  display: none;
+}
+.angular-stab-panel.active {
+  display: block;
+}
+/* Angular Store */
+.ng-store-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.ng-store-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 10px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+}
+[data-theme='dark'] .ng-store-section-label {
+  color: var(--text-secondary, #aaa);
+  border-color: var(--border-color, #2a2a2a);
+}
+.ng-store-card {
+  background: var(--bg-tertiary, #f8f9fa);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+[data-theme='dark'] .ng-store-card {
+  background: var(--bg-tertiary, #1a1a2e);
+  border-color: var(--border-color, #333);
+}
+.ng-store-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ng-store-name {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+[data-theme='dark'] .ng-store-name {
+  color: var(--text-primary, #e0e0e0);
+}
+.ng-store-type-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.ng-store-type-badge.type-ngrx-store {
+  background: #dd0031;
+  color: #fff;
+}
+.ng-store-type-badge.type-signal-store {
+  background: #f39c12;
+  color: #fff;
+}
+.ng-store-type-badge.type-signal {
+  background: #3498db;
+  color: #fff;
+}
+.ng-store-type-badge.type-unknown {
+  background: #95a5a6;
+  color: #fff;
+}
+.ng-store-node {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ng-store-key-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 0;
+}
+.ng-store-key-row:hover {
+  background: var(--bg-card, rgba(0,0,0,0.02));
+  border-radius: 2px;
+}
+.ng-store-toggle {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--text-secondary, #888);
+  flex-shrink: 0;
+  user-select: none;
+}
+.ng-store-toggle-collapsed {
+  color: #dd0031;
+}
+.ng-store-toggle-expanded {
+  color: #dd0031;
+}
+.ng-store-key {
+  font-family: monospace;
+  font-weight: 500;
+  color: var(--text-primary, #333);
+  flex-shrink: 0;
+}
+[data-theme='dark'] .ng-store-key {
+  color: var(--text-primary, #e0e0e0);
+}
+.ng-store-val {
+  color: var(--text-secondary, #666);
+  font-size: 11px;
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+[data-theme='dark'] .ng-store-val {
+  color: var(--text-secondary, #aaa);
+}
+.ng-store-val.ng-store-null {
+  color: #95a5a6;
+  font-style: italic;
+}
+.ng-store-children {
+  padding-left: 16px;
+}
+.ng-store-children.hidden {
+  display: none;
+}
+.ng-store-more {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  padding: 2px 0;
+  font-style: italic;
+}
+.ng-store-truncated {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  font-style: italic;
+}
+.ng-store-section {
+  margin-bottom: 8px;
+}
+.ng-store-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  margin-bottom: 4px;
+}
+/* Angular API list */
+.ng-api-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ng-api-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--bg-tertiary, #f8f9fa);
+  border-radius: 4px;
+}
+[data-theme='dark'] .ng-api-item {
+  background: var(--bg-tertiary, #1e1e2e);
+}
+.ng-api-item code {
+  flex: 1;
+  font-size: 11px;
+  font-family: monospace;
+  word-break: break-all;
+  color: var(--accent, #0066cc);
+}
+/* Angular Router */
+.ng-router-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.ng-route-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ng-route-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+}
+[data-theme='dark'] .ng-route-item {
+  border-color: var(--border-color, #2a2a2a);
+}
+.ng-route-item:last-child {
+  border-bottom: none;
+}
+.ng-route-path {
+  font-family: monospace;
+  color: #dd0031;
+  word-break: break-all;
+}
+.ng-route-attr {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--bg-tertiary, #e8ecf0);
+  color: var(--text-secondary, #555);
+}
+[data-theme='dark'] .ng-route-attr {
+  background: var(--bg-tertiary, #2a2a3e);
+  color: var(--text-secondary, #aaa);
+}
+.ng-route-lazy {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(243,156,18,0.15);
+  color: #f39c12;
+  font-weight: 600;
+}
+.ng-route-guard {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(52,152,219,0.15);
+  color: #3498db;
+  font-weight: 600;
+}

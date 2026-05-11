@@ -211,12 +211,14 @@ function initSecurityDetectors() {
     import('./vk-cookie-audit.js'),
     import('./vk-react.js'),
     import('./vk-angular.js'),
+    import('./vk-svelte.js'),
   ]).then(function (mods) {
     var ruoyi = mods[0];
     var waf = mods[1];
     var cookieAudit = mods[2];
     var react = mods[3];
     var angular = mods[4];
+    var svelte = mods[5];
 
     utils.bindTabSwitch('ruoyi-stab', 'rstab', ruoyi.switchRuoYiSubTab);
 
@@ -293,9 +295,22 @@ function initSecurityDetectors() {
     utils.bindClick('react-router-read-btn', react.handleRouterRead);
     utils.bindClick('react-router-copy-btn', react.handleRouterCopy);
 
+    angular.initSubTabs();
     utils.bindClick('angular-detect-btn', angular.detectAngular);
     utils.bindClick('angular-copy-btn', angular.copyResults);
     utils.bindClick('angular-export-btn', angular.exportResults);
+
+    utils.bindClick('angular-store-read-btn', angular.handleStoreRead);
+    utils.bindClick('angular-store-copy-btn', angular.copyAngularStoreJson);
+    utils.bindClick('angular-store-refresh-btn', angular.handleStoreRead);
+    angular.initStoreExplorerEvents();
+
+    utils.bindClick('angular-router-read-btn', angular.handleRouterRead);
+    utils.bindClick('angular-router-copy-btn', angular.handleRouterCopy);
+
+    utils.bindClick('svelte-detect-btn', svelte.detectSvelte);
+    utils.bindClick('svelte-copy-btn', svelte.copyResults);
+    utils.bindClick('svelte-export-btn', svelte.exportResults);
 
     // Restore RuoYi hook state for current tab
     restoreRuoYiHookState(ruoyi);

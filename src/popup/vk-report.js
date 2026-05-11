@@ -33,6 +33,8 @@ const MODULE_LABELS = {
   fuzz: '目录扫描',
   jwt: 'JWT 分析',
   'storage-check': '存储检查',
+  angular: 'Angular 分析',
+  svelte: 'Svelte 分析',
 };
 
 function normalizeSeverity(raw) {
@@ -57,6 +59,8 @@ async function collectAllFindings() {
     graphql: './vk-graphql.js',
     jwt: './vk-jwt.js',
     'storage-check': './vk-storage-check.js',
+    angular: './vk-angular.js',
+    svelte: './vk-svelte.js',
   };
 
   for (var key in moduleMap) {

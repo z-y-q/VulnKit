@@ -1,31 +1,51 @@
-// 灵眸 - Angular Detection
+// 灵眸 - Angular Detection & Store Explorer
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import {
+  exploreAngularStore,
+  copyAngularStoreJson,
+  copyAngularRoutesJson,
+  initStoreExplorerEvents,
+  handleRouterRead,
+} from './vk-angular-store.js';
 
 let lastResult = null;
+
+function initSubTabs() {
+  document.querySelectorAll('.angular-stab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var tab = this.dataset.angulartab;
+      document.querySelectorAll('.angular-stab').forEach(function (b) { b.classList.remove('active'); });
+      this.classList.add('active');
+      document.querySelectorAll('.angular-stab-panel').forEach(function (p) { p.classList.remove('active'); });
+      var target = document.getElementById('angulartab-' + tab);
+      if (target) target.classList.add('active');
+    });
+  });
+}
 
 function exportResults() {
   if (!lastResult) {
     utils.showToast('没有可导出的结果', 'warning');
     return;
   }
-  const report = { timestamp: new Date().toISOString(), result: lastResult };
-  const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  var report = { timestamp: new Date().toISOString(), result: lastResult };
+  var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
   a.href = url;
-  a.download = `angular-analysis-${Date.now()}.json`;
+  a.download = 'angular-analysis-' + Date.now() + '.json';
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   utils.showToast('已导出 JSON', 'success');
 }
 
 function detectAngular() {
-  const statusEl = utils.get('angular-status');
-  let resultsEl = utils.get('angular-results');
-  const copyBtn = utils.get('angular-copy-btn');
-  const exportBtn = utils.get('angular-export-btn');
+  var statusEl = utils.get('angular-status');
+  var resultsEl = utils.get('angular-results');
+  var copyBtn = utils.get('angular-copy-btn');
+  var exportBtn = utils.get('angular-export-btn');
 
   if (statusEl) statusEl.textContent = '正在检测 Angular...';
   if (resultsEl) resultsEl.innerHTML = '';
@@ -68,7 +88,7 @@ function detectAngular() {
             function () {
               if (chrome.runtime.lastError) {
                 if (statusEl)
-                  statusEl.textContent = `注入失败: ${chrome.runtime.lastError.message || '未知错误'}`;
+                  statusEl.textContent = '注入失败: ' + (chrome.runtime.lastError.message || '未知错误');
                 return;
               }
               function trySend(remaining) {
@@ -98,7 +118,7 @@ function detectAngular() {
 }
 
 function renderResult(data) {
-  const resultsEl = utils.get('angular-results');
+  var resultsEl = utils.get('angular-results');
   if (!resultsEl) return;
 
   if (!data.detected && (!data.signals || data.signals.length === 0)) {
@@ -106,43 +126,43 @@ function renderResult(data) {
     return;
   }
 
-  let title = 'Angular';
+  var title = 'Angular';
   if (data.variant) title = data.variant;
-  if (data.version) title += ` ${data.version}`;
+  if (data.version) title += ' ' + data.version;
 
-  let html =
+  var html =
     '<div class="angular-card">' +
     '<div class="angular-card-header">' +
-    `<span class="angular-badge ${data.detected ? 'detected' : 'not-detected'}">` +
-    `${data.detected ? '已检测到' : '未检测到'}</span>` +
-    `<span class="angular-card-title">${utils.escapeHtml(title)}</span>` +
+    '<span class="angular-badge ' + (data.detected ? 'detected' : 'not-detected') + '">' +
+    (data.detected ? '已检测到' : '未检测到') + '</span>' +
+    '<span class="angular-card-title">' + utils.escapeHtml(title) + '</span>' +
     '</div>';
 
   if (data.variant) {
-    html += `<div class="angular-info-row"><span class="angular-info-label">框架变体</span><span class="angular-info-value"><span class="angular-badge info">${utils.escapeHtml(data.variant)}</span></span></div>`;
+    html += '<div class="angular-info-row"><span class="angular-info-label">框架变体</span><span class="angular-info-value"><span class="angular-badge info">' + utils.escapeHtml(data.variant) + '</span></span></div>';
   }
   if (data.version) {
-    html += `<div class="angular-info-row"><span class="angular-info-label">版本</span><span class="angular-info-value">${utils.escapeHtml(data.version)}</span></div>`;
+    html += '<div class="angular-info-row"><span class="angular-info-label">版本</span><span class="angular-info-value">' + utils.escapeHtml(data.version) + '</span></div>';
   }
 
   if (data.mode) {
-    const modeBadge = data.mode === 'development' ? 'warn' : 'ok';
-    html += `<div class="angular-info-row"><span class="angular-info-label">运行模式</span><span class="angular-info-value"><span class="angular-badge ${modeBadge}">${utils.escapeHtml(data.mode)}</span></span></div>`;
+    var modeBadge = data.mode === 'development' ? 'warn' : 'ok';
+    html += '<div class="angular-info-row"><span class="angular-info-label">运行模式</span><span class="angular-info-value"><span class="angular-badge ' + modeBadge + '">' + utils.escapeHtml(data.mode) + '</span></span></div>';
   }
 
   if (data.modules && data.modules.length > 0) {
-    const moduleLabel = data.variant === 'Angular' ? '组件/模块' : '模块';
-    html += `<div class="angular-info-row"><span class="angular-info-label">${moduleLabel} (${data.modules.length})</span><span class="angular-info-value angular-modules">`;
+    var moduleLabel = data.variant === 'Angular' ? '组件/模块' : '模块';
+    html += '<div class="angular-info-row"><span class="angular-info-label">' + moduleLabel + ' (' + data.modules.length + ')</span><span class="angular-info-value angular-modules">';
     data.modules.forEach(function (m) {
-      html += `<span class="angular-module-tag">${utils.escapeHtml(m)}</span>`;
+      html += '<span class="angular-module-tag">' + utils.escapeHtml(m) + '</span>';
     });
     html += '</span></div>';
   }
 
   if (data.routes && data.routes.length > 0) {
-    html += `<div class="angular-info-row"><span class="angular-info-label">路由 (${data.routes.length})</span><span class="angular-info-value">`;
+    html += '<div class="angular-info-row"><span class="angular-info-label">路由 (' + data.routes.length + ')</span><span class="angular-info-value">';
     data.routes.forEach(function (r) {
-      html += `<div class="angular-route-item">${utils.escapeHtml(r)}</div>`;
+      html += '<div class="angular-route-item">' + utils.escapeHtml(r) + '</div>';
     });
     html += '</span></div>';
   }
@@ -152,7 +172,7 @@ function renderResult(data) {
       '<div class="angular-info-row"><span class="angular-info-label">检测信号</span><span class="angular-info-value">' +
       data.signals
         .map(function (s) {
-          return `<div>${utils.escapeHtml(s)}</div>`;
+          return '<div>' + utils.escapeHtml(s) + '</div>';
         })
         .join('') +
       '</span></div>';
@@ -167,30 +187,80 @@ function copyResults() {
     utils.showToast('没有检测结果', 'warning');
     return;
   }
-  const lines = [];
+  var lines = [];
   if (lastResult.detected) {
-    const name = lastResult.variant || 'Angular';
-    lines.push(`${name} Detected: ${lastResult.version || 'unknown'}`);
-    if (lastResult.mode) lines.push(`Mode: ${lastResult.mode}`);
+    var name = lastResult.variant || 'Angular';
+    lines.push(name + ' Detected: ' + (lastResult.version || 'unknown'));
+    if (lastResult.mode) lines.push('Mode: ' + lastResult.mode);
   } else {
     lines.push('Angular: Not detected');
   }
   if (lastResult.modules && lastResult.modules.length > 0) {
-    lines.push(`Modules: ${lastResult.modules.join(', ')}`);
+    lines.push('Modules: ' + lastResult.modules.join(', '));
   }
   if (lastResult.routes && lastResult.routes.length > 0) {
     lines.push('Routes:');
     lastResult.routes.forEach(function (r) {
-      lines.push(`  - ${r}`);
+      lines.push('  - ' + r);
     });
   }
   if (lastResult.signals && lastResult.signals.length > 0) {
     lines.push('Signals:');
     lastResult.signals.forEach(function (s) {
-      lines.push(`  - ${s}`);
+      lines.push('  - ' + s);
     });
   }
   utils.copyAndToast(lines.join('\n'));
 }
 
-export { detectAngular, copyResults, exportResults };
+function handleStoreRead() {
+  exploreAngularStore();
+}
+
+function handleRouterCopy() {
+  utils.requireTabId().then(function (tab) {
+    if (!tab) return;
+    chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_STORE_EXPLORE' }, function (data) {
+      if (!data || data.error || !data.routes || data.routes.length === 0) {
+        utils.showToast('没有路由数据', 'warning');
+        return;
+      }
+      var paths = data.routes.map(function (r) { return r.path; }).join('\n');
+      utils.copyAndToast(paths, '已复制 ' + data.routes.length + ' 个路由');
+    });
+  });
+}
+
+function getFindings() {
+  if (!lastResult) return [];
+  var findings = [];
+  if (lastResult.detected && lastResult.version) {
+    findings.push({
+      severity: 'info',
+      title: 'Angular 版本泄露',
+      detail: '检测到 Angular 版本: ' + lastResult.version,
+    });
+  }
+  if (lastResult.detected && lastResult.mode === 'development') {
+    findings.push({
+      severity: 'medium',
+      title: 'Angular 开发模式运行',
+      detail: '应用以开发模式运行，可能泄露调试信息和源码映射',
+    });
+  }
+  return findings;
+}
+
+export {
+  detectAngular,
+  copyResults,
+  exportResults,
+  initSubTabs,
+  initStoreExplorerEvents,
+  handleStoreRead,
+  handleRouterRead,
+  handleRouterCopy,
+  copyAngularStoreJson,
+  copyAngularRoutesJson,
+  getFindings,
+};
