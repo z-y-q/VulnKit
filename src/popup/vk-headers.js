@@ -253,13 +253,23 @@ async function scanSecurityHeaders(url) {
 function setFilter(filter) {
   currentFilter = filter;
   if (lastAnalysisResult)
-    renderHeadersResults(lastAnalysisResult.analysis, lastAnalysisResult, currentFilter, currentSearch);
+    renderHeadersResults(
+      lastAnalysisResult.analysis,
+      lastAnalysisResult,
+      currentFilter,
+      currentSearch
+    );
 }
 
 function setSearch(query) {
   currentSearch = (query || '').toLowerCase();
   if (lastAnalysisResult)
-    renderHeadersResults(lastAnalysisResult.analysis, lastAnalysisResult, currentFilter, currentSearch);
+    renderHeadersResults(
+      lastAnalysisResult.analysis,
+      lastAnalysisResult,
+      currentFilter,
+      currentSearch
+    );
 }
 
 function renderHeadersResultsWrapper(analysis) {
@@ -388,7 +398,7 @@ export {
   lastAnalysisResult,
   scanning,
   scanSecurityHeaders,
-  renderHeadersResults: renderHeadersResultsWrapper,
+  renderHeadersResultsWrapper as renderHeadersResults,
   exportHeadersResults,
   getFindings,
   setFilter,
