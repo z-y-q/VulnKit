@@ -136,6 +136,53 @@ function renderHeadersResults(analysis, lastAnalysisResult, currentFilter, curre
     html += '</div>';
   }
 
+  if (
+    lastAnalysisResult &&
+    lastAnalysisResult.cspDeep &&
+    (lastAnalysisResult.cspDeep.bypasses.length > 0 ||
+      lastAnalysisResult.cspDeep.missingCritical.length > 0)
+  ) {
+    var cspDeep = lastAnalysisResult.cspDeep;
+    html += '<div class="headers-category">';
+    html +=
+      '<div class="headers-category-title headers-category-csp-deep">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> CSP 深度分析</div>';
+
+    if (cspDeep.bypasses.length > 0) {
+      for (var bi = 0; bi < cspDeep.bypasses.length; bi++) {
+        var bp = cspDeep.bypasses[bi];
+        html +=
+          '<div class="headers-result-card headers-csp-bypass ' + (bp.severity || 'medium') + '">';
+        html += '<div class="headers-result-row">';
+        html += '<span class="headers-csp-bypass-type">' + utils.escapeHtml(bp.type) + '</span>';
+        html +=
+          '<span class="headers-csp-bypass-severity ' +
+          (bp.severity || 'medium') +
+          '">' +
+          utils.escapeHtml(bp.severity || 'medium') +
+          '</span>';
+        html += '</div>';
+        html += '<div class="headers-header-rec">' + utils.escapeHtml(bp.description) + '</div>';
+        html += '</div>';
+      }
+    }
+
+    if (cspDeep.missingCritical.length > 0) {
+      for (var mi = 0; mi < cspDeep.missingCritical.length; mi++) {
+        var mc = cspDeep.missingCritical[mi];
+        html += '<div class="headers-result-card headers-csp-missing">';
+        html += '<div class="headers-result-row">';
+        html +=
+          '<span class="headers-csp-missing-name">' + utils.escapeHtml(mc.directive) + '</span>';
+        html += '</div>';
+        html += '<div class="headers-header-rec">' + utils.escapeHtml(mc.impact) + '</div>';
+        html += '</div>';
+      }
+    }
+
+    html += '</div>';
+  }
+
   if (!html) {
     html = '<div class="empty-state">无匹配结果</div>';
   }

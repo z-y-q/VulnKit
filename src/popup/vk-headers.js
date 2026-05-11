@@ -3,7 +3,7 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 import { SECURITY_HEADERS, SERVER_SIGNATURES } from './vk-headers-data.js';
-import { HEADER_CHECKERS } from './vk-headers-checkers.js';
+import { HEADER_CHECKERS, deepAnalyzeCSP } from './vk-headers-checkers.js';
 import { renderHeadersResults, groupByCategory, applyHeaderFilter } from './vk-headers-render.js';
 
 var lastAnalysisResult = null;
@@ -231,11 +231,14 @@ async function scanSecurityHeaders(url) {
     var setCookies = parseSetCookies(cookieHeaders);
     var cookieAnalysis = analyzeCookieSecurity(setCookies);
 
+    var cspDeep = deepAnalyzeCSP(parsed['content-security-policy'] || null);
+
     lastAnalysisResult = {
       url: url,
       analysis: analysis,
       infoLeaks: infoLeaks,
       cookieAnalysis: cookieAnalysis,
+      cspDeep: cspDeep,
       grouped: groupByCategory(analysis.results),
     };
     return analysis;
@@ -384,6 +387,34 @@ function getFindings() {
         module: 'headers',
         url: lastAnalysisResult.url || '',
       });
+    }
+  }
+
+  if (lastAnalysisResult.cspDeep) {
+    var cspDeep = lastAnalysisResult.cspDeep;
+    if (cspDeep.missingCritical) {
+      for (var m = 0; m < cspDeep.missingCritical.length; m++) {
+        var mc = cspDeep.missingCritical[m];
+        findings.push({
+          severity: mc.severity || 'medium',
+          title: 'CSP 缺失指令: ' + mc.directive,
+          detail: mc.impact,
+          module: 'headers',
+          url: lastAnalysisResult.url || '',
+        });
+      }
+    }
+    if (cspDeep.bypasses) {
+      for (var n = 0; n < cspDeep.bypasses.length; n++) {
+        var bp = cspDeep.bypasses[n];
+        findings.push({
+          severity: bp.severity || 'medium',
+          title: 'CSP 绕过: ' + bp.type,
+          detail: bp.description,
+          module: 'headers',
+          url: lastAnalysisResult.url || '',
+        });
+      }
     }
   }
 

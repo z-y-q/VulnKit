@@ -66,6 +66,274 @@ function checkCSP(value) {
   return { status: 'pass', detail: value.substring(0, 200), recommendation: '' };
 }
 
+var RISK_ORDER = { safe: 0, low: 1, medium: 2, high: 3 };
+
+function buildScriptSrcChecks(addBypass) {
+  return [
+    {
+      check: function (v) {
+        return v.indexOf("'unsafe-inline'") !== -1;
+      },
+      risk: 'high',
+      issue: '允许内联脚本执行（unsafe-inline）',
+      bypass: {
+        type: 'xss-inline',
+        desc: '直接注入 <script>alert(1)</script> 即可执行 XSS',
+        severity: 'high',
+      },
+    },
+    {
+      check: function (v) {
+        return v.indexOf("'unsafe-eval'") !== -1;
+      },
+      risk: 'high',
+      issue: '允许 eval() 执行（unsafe-eval）',
+      bypass: {
+        type: 'eval-injection',
+        desc: '通过 eval() / Function() 动态执行任意代码',
+        severity: 'high',
+      },
+    },
+    {
+      check: function (v) {
+        return v.indexOf('data:') !== -1;
+      },
+      risk: 'medium',
+      issue: '允许 data: URI 加载脚本',
+      bypass: {
+        type: 'data-uri-script',
+        desc: '通过 <script src="data:text/javascript,..."> 注入脚本',
+        severity: 'medium',
+      },
+    },
+  ];
+}
+
+function buildOtherDirectiveChecks() {
+  return {
+    'default-src': [
+      {
+        check: function (v) {
+          return v.indexOf('*') !== -1;
+        },
+        risk: 'high',
+        issue: '通配符 * 允许任意来源',
+        bypass: {
+          type: 'wildcard-default',
+          desc: 'default-src * 几乎使所有 CSP 保护失效',
+          severity: 'high',
+        },
+      },
+    ],
+    'style-src': [
+      {
+        check: function (v) {
+          return v.indexOf("'unsafe-inline'") !== -1;
+        },
+        risk: 'low',
+        issue: '允许内联样式（CSS 注入可窃取数据）',
+        bypass: {
+          type: 'css-exfil',
+          desc: '通过 CSS 注入窃取 CSRF token 等敏感属性值',
+          severity: 'low',
+        },
+      },
+    ],
+    'img-src': [
+      {
+        check: function (v) {
+          return v.indexOf('*') !== -1 || v.indexOf('data:') !== -1;
+        },
+        risk: 'low',
+        issue: 'img-src 限制宽松（可探测内网）',
+        bypass: {
+          type: 'ssrf-img',
+          desc: '通过 <img src="http://192.168.x.x/"> 探测内网服务',
+          severity: 'low',
+        },
+      },
+    ],
+    'connect-src': [
+      {
+        check: function (v) {
+          return v.indexOf('*') !== -1;
+        },
+        risk: 'high',
+        issue: 'connect-src 允许任意目标（数据外泄）',
+        bypass: {
+          type: 'data-exfil',
+          desc: '通过 fetch/WebSocket 将数据发送到任意域名',
+          severity: 'high',
+        },
+      },
+    ],
+  };
+}
+
+function buildMissingChecks() {
+  return [
+    {
+      directive: 'base-uri',
+      impact: '缺失 base-uri 允许攻击者注入 <base href="https://evil.com"> 劫持相对路径资源加载',
+      severity: 'medium',
+      bypassType: 'base-hijack',
+      bypassDesc: '注入 <base href="https://evil.com"> 劫持所有相对路径资源',
+    },
+    {
+      directive: 'object-src',
+      impact: "缺失 object-src（默认非 'none'）允许加载 Flash/Java applet 等插件",
+      severity: 'medium',
+    },
+    {
+      directive: 'form-action',
+      impact: '缺失 form-action 允许表单提交到任意 URL（钓鱼攻击）',
+      severity: 'medium',
+      bypassType: 'form-phish',
+      bypassDesc: '表单数据可被引导提交到钓鱼站点',
+    },
+    {
+      directive: 'frame-ancestors',
+      impact: '缺失 frame-ancestors 允许页面被 iframe 嵌套（点击劫持）',
+      severity: 'medium',
+      bypassType: 'clickjack',
+      bypassDesc: '页面可被嵌入恶意 iframe 进行点击劫持攻击',
+    },
+    {
+      directive: 'upgrade-insecure-requests',
+      impact: '缺失 upgrade-insecure-requests 存在混合内容风险',
+      severity: 'low',
+    },
+  ];
+}
+
+function buildSummary(bypasses, missingCritical) {
+  var parts = [];
+  var highCount = 0;
+  var medCount = 0;
+  for (var i = 0; i < bypasses.length; i++) {
+    if (bypasses[i].severity === 'high') highCount++;
+    else if (bypasses[i].severity === 'medium') medCount++;
+  }
+  if (highCount > 0) parts.push('高危绕过 ' + highCount + ' 项');
+  if (medCount > 0) parts.push('中危绕过 ' + medCount + ' 项');
+  if (missingCritical.length > 0) parts.push('缺失指令 ' + missingCritical.length + ' 项');
+  if (parts.length === 0) parts.push('CSP 配置良好');
+  return parts.join('，');
+}
+
+function analyzeDirectiveValues(directives, name, values, riskIssues, addBypass) {
+  var result = { values: values, risk: 'safe', issues: [] };
+  for (var i = 0; i < riskIssues.length; i++) {
+    var item = riskIssues[i];
+    if (item.check(values)) {
+      result.issues.push(item.issue);
+      if ((RISK_ORDER[item.risk] || 0) > (RISK_ORDER[result.risk] || 0)) {
+        result.risk = item.risk;
+      }
+      if (item.bypass) addBypass(item.bypass.type, item.bypass.desc, item.bypass.severity);
+    }
+  }
+  directives[name] = result;
+}
+
+function checkScriptDomainSources(scriptSrc, directives, addBypass) {
+  var domainValues = scriptSrc.filter(function (v) {
+    return !v.startsWith("'") && v !== 'data:' && v !== '*' && v.indexOf('blob:') !== 0;
+  });
+  if (domainValues.length === 0) return;
+  if (directives['script-src'].risk === 'safe') directives['script-src'].risk = 'medium';
+  directives['script-src'].issues.push('允许加载外部域名脚本: ' + domainValues.join(', '));
+  addBypass(
+    'domain-takeover',
+    '攻陷 ' + domainValues[0] + ' 后可注入恶意脚本到该域名，CSP 自动放行',
+    'medium'
+  );
+}
+
+function checkMissingDirectives(d, addBypass) {
+  var missingCritical = [];
+  var checks = buildMissingChecks();
+  for (var i = 0; i < checks.length; i++) {
+    var item = checks[i];
+    if (!d[item.directive]) {
+      missingCritical.push({
+        directive: item.directive,
+        impact: item.impact,
+        severity: item.severity,
+      });
+      if (item.bypassType) addBypass(item.bypassType, item.bypassDesc, item.severity);
+    }
+  }
+  return missingCritical;
+}
+
+function deepAnalyzeCSP(cspValue) {
+  if (!cspValue) {
+    return {
+      directives: {},
+      bypasses: [],
+      missingCritical: [
+        {
+          directive: 'Content-Security-Policy',
+          impact: '未设置 CSP，页面完全不受内容安全策略保护',
+          severity: 'high',
+        },
+      ],
+      summary: '未设置 Content-Security-Policy',
+    };
+  }
+
+  var parsed = parseCSP(cspValue);
+  var d = parsed.directives;
+  var fallbackSrc = d['default-src'] ? d['default-src'] : [];
+  var scriptSrc = d['script-src'] ? d['script-src'] : fallbackSrc;
+  var styleSrc = d['style-src'] ? d['style-src'] : fallbackSrc;
+  var imgSrc = d['img-src'] ? d['img-src'] : fallbackSrc;
+  var connectSrc = d['connect-src'] ? d['connect-src'] : fallbackSrc;
+
+  var directives = {};
+  var bypasses = [];
+  var bypassTypes = {};
+
+  function addBypass(type, description, severity) {
+    if (!bypassTypes[type]) {
+      bypassTypes[type] = true;
+      bypasses.push({ type: type, description: description, severity: severity });
+    }
+  }
+
+  analyzeDirectiveValues(
+    directives,
+    'script-src',
+    scriptSrc,
+    buildScriptSrcChecks(addBypass),
+    addBypass
+  );
+  checkScriptDomainSources(scriptSrc, directives, addBypass);
+
+  var otherChecks = buildOtherDirectiveChecks();
+  var otherMap = {
+    'default-src': fallbackSrc,
+    'style-src': styleSrc,
+    'img-src': imgSrc,
+    'connect-src': connectSrc,
+  };
+  var otherNames = ['default-src', 'style-src', 'img-src', 'connect-src'];
+  for (var i = 0; i < otherNames.length; i++) {
+    var name = otherNames[i];
+    analyzeDirectiveValues(directives, name, otherMap[name], otherChecks[name], addBypass);
+  }
+
+  var missingCritical = checkMissingDirectives(d, addBypass);
+
+  return {
+    directives: directives,
+    bypasses: bypasses,
+    missingCritical: missingCritical,
+    summary: buildSummary(bypasses, missingCritical),
+  };
+}
+
 function checkHSTS(value) {
   if (!value)
     return {
@@ -295,6 +563,7 @@ var HEADER_CHECKERS = {
 export {
   parseCSP,
   checkCSP,
+  deepAnalyzeCSP,
   HEADER_CHECKERS,
   checkHSTS,
   checkXFO,
