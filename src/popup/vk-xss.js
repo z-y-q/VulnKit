@@ -30,6 +30,7 @@ import {
   stopAutoFuzz,
   renderAutoFuzzResults,
   exportAutoFuzzResults,
+  generatePocHtml,
   getAutoFuzzFindings,
   autofuzzState,
 } from './vk-xss-autofuzz.js';
@@ -499,6 +500,10 @@ function handleAutoFuzzExport() {
   exportAutoFuzzResults('csv');
 }
 
+function handleGeneratePoc() {
+  generatePocHtml();
+}
+
 // ====== getFindings for unified report ======
 
 function getFindings() {
@@ -543,6 +548,7 @@ export {
   handleAutoFuzz,
   handleStopAutoFuzz,
   handleAutoFuzzExport,
+  handleGeneratePoc,
 };
 
 function sendToConsole() {
