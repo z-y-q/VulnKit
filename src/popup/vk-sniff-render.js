@@ -10,7 +10,7 @@ var PANEL_MAP = {
   Angular: 'angular',
   Svelte: 'svelte',
   'Next.js': 'react',
-  '若依框架': 'ruoyi',
+  若依框架: 'ruoyi',
 };
 
 var SOURCE_LABELS = {
@@ -257,7 +257,10 @@ function updateFrameworkBadges(results) {
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     if (!tabs || !tabs[0] || !tabs[0].id) return;
     try {
-      chrome.storage.session.set({ 'sniff_badges_' + tabs[0].id: badgeMap });
+      var storageKey = 'sniff_badges_' + tabs[0].id;
+      var storageData = {};
+      storageData[storageKey] = badgeMap;
+      chrome.storage.session.set(storageData);
     } catch (e) {
       /* session storage unavailable */
     }
@@ -272,8 +275,12 @@ function renderAll(results) {
 }
 
 function restoreFrameworkBadges(badgeMap) {
-  document.querySelectorAll('.tab-btn .detect-badge').forEach(function (b) { b.remove(); });
-  document.querySelectorAll('.tab-btn.has-detect-badge').forEach(function (b) { b.classList.remove('has-detect-badge'); });
+  document.querySelectorAll('.tab-btn .detect-badge').forEach(function (b) {
+    b.remove();
+  });
+  document.querySelectorAll('.tab-btn.has-detect-badge').forEach(function (b) {
+    b.classList.remove('has-detect-badge');
+  });
   if (!badgeMap) return;
   Object.keys(badgeMap).forEach(function (panelId) {
     var btn = document.querySelector('.tab-btn[data-panel="' + panelId + '"]');
