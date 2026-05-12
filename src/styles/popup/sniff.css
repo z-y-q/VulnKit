@@ -173,6 +173,29 @@
   font-weight: 500;
 }
 
+.sniff-goto-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #4A90E2;
+  border-radius: 3px;
+  background: #4A90E2;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.sniff-goto-btn:hover {
+  background: #357abd;
+  border-color: #357abd;
+}
+
 .sniff-conf-badge {
   display: inline-block;
   font-size: 10px;
@@ -424,6 +447,16 @@
 
 [data-theme='dark'] .sniff-tech-name {
   color: var(--text-primary);
+}
+
+[data-theme='dark'] .sniff-goto-btn {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+[data-theme='dark'] .sniff-goto-btn:hover {
+  background: #357abd;
+  border-color: #357abd;
 }
 
 [data-theme='dark'] .sniff-tech-evidence {

@@ -81,6 +81,7 @@ function initLinksHistoryMultiUrl() {
       utils.copyAndToast(text, '已复制 ' + history.lastHistoryResults.length + ' 条');
     });
     utils.bindClick('history-export-btn', history.exportData);
+    utils.bindClick('history-send-fuzz-btn', history.sendWaybackToFuzz);
 
     utils.on('history-type-filter', 'input', function () {
       if (history.allHistoryResults.length === 0) return;
@@ -356,6 +357,7 @@ function initXssAndSourcemap(bindFilterSearch) {
     utils.bindClick('xssscan-open-reflected-btn', xss.handleOpenReflected);
     utils.bindClick('xssscan-copyall-btn', xss.handleCopyXssUrls);
     utils.bindClick('xssscan-export-btn', xss.xssExportData);
+    utils.bindClick('xss-send-console-btn', xss.sendToConsole);
     utils.bindClick('xssscan-sink-btn', xss.analyzeDomSinks);
     utils.bindClick('xssscan-sink-clear-btn', function () {
       utils.setEmpty('xssscan-sink-results', '暂无分析结果');

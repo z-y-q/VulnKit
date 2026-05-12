@@ -375,6 +375,7 @@ function initNetworkTools() {
     utils.bindClick('subdomain-all-btn', subdomain.runAllScans);
     utils.bindClick('subdomain-copy-btn', subdomain.copyResults);
     utils.bindClick('subdomain-export-btn', subdomain.exportResults);
+    utils.bindClick('subdomain-send-fuzz-btn', subdomain.sendToFuzz);
     utils.bindClick('subdomain-certspotter-btn', subdomain.collectFromCertspotter);
     utils.bindClick('subdomain-archive-btn', subdomain.collectFromWebArchive);
     utils.bindClick('subdomain-dnsrec-btn', subdomain.collectFromDnsRecords);

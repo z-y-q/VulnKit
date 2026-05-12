@@ -4,6 +4,14 @@
 import { utilsProxy as utils } from './vk-namespace.js';
 import { sniffState } from './vk-sniff-scanner.js';
 
+var PANEL_MAP = {
+  'Vue.js': 'vue',
+  React: 'react',
+  Angular: 'angular',
+  Svelte: 'svelte',
+  'Next.js': 'react',
+};
+
 var SOURCE_LABELS = {
   headers: 'HTTP 响应头',
   globals: 'JS 全局变量',
@@ -98,12 +106,30 @@ function renderTechTag(item) {
   var confColor = conf ? conf.color : '#9ca3af';
   var versionStr = item.version ? ' v' + utils.escapeHtml(item.version) : '';
   var expandId = 'sniff-evidence-' + item.name.replace(/[^a-zA-Z0-9]/g, '_');
+  var gotoPanel = PANEL_MAP[item.name];
+  var gotoBtn = gotoPanel
+    ? '<button class="sniff-goto-btn" data-goto="' +
+      gotoPanel +
+      '" title="跳转到分析面板">&rarr;</button>'
+    : '';
 
   return (
-    '<div class="sniff-tech-tag" data-expand="' + expandId + '">' +
-    '<span class="sniff-tech-name">' + utils.escapeHtml(item.name) + versionStr + '</span>' +
-    '<span class="sniff-conf-badge" style="background:' + confColor + '">' + confLabel + '</span>' +
-    '<div class="sniff-tech-evidence" id="' + expandId + '" style="display:none">' +
+    '<div class="sniff-tech-tag" data-expand="' +
+    expandId +
+    '">' +
+    '<span class="sniff-tech-name">' +
+    utils.escapeHtml(item.name) +
+    versionStr +
+    '</span>' +
+    gotoBtn +
+    '<span class="sniff-conf-badge" style="background:' +
+    confColor +
+    '">' +
+    confLabel +
+    '</span>' +
+    '<div class="sniff-tech-evidence" id="' +
+    expandId +
+    '" style="display:none">' +
     renderEvidence(item.evidences) +
     '</div>' +
     '</div>'
@@ -123,8 +149,12 @@ function renderEvidence(evidences) {
     }
     html +=
       '<div class="sniff-evidence-row">' +
-      '<span class="sniff-evidence-source">' + utils.escapeHtml(sourceLabel) + '</span>' +
-      '<span class="sniff-evidence-text">' + utils.escapeHtml(evidenceText) + '</span>' +
+      '<span class="sniff-evidence-source">' +
+      utils.escapeHtml(sourceLabel) +
+      '</span>' +
+      '<span class="sniff-evidence-text">' +
+      utils.escapeHtml(evidenceText) +
+      '</span>' +
       '</div>';
   }
   html += '</div>';
@@ -155,7 +185,12 @@ function renderResults(results, categoryFilter) {
     var cat = catNames[c];
     var items = groups[cat];
     html += '<div class="sniff-category">';
-    html += '<div class="sniff-category-title">' + utils.escapeHtml(cat) + ' <span class="sniff-cat-badge">' + items.length + '</span></div>';
+    html +=
+      '<div class="sniff-category-title">' +
+      utils.escapeHtml(cat) +
+      ' <span class="sniff-cat-badge">' +
+      items.length +
+      '</span></div>';
     html += '<div class="sniff-category-tags">';
     for (var i = 0; i < items.length; i++) {
       html += renderTechTag(items[i]);
@@ -175,6 +210,18 @@ function renderResults(results, categoryFilter) {
       }
     });
   });
+
+  if (!renderResults._gotoBound) {
+    container.addEventListener('click', function (e) {
+      var btn = e.target.closest('.sniff-goto-btn');
+      if (!btn) return;
+      e.stopPropagation();
+      var target = btn.dataset.goto;
+      var tab = document.querySelector('[data-panel="' + target + '"]');
+      if (tab) tab.click();
+    });
+    renderResults._gotoBound = true;
+  }
 }
 
 function renderAll(results) {

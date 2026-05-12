@@ -54,6 +54,8 @@ function renderXssPoints() {
   const container = utils.get('xssscan-results');
   const countEl = utils.get('xssscan-count');
   if (!container) return;
+  var consoleBtn = utils.get('xss-send-console-btn');
+  if (consoleBtn) consoleBtn.hidden = xssPoints.length === 0;
   const filtered = getFilteredXssPoints();
   if (countEl) {
     let hasFilter = xssFilterType !== 'all' || xssSearchText;
@@ -497,4 +499,36 @@ export {
   setFilter,
   setSearch,
   getFindings,
+  sendToConsole,
 };
+
+function sendToConsole() {
+  if (xssPoints.length === 0) {
+    utils.showToast('没有 XSS 注入点', 'warning');
+    return;
+  }
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    if (!tabs || !tabs[0] || !tabs[0].id) return;
+    var data = xssPoints.map(function (p) {
+      return { source: p.source, param: p.param, method: p.method, url: p.url };
+    });
+    chrome.scripting.executeScript(
+      {
+        target: { tabId: tabs[0].id },
+        world: 'MAIN',
+        func: function (points) {
+          console.group('%c[灵眸] XSS 注入点', 'color: #ff4444; font-weight: bold');
+          console.table(points);
+          console.groupEnd();
+          console.warn('%c[灵眸] 共发现 ' + points.length + ' 个 XSS 注入点', 'color: #ff4444');
+        },
+        args: [data],
+      },
+      function () {
+        if (!chrome.runtime.lastError) {
+          utils.showToast('已输出 ' + xssPoints.length + ' 个注入点到 Console', 'success');
+        }
+      }
+    );
+  });
+}

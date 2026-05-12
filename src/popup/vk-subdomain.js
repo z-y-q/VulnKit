@@ -606,6 +606,10 @@ function renderSubdomains(subdomains, baseDomain) {
       utils.showToast(`已复制: ${this.dataset.host}`, 'success', 800);
     });
   });
+
+  // Show send-to-fuzz button when results exist
+  var sendFuzzBtn = utils.get('subdomain-send-fuzz-btn');
+  if (sendFuzzBtn) sendFuzzBtn.hidden = subdomains.length === 0;
 }
 
 function sourceLabel(src) {
@@ -1021,6 +1025,20 @@ function getFindings() {
   });
 }
 
+function sendToFuzz() {
+  if (lastSubdomains.length === 0) {
+    utils.showToast('没有可发送的子域名', 'warning');
+    return;
+  }
+  var fuzzInput = utils.get('fuzz-url');
+  if (fuzzInput) {
+    fuzzInput.value = 'https://' + lastSubdomains[0].host;
+  }
+  var fuzzBtn = document.querySelector('[data-panel="fuzz"]');
+  if (fuzzBtn) fuzzBtn.click();
+  utils.showToast('已发送 ' + lastSubdomains.length + ' 个子域名到目录扫描', 'success');
+}
+
 export {
   collectSubdomains,
   extractFromPage,
@@ -1035,4 +1053,5 @@ export {
   searchResults,
   runAllScans,
   getFindings,
+  sendToFuzz,
 };

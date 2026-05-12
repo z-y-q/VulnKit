@@ -247,6 +247,37 @@ function exportData() {
   );
 }
 
+function sendWaybackToFuzz() {
+  var urls = allHistoryResults.length > 0 ? allHistoryResults : lastHistoryResults;
+  if (urls.length === 0) {
+    utils.showToast('没有 Wayback 结果可发送', 'warning');
+    return;
+  }
+  var domains = [];
+  var seen = {};
+  for (var i = 0; i < urls.length; i++) {
+    var host = '';
+    try {
+      host = new URL(urls[i].url || urls[i]).hostname;
+    } catch (_) {
+      continue;
+    }
+    if (host && !seen[host]) {
+      seen[host] = true;
+      domains.push(host);
+    }
+  }
+  if (domains.length === 0) {
+    utils.showToast('未能提取域名', 'warning');
+    return;
+  }
+  var fuzzInput = utils.get('fuzz-url');
+  if (fuzzInput) fuzzInput.value = 'https://' + domains[0];
+  var fuzzBtn = document.querySelector('[data-panel="fuzz"]');
+  if (fuzzBtn) fuzzBtn.click();
+  utils.showToast('已发送 ' + domains.length + ' 个域名到目录扫描', 'success');
+}
+
 export {
   showHistoryQuickLinks,
   buildCdxUrl,
@@ -257,4 +288,5 @@ export {
   exportData,
   lastHistoryResults,
   allHistoryResults,
+  sendWaybackToFuzz,
 };

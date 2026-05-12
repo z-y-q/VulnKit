@@ -674,6 +674,11 @@ function getFindings() {
   return findings;
 }
 
+function setFuzzTarget(url) {
+  var input = utils.get('fuzz-url');
+  if (input) input.value = url;
+}
+
 export {
   DEFAULT_WORDLISTS,
   fuzzState,
@@ -685,4 +690,5 @@ export {
   getFindings,
   setFilter,
   setSearch,
+  setFuzzTarget,
 };

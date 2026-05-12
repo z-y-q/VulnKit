@@ -114,6 +114,34 @@ async function loadToSources() {
   renderResults(lastResults);
   if (copyBtn) copyBtn.style.display = '';
   utils.showToast(`已加载 ${lastResults.length} 个资源，请打开 DevTools → Sources 查看`, 'success');
+
+  var successUrls = lastResults
+    .filter(function (r) {
+      return r.status === 'success';
+    })
+    .map(function (r) {
+      return r.url;
+    });
+  if (successUrls.length > 0 && tab.id) {
+    chrome.scripting.executeScript(
+      {
+        target: { tabId: tab.id },
+        world: 'MAIN',
+        func: function (urls) {
+          console.group('%c[灵眸] Source Loader 已加载资源', 'color: #00aa00; font-weight: bold');
+          urls.forEach(function (u) {
+            console.log('%c✓ ' + u, 'color: #00aa00');
+          });
+          console.log('%c→ 请打开 DevTools → Sources 面板查看', 'color: #888');
+          console.groupEnd();
+        },
+        args: [successUrls],
+      },
+      function () {
+        /* ignore errors */
+      }
+    );
+  }
 }
 
 function injectJs(tabId, code, sourceUrl) {
