@@ -22,6 +22,7 @@ const SEV_BG = {
 
 const MODULE_LABELS = {
   xss: 'XSS 扫描',
+  'xss-autofuzz': 'XSS Fuzz',
   cors: 'CORS 检测',
   waf: 'WAF 检测',
   cookie: 'Cookie 审计',
@@ -35,6 +36,7 @@ const MODULE_LABELS = {
   'storage-check': '存储检查',
   angular: 'Angular 分析',
   svelte: 'Svelte 分析',
+  ruoyi: '若依检测',
 };
 
 function normalizeSeverity(raw) {
@@ -46,12 +48,14 @@ function normalizeSeverity(raw) {
 
 async function collectAllFindings() {
   var allFindings = [];
+  var activeModules = {};
   var moduleMap = {
     xss: './vk-xss.js',
     cors: './vk-cors.js',
     waf: './vk-waf.js',
     cookie: './vk-cookie-audit.js',
     sniff: './vk-sniff-scanner.js',
+    leak: './vk-leakscan-scanner.js',
     subdomain: './vk-subdomain.js',
     headers: './vk-headers.js',
     redirect: './vk-redirect.js',
@@ -70,16 +74,19 @@ async function collectAllFindings() {
       if (typeof mod.getFindings !== 'function') continue;
       var items = mod.getFindings();
       if (!Array.isArray(items)) continue;
-      for (var i = 0; i < items.length; i++) {
-        var f = items[i];
-        if (!f || !f.module) continue;
-        allFindings.push({
-          severity: normalizeSeverity(f.severity),
-          title: f.title || '未知发现',
-          detail: f.detail || '',
-          module: f.module,
-          url: f.url || '',
-        });
+      if (items.length > 0) {
+        activeModules[key] = items.length;
+        for (var i = 0; i < items.length; i++) {
+          var f = items[i];
+          if (!f || !f.module) continue;
+          allFindings.push({
+            severity: normalizeSeverity(f.severity),
+            title: f.title || '未知发现',
+            detail: f.detail || '',
+            module: f.module,
+            url: f.url || '',
+          });
+        }
       }
     } catch (e) {
       console.debug('[Report] Failed to load module:', key, e.message);
@@ -90,7 +97,11 @@ async function collectAllFindings() {
     return (SEV_ORDER[b.severity] || 0) - (SEV_ORDER[a.severity] || 0);
   });
 
-  return allFindings;
+  return {
+    findings: allFindings,
+    activeModules: activeModules,
+    totalModules: Object.keys(moduleMap).length,
+  };
 }
 
 function buildSummary(findings) {
@@ -244,7 +255,10 @@ function generateMarkdownReport(findings) {
   return lines.join('\n');
 }
 
-function renderReport(findings) {
+function renderReport(collected) {
+  var findings = collected.findings;
+  var activeModules = collected.activeModules;
+  var totalModules = collected.totalModules;
   var container = utils.get('report-content');
   var summaryContainer = utils.get('report-summary');
   if (!container) return;
@@ -265,11 +279,47 @@ function renderReport(findings) {
         summary[sk] +
         '</span>';
     }
+    html += '</div>';
+
+    html += '<div class="report-coverage">';
+    html +=
+      '<div class="report-coverage-title">模块覆盖 ' +
+      Object.keys(activeModules).length +
+      '/' +
+      totalModules +
+      '</div>';
+    html += '<div class="report-coverage-grid">';
+    var moduleKeys = Object.keys(MODULE_LABELS);
+    for (var m = 0; m < moduleKeys.length; m++) {
+      var mk = moduleKeys[m];
+      var isActive = activeModules.hasOwnProperty(mk);
+      var count = activeModules[mk] || 0;
+      var hasCriticalOrHigh =
+        isActive &&
+        findings.some(function (f) {
+          return f.module === mk && (f.severity === 'critical' || f.severity === 'high');
+        });
+      var modClass = hasCriticalOrHigh
+        ? 'coverage-mod coverage-mod-danger'
+        : isActive
+          ? 'coverage-mod coverage-mod-active'
+          : 'coverage-mod coverage-mod-idle';
+      html +=
+        '<div class="' +
+        modClass +
+        '" title="' +
+        utils.escapeHtml(MODULE_LABELS[mk]) +
+        '">' +
+        utils.escapeHtml(MODULE_LABELS[mk]) +
+        (isActive ? ' <span class="coverage-count">' + count + '</span>' : '') +
+        '</div>';
+    }
+    html += '</div></div>';
+
     if (findings.length === 0) {
       html +=
         '<div class="report-findings-empty">暂无发现 — 请先运行扫描模块或点击「一键审计」</div>';
     }
-    html += '</div>';
     summaryContainer.innerHTML = html;
   }
 
@@ -347,22 +397,26 @@ async function handleCollectFindings() {
     statusEl.style.color = '#4A90E2';
   }
   try {
-    var findings = await collectAllFindings();
-    _lastCollectedFindings = findings;
-    renderReport(findings);
-    var summary = buildSummary(findings);
+    var result = await collectAllFindings();
+    _lastCollectedFindings = result;
+    renderReport(result);
+    var summary = buildSummary(result.findings);
+    var activeCount = Object.keys(result.activeModules).length;
     if (statusEl) {
       statusEl.textContent =
         '收集完成: ' +
-        findings.length +
-        ' 个发现（严重 ' +
+        result.findings.length +
+        ' 个发现（' +
+        activeCount +
+        '/' +
+        result.totalModules +
+        ' 模块）严重 ' +
         summary.critical +
         ' / 高危 ' +
         summary.high +
         ' / 中危 ' +
-        summary.medium +
-        '）';
-      statusEl.style.color = findings.length > 0 ? '#27ae60' : '#999';
+        summary.medium;
+      statusEl.style.color = result.findings.length > 0 ? '#27ae60' : '#999';
     }
   } catch (e) {
     if (statusEl) {

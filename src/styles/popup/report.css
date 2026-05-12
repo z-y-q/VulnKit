@@ -117,6 +117,52 @@
   word-break: break-all;
 }
 
+/* ====== Module Coverage Grid ====== */
+
+.report-coverage {
+  margin-bottom: 12px;
+}
+
+.report-coverage-title {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.report-coverage-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.coverage-mod {
+  display: inline-block;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  color: #aaa;
+  background: #f5f5f5;
+  transition: all 0.15s;
+}
+
+.coverage-mod-active {
+  color: #4A90E2;
+  border-color: #4A90E2;
+  background: rgba(74, 144, 226, 0.08);
+}
+
+.coverage-mod-danger {
+  color: #e74c3c;
+  border-color: #e74c3c;
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.coverage-count {
+  font-weight: 600;
+  margin-left: 2px;
+}
+
 /* ====== Dark Theme ====== */
 
 [data-theme='dark'] .report-module-desc {
@@ -158,4 +204,26 @@
 
 [data-theme='dark'] .report-finding-url {
   color: var(--text-secondary);
+}
+
+[data-theme='dark'] .report-coverage-title {
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .coverage-mod {
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+}
+
+[data-theme='dark'] .coverage-mod-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(74, 144, 226, 0.12);
+}
+
+[data-theme='dark'] .coverage-mod-danger {
+  color: #e74c3c;
+  border-color: #e74c3c;
+  background: rgba(231, 76, 60, 0.12);
 }

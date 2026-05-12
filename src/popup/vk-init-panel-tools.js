@@ -425,7 +425,8 @@ function initReport() {
     });
 
     utils.bindClick('report-export-html-btn', function () {
-      var findings = report.getLastFindings();
+      var collected = report.getLastFindings();
+      var findings = collected ? collected.findings : null;
       if (!findings || findings.length === 0) {
         utils.showToast('没有可导出的结果', 'warning');
         return;
@@ -434,7 +435,8 @@ function initReport() {
     });
 
     utils.bindClick('report-export-md-btn', function () {
-      var findings = report.getLastFindings();
+      var collected = report.getLastFindings();
+      var findings = collected ? collected.findings : null;
       if (!findings || findings.length === 0) {
         utils.showToast('没有可导出的结果', 'warning');
         return;
