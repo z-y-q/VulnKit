@@ -5,6 +5,7 @@ import { utils, updateWorkflowStep, toggleSelectAll, copyRoutePaths } from './vk
 import * as detect from './vk-ruoyi-detect.js';
 import * as hook from './vk-ruoyi-hook.js';
 import * as mar from './vk-ruoyi-mar.js';
+import * as CveDb from './vk-ruoyi-cve-db.js';
 
 // ====== Shared State ======
 
@@ -685,4 +686,101 @@ export {
   clearApiTraffic,
   exportApiTraffic,
   filterApiTraffic,
+  getFindings,
 };
+
+function getFindings() {
+  var findings = [];
+  if (!state.detectedVariant) return findings;
+
+  findings.push({
+    severity: 'info',
+    title: '若依框架检测',
+    detail: '变体: ' + state.detectedVariant,
+    module: 'ruoyi',
+  });
+
+  var nacosSvcs = state.nacosServices;
+  if (Array.isArray(nacosSvcs) && nacosSvcs.length > 0) {
+    findings.push({
+      severity: 'critical',
+      title: 'Nacos 服务发现暴露',
+      detail: '暴露 ' + nacosSvcs.length + ' 个微服务: ' + nacosSvcs.slice(0, 5).join(', '),
+      module: 'ruoyi',
+    });
+  }
+  var gwRoutes = state.capturedGatewayRoutes;
+  if (Array.isArray(gwRoutes) && gwRoutes.length > 0) {
+    findings.push({
+      severity: 'high',
+      title: 'Spring Cloud Gateway 路由暴露',
+      detail: '发现 ' + gwRoutes.length + ' 条网关路由规则',
+      module: 'ruoyi',
+    });
+  }
+  var backends = state.cloudBackendServices;
+  if (Array.isArray(backends) && backends.length > 0) {
+    findings.push({
+      severity: 'medium',
+      title: '后端服务 URI 暴露',
+      detail: 'lb:// ' + backends.slice(0, 5).join(', '),
+      module: 'ruoyi',
+    });
+  }
+  var hiddenRoutes = state.marHiddenRoutes;
+  if (Array.isArray(hiddenRoutes) && hiddenRoutes.length > 0) {
+    findings.push({
+      severity: 'high',
+      title: '若依隐藏路由发现',
+      detail: 'MAR 扫描发现 ' + hiddenRoutes.length + ' 个隐藏/动态路由',
+      module: 'ruoyi',
+    });
+  }
+  var extraRoutes = state.extraRoutes;
+  if (Array.isArray(extraRoutes) && extraRoutes.length > 0) {
+    findings.push({
+      severity: 'medium',
+      title: '未注册路由发现',
+      detail: 'JS 分析发现 ' + extraRoutes.length + ' 条不在路由表中的路径',
+      module: 'ruoyi',
+    });
+  }
+
+  var cveMatches = CveDb.searchByVersion('');
+  if (!cveMatches || cveMatches.length === 0) {
+    cveMatches = CveDb.searchCve('RuoYi');
+  }
+  if (Array.isArray(cveMatches) && cveMatches.length > 0) {
+    var criticalCves = cveMatches.filter(function (c) {
+      return c.severity === 'critical';
+    });
+    var highCves = cveMatches.filter(function (c) {
+      return c.severity === 'high';
+    });
+    if (criticalCves.length > 0) {
+      findings.push({
+        severity: 'critical',
+        title: '若依严重漏洞 (' + criticalCves.length + ' 个)',
+        detail: criticalCves
+          .map(function (c) {
+            return c.id + ': ' + c.title;
+          })
+          .join('; '),
+        module: 'ruoyi',
+      });
+    }
+    if (highCves.length > 0) {
+      findings.push({
+        severity: 'high',
+        title: '若依高危漏洞 (' + highCves.length + ' 个)',
+        detail: highCves
+          .map(function (c) {
+            return c.id + ': ' + c.title;
+          })
+          .join('; '),
+        module: 'ruoyi',
+      });
+    }
+  }
+  return findings;
+}

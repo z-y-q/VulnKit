@@ -37,6 +37,9 @@ const MODULE_LABELS = {
   angular: 'Angular 分析',
   svelte: 'Svelte 分析',
   ruoyi: '若依检测',
+  vue: 'Vue 分析',
+  react: 'React 分析',
+  sourcemap: 'SourceMap',
 };
 
 function normalizeSeverity(raw) {
@@ -65,6 +68,10 @@ async function collectAllFindings() {
     'storage-check': './vk-storage-check.js',
     angular: './vk-angular.js',
     svelte: './vk-svelte.js',
+    ruoyi: './vk-ruoyi.js',
+    vue: './vk-vue.js',
+    react: './vk-react.js',
+    sourcemap: './vk-sourcemap.js',
   };
 
   for (var key in moduleMap) {
@@ -438,14 +445,19 @@ async function runFullAudit() {
   }
   if (progressEl) progressEl.style.display = '';
   if (progressBar) progressBar.style.width = '0%';
-  if (progressText) progressText.textContent = '0/5';
+  if (progressText) progressText.textContent = '0/10';
 
   var steps = [
     { importPath: './vk-sniff-scanner.js', runFn: 'runSniffScan', label: '技术栈识别' },
+    { importPath: './vk-headers.js', runFn: 'scanSecurityHeaders', label: '安全头检测' },
     { importPath: './vk-xss.js', runFn: 'handleXssHarvest', label: 'XSS 注入点采集' },
     { importPath: './vk-cors.js', runFn: 'scanCors', label: 'CORS 配置检测' },
     { importPath: './vk-waf.js', runFn: 'scanWaf', label: 'WAF 指纹检测' },
     { importPath: './vk-cookie-audit.js', runFn: 'auditCookies', label: 'Cookie 安全审计' },
+    { importPath: './vk-leakscan-scanner.js', runFn: 'runDeepLeakScan', label: '信息泄露扫描' },
+    { importPath: './vk-jwt.js', runFn: 'analyzeJwtClaims', label: 'JWT 令牌分析' },
+    { importPath: './vk-storage-check.js', runFn: 'readWebStorage', label: 'Web 存储检查' },
+    { importPath: './vk-redirect.js', runFn: 'scanRedirects', label: '重定向检测' },
   ];
 
   for (var i = 0; i < steps.length; i++) {

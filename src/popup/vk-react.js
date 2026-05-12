@@ -2,7 +2,11 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
-import { exploreReactStore, copyReactStoreJson, initStoreExplorerEvents } from './vk-react-store.js';
+import {
+  exploreReactStore,
+  copyReactStoreJson,
+  initStoreExplorerEvents,
+} from './vk-react-store.js';
 
 let lastResult = null;
 
@@ -10,9 +14,13 @@ function initSubTabs() {
   document.querySelectorAll('.react-stab').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var tab = this.dataset.reacttab;
-      document.querySelectorAll('.react-stab').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.react-stab').forEach(function (b) {
+        b.classList.remove('active');
+      });
       this.classList.add('active');
-      document.querySelectorAll('.react-stab-panel').forEach(function (p) { p.classList.remove('active'); });
+      document.querySelectorAll('.react-stab-panel').forEach(function (p) {
+        p.classList.remove('active');
+      });
       var target = document.getElementById('reacttab-' + tab);
       if (target) target.classList.add('active');
     });
@@ -31,7 +39,9 @@ function exportResults() {
   a.href = url;
   a.download = 'react-analysis-' + Date.now() + '.json';
   a.click();
-  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  setTimeout(function () {
+    URL.revokeObjectURL(url);
+  }, 1000);
   utils.showToast('已导出 JSON', 'success');
 }
 
@@ -82,7 +92,8 @@ function detectReact() {
             function () {
               if (chrome.runtime.lastError) {
                 if (statusEl)
-                  statusEl.textContent = '注入失败: ' + (chrome.runtime.lastError.message || '未知错误');
+                  statusEl.textContent =
+                    '注入失败: ' + (chrome.runtime.lastError.message || '未知错误');
                 return;
               }
               function trySend(remaining) {
@@ -120,7 +131,12 @@ function renderResult(data) {
     return;
   }
 
-  var html = '<div class="react-card"><div class="react-card-header"><span class="react-badge ' + (data.detected ? 'detected' : 'not-detected') + '">' + (data.detected ? '已检测到' : '未检测到') + '</span>';
+  var html =
+    '<div class="react-card"><div class="react-card-header"><span class="react-badge ' +
+    (data.detected ? 'detected' : 'not-detected') +
+    '">' +
+    (data.detected ? '已检测到' : '未检测到') +
+    '</span>';
   if (data.version) {
     html += '<span class="react-card-title">React ' + utils.escapeHtml(data.version) + '</span>';
   } else {
@@ -130,19 +146,33 @@ function renderResult(data) {
 
   if (data.mode) {
     var modeBadge = data.mode === 'development' ? 'warn' : 'ok';
-    html += '<div class="react-info-row"><span class="react-info-label">运行模式</span><span class="react-info-value"><span class="react-badge ' + modeBadge + '">' + utils.escapeHtml(data.mode) + '</span></span></div>';
+    html +=
+      '<div class="react-info-row"><span class="react-info-label">运行模式</span><span class="react-info-value"><span class="react-badge ' +
+      modeBadge +
+      '">' +
+      utils.escapeHtml(data.mode) +
+      '</span></span></div>';
   }
 
   if (data.metaframework) {
-    html += '<div class="react-info-row"><span class="react-info-label">元框架</span><span class="react-info-value"><span class="react-badge info">' + utils.escapeHtml(data.metaframework) + '</span></span></div>';
+    html +=
+      '<div class="react-info-row"><span class="react-info-label">元框架</span><span class="react-info-value"><span class="react-badge info">' +
+      utils.escapeHtml(data.metaframework) +
+      '</span></span></div>';
   }
 
   if (data.stateManager) {
-    html += '<div class="react-info-row"><span class="react-info-label">状态管理</span><span class="react-info-value">' + utils.escapeHtml(data.stateManager) + '</span></div>';
+    html +=
+      '<div class="react-info-row"><span class="react-info-label">状态管理</span><span class="react-info-value">' +
+      utils.escapeHtml(data.stateManager) +
+      '</span></div>';
   }
 
   if (data.components && data.components.length > 0) {
-    html += '<div class="react-info-row"><span class="react-info-label">组件树 (' + data.components.length + ')</span><span class="react-info-value react-components">';
+    html +=
+      '<div class="react-info-row"><span class="react-info-label">组件树 (' +
+      data.components.length +
+      ')</span><span class="react-info-value react-components">';
     data.components.forEach(function (c) {
       html += '<span class="react-component-tag">' + utils.escapeHtml(c) + '</span>';
     });
@@ -150,7 +180,10 @@ function renderResult(data) {
   }
 
   if (data.routes && data.routes.length > 0) {
-    html += '<div class="react-info-row"><span class="react-info-label">路由 (' + data.routes.length + ')</span><span class="react-info-value">';
+    html +=
+      '<div class="react-info-row"><span class="react-info-label">路由 (' +
+      data.routes.length +
+      ')</span><span class="react-info-value">';
     data.routes.forEach(function (r) {
       html += '<div class="react-route-item">' + utils.escapeHtml(r) + '</div>';
     });
@@ -158,7 +191,8 @@ function renderResult(data) {
   }
 
   if (data.signals && data.signals.length > 0) {
-    html += '<div class="react-info-row"><span class="react-info-label">检测信号</span><span class="react-info-value">';
+    html +=
+      '<div class="react-info-row"><span class="react-info-label">检测信号</span><span class="react-info-value">';
     data.signals.forEach(function (s) {
       html += '<div>' + utils.escapeHtml(s) + '</div>';
     });
@@ -210,50 +244,61 @@ function handleRouterRead() {
   var routesEl = utils.get('react-routes-results');
   if (statusEl) statusEl.textContent = '正在读取路由...';
 
-  utils.requireTabId().then(function (tab) {
-    if (!tab) {
-      if (statusEl) statusEl.textContent = '无法获取标签页';
-      return;
-    }
-    chrome.tabs.sendMessage(tab.id, { type: 'VK_REACT_STORE_EXPLORE' }, function (data) {
-      if (chrome.runtime.lastError || !data) {
-        if (statusEl) statusEl.textContent = '无响应，请刷新页面后重试';
+  utils
+    .requireTabId()
+    .then(function (tab) {
+      if (!tab) {
+        if (statusEl) statusEl.textContent = '无法获取标签页';
         return;
       }
-      if (data.error) {
-        if (statusEl) statusEl.textContent = '错误: ' + data.error;
-        return;
-      }
-      var routes = data.routes || [];
-      if (statusEl) statusEl.textContent = '发现 ' + routes.length + ' 个路由';
-      if (routesEl) {
-        if (routes.length === 0) {
-          routesEl.innerHTML = utils.emptyHtml('未发现路由');
-        } else {
-          var grouped = {};
-          routes.forEach(function (r) {
-            var src = r.source || 'unknown';
-            if (!grouped[src]) grouped[src] = [];
-            grouped[src].push(r);
-          });
-          var html = '';
-          Object.keys(grouped).forEach(function (src) {
-            html += '<div class="react-route-group">';
-            html += '<div class="react-route-source">' + utils.escapeHtml(src) + ' (' + grouped[src].length + ')</div>';
-            grouped[src].forEach(function (r) {
-              html += '<div class="react-route-item"><code class="react-route-path">' + utils.escapeHtml(r.path) + '</code>';
-              if (r.hasElement) html += '<span class="react-route-attr">component</span>';
+      chrome.tabs.sendMessage(tab.id, { type: 'VK_REACT_STORE_EXPLORE' }, function (data) {
+        if (chrome.runtime.lastError || !data) {
+          if (statusEl) statusEl.textContent = '无响应，请刷新页面后重试';
+          return;
+        }
+        if (data.error) {
+          if (statusEl) statusEl.textContent = '错误: ' + data.error;
+          return;
+        }
+        var routes = data.routes || [];
+        if (statusEl) statusEl.textContent = '发现 ' + routes.length + ' 个路由';
+        if (routesEl) {
+          if (routes.length === 0) {
+            routesEl.innerHTML = utils.emptyHtml('未发现路由');
+          } else {
+            var grouped = {};
+            routes.forEach(function (r) {
+              var src = r.source || 'unknown';
+              if (!grouped[src]) grouped[src] = [];
+              grouped[src].push(r);
+            });
+            var html = '';
+            Object.keys(grouped).forEach(function (src) {
+              html += '<div class="react-route-group">';
+              html +=
+                '<div class="react-route-source">' +
+                utils.escapeHtml(src) +
+                ' (' +
+                grouped[src].length +
+                ')</div>';
+              grouped[src].forEach(function (r) {
+                html +=
+                  '<div class="react-route-item"><code class="react-route-path">' +
+                  utils.escapeHtml(r.path) +
+                  '</code>';
+                if (r.hasElement) html += '<span class="react-route-attr">component</span>';
+                html += '</div>';
+              });
               html += '</div>';
             });
-            html += '</div>';
-          });
-          routesEl.innerHTML = html;
+            routesEl.innerHTML = html;
+          }
         }
-      }
+      });
+    })
+    .catch(function () {
+      if (statusEl) statusEl.textContent = '获取标签页失败';
     });
-  }).catch(function () {
-    if (statusEl) statusEl.textContent = '获取标签页失败';
-  });
 }
 
 function handleRouterCopy() {
@@ -264,7 +309,11 @@ function handleRouterCopy() {
         utils.showToast('没有路由数据', 'warning');
         return;
       }
-      var paths = data.routes.map(function (r) { return r.path; }).join('\n');
+      var paths = data.routes
+        .map(function (r) {
+          return r.path;
+        })
+        .join('\n');
       utils.copyAndToast(paths, '已复制 ' + data.routes.length + ' 个路由');
     });
   });
@@ -280,4 +329,43 @@ export {
   handleRouterRead,
   handleRouterCopy,
   copyReactStoreJson,
+  getFindings,
 };
+
+function getFindings() {
+  var findings = [];
+  if (!lastResult || !lastResult.detected) return findings;
+  if (lastResult.version) {
+    findings.push({
+      severity: 'info',
+      title: 'React 版本泄露',
+      detail: 'React ' + lastResult.version,
+      module: 'react',
+    });
+  }
+  if (lastResult.mode === 'development') {
+    findings.push({
+      severity: 'high',
+      title: 'React 开发模式运行',
+      detail: '生产环境使用开发模式构建，泄露组件树和内部结构',
+      module: 'react',
+    });
+  }
+  if (lastResult.metaframework) {
+    findings.push({
+      severity: 'info',
+      title: '元框架检测',
+      detail: lastResult.metaframework,
+      module: 'react',
+    });
+  }
+  if (lastResult.routes && lastResult.routes.length > 0) {
+    findings.push({
+      severity: 'medium',
+      title: '客户端路由发现',
+      detail: lastResult.routes.length + ' 个路由',
+      module: 'react',
+    });
+  }
+  return findings;
+}
