@@ -73,7 +73,29 @@ function getSelectedOrigins() {
   if (customVal) {
     origins.push({ value: customVal, label: customVal });
   }
+
+  var dynamicOrigins = buildDynamicOrigins();
+  for (var i = 0; i < dynamicOrigins.length; i++) {
+    origins.push(dynamicOrigins[i]);
+  }
   return origins;
+}
+
+function buildDynamicOrigins() {
+  try {
+    var host = location.hostname || '';
+    var parts = host.split('.');
+    var tld = parts.length > 1 ? parts[parts.length - 1] : '';
+    var baseHost = parts.length > 2 ? parts.slice(-2).join('.') : host;
+    return [
+      { value: 'https://evil.' + baseHost, label: '子域名混淆 (evil.' + baseHost + ')' },
+      { value: 'https://' + baseHost + '.evil.com', label: '后缀混淆 (' + baseHost + '.evil.com)' },
+      { value: 'https://' + host.replace(/^www\./, '') + '.attacker.com', label: '去 www 后缀' },
+      { value: 'https://' + tld + '.evil.com', label: 'TLD 混淆 (' + tld + '.evil.com)' },
+    ];
+  } catch (e) {
+    return [];
+  }
 }
 
 function sendCorsProbe(url, method, origin, timeoutMs, credentials) {

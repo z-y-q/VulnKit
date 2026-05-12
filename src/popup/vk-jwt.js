@@ -71,7 +71,29 @@ var JWT_ECDSA_MAP = {
   ES512: { hash: 'SHA-512', name: 'ECDSA', curve: 'P-521' },
 };
 
-var ALL_ALGO_MAP = Object.assign({}, JWT_HMAC_MAP, JWT_RSA_MAP, JWT_ECDSA_MAP);
+var JWT_EDDSA_MAP = {
+  EdDSA: { hash: 'SHA-512', name: 'EdDSA', curve: 'Ed25519' },
+};
+
+var JWT_PS_MAP = {
+  PS256: { hash: 'SHA-256', name: 'RSASSA-PSS' },
+  PS384: { hash: 'SHA-384', name: 'RSASSA-PSS' },
+  PS512: { hash: 'SHA-512', name: 'RSASSA-PSS' },
+};
+
+var JWT_ES256K_MAP = {
+  ES256K: { hash: 'SHA-256', name: 'ECDSA', curve: 'secp256k1' },
+};
+
+var ALL_ALGO_MAP = Object.assign(
+  {},
+  JWT_HMAC_MAP,
+  JWT_RSA_MAP,
+  JWT_ECDSA_MAP,
+  JWT_EDDSA_MAP,
+  JWT_PS_MAP,
+  JWT_ES256K_MAP
+);
 
 var lastDecodedJwt = { header: null, payload: null, token: '' };
 
@@ -88,6 +110,19 @@ var SENSITIVE_CLAIMS = [
   'credit_card',
   'ssn',
   'phone',
+  'jwk',
+  'x5u',
+  'x5c',
+  'kid',
+  'act',
+  'cnf',
+  'nonce',
+  'aud',
+  'azp',
+  'authorization_endpoint',
+  'token_endpoint',
+  'session_id',
+  'refresh_token',
 ];
 
 function pemToArrayBuffer(pem) {

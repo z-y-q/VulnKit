@@ -732,7 +732,10 @@ const TECH_SIGNATURES = [
   {
     name: 'Sentry',
     category: '监控',
-    matchers: [{ source: 'globals', type: 'equals', value: 'Sentry' }],
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'Sentry' },
+      { source: 'scriptSrc', type: 'regex', value: /sentry\.io|cdn\.sentry-cdn\.com/i },
+    ],
   },
   {
     name: 'New Relic',
@@ -740,6 +743,82 @@ const TECH_SIGNATURES = [
     matchers: [
       { source: 'globals', type: 'equals', value: 'NREUM' },
       { source: 'scriptSrc', type: 'regex', value: /newrelic\.com/i },
+    ],
+  },
+  {
+    name: 'Datadog',
+    category: '监控',
+    matchers: [
+      {
+        source: 'scriptSrc',
+        type: 'regex',
+        value: /datadog[-_]browser|static\.datadog\.com|dd-browser/i,
+      },
+      { source: 'globals', type: 'equals', value: 'DD_RUM' },
+    ],
+  },
+  {
+    name: 'Dynatrace',
+    category: '监控',
+    matchers: [
+      { source: 'scriptSrc', type: 'regex', value: /dynatrace\.com|js-agent\.newrelic\.com/i },
+      { source: 'cookies', type: 'regex', value: /dtCookie|dtSa|dtPC/i },
+    ],
+  },
+  {
+    name: 'AppDynamics',
+    category: '监控',
+    matchers: [
+      { source: 'scriptSrc', type: 'regex', value: /appdynamics\.com|cdn\.appdynamics\.com/i },
+      { source: 'globals', type: 'equals', value: 'ADRUM' },
+    ],
+  },
+  {
+    name: 'Elastic APM',
+    category: '监控',
+    matchers: [
+      { source: 'scriptSrc', type: 'regex', value: /elastic-apm|elastic\.co\/apm/i },
+      { source: 'headers', type: 'regex', value: /elastic-apm-traceparent/i },
+    ],
+  },
+  {
+    name: 'Honeybadger',
+    category: '监控',
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'Honeybadger' },
+      { source: 'scriptSrc', type: 'regex', value: /honeybadger\.io|js\.honeybadger\.io/i },
+    ],
+  },
+  {
+    name: 'Rollbar',
+    category: '监控',
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'Rollbar' },
+      { source: 'scriptSrc', type: 'regex', value: /rollbar\.com|cdnjs.*rollbar/i },
+    ],
+  },
+  {
+    name: 'Bugsnag',
+    category: '监控',
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'Bugsnag' },
+      { source: 'scriptSrc', type: 'regex', value: /bugsnag\.com|cdn\.bugsnag\.com/i },
+    ],
+  },
+  {
+    name: 'Instana',
+    category: '监控',
+    matchers: [
+      { source: 'scriptSrc', type: 'regex', value: /instana\.io|eum\.instana\.io/i },
+      { source: 'headers', type: 'regex', value: /X-Instana-T/i },
+    ],
+  },
+  {
+    name: 'Raygun',
+    category: '监控',
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'Raygun' },
+      { source: 'scriptSrc', type: 'regex', value: /raygun\.io|cdn\.raygun\.io/i },
     ],
   },
 
@@ -789,17 +868,53 @@ const TECH_SIGNATURES = [
   {
     name: 'Capacitor',
     category: '移动框架',
-    matchers: [{ source: 'globals', type: 'equals', value: 'Capacitor' }],
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'Capacitor' },
+      { source: 'body', type: 'regex', value: /capacitor\.js|@capacitor\//i },
+    ],
   },
   {
     name: 'Cordova',
     category: '移动框架',
-    matchers: [{ source: 'globals', type: 'equals', value: 'cordova' }],
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'cordova' },
+      { source: 'body', type: 'regex', value: /cordova\.js|cordova\.plugins/i },
+    ],
   },
   {
     name: 'UniApp',
     category: '移动框架',
-    matchers: [{ source: 'body', type: 'regex', value: /uni-app|__uniappview/i }],
+    matchers: [
+      { source: 'body', type: 'regex', value: /uni-app|__uniappview/i },
+      { source: 'globals', type: 'equals', value: 'uni' },
+    ],
+  },
+  {
+    name: 'React Native',
+    category: '移动框架',
+    matchers: [
+      { source: 'globals', type: 'equals', value: '__ReactNative' },
+      { source: 'body', type: 'regex', value: /react-native/i },
+      { source: 'scriptSrc', type: 'regex', value: /react-native/i },
+    ],
+  },
+  {
+    name: 'Flutter',
+    category: '移动框架',
+    matchers: [
+      { source: 'body', type: 'regex', value: /flutter|flutter_service_worker|_flutter/i },
+      { source: 'scriptSrc', type: 'regex', value: /flutter|flutter\.js/i },
+      { source: 'meta', type: 'regex', value: /flutter/i },
+    ],
+  },
+  {
+    name: 'Ionic',
+    category: '移动框架',
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'Ionic' },
+      { source: 'body', type: 'regex', value: /ionic/i },
+      { source: 'scriptSrc', type: 'regex', value: /@ionic\//i },
+    ],
   },
 
   // ====== Other ======
@@ -855,6 +970,59 @@ const TECH_SIGNATURES = [
     name: '腾讯云 COS',
     category: '云服务',
     matchers: [{ source: 'headers', type: 'regex', value: /x-cos-request-id/i }],
+  },
+  {
+    name: 'AWS S3',
+    category: '云服务',
+    matchers: [
+      { source: 'headers', type: 'regex', value: /x-amz-request-id|x-amz-id-2/i },
+      {
+        source: 'body',
+        type: 'regex',
+        value: /s3\.amazonaws\.com|s3\.([a-z0-9-]+)\.amazonaws\.com/i,
+      },
+    ],
+  },
+  {
+    name: 'Google Cloud Storage',
+    category: '云服务',
+    matchers: [
+      { source: 'headers', type: 'regex', value: /x-goog-storage-class|x-guploader/i },
+      { source: 'body', type: 'regex', value: /storage\.googleapis\.com/i },
+    ],
+  },
+  {
+    name: 'Azure Blob Storage',
+    category: '云服务',
+    matchers: [
+      { source: 'headers', type: 'regex', value: /x-ms-blob-type|x-ms-lease-status/i },
+      { source: 'body', type: 'regex', value: /\.blob\.core\.windows\.net/i },
+    ],
+  },
+  {
+    name: 'Vercel',
+    category: '云服务',
+    matchers: [
+      { source: 'headers', type: 'regex', value: /x-vercel-id|x-now-trace/i },
+      { source: 'body', type: 'regex', value: /vercel\.com|vercel-insights/i },
+      { source: 'scriptSrc', type: 'regex', value: /vercel/i },
+    ],
+  },
+  {
+    name: 'Netlify',
+    category: '云服务',
+    matchers: [
+      { source: 'headers', type: 'regex', value: /x-nf-request-id|x-netlify/i },
+      { source: 'body', type: 'regex', value: /netlify/i },
+    ],
+  },
+  {
+    name: 'Cloudflare Pages',
+    category: '云服务',
+    matchers: [
+      { source: 'headers', type: 'regex', value: /cf-ray/i },
+      { source: 'body', type: 'regex', value: /pages\.dev|cloudflarepages\.com/i },
+    ],
   },
 
   // ====== Security Headers ======

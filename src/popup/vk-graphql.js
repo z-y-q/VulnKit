@@ -22,12 +22,39 @@ var GRAPHQL_PATHS = [
 var INTROSPECTION_QUERY =
   '{"query":"{ __schema { queryType { name } mutationType { name } subscriptionType { name } types { name kind fields { name type { name kind } } } } }"}';
 
-var BATCH_PAYLOAD = [
-  { query: '{ __typename }' },
-  { query: '{ __typename }' },
-];
+var BATCH_PAYLOAD = [{ query: '{ __typename }' }, { query: '{ __typename }' }];
 
 var SUGGESTION_QUERY = '{"query":"{ _fake_field_that_does_not_exist }"}';
+
+var DEPTH_DOS_PAYLOADS = [
+  '{"query":"{ a{b{c{d{e{f{g{h{i{j}}}}}}}}}}}"}',
+  '{"query":"{ user{ posts{ comments{ author{ posts{ comments{ author{ id } } } } } } } }"}',
+  '{"query":"{ n0:n{ n1:n{ n2:n{ n3:n{ n4:n{ n5:n{ n6:n{ n7:n{ n8:n{ n9:n } } } } } } } } } }"}',
+];
+
+var CIRCULAR_FRAGMENT_PAYLOAD =
+  '{"query":"fragment frag on Query { ...frag } query { __typename }"}';
+
+var DIRECTIVE_INJECTION_PAYLOADS = [
+  '{"query":"{ __typename @skip(if: true) @include(if: false) }"}',
+  '{"query":"{ user @include(if: true) { id @skip(if: false) } }"}',
+  '{"query":"query($cond: Boolean!) { user(id: 1) @include(if: $cond) { email } }","variables":{"cond":true}}',
+];
+
+var MUTATION_EXFIL_PAYLOADS = [
+  '{"query":"mutation { updatePassword(new: \"test\") { success } }"}',
+  '{"query":"mutation { deleteUser(id: 1) { id } }"}',
+  '{"query":"mutation { createAdmin(input: {email:\"x\",role:ADMIN}) { id } }"}',
+];
+
+var SUBSCRIPTION_PROBE = '{"query":"subscription { userUpdated { id email } }"}';
+
+var FIELD_FUZZ_PAYLOADS = [
+  '{"query":"{ __typename }"}',
+  '{"query":"{ __schema { types { name } } }"}',
+  '{"query":"{ __type(name: \"Query\") { fields { name } } }"}',
+  '{"query":"{ __directive(name: \"include\") { name locations } }"}',
+];
 
 function sendProbe(url, body, timeout) {
   return new Promise(function (resolve) {
@@ -210,10 +237,7 @@ async function scanGraphQL() {
 
     if (foundEndpoint) {
       if (statusEl) statusEl.textContent = '测试批量查询...';
-      var batchResp = await sendProbe(
-        foundEndpoint,
-        JSON.stringify(BATCH_PAYLOAD)
-      );
+      var batchResp = await sendProbe(foundEndpoint, JSON.stringify(BATCH_PAYLOAD));
       var batchJson = parseJsonBody(batchResp);
       if (Array.isArray(batchJson)) {
         batchSupported = true;
@@ -237,12 +261,113 @@ async function scanGraphQL() {
         });
       }
 
+      if (statusEl) statusEl.textContent = '测试深度查询 DoS...';
+      for (var di = 0; di < DEPTH_DOS_PAYLOADS.length; di++) {
+        var depthResp = await sendProbe(foundEndpoint, DEPTH_DOS_PAYLOADS[di], 12000);
+        var depthJson = parseJsonBody(depthResp);
+        if (depthJson && !depthJson.errors) {
+          findings.push({
+            severity: 'medium',
+            title: '深度嵌套查询未限制',
+            detail: '服务端接受 10+ 层嵌套查询，可能导致 DoS',
+            path: foundEndpoint.replace(origin, ''),
+          });
+          break;
+        }
+      }
+
+      if (statusEl) statusEl.textContent = '测试循环 fragment...';
+      var circResp = await sendProbe(foundEndpoint, CIRCULAR_FRAGMENT_PAYLOAD);
+      var circJson = parseJsonBody(circResp);
+      if (circJson && !circJson.errors) {
+        findings.push({
+          severity: 'medium',
+          title: '循环 Fragment 未限制',
+          detail: '服务端接受循环 fragment 引用，可能导致无限递归',
+          path: foundEndpoint.replace(origin, ''),
+        });
+      }
+
+      if (statusEl) statusEl.textContent = '测试 directive 注入...';
+      for (var dri = 0; dri < DIRECTIVE_INJECTION_PAYLOADS.length; dri++) {
+        var dirResp = await sendProbe(foundEndpoint, DIRECTIVE_INJECTION_PAYLOADS[dri]);
+        var dirJson = parseJsonBody(dirResp);
+        if (dirJson && dirJson.data) {
+          findings.push({
+            severity: 'low',
+            title: 'Directive 注入可用',
+            detail: '可通过 @skip/@include 操纵查询逻辑绕过权限检查',
+            path: foundEndpoint.replace(origin, ''),
+          });
+          break;
+        }
+      }
+
+      if (statusEl) statusEl.textContent = '测试 mutation 端点...';
+      for (var mi = 0; mi < MUTATION_EXFIL_PAYLOADS.length; mi++) {
+        var mutResp = await sendProbe(foundEndpoint, MUTATION_EXFIL_PAYLOADS[mi]);
+        var mutJson = parseJsonBody(mutResp);
+        if (mutJson && mutJson.data && !mutJson.errors) {
+          findings.push({
+            severity: 'high',
+            title: '危险 Mutation 未鉴权',
+            detail:
+              'mutation "' +
+              MUTATION_EXFIL_PAYLOADS[mi].match(/mutation\s+\{ (\w+)/)[1] +
+              '" 可直接调用，无需认证',
+            path: foundEndpoint.replace(origin, ''),
+          });
+          break;
+        }
+      }
+
+      if (statusEl) statusEl.textContent = '探测 Subscription 端点...';
+      var subResp = await sendProbe(foundEndpoint, SUBSCRIPTION_PROBE);
+      var subJson = parseJsonBody(subResp);
+      if (
+        subJson &&
+        (subJson.data ||
+          (subJson.errors &&
+            subJson.errors[0] &&
+            subJson.errors[0].message.indexOf('subscription') !== -1))
+      ) {
+        findings.push({
+          severity: 'info',
+          title: 'Subscription 端点可用',
+          detail: '服务端支持 WebSocket subscription，可用于实时数据监控',
+          path: foundEndpoint.replace(origin, ''),
+        });
+      }
+
+      if (statusEl) statusEl.textContent = '测试内省字段...';
+      for (var fi = 0; fi < FIELD_FUZZ_PAYLOADS.length; fi++) {
+        var fieldResp = await sendProbe(foundEndpoint, FIELD_FUZZ_PAYLOADS[fi]);
+        var fieldJson = parseJsonBody(fieldResp);
+        if (fieldJson && fieldJson.data && !fieldJson.errors) {
+          var innerField = fieldJson.data;
+          if (innerField.__type || innerField.__directive) {
+            findings.push({
+              severity: 'low',
+              title: '高级内省字段可访问',
+              detail: '__type/__directive 等内省字段可用，可枚举完整 schema 定义',
+              path: foundEndpoint.replace(origin, ''),
+            });
+            break;
+          }
+        }
+      }
+
       if (schemaInfo) {
         if (schemaInfo.mutations.length > 0) {
           findings.push({
             severity: 'info',
             title: 'Mutation 端点可用',
-            detail: '发现 ' + schemaInfo.mutations.length + ' 个 mutation: ' + schemaInfo.mutations.slice(0, 5).join(', ') + (schemaInfo.mutations.length > 5 ? '...' : ''),
+            detail:
+              '发现 ' +
+              schemaInfo.mutations.length +
+              ' 个 mutation: ' +
+              schemaInfo.mutations.slice(0, 5).join(', ') +
+              (schemaInfo.mutations.length > 5 ? '...' : ''),
             path: foundEndpoint.replace(origin, ''),
           });
         }
@@ -331,9 +456,10 @@ async function executeCustomQuery() {
   }
 
   if (statusEl) {
-    statusEl.textContent = resp && !resp.error
-      ? '查询完成 — HTTP ' + resp.status
-      : '查询失败: ' + (resp ? resp.error : '无响应');
+    statusEl.textContent =
+      resp && !resp.error
+        ? '查询完成 — HTTP ' + resp.status
+        : '查询失败: ' + (resp ? resp.error : '无响应');
   }
 }
 
@@ -349,7 +475,8 @@ function renderResults(result) {
       var ep = result.endpoints[i];
       html += '<div class="graphql-endpoint-row">';
       html += '<span class="graphql-endpoint-path">' + utils.escapeHtml(ep.path) + '</span>';
-      html += '<span class="graphql-badge ' + (ep.introspection ? 'badge-high' : 'badge-info') + '">';
+      html +=
+        '<span class="graphql-badge ' + (ep.introspection ? 'badge-high' : 'badge-info') + '">';
       html += ep.introspection ? 'Introspection 开启' : 'Introspection 关闭';
       html += '</span>';
       html += '<span class="graphql-status-tag">HTTP ' + ep.status + '</span>';
@@ -371,21 +498,28 @@ function renderResults(result) {
     if (si.queries.length > 0) {
       html += '<div class="graphql-type-group"><div class="graphql-type-label">Queries</div>';
       for (var q = 0; q < si.queries.length; q++) {
-        html += '<span class="graphql-type-item query">' + utils.escapeHtml(si.queries[q]) + '</span>';
+        html +=
+          '<span class="graphql-type-item query">' + utils.escapeHtml(si.queries[q]) + '</span>';
       }
       html += '</div>';
     }
     if (si.mutations.length > 0) {
       html += '<div class="graphql-type-group"><div class="graphql-type-label">Mutations</div>';
       for (var m = 0; m < si.mutations.length; m++) {
-        html += '<span class="graphql-type-item mutation">' + utils.escapeHtml(si.mutations[m]) + '</span>';
+        html +=
+          '<span class="graphql-type-item mutation">' +
+          utils.escapeHtml(si.mutations[m]) +
+          '</span>';
       }
       html += '</div>';
     }
     if (si.subscriptions.length > 0) {
       html += '<div class="graphql-type-group"><div class="graphql-type-label">Subscriptions</div>';
       for (var s = 0; s < si.subscriptions.length; s++) {
-        html += '<span class="graphql-type-item subscription">' + utils.escapeHtml(si.subscriptions[s]) + '</span>';
+        html +=
+          '<span class="graphql-type-item subscription">' +
+          utils.escapeHtml(si.subscriptions[s]) +
+          '</span>';
       }
       html += '</div>';
     }
@@ -398,7 +532,12 @@ function renderResults(result) {
     for (var f = 0; f < result.findings.length; f++) {
       var finding = result.findings[f];
       html += '<div class="graphql-finding-row ' + finding.severity + '">';
-      html += '<span class="graphql-badge badge-' + finding.severity + '">' + sevLabel(finding.severity) + '</span>';
+      html +=
+        '<span class="graphql-badge badge-' +
+        finding.severity +
+        '">' +
+        sevLabel(finding.severity) +
+        '</span>';
       html += '<span class="graphql-finding-title">' + utils.escapeHtml(finding.title) + '</span>';
       html += '<div class="graphql-finding-detail">' + utils.escapeHtml(finding.detail) + '</div>';
       html += '</div>';
@@ -407,10 +546,12 @@ function renderResults(result) {
   }
 
   if (result.batchSupported) {
-    html += '<div class="graphql-section"><div class="graphql-info-tag">批量查询: 已启用</div></div>';
+    html +=
+      '<div class="graphql-section"><div class="graphql-info-tag">批量查询: 已启用</div></div>';
   }
   if (result.suggestionsEnabled) {
-    html += '<div class="graphql-section"><div class="graphql-info-tag">字段建议: 已启用</div></div>';
+    html +=
+      '<div class="graphql-section"><div class="graphql-info-tag">字段建议: 已启用</div></div>';
   }
 
   resultsEl.innerHTML = html;
@@ -433,13 +574,23 @@ function copyResults() {
     lines.push('Endpoints:');
     for (var i = 0; i < lastResult.endpoints.length; i++) {
       var ep = lastResult.endpoints[i];
-      lines.push('  ' + ep.path + ' (HTTP ' + ep.status + ', introspection: ' + ep.introspection + ')');
+      lines.push(
+        '  ' + ep.path + ' (HTTP ' + ep.status + ', introspection: ' + ep.introspection + ')'
+      );
     }
     lines.push('');
   }
   if (lastResult.schemaInfo) {
     var si = lastResult.schemaInfo;
-    lines.push('Schema: ' + si.totalTypes + ' types, ' + si.queries.length + ' queries, ' + si.mutations.length + ' mutations');
+    lines.push(
+      'Schema: ' +
+        si.totalTypes +
+        ' types, ' +
+        si.queries.length +
+        ' queries, ' +
+        si.mutations.length +
+        ' mutations'
+    );
     if (si.queries.length > 0) lines.push('Queries: ' + si.queries.join(', '));
     if (si.mutations.length > 0) lines.push('Mutations: ' + si.mutations.join(', '));
     lines.push('');

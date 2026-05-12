@@ -31,6 +31,11 @@ var SECURITY_HEADERS = [
   { name: 'X-Download-Options', weight: 2, category: 'security' },
   { name: 'Report-To', weight: 2, category: 'monitoring' },
   { name: 'NEL', weight: 2, category: 'monitoring' },
+  { name: 'Reporting-Endpoints', weight: 1, category: 'monitoring' },
+  { name: 'Content-Digest', weight: 1, category: 'security' },
+  { name: 'Accept-CH', weight: 1, category: 'privacy' },
+  { name: 'Origin-Agent-Cluster', weight: 1, category: 'security' },
+  { name: 'X-Permitted-Cross-Domain-Policies', weight: 3, category: 'cross-origin' },
 ];
 
 var SERVER_SIGNATURES = [

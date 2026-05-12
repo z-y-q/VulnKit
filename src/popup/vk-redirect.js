@@ -47,6 +47,16 @@ var PROTOCOL_VARIANTS = [
   'http://evil.com',
   'https://evil.com%00.example.com',
   'javascript://evil.com',
+  'https://attacker.com/%00/evil',
+  'https://attacker.com/%0d%0a/evil',
+  'data:text/html,<script>alert(1)</script>',
+  'javascript:alert(1)',
+  'https://attacker.com\\@target.com',
+  'https://attacker.com#@target.com',
+  'https://%61ttacker.com',
+  'https://attacker.com%2F@target.com',
+  '\\\\\\\\attacker.com',
+  'https://attacker.com%09.target.com',
 ];
 
 var TEST_DOMAIN = 'example.com';

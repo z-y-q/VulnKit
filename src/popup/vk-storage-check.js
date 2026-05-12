@@ -6,9 +6,39 @@ import { utilsProxy as utils } from './vk-namespace.js';
 // ====== Sensitive patterns ======
 
 var KEY_PATTERNS = [
-  'token', 'auth', 'session', 'password', 'passwd', 'secret',
-  'api_key', 'apikey', 'bearer', 'access_token', 'refresh_token',
-  'private_key', 'credential', 'jwt', 'id_token',
+  'token',
+  'auth',
+  'session',
+  'password',
+  'passwd',
+  'secret',
+  'api_key',
+  'apikey',
+  'bearer',
+  'access_token',
+  'refresh_token',
+  'private_key',
+  'credential',
+  'jwt',
+  'id_token',
+  'stripe',
+  'twilio',
+  'sendgrid',
+  'mailgun',
+  'nexmo',
+  'api_secret',
+  'apisecret',
+  'secret_key',
+  'secretkey',
+  'privatekey',
+  'auth_token',
+  'db_password',
+  'db_host',
+  'db_port',
+  'connection_string',
+  'conn_str',
+  'firebase',
+  'supabase',
 ];
 
 var VALUE_PATTERNS = [
@@ -18,6 +48,39 @@ var VALUE_PATTERNS = [
   { regex: /^AKIA[A-Z0-9]{16}$/, label: 'AWS Access Key' },
   { regex: /-----BEGIN.*PRIVATE KEY-----/, label: 'PEM Private Key' },
   { regex: /^[a-f0-9]{32,}$/, label: 'Hex Hash/Key' },
+  { regex: /^(pk|sk|rk)_live_[A-Za-z0-9]{24,}$/, label: 'Stripe API Key' },
+  { regex: /^(pk|sk|rk)_test_[A-Za-z0-9]{24,}$/, label: 'Stripe Test Key' },
+  { regex: /^ghp_[A-Za-z0-9]{36,}$/, label: 'GitHub PAT' },
+  { regex: /^gho_[A-Za-z0-9]{36,}$/, label: 'GitHub OAuth Token' },
+  { regex: /^ghs_[A-Za-z0-9]{36,}$/, label: 'GitHub App Token' },
+  { regex: /^ghu_[A-Za-z0-9]{36,}$/, label: 'GitHub User Token' },
+  { regex: /^xox[bpas]-[A-Za-z0-9-]{10,}$/, label: 'Slack Token' },
+  {
+    regex: /^hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[A-Za-z0-9]+/,
+    label: 'Slack Webhook',
+  },
+  { regex: /^wif-[a-f0-9-]{36,}$/, label: 'GCP Service Account Key' },
+  { regex: /^AIza[A-Za-z0-9_-]{35}$/, label: 'Google API Key' },
+  { regex: /^[a-f0-9]{64}$/, label: 'SHA-256 Hash' },
+  { regex: /^[A-Za-z0-9+/]{40,}={0,2}$/, label: 'Base64 Encoded Data' },
+  { regex: /^mysql:\/\/[^\s]+/, label: 'MySQL Connection String' },
+  { regex: /^postgres(?:ql)?:\/\/[^\s]+/, label: 'PostgreSQL Connection String' },
+  { regex: /^mongodb(?:\+srv)?:\/\/[^\s]+/, label: 'MongoDB Connection String' },
+  { regex: /^redis:\/\/[^\s]+/, label: 'Redis Connection String' },
+  { regex: /^amqp(?:s)?:\/\/[^\s]+/, label: 'RabbitMQ Connection String' },
+  {
+    regex: /^[A-F0-9]{8}-[A-F0-9]{4}-4[A-F0-9]{3}-[89AB][A-F0-9]{3}-[A-F0-9]{12}$/i,
+    label: 'UUID Token',
+  },
+  { regex: /^AC[a-f0-9]{32}$/, label: 'Twilio Account SID' },
+  { regex: /^SK[a-f0-9]{32}$/, label: 'Twilio Auth Token' },
+  { regex: /^NDA[0-9A-Z]{24,}$/, label: 'Nexmo API Key' },
+  { regex: /^(?:MII[A-Za-z0-9+/]{4,})/, label: 'X.509 Certificate' },
+  { regex: /^-----BEGIN CERTIFICATE-----/, label: 'PEM Certificate' },
+  { regex: /^-----BEGIN RSA PRIVATE KEY-----/, label: 'RSA Private Key' },
+  { regex: /^-----BEGIN EC PRIVATE KEY-----/, label: 'EC Private Key' },
+  { regex: /^-----BEGIN OPENSSH PRIVATE KEY-----/, label: 'OpenSSH Private Key' },
+  { regex: /^[a-zA-Z0-9+/]{200,}={0,2}$/, label: 'Long Base64 (Possible Secret)' },
 ];
 
 // ====== State ======
@@ -119,8 +182,12 @@ function readIndexedDB() {
             try {
               var db = await new Promise(function (resolve, reject) {
                 var req = indexedDB.open(dbInfo.name, dbInfo.version);
-                req.onsuccess = function () { resolve(req.result); };
-                req.onerror = function () { reject(req.error); };
+                req.onsuccess = function () {
+                  resolve(req.result);
+                };
+                req.onerror = function () {
+                  reject(req.error);
+                };
               });
               var stores = [];
               for (var s = 0; s < db.objectStoreNames.length; s++) {
@@ -130,15 +197,23 @@ function readIndexedDB() {
                   var store = tx.objectStore(storeName);
                   var count = await new Promise(function (res, rej) {
                     var r = store.count();
-                    r.onsuccess = function () { res(r.result); };
-                    r.onerror = function () { rej(r.error); };
+                    r.onsuccess = function () {
+                      res(r.result);
+                    };
+                    r.onerror = function () {
+                      rej(r.error);
+                    };
                   });
                   var records = [];
                   if (count > 0 && count <= 100) {
                     records = await new Promise(function (res, rej) {
                       var r = store.getAll();
-                      r.onsuccess = function () { res(r.result); };
-                      r.onerror = function () { rej(r.error); };
+                      r.onsuccess = function () {
+                        res(r.result);
+                      };
+                      r.onerror = function () {
+                        rej(r.error);
+                      };
                     });
                     for (var ri = 0; ri < records.length; ri++) {
                       records[ri] = JSON.stringify(records[ri]);
@@ -180,7 +255,11 @@ function truncate(val, max) {
 }
 
 function escapeAttr(s) {
-  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function renderStats(type, items) {
@@ -192,7 +271,9 @@ function renderStats(type, items) {
     if (items[i].isSensitive) sensCount++;
   }
   el.innerHTML =
-    '<span class="stat-badge stat-found">总数 ' + total + '</span>' +
+    '<span class="stat-badge stat-found">总数 ' +
+    total +
+    '</span>' +
     (sensCount > 0 ? ' <span class="stat-badge stat-vuln">敏感 ' + sensCount + '</span>' : '');
   el.style.display = '';
 }
@@ -222,7 +303,8 @@ function renderStorageResults(type) {
   });
 
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="empty-state">' + (items.length === 0 ? '存储为空' : '无匹配结果') + '</div>';
+    container.innerHTML =
+      '<div class="empty-state">' + (items.length === 0 ? '存储为空' : '无匹配结果') + '</div>';
     return;
   }
 
@@ -232,17 +314,40 @@ function renderStorageResults(type) {
     var cls = item.isSensitive ? 'sc-item sc-item-sensitive' : 'sc-item';
     html += '<div class="' + cls + '">';
     html += '<div class="sc-item-header">';
-    html += '<span class="sc-item-key" title="' + escapeAttr(item.key) + '">' + utils.escapeHtml(item.key) + '</span>';
+    html +=
+      '<span class="sc-item-key" title="' +
+      escapeAttr(item.key) +
+      '">' +
+      utils.escapeHtml(item.key) +
+      '</span>';
     html += '<div class="sc-item-actions">';
     if (item.isSensitive) {
       for (var p = 0; p < item.matchedPatterns.length; p++) {
-        html += '<span class="sc-sens-badge">' + utils.escapeHtml(item.matchedPatterns[p]) + '</span>';
+        html +=
+          '<span class="sc-sens-badge">' + utils.escapeHtml(item.matchedPatterns[p]) + '</span>';
       }
     }
-    html += '<button class="sc-action-btn" data-action="copy" data-type="' + type + '" data-key="' + escapeAttr(item.key) + '" title="复制值">&#128203;</button>';
-    html += '<button class="sc-action-btn sc-action-delete" data-action="delete" data-type="' + type + '" data-key="' + escapeAttr(item.key) + '" title="删除">&#128465;</button>';
+    html +=
+      '<button class="sc-action-btn" data-action="copy" data-type="' +
+      type +
+      '" data-key="' +
+      escapeAttr(item.key) +
+      '" title="复制值">&#128203;</button>';
+    html +=
+      '<button class="sc-action-btn sc-action-delete" data-action="delete" data-type="' +
+      type +
+      '" data-key="' +
+      escapeAttr(item.key) +
+      '" title="删除">&#128465;</button>';
     html += '</div></div>';
-    html += '<div class="sc-item-value" data-trunc="' + escapeAttr(truncate(item.value, 120)) + '" data-full="' + escapeAttr(item.value) + '">' + utils.escapeHtml(truncate(item.value, 120)) + '</div>';
+    html +=
+      '<div class="sc-item-value" data-trunc="' +
+      escapeAttr(truncate(item.value, 120)) +
+      '" data-full="' +
+      escapeAttr(item.value) +
+      '">' +
+      utils.escapeHtml(truncate(item.value, 120)) +
+      '</div>';
     html += '</div>';
   }
 
@@ -263,16 +368,29 @@ function renderIDBResults() {
   for (var d = 0; d < dbs.length; d++) {
     var db = dbs[d];
     html += '<div class="sc-idb-db">';
-    html += '<div class="sc-idb-db-name">' + utils.escapeHtml(db.name) + ' <span class="sc-idb-meta">v' + db.version + '</span></div>';
+    html +=
+      '<div class="sc-idb-db-name">' +
+      utils.escapeHtml(db.name) +
+      ' <span class="sc-idb-meta">v' +
+      db.version +
+      '</span></div>';
     if (db.stores) {
       for (var s = 0; s < db.stores.length; s++) {
         var store = db.stores[s];
         html += '<div class="sc-idb-store">';
-        html += '<div class="sc-idb-store-name">' + utils.escapeHtml(store.name) + ' <span class="sc-idb-meta">' + store.count + ' 条</span></div>';
+        html +=
+          '<div class="sc-idb-store-name">' +
+          utils.escapeHtml(store.name) +
+          ' <span class="sc-idb-meta">' +
+          store.count +
+          ' 条</span></div>';
         if (store.records && store.records.length > 0) {
           html += '<div class="sc-idb-records">';
           for (var r = 0; r < store.records.length; r++) {
-            html += '<div class="sc-idb-record"><code>' + utils.escapeHtml(truncate(store.records[r], 200)) + '</code></div>';
+            html +=
+              '<div class="sc-idb-record"><code>' +
+              utils.escapeHtml(truncate(store.records[r], 200)) +
+              '</code></div>';
           }
           html += '</div>';
         }
@@ -298,7 +416,9 @@ function deleteStorageItem(type, key) {
       { world: 'MAIN', args: [{ type: type, key: key }] }
     );
     var items = type === 'local' ? state.localItems : state.sessionItems;
-    var updated = items.filter(function (item) { return item.key !== key; });
+    var updated = items.filter(function (item) {
+      return item.key !== key;
+    });
     if (type === 'local') state.localItems = updated;
     else state.sessionItems = updated;
     renderStorageResults(type);
@@ -307,24 +427,30 @@ function deleteStorageItem(type, key) {
 }
 
 function clearStorage(type) {
-  utils.confirmDanger('确定清空当前页面的 ' + (type === 'local' ? 'localStorage' : 'sessionStorage') + '？此操作不可撤销。').then(function (confirmed) {
-    if (!confirmed) return;
-    utils.withTab(async function (tab) {
-      await utils.execInTab(
-        tab.id,
-        function (stype) {
-          var storage = stype === 'local' ? localStorage : sessionStorage;
-          storage.clear();
-        },
-        { world: 'MAIN', args: [type] }
-      );
-      if (type === 'local') state.localItems = [];
-      else state.sessionItems = [];
-      renderStorageResults(type);
-      renderStats(type, []);
-      utils.setStatus('sc-' + type + '-status', '已清空');
+  utils
+    .confirmDanger(
+      '确定清空当前页面的 ' +
+        (type === 'local' ? 'localStorage' : 'sessionStorage') +
+        '？此操作不可撤销。'
+    )
+    .then(function (confirmed) {
+      if (!confirmed) return;
+      utils.withTab(async function (tab) {
+        await utils.execInTab(
+          tab.id,
+          function (stype) {
+            var storage = stype === 'local' ? localStorage : sessionStorage;
+            storage.clear();
+          },
+          { world: 'MAIN', args: [type] }
+        );
+        if (type === 'local') state.localItems = [];
+        else state.sessionItems = [];
+        renderStorageResults(type);
+        renderStats(type, []);
+        utils.setStatus('sc-' + type + '-status', '已清空');
+      });
     });
-  });
 }
 
 function copyAllData(type) {
@@ -362,7 +488,9 @@ function bindFilterSearch(type) {
     var timer = null;
     searchInput.addEventListener('input', function () {
       clearTimeout(timer);
-      timer = setTimeout(function () { renderStorageResults(type); }, 200);
+      timer = setTimeout(function () {
+        renderStorageResults(type);
+      }, 200);
     });
   }
 }

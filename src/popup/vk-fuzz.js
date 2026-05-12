@@ -242,6 +242,18 @@ var CONTENT_PATTERNS = [
   { regex: /(?:config|配置|setting|参数)/i, tag: '配置信息', group: 'feature' },
   { regex: /(?:database|mysql|postgres|mongodb|redis)/i, tag: '数据库', group: 'feature' },
   { regex: /(?:password|passwd|secret|token|key=)/i, tag: '敏感信息', group: 'feature' },
+  { regex: /WAF|防火墙|拦截|block|forbidden/i, tag: 'WAF', group: 'security' },
+  { regex: /验证码|captcha|CAPTCHA|recaptcha/i, tag: '验证码', group: 'security' },
+  { regex: /Location:\s*https?:\/\//i, tag: '302重定向', group: 'security' },
+  { regex: /401\s+Unauthorized/i, tag: '401认证', group: 'security' },
+  { regex: /403\s+Forbidden/i, tag: '403禁止', group: 'security' },
+  { regex: /spring|springframework|springboot/i, tag: 'Spring', group: 'framework' },
+  { regex: /laravel|symfony|django|flask|express/i, tag: '框架', group: 'framework' },
+  { regex: /swagger|api-docs|openapi/i, tag: 'API文档', group: 'infoleak' },
+  { regex: /phpinfo\(\)|PHP Version/i, tag: 'PHPInfo', group: 'infoleak' },
+  { regex: /debug|stack\s+trace|exception|traceback/i, tag: '调试信息', group: 'infoleak' },
+  { regex: /git|svn|\.git\/|\.svn\//i, tag: '版本控制', group: 'infoleak' },
+  { regex: /docker|kubernetes|k8s/i, tag: '容器特征', group: 'infoleak' },
 ];
 
 var fuzzState = {

