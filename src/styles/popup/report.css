@@ -20,9 +20,21 @@
 .report-progress-bar {
   height: 100%;
   width: 0%;
-  background: #4A90E2;
+  background: linear-gradient(90deg, #4A90E2, #6c5ce7, #4A90E2);
+  background-size: 200% 100%;
   border-radius: 2px;
   transition: width 0.3s ease;
+  animation: progressShimmer 2s ease infinite;
+}
+
+@keyframes progressShimmer {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
+}
+
+.report-progress-bar.complete {
+  background: linear-gradient(90deg, #27ae60, #2ecc71);
+  animation: none;
 }
 
 .report-progress-text {
@@ -79,6 +91,30 @@
 
 .report-findings-header {
   margin-bottom: 8px;
+}
+
+/* ====== Markdown Summary ====== */
+
+.report-md-summary {
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 8px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #2a2a4a;
+}
+
+[data-theme='dark'] .report-md-summary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
 }
 
 .report-finding-sev {
@@ -175,6 +211,11 @@
 
 [data-theme='dark'] .report-progress-bar {
   background: var(--accent);
+}
+
+[data-theme='dark'] .report-progress-bar.complete {
+  background: #27ae60;
+  animation: none;
 }
 
 [data-theme='dark'] .report-progress-text {

@@ -150,8 +150,7 @@ async function analyzeSourcemaps() {
       this.classList.add('active');
       let severity = this.dataset.severity;
       resultsEl.querySelectorAll('.sm-analysis-item').forEach(function (item) {
-        item.style.display =
-          severity === 'all' || item.dataset.severity === severity ? '' : 'none';
+        item.style.display = severity === 'all' || item.dataset.severity === severity ? '' : 'none';
       });
     });
   });
@@ -165,6 +164,11 @@ function extractApiEndpoints() {
     /(?:url|uri|endpoint|apiUrl|baseUrl)\s*[:=]\s*['"`]([^'"`\s)]+)['"`]/gi,
     /['"`](\/api\/[^\s'"`)]{2,})['"`]/gi,
     /['"`](\/(?:v[0-9]+)\/[^\s'"`)]{2,})['"`]/gi,
+    /['"`](\/graphql[^\s'"`)]*)['"`]/gi,
+    /new\s+WebSocket\s*\(\s*['"`]([^'"`\s)]+)['"`]/gi,
+    /['"`](wss?:\/\/[^\s'"`)]+)['"`]/gi,
+    /socket\.io\s*\(\s*['"`]([^'"`\s)]+)['"`]/gi,
+    /io\s*\(\s*['"`]([^'"`\s)]+)['"`]/gi,
   ];
 
   const skipRe = /\.(css|png|jpg|jpeg|gif|svg|ico|woff|ttf|eot|map)(?:\?|$)/i;
@@ -189,6 +193,71 @@ function extractApiEndpoints() {
   });
 
   return endpoints;
+}
+
+function extractGraphQLQueries() {
+  var queries = [];
+  var patterns = [
+    /gql\s*`([\s\S]*?)`/g,
+    /graphql\s*`([\s\S]*?)`/g,
+    /(?:query|mutation|subscription)\s+(\w+)\s*\{([\s\S]*?)\}/g,
+    /['"`]\s*(?:query|mutation|subscription)\s+\w+\s*\{[\s\S]*?\}\s*['"`]/g,
+  ];
+
+  smState.sourcemapModules.forEach(function (mod) {
+    var source = smState.sourcemapSourceCache[mod.path];
+    if (!source) return;
+    patterns.forEach(function (pat) {
+      var regex = new RegExp(pat.source, pat.flags);
+      var match;
+      var count = 0;
+      while ((match = regex.exec(source)) !== null) {
+        if (count++ > 10) break;
+        var body = match[1] || match[0];
+        if (!body || body.length < 5) continue;
+        var cleaned = body.replace(/\s+/g, ' ').trim().substring(0, 300);
+        if (cleaned.length < 10) continue;
+        queries.push({
+          body: cleaned,
+          file: mod.path,
+          moduleIndex: smState.sourcemapModules.indexOf(mod),
+        });
+      }
+    });
+  });
+
+  return queries;
+}
+
+function extractWebSocketUrls() {
+  var wsUrls = {};
+  var patterns = [
+    /new\s+WebSocket\s*\(\s*['"`]([^'"`\s)]+)['"`]/gi,
+    /['"`](wss?:\/\/[^\s'"`)]+)['"`]/gi,
+    /socket\.io\s*\(\s*\{?\s*url\s*:\s*['"`]([^'"`\s)]+)['"`]/gi,
+  ];
+
+  smState.sourcemapModules.forEach(function (mod) {
+    var source = smState.sourcemapSourceCache[mod.path];
+    if (!source) return;
+    patterns.forEach(function (pat) {
+      var regex = new RegExp(pat.source, pat.flags);
+      var match;
+      while ((match = regex.exec(source)) !== null) {
+        var url = match[1];
+        if (!url) continue;
+        url = url.replace(/\$\{[^}]*\}/g, ':param').replace(/['"`]/g, '');
+        if (!wsUrls[url]) {
+          wsUrls[url] = [];
+        }
+        if (wsUrls[url].indexOf(mod.path) === -1) {
+          wsUrls[url].push(mod.path);
+        }
+      }
+    });
+  });
+
+  return wsUrls;
 }
 
 function showApiEndpoints() {
@@ -227,11 +296,15 @@ function showApiEndpoints() {
 smState.Analysis = {
   analyzeSourcemaps: analyzeSourcemaps,
   extractApiEndpoints: extractApiEndpoints,
+  extractGraphQLQueries: extractGraphQLQueries,
+  extractWebSocketUrls: extractWebSocketUrls,
   showApiEndpoints: showApiEndpoints,
 };
 
 export {
   analyzeSourcemaps,
   extractApiEndpoints,
+  extractGraphQLQueries,
+  extractWebSocketUrls,
   showApiEndpoints,
 };

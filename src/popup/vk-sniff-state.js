@@ -197,6 +197,55 @@ const TECH_SIGNATURES = [
       { source: 'cookies', type: 'regex', value: /thinkphp_session|think_var/i },
     ],
   },
+  {
+    name: 'Remix',
+    category: '框架',
+    matchers: [
+      { source: 'scriptSrc', type: 'regex', value: /build\/remix/i },
+      { source: 'body', type: 'regex', value: /remix[_-](?:context|route|entry|manifest)/i },
+      { source: 'globals', type: 'equals', value: '__remixContext' },
+    ],
+  },
+  {
+    name: 'Astro',
+    category: '框架',
+    matchers: [
+      { source: 'body', type: 'regex', value: /astro-island|astro-slot|data-astro/i },
+      { source: 'scriptSrc', type: 'regex', value: /_astro\//i },
+    ],
+  },
+  {
+    name: 'SvelteKit',
+    category: '框架',
+    matchers: [
+      { source: 'scriptSrc', type: 'regex', value: /\/_app\/immutable\//i },
+      { source: 'globals', type: 'equals', value: '__sveltekit' },
+      { source: 'body', type: 'regex', value: /sveltekit/i },
+    ],
+  },
+  {
+    name: 'Gin',
+    category: '框架',
+    matchers: [{ source: 'headers', type: 'regex', value: /X-Powered-By.*Gin/im }],
+  },
+  {
+    name: 'FastAPI',
+    category: '框架',
+    matchers: [{ source: 'headers', type: 'regex', value: /X-Powered-By.*FastAPI|fastapi/im }],
+  },
+  {
+    name: 'Fiber (Go)',
+    category: '框架',
+    matchers: [{ source: 'headers', type: 'regex', value: /X-Powered-By.*Fiber/im }],
+  },
+  {
+    name: 'NestJS',
+    category: '框架',
+    matchers: [
+      { source: 'headers', type: 'regex', value: /X-Powered-By.*Express/i },
+      { source: 'body', type: 'regex', value: /nest-[A-Z][a-zA-Z]+\.module|@nestjs\//i },
+    ],
+  },
 
   {
     name: '若依框架',
@@ -461,6 +510,79 @@ const TECH_SIGNATURES = [
     matchers: [
       { source: 'classNames', type: 'regex', value: /\bis-[\w-]+\b.*\bcolumn\b|\bnavbar\b/i },
       { source: 'meta', type: 'regex', value: /bulma/i },
+    ],
+  },
+  {
+    name: 'Naive UI',
+    category: 'UI 框架',
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'Naive UI' },
+      { source: 'classNames', type: 'regex', value: /\bn-[a-z]+-\d+\b/i },
+      { source: 'body', type: 'regex', value: /naive-ui|naive-ui-theme/i },
+    ],
+  },
+  {
+    name: 'TDesign',
+    category: 'UI 框架',
+    matchers: [
+      { source: 'classNames', type: 'regex', value: /\bt-[a-z]+__[a-z-]+\b/i },
+      { source: 'body', type: 'regex', value: /tdesign|t-desgin/i },
+      { source: 'scriptSrc', type: 'regex', value: /tdesign/i },
+    ],
+  },
+  {
+    name: 'Arco Design',
+    category: 'UI 框架',
+    matchers: [
+      { source: 'classNames', type: 'regex', value: /\barco-[a-z]+-[a-z]+\b/i },
+      { source: 'body', type: 'regex', value: /arco-design/i },
+      { source: 'scriptSrc', type: 'regex', value: /arco-design/i },
+    ],
+  },
+  {
+    name: 'Semi Design',
+    category: 'UI 框架',
+    matchers: [
+      { source: 'classNames', type: 'regex', value: /\bsemi-[a-z]+-[a-z]+\b/i },
+      { source: 'body', type: 'regex', value: /semi-design|semi[-_]ui/i },
+      { source: 'scriptSrc', type: 'regex', value: /semi[-_]design/i },
+    ],
+  },
+  {
+    name: 'Material UI',
+    category: 'UI 框架',
+    matchers: [
+      { source: 'globals', type: 'equals', value: 'Material-UI' },
+      { source: 'classNames', type: 'regex', value: /\bMui[A-Z][a-zA-Z]+\b/ },
+      { source: 'body', type: 'regex', value: /material-ui|MUI_/i },
+    ],
+  },
+  {
+    name: 'Chakra UI',
+    category: 'UI 框架',
+    matchers: [
+      { source: 'classNames', type: 'regex', value: /\bchakra-[a-z]+\b/i },
+      { source: 'body', type: 'regex', value: /chakra-ui|__chakra/i },
+    ],
+  },
+  {
+    name: 'Radix UI',
+    category: 'UI 框架',
+    matchers: [
+      { source: 'classNames', type: 'regex', value: /\bradix-[a-z]+\b/i },
+      { source: 'body', type: 'regex', value: /radix-ui/i },
+    ],
+  },
+  {
+    name: 'Shadcn/ui',
+    category: 'UI 框架',
+    matchers: [
+      {
+        source: 'classNames',
+        type: 'regex',
+        value:
+          /\b(?:border|bg|text|rounded|p|m|flex|gap)-(?:input|card|btn|badge|alert|dialog|toast|avatar|separator|sheet|dropdown|popover|tooltip|scroll|slider|switch|table|tabs|select|checkbox|radio|form|label|calendar|carousel|collapsible|accordion|command|sidebar|skeleton|sonner|aspect-ratio)\b/i,
+      },
     ],
   },
 

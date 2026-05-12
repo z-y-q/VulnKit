@@ -339,6 +339,12 @@ function renderReport(collected) {
     '<div class="report-findings-header"><span class="stat-badge stat-total">共 ' +
     findings.length +
     ' 项发现</span></div>';
+
+  var mdSummary = generateShortMarkdownSummary(findings, activeModules, totalModules);
+  listHtml += '<div class="report-md-summary">' + utils.escapeHtml(mdSummary) + '</div>';
+
+  listHtml +=
+    '<div style="margin-bottom:8px;text-align:right"><button class="btn btn-sm btn-outline" id="report-copy-summary">复制摘要</button></div>';
   listHtml += '<div class="report-findings-list">';
   for (var i = 0; i < findings.length; i++) {
     var f = findings[i];
@@ -365,6 +371,68 @@ function renderReport(collected) {
   }
   listHtml += '</div>';
   container.innerHTML = listHtml;
+
+  var copyBtn = utils.get('report-copy-summary');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function () {
+      utils.copyText(mdSummary);
+      utils.showToast('摘要已复制到剪贴板', 'success');
+    });
+  }
+}
+
+function generateShortMarkdownSummary(findings, activeModules, totalModules) {
+  var summary = buildSummary(findings);
+  var now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  var domain = '';
+  try {
+    var tab = utils.getActiveTab ? utils.getActiveTab() : null;
+    if (tab && tab.url) domain = new URL(tab.url).hostname;
+  } catch (_) {}
+
+  var lines = [];
+  lines.push('## 灵眸渗透测试摘要');
+  lines.push('');
+  lines.push('- 目标: ' + (domain || '未知'));
+  lines.push('- 时间: ' + now);
+  lines.push('- 覆盖模块: ' + Object.keys(activeModules).length + '/' + totalModules);
+  lines.push('- 发现总数: ' + findings.length);
+  lines.push('');
+
+  if (summary.critical > 0 || summary.high > 0) {
+    lines.push('### 高危发现');
+    var criticalOrHigh = findings.filter(function (f) {
+      return f.severity === 'critical' || f.severity === 'high';
+    });
+    for (var i = 0; i < Math.min(criticalOrHigh.length, 10); i++) {
+      var f = criticalOrHigh[i];
+      var label = f.severity === 'critical' ? '[严重]' : '[高危]';
+      lines.push('- ' + label + ' ' + f.title + ' (' + (MODULE_LABELS[f.module] || f.module) + ')');
+    }
+    if (criticalOrHigh.length > 10) {
+      lines.push('- ... 及其他 ' + (criticalOrHigh.length - 10) + ' 项');
+    }
+    lines.push('');
+  }
+
+  lines.push('### 统计');
+  lines.push('| 严重 | 高危 | 中危 | 低危 | 信息 |');
+  lines.push('|------|------|------|------|------|');
+  lines.push(
+    '| ' +
+      summary.critical +
+      ' | ' +
+      summary.high +
+      ' | ' +
+      summary.medium +
+      ' | ' +
+      summary.low +
+      ' | ' +
+      summary.info +
+      ' |'
+  );
+
+  return lines.join('\n');
 }
 
 function exportHtml(findings) {
@@ -433,6 +501,23 @@ async function handleCollectFindings() {
   }
 }
 
+var FRAMEWORK_AUTO_STEPS = [
+  { name: 'Vue.js', importPath: './vk-vue.js', runFn: 'detectVue', label: 'Vue 框架检测' },
+  { name: 'React', importPath: './vk-react.js', runFn: 'detectReact', label: 'React 框架检测' },
+  {
+    name: 'Angular',
+    importPath: './vk-angular.js',
+    runFn: 'detectAngular',
+    label: 'Angular 框架检测',
+  },
+  {
+    name: 'Svelte',
+    importPath: './vk-svelte.js',
+    runFn: 'detectSvelte',
+    label: 'Svelte 框架检测',
+  },
+];
+
 async function runFullAudit() {
   var statusEl = utils.get('report-status');
   var progressEl = utils.get('report-progress');
@@ -445,9 +530,8 @@ async function runFullAudit() {
   }
   if (progressEl) progressEl.style.display = '';
   if (progressBar) progressBar.style.width = '0%';
-  if (progressText) progressText.textContent = '0/10';
 
-  var steps = [
+  var baseSteps = [
     { importPath: './vk-sniff-scanner.js', runFn: 'runSniffScan', label: '技术栈识别' },
     { importPath: './vk-headers.js', runFn: 'scanSecurityHeaders', label: '安全头检测' },
     { importPath: './vk-xss.js', runFn: 'handleXssHarvest', label: 'XSS 注入点采集' },
@@ -460,11 +544,38 @@ async function runFullAudit() {
     { importPath: './vk-redirect.js', runFn: 'scanRedirects', label: '重定向检测' },
   ];
 
+  var detectedNames = {};
+  var steps = [];
+  for (var b = 0; b < baseSteps.length; b++) {
+    steps.push(baseSteps[b]);
+    if (baseSteps[b].runFn === 'runSniffScan') {
+      try {
+        var sniffMod = await import('./vk-sniff-scanner.js');
+        var sniffState = sniffMod.sniffState || {};
+        var results = sniffState.lastResults || [];
+        for (var r = 0; r < results.length; r++) {
+          detectedNames[results[r].name] = true;
+        }
+        for (var f = 0; f < FRAMEWORK_AUTO_STEPS.length; f++) {
+          var fw = FRAMEWORK_AUTO_STEPS[f];
+          if (detectedNames[fw.name]) {
+            steps.push({ importPath: fw.importPath, runFn: fw.runFn, label: fw.label });
+          }
+        }
+      } catch (_) {
+        /* sniff state unavailable, skip framework auto-detect */
+      }
+    }
+  }
+
+  var totalSteps = steps.length;
+  if (progressText) progressText.textContent = '0/' + totalSteps;
+
   for (var i = 0; i < steps.length; i++) {
     var step = steps[i];
-    var pct = Math.round((i / steps.length) * 100);
+    var pct = Math.round((i / totalSteps) * 100);
     if (progressBar) progressBar.style.width = pct + '%';
-    if (progressText) progressText.textContent = i + 1 + '/' + steps.length;
+    if (progressText) progressText.textContent = i + 1 + '/' + totalSteps;
     if (statusEl) statusEl.textContent = '审计中: ' + step.label + '...';
 
     try {
@@ -481,8 +592,11 @@ async function runFullAudit() {
     });
   }
 
-  if (progressBar) progressBar.style.width = '100%';
-  if (progressText) progressText.textContent = steps.length + '/' + steps.length;
+  if (progressBar) {
+    progressBar.style.width = '100%';
+    progressBar.classList.add('complete');
+  }
+  if (progressText) progressText.textContent = totalSteps + '/' + totalSteps;
 
   await new Promise(function (resolve) {
     setTimeout(resolve, 1000);
@@ -504,6 +618,7 @@ export {
   buildSummary,
   generateHtmlReport,
   generateMarkdownReport,
+  generateShortMarkdownSummary,
   renderReport,
   exportHtml,
   exportMarkdown,

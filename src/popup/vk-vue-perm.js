@@ -97,6 +97,7 @@ async function refreshPermCaptured() {
     S.permCapturedLength = result.length;
     S.permCapturedData = result.items || [];
     renderPermList();
+    autoClassifyAndSuggest();
   } catch (e) {
     utils.showToast('获取捕获数据失败', 'error');
   } finally {
@@ -657,6 +658,37 @@ async function applyPermOverride() {
     utils.showToast(msg, 'success');
   } catch (e) {
     utils.showToast(`应用失败: ${e.message}`, 'error');
+  }
+}
+
+var _autoClassifyTriggered = false;
+
+function autoClassifyAndSuggest() {
+  if (_autoClassifyTriggered || !S.permCapturedData || S.permCapturedData.length === 0) return;
+  var hasZeroOpen = false;
+  var hasSpecialZero = false;
+  for (var i = 0; i < S.permCapturedData.length; i++) {
+    var cls = classifyPermType(S.permCapturedData[i].data);
+    if (cls.type === 'zero-open') hasZeroOpen = true;
+    if (cls.type === 'special-zero') hasSpecialZero = true;
+  }
+  if (S.permCapturedData.length === 1) {
+    S.permSelectedIndex = 0;
+    showPermDetail(0);
+  }
+  if (hasZeroOpen && !S._autoSearchTriggered) {
+    _autoClassifyTriggered = true;
+    S._autoSearchTriggered = true;
+    utils.showToast('检测到 0 开放，自动搜索 JS 菜单定义...', 'info');
+    setTimeout(function () {
+      if (S.JsSearch && typeof S.JsSearch.autoSearchForZeroOpen === 'function') {
+        S.JsSearch.autoSearchForZeroOpen();
+      }
+    }, 800);
+  } else if (hasSpecialZero && !S._autoAdminTriggered) {
+    _autoClassifyTriggered = true;
+    S._autoAdminTriggered = true;
+    utils.showToast('检测到角色控制字段（值=0），可点击「提权至管理员」', 'warning');
   }
 }
 
