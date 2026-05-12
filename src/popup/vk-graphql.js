@@ -3,9 +3,21 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { saveScanResult } from './vk-scan-history.js';
 
 var lastResult = null;
 var scanning = false;
+var currentSort = '';
+
+var GRAPHQL_SORT_FNS = {
+  severity: function (a, b) {
+    var o = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+    return (o[a.severity] || 4) - (o[b.severity] || 4);
+  },
+  type: function (a, b) {
+    return (a.title || '').localeCompare(b.title || '');
+  },
+};
 
 var GRAPHQL_PATHS = [
   '/graphql',
@@ -164,6 +176,9 @@ async function scanGraphQL() {
   var statusEl = utils.get('graphql-status');
   var resultsEl = utils.get('graphql-results');
   var scanBtn = utils.get('graphql-scan-btn');
+  var copyBtn = utils.get('graphql-copy-btn');
+  var copyMdBtn = utils.get('graphql-copy-md-btn');
+  var exportBtn = utils.get('graphql-export-btn');
 
   if (statusEl) statusEl.textContent = '正在探测 GraphQL 端点...';
   if (resultsEl) resultsEl.innerHTML = '';
@@ -400,11 +415,18 @@ async function scanGraphQL() {
 
     renderResults(lastResult);
 
+    utils.getCurrentDomain().then(function (d) {
+      if (d) saveScanResult('graphql', d, getFindings());
+    });
+
     if (statusEl) {
       statusEl.textContent = foundEndpoint
         ? '扫描完成 — 发现 ' + endpoints.length + ' 个端点，' + findings.length + ' 个发现'
         : '扫描完成 — 未发现 GraphQL 端点';
     }
+    if (copyBtn) copyBtn.disabled = false;
+    if (copyMdBtn) copyMdBtn.disabled = false;
+    if (exportBtn) exportBtn.disabled = false;
     return lastResult;
   } catch (e) {
     console.debug('[GraphQL] scan error:', e.message);
@@ -528,9 +550,10 @@ function renderResults(result) {
   }
 
   if (result.findings.length > 0) {
+    var sortedFindings = utils.applySort(result.findings, currentSort, GRAPHQL_SORT_FNS);
     html += '<div class="graphql-section"><div class="graphql-section-title">安全发现</div>';
-    for (var f = 0; f < result.findings.length; f++) {
-      var finding = result.findings[f];
+    for (var f = 0; f < sortedFindings.length; f++) {
+      var finding = sortedFindings[f];
       html += '<div class="graphql-finding-row ' + finding.severity + '">';
       html +=
         '<span class="graphql-badge badge-' +
@@ -604,6 +627,20 @@ function copyResults() {
   utils.copyAndToast(lines.join('\n'));
 }
 
+function copyMarkdown() {
+  if (!lastResult || !lastResult.findings || lastResult.findings.length === 0) {
+    utils.showToast('没有扫描结果或无安全发现', 'warning');
+    return;
+  }
+  var rows = lastResult.findings.map(function (f) {
+    return [f.severity, f.title, f.detail, f.testType || ''];
+  });
+  var md = '# GraphQL Security Scan Results\n\n';
+  md += '**Target:** ' + (lastResult.url || '') + '\n\n';
+  md += utils.buildMarkdownTable(['Severity', 'Title', 'Detail', 'Type'], rows);
+  utils.copyAndToast(md, '已复制 Markdown', 'success');
+}
+
 function exportResults() {
   if (!lastResult) {
     utils.showToast('没有扫描结果', 'warning');
@@ -637,4 +674,17 @@ function getFindings() {
   });
 }
 
-export { scanGraphQL, executeCustomQuery, copyResults, exportResults, getFindings };
+function sortResults(key) {
+  currentSort = key;
+  if (lastResult) renderResults(lastResult);
+}
+
+export {
+  scanGraphQL,
+  executeCustomQuery,
+  copyResults,
+  copyMarkdown,
+  exportResults,
+  getFindings,
+  sortResults,
+};

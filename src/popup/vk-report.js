@@ -187,31 +187,74 @@ function generateHtmlReport(findings) {
   }
   html += '</div>';
 
-  html += '<div class="findings"><h2>发现列表</h2>';
-  for (var i = 0; i < findings.length; i++) {
-    var f = findings[i];
+  // Severity distribution bar
+  if (findings.length > 0) {
     html +=
-      '<div class="finding">' +
-      '<span class="sev-badge" style="background:' +
-      SEV_BG[f.severity] +
-      ';color:' +
-      SEV_COLORS[f.severity] +
-      '">' +
-      SEV_LABELS[f.severity] +
-      '</span>' +
-      '<span class="module-tag">' +
-      utils.escapeHtml(MODULE_LABELS[f.module] || f.module) +
-      '</span>' +
-      '<div class="title">' +
-      utils.escapeHtml(f.title) +
-      '</div>' +
-      '<div class="detail">' +
-      utils.escapeHtml(f.detail) +
-      '</div>' +
-      (f.url ? '<div class="url">' + utils.escapeHtml(f.url) + '</div>' : '') +
-      '</div>';
+      '<div style="margin-bottom:24px"><div style="font-size:13px;color:#aaa;margin-bottom:6px">严重程度分布</div>';
+    html += '<div style="display:flex;border-radius:4px;overflow:hidden;height:24px">';
+    for (var s = 0; s < sevKeys.length; s++) {
+      var sk = sevKeys[s];
+      if (summary[sk] === 0) continue;
+      var pct = Math.max(Math.round((summary[sk] / findings.length) * 100), 2);
+      html +=
+        '<div style="width:' +
+        pct +
+        '%;background:' +
+        SEV_COLORS[sk] +
+        '" title="' +
+        SEV_LABELS[sk] +
+        ': ' +
+        summary[sk] +
+        '"></div>';
+    }
+    html += '</div></div>';
   }
-  html += '</div></body></html>';
+
+  // Module-grouped findings
+  var grouped = {};
+  for (var i = 0; i < findings.length; i++) {
+    var mod = findings[i].module || 'other';
+    if (!grouped[mod]) grouped[mod] = [];
+    grouped[mod].push(findings[i]);
+  }
+  var modKeys = Object.keys(grouped).sort(function (a, b) {
+    return grouped[b].length - grouped[a].length;
+  });
+  for (var m = 0; m < modKeys.length; m++) {
+    var mk = modKeys[m];
+    var items = grouped[mk];
+    html +=
+      '<div class="findings"><h2>' +
+      utils.escapeHtml(MODULE_LABELS[mk] || mk) +
+      ' (' +
+      items.length +
+      ')</h2>';
+    for (var i = 0; i < items.length; i++) {
+      var f = items[i];
+      html +=
+        '<div class="finding">' +
+        '<span class="sev-badge" style="background:' +
+        SEV_BG[f.severity] +
+        ';color:' +
+        SEV_COLORS[f.severity] +
+        '">' +
+        SEV_LABELS[f.severity] +
+        '</span>' +
+        '<span class="module-tag">' +
+        utils.escapeHtml(MODULE_LABELS[f.module] || f.module) +
+        '</span>' +
+        '<div class="title">' +
+        utils.escapeHtml(f.title) +
+        '</div>' +
+        '<div class="detail">' +
+        utils.escapeHtml(f.detail) +
+        '</div>' +
+        (f.url ? '<div class="url">' + utils.escapeHtml(f.url) + '</div>' : '') +
+        '</div>';
+    }
+    html += '</div>';
+  }
+  html += '</body></html>';
 
   return html;
 }
@@ -463,6 +506,40 @@ function exportMarkdown(findings) {
   utils.showToast('Markdown 报告已导出', 'success');
 }
 
+function exportJson(collected) {
+  var findings = collected ? collected.findings : null;
+  var activeModules = collected ? collected.activeModules : {};
+  var summary = findings ? buildSummary(findings) : {};
+  var now = new Date().toISOString();
+  var domain = '';
+  try {
+    var tab = utils.getActiveTab ? utils.getActiveTab() : null;
+    if (tab && tab.url) domain = new URL(tab.url).hostname;
+  } catch (_) {}
+
+  var report = {
+    tool: '灵眸 VulnKit',
+    version: '5.0.0',
+    target: domain || '未知',
+    timestamp: now,
+    summary: summary,
+    activeModules: activeModules,
+    totalModules: collected ? collected.totalModules : 0,
+    findings: findings || [],
+  };
+  var json = JSON.stringify(report, null, 2);
+  var blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'lingmou-report-' + Date.now() + '.json';
+  a.click();
+  setTimeout(function () {
+    URL.revokeObjectURL(url);
+  }, 1000);
+  utils.showToast('JSON 报告已导出', 'success');
+}
+
 var _lastCollectedFindings = null;
 
 async function handleCollectFindings() {
@@ -622,6 +699,7 @@ export {
   renderReport,
   exportHtml,
   exportMarkdown,
+  exportJson,
   handleCollectFindings,
   runFullAudit,
   getLastFindings,

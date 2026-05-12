@@ -2,6 +2,7 @@
 // Open Redirect vulnerability detection
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { saveScanResult } from './vk-scan-history.js';
 
 var REDIRECT_PAYLOADS = [
   { param: 'url', pattern: '?url={URL}' },
@@ -61,6 +62,16 @@ var PROTOCOL_VARIANTS = [
 
 var TEST_DOMAIN = 'example.com';
 
+var REDIRECT_SORT_FNS = {
+  status: function (a, b) {
+    var o = { vulnerable: 0, safe: 1 };
+    return (o[a.status] || 1) - (o[b.status] || 1);
+  },
+  param: function (a, b) {
+    return (a.param || '').localeCompare(b.param || '');
+  },
+};
+
 var redirectState = {
   scanning: false,
   aborted: false,
@@ -68,6 +79,7 @@ var redirectState = {
   lastResults: null,
   currentFilter: 'all',
   currentSearch: '',
+  currentSort: '',
 };
 
 function buildTestUrls(baseUrl) {
@@ -239,6 +251,9 @@ async function scanRedirects(baseUrl, concurrency, onProgress) {
       errors: errors,
       total: total,
     };
+    utils.getCurrentDomain().then(function (d) {
+      if (d) saveScanResult('redirect', d, getFindings());
+    });
     return redirectState.lastResults;
   } finally {
     redirectState.scanning = false;
@@ -298,6 +313,7 @@ function renderRedirectResults(result) {
   var container = utils.get('redirect-results');
   var statsEl = utils.get('redirect-stats');
   var exportBtn = utils.get('redirect-export-btn');
+  var copyMdBtn = utils.get('redirect-copy-md-btn');
 
   if (!container || !result) return;
 
@@ -319,17 +335,19 @@ function renderRedirectResults(result) {
   }
 
   var filtered = redirectState.results.filter(applyFilter);
+  var sorted = utils.applySort(filtered, redirectState.currentSort, REDIRECT_SORT_FNS);
 
-  if (filtered.length === 0) {
+  if (sorted.length === 0) {
     container.innerHTML = '<div class="empty-state">无匹配结果</div>';
     if (exportBtn) exportBtn.hidden = false;
+    if (copyMdBtn) copyMdBtn.hidden = false;
     return;
   }
 
   var html = '';
   var seenParams = {};
-  for (var i = 0; i < filtered.length; i++) {
-    var item = filtered[i];
+  for (var i = 0; i < sorted.length; i++) {
+    var item = sorted[i];
     if (item.type === 'vulnerable' && seenParams[item.param]) continue;
     if (item.type === 'vulnerable') seenParams[item.param] = true;
 
@@ -366,6 +384,7 @@ function renderRedirectResults(result) {
 
   container.innerHTML = html;
   if (exportBtn) exportBtn.hidden = false;
+  if (copyMdBtn) copyMdBtn.hidden = false;
 }
 
 function exportTxt() {
@@ -440,6 +459,30 @@ function getFindings() {
   return findings;
 }
 
+function copyMarkdown() {
+  if (
+    !redirectState.lastResults ||
+    !redirectState.lastResults.vulnerable ||
+    redirectState.lastResults.vulnerable.length === 0
+  ) {
+    utils.showToast('无可利用结果可复制', 'warning');
+    return;
+  }
+  var headers = ['Parameter', 'Variant', 'URL', 'Status', 'Location'];
+  var rows = [];
+  for (var i = 0; i < redirectState.lastResults.vulnerable.length; i++) {
+    var v = redirectState.lastResults.vulnerable[i];
+    rows.push([v.param, v.variant, v.url, v.status, v.location]);
+  }
+  var markdown = utils.buildMarkdownTable(headers, rows);
+  utils.copyAndToast(markdown);
+}
+
+function sortResults(key) {
+  redirectState.currentSort = key;
+  if (redirectState.lastResults) renderRedirectResults(redirectState.lastResults);
+}
+
 export {
   redirectState,
   scanRedirects,
@@ -447,6 +490,8 @@ export {
   renderRedirectResults,
   exportRedirectResults,
   getFindings,
+  copyMarkdown,
   setFilter,
   setSearch,
+  sortResults,
 };

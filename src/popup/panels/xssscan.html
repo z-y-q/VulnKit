@@ -21,6 +21,7 @@
           <button class="xssscan-filter-btn" data-xfilter="url">URL</button>
           <button class="xssscan-filter-btn" data-xfilter="ajax">AJAX</button>
           <input type="text" id="xssscan-search" class="input xssscan-filter-search" placeholder="搜索URL/参数...">
+          <select id="xssscan-sort" class="sort-select"><option value="">排序</option><option value="source">来源</option><option value="url">URL</option><option value="param">参数</option></select>
         </div>
         <div class="xssscan-count" id="xssscan-count"></div>
         <div class="xssscan-results" id="xssscan-results">
@@ -56,6 +57,7 @@
             <button class="btn btn-sm btn-secondary" id="xssscan-verify-btn">验证反射</button>
             <button class="btn btn-sm btn-outline" id="xssscan-copyall-btn">复制所有URL</button>
             <button class="btn btn-sm btn-outline" id="xssscan-export-btn">导出</button>
+            <button class="btn btn-sm btn-outline" id="xssscan-copy-md-btn" hidden>Markdown</button>
             <button class="btn btn-sm btn-outline" id="xss-send-console-btn" hidden>发送到 Console</button>
           </div>
         </div>

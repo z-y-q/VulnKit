@@ -237,3 +237,17 @@
 .graphql-response.has-response {
   display: block;
 }
+
+/* Dark theme */
+[data-theme='dark'] .graphql-finding-row.high {
+  background: rgba(230, 126, 34, 0.15);
+}
+[data-theme='dark'] .graphql-finding-row.medium {
+  background: rgba(243, 156, 18, 0.15);
+}
+[data-theme='dark'] .graphql-finding-row.low {
+  background: rgba(52, 152, 219, 0.15);
+}
+[data-theme='dark'] .graphql-finding-row.info {
+  background: var(--bg-tertiary);
+}

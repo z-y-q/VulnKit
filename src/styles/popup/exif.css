@@ -279,3 +279,5 @@
 [data-theme='dark'] .exif-page-item:hover { background: var(--bg-tertiary); }
 [data-theme='dark'] .exif-page-thumb { border-color: var(--border-color); background: var(--bg-input); }
 [data-theme='dark'] .exif-page-src { color: var(--text-primary); }
+[data-theme='dark'] .exif-page-count { color: var(--text-secondary); }
+[data-theme='dark'] .exif-page-info { color: var(--text-secondary); }

@@ -2,6 +2,7 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { saveScanResult } from './vk-scan-history.js';
 
 let lastSubdomains = [];
 let lastBaseDomain = '';
@@ -9,6 +10,15 @@ let dnsScanActive = false;
 let dnsScanAborted = false;
 let currentFilter = 'all';
 let currentSearch = '';
+let currentSort = '';
+var SUBDOMAIN_SORT_FNS = {
+  name: function (a, b) {
+    return a.host.localeCompare(b.host);
+  },
+  source: function (a, b) {
+    return a.source.localeCompare(b.source);
+  },
+};
 let scanStartTime = 0;
 const CT_TIMEOUT_MS = 30000;
 const DNS_BATCH_SIZE = 10;
@@ -175,6 +185,7 @@ function collectSubdomains() {
   const statusEl = utils.get('subdomain-status');
   const resultsEl = utils.get('subdomain-results');
   const copyBtn = utils.get('subdomain-copy-btn');
+  const copyMdBtn = utils.get('subdomain-copy-md-btn');
   const exportBtn = utils.get('subdomain-export-btn');
 
   if (statusEl) statusEl.textContent = '正在通过证书透明度收集子域名...';
@@ -228,6 +239,7 @@ function collectSubdomains() {
         if (statusEl) statusEl.textContent = statusText;
         renderSubdomains(lastSubdomains, baseDomain);
         if (copyBtn) copyBtn.hidden = false;
+        if (copyMdBtn) copyMdBtn.hidden = false;
         if (exportBtn) exportBtn.hidden = false;
       })
       .catch(function (e) {
@@ -241,6 +253,7 @@ function extractFromPage() {
   const statusEl = utils.get('subdomain-status');
   const resultsEl = utils.get('subdomain-results');
   const copyBtn = utils.get('subdomain-copy-btn');
+  const copyMdBtn = utils.get('subdomain-copy-md-btn');
   const exportBtn = utils.get('subdomain-export-btn');
 
   if (statusEl) statusEl.textContent = '正在从页面提取子域名...';
@@ -306,6 +319,7 @@ function extractFromPage() {
               statusEl.textContent = `页面提取完成: 新增 ${pageSubdomains.length}，共 ${lastSubdomains.length} 个子域名`;
             renderSubdomains(lastSubdomains, baseDomain);
             if (copyBtn) copyBtn.hidden = false;
+            if (copyMdBtn) copyMdBtn.hidden = false;
             if (exportBtn) exportBtn.hidden = false;
           });
         });
@@ -320,6 +334,7 @@ function extractFromPage() {
 async function collectFromCertspotter() {
   var statusEl = utils.get('subdomain-status');
   var copyBtn = utils.get('subdomain-copy-btn');
+  var copyMdBtn = utils.get('subdomain-copy-md-btn');
   var exportBtn = utils.get('subdomain-export-btn');
 
   if (statusEl) statusEl.textContent = '正在通过 CertSpotter 收集子域名...';
@@ -368,6 +383,7 @@ async function collectFromCertspotter() {
         ' 个子域名';
     renderSubdomains(lastSubdomains, lastBaseDomain);
     if (copyBtn) copyBtn.hidden = false;
+    if (copyMdBtn) copyMdBtn.hidden = false;
     if (exportBtn) exportBtn.hidden = false;
   } catch (e) {
     if (statusEl) statusEl.textContent = 'CertSpotter 查询失败: ' + (e.message || e);
@@ -377,6 +393,7 @@ async function collectFromCertspotter() {
 async function collectFromWebArchive() {
   var statusEl = utils.get('subdomain-status');
   var copyBtn = utils.get('subdomain-copy-btn');
+  var copyMdBtn = utils.get('subdomain-copy-md-btn');
   var exportBtn = utils.get('subdomain-export-btn');
 
   if (statusEl) statusEl.textContent = '正在通过 Wayback Machine 收集子域名...';
@@ -424,6 +441,7 @@ async function collectFromWebArchive() {
         'Wayback 完成: 新增 ' + newDomains.length + '，共 ' + lastSubdomains.length + ' 个子域名';
     renderSubdomains(lastSubdomains, lastBaseDomain);
     if (copyBtn) copyBtn.hidden = false;
+    if (copyMdBtn) copyMdBtn.hidden = false;
     if (exportBtn) exportBtn.hidden = false;
   } catch (e) {
     if (statusEl) statusEl.textContent = 'Wayback 查询失败: ' + (e.message || e);
@@ -433,6 +451,7 @@ async function collectFromWebArchive() {
 async function collectFromDnsRecords() {
   var statusEl = utils.get('subdomain-status');
   var copyBtn = utils.get('subdomain-copy-btn');
+  var copyMdBtn = utils.get('subdomain-copy-md-btn');
   var exportBtn = utils.get('subdomain-export-btn');
 
   if (statusEl) statusEl.textContent = '正在枚举 DNS 记录...';
@@ -483,6 +502,7 @@ async function collectFromDnsRecords() {
       'DNS 记录枚举完成: 新增 ' + newDomains.length + '，共 ' + lastSubdomains.length + ' 个子域名';
   renderSubdomains(lastSubdomains, lastBaseDomain);
   if (copyBtn) copyBtn.hidden = false;
+  if (copyMdBtn) copyMdBtn.hidden = false;
   if (exportBtn) exportBtn.hidden = false;
 }
 
@@ -567,7 +587,8 @@ function applyFilter() {
     if (currentSearch && s.host.indexOf(currentSearch) === -1) return false;
     return true;
   });
-  renderSubdomains(filtered, lastBaseDomain);
+  var sorted = utils.applySort(filtered, currentSort, SUBDOMAIN_SORT_FNS);
+  renderSubdomains(sorted, lastBaseDomain);
 }
 
 function renderSubdomains(subdomains, baseDomain) {
@@ -676,6 +697,20 @@ function copyResults() {
     })
     .join('\n');
   utils.copyAndToast(text, `已复制 ${lastSubdomains.length} 个子域名`);
+}
+
+function copyMarkdown() {
+  if (lastSubdomains.length === 0) {
+    utils.showToast('没有可复制的结果', 'warning');
+    return;
+  }
+  var rows = lastSubdomains.map(function (s) {
+    return [s.host, sourceLabel(s.source), s.ip || ''];
+  });
+  var md = '# Subdomain Collection Results\n\n';
+  md += '**Domain:** ' + lastBaseDomain + '\n\n';
+  md += utils.buildMarkdownTable(['Host', 'Source', 'IP'], rows);
+  utils.copyAndToast(md, '已复制 Markdown', 'success');
 }
 
 function exportResults() {
@@ -838,6 +873,7 @@ function mergeScanResults(newDomains) {
 async function bruteForceHttpProbe() {
   let statusEl = utils.get('subdomain-status');
   let copyBtn = utils.get('subdomain-copy-btn');
+  let copyMdBtn = utils.get('subdomain-copy-md-btn');
   let exportBtn = utils.get('subdomain-export-btn');
 
   if (dnsScanActive) {
@@ -905,6 +941,7 @@ async function bruteForceHttpProbe() {
   dnsScanActive = false;
   renderSubdomains(lastSubdomains, baseDomain);
   if (copyBtn) copyBtn.hidden = false;
+  if (copyMdBtn) copyMdBtn.hidden = false;
   if (exportBtn) exportBtn.hidden = false;
 }
 
@@ -1011,6 +1048,7 @@ async function runAllScans() {
   }
   let statusEl = utils.get('subdomain-status');
   let copyBtn = utils.get('subdomain-copy-btn');
+  let copyMdBtn = utils.get('subdomain-copy-md-btn');
   let exportBtn = utils.get('subdomain-export-btn');
   let allBtn = utils.get('subdomain-all-btn');
   if (allBtn) {
@@ -1046,11 +1084,15 @@ async function runAllScans() {
     }
   }
   if (copyBtn) copyBtn.hidden = false;
+  if (copyMdBtn) copyMdBtn.hidden = false;
   if (exportBtn) exportBtn.hidden = false;
   if (allBtn) {
     allBtn.disabled = false;
     allBtn.textContent = '一键全部';
   }
+  utils.getCurrentDomain().then(function (d) {
+    if (d) saveScanResult('subdomain', d, getFindings());
+  });
 }
 
 function getFindings() {
@@ -1080,6 +1122,11 @@ function sendToFuzz() {
   utils.showToast('已发送 ' + lastSubdomains.length + ' 个子域名到目录扫描', 'success');
 }
 
+function sortResults(key) {
+  currentSort = key;
+  applyFilter();
+}
+
 export {
   collectSubdomains,
   extractFromPage,
@@ -1089,10 +1136,12 @@ export {
   bruteForceHttpProbe as bruteForceDns,
   bruteForceHttpProbe,
   copyResults,
+  copyMarkdown,
   exportResults,
   filterBySource,
   searchResults,
   runAllScans,
   getFindings,
   sendToFuzz,
+  sortResults,
 };

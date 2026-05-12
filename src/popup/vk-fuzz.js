@@ -2,6 +2,7 @@
 // Directory / Path brute-force enumeration
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { saveScanResult } from './vk-scan-history.js';
 
 var DEFAULT_WORDLISTS = {
   common: [
@@ -256,6 +257,18 @@ var CONTENT_PATTERNS = [
   { regex: /docker|kubernetes|k8s/i, tag: '容器特征', group: 'infoleak' },
 ];
 
+var FUZZ_SORT_FNS = {
+  status: function (a, b) {
+    return a.status - b.status;
+  },
+  size: function (a, b) {
+    return b.size - a.size;
+  },
+  time: function (a, b) {
+    return a.time - b.time;
+  },
+};
+
 var fuzzState = {
   scanning: false,
   paused: false,
@@ -265,6 +278,7 @@ var fuzzState = {
   stats: { total: 0, completed: 0, found: 0, errors: 0 },
   currentFilter: 'all',
   currentSearch: '',
+  currentSort: '',
 };
 
 function extractHeader(headers, name) {
@@ -443,6 +457,9 @@ async function runFuzzScan(baseUrl, wordlistKey, concurrency, onProgress, onResu
       results: fuzzState.results,
       stats: Object.assign({}, fuzzState.stats),
     };
+    utils.getCurrentDomain().then(function (d) {
+      if (d) saveScanResult('fuzz', d, getFindings());
+    });
     return fuzzState.lastResults;
   } finally {
     fuzzState.scanning = false;
@@ -499,6 +516,8 @@ function renderFuzzResults(result) {
   var container = utils.get('fuzz-results');
   var statsEl = utils.get('fuzz-stats');
   var exportBtn = utils.get('fuzz-export-btn');
+  var copyMdBtn = utils.get('fuzz-copy-md-btn');
+  var copyCurlBtn = utils.get('fuzz-copy-curl-btn');
 
   if (!container || !result) return;
 
@@ -522,17 +541,22 @@ function renderFuzzResults(result) {
   if (found.length === 0) {
     container.innerHTML = '<div class="empty-state">无匹配结果</div>';
     if (exportBtn) exportBtn.hidden = false;
+    if (copyMdBtn) copyMdBtn.hidden = false;
+    if (copyCurlBtn) copyCurlBtn.hidden = false;
     return;
   }
 
-  found.sort(function (a, b) {
-    if (a.status !== b.status) return a.status - b.status;
-    return b.size - a.size;
-  });
+  var sorted = utils.applySort(found, fuzzState.currentSort, FUZZ_SORT_FNS);
+  if (!fuzzState.currentSort) {
+    sorted.sort(function (a, b) {
+      if (a.status !== b.status) return a.status - b.status;
+      return b.size - a.size;
+    });
+  }
 
   var html = '';
-  for (var i = 0; i < found.length; i++) {
-    var r = found[i];
+  for (var i = 0; i < sorted.length; i++) {
+    var r = sorted[i];
     var statusClass = 's-' + (r.status < 600 ? r.status : 'other');
     if (r.status >= 200 && r.status < 300) statusClass = 's-200';
     else if (r.status >= 300 && r.status < 400) statusClass = r.status === 301 ? 's-301' : 's-302';
@@ -580,6 +604,8 @@ function renderFuzzResults(result) {
 
   container.innerHTML = html;
   if (exportBtn) exportBtn.hidden = false;
+  if (copyMdBtn) copyMdBtn.hidden = false;
+  if (copyCurlBtn) copyCurlBtn.hidden = false;
 }
 
 function exportTxt() {
@@ -691,6 +717,41 @@ function setFuzzTarget(url) {
   if (input) input.value = url;
 }
 
+function copyMarkdown() {
+  if (!fuzzState.lastResults) return;
+  var found = fuzzState.lastResults.results.filter(function (r) {
+    return r.status > 0 && r.status !== 404;
+  });
+  if (found.length === 0) {
+    utils.showToast('没有可复制的结果', 'warning');
+    return;
+  }
+  var lines = ['| Path | Status | Size | Time |', '| --- | --- | --- | --- |'];
+  for (var i = 0; i < found.length; i++) {
+    var e = found[i];
+    lines.push('| ' + e.path + ' | ' + e.status + ' | ' + e.size + ' | ' + e.time + ' |');
+  }
+  utils.copyAndToast(lines.join('\n'), '已复制 Markdown 表格', 'success');
+}
+
+function copyCurl() {
+  if (!fuzzState.lastResults) return;
+  var found = fuzzState.lastResults.results.filter(function (r) {
+    return r.status > 0 && r.status !== 404;
+  });
+  if (found.length === 0) {
+    utils.showToast('没有可复制的结果', 'warning');
+    return;
+  }
+  var cmds = utils.buildCurlCommands(found, { urlKey: 'url' });
+  utils.copyAndToast(cmds, '已复制 cURL', 'success');
+}
+
+function sortResults(key) {
+  fuzzState.currentSort = key;
+  if (fuzzState.lastResults) renderFuzzResults(fuzzState.lastResults);
+}
+
 export {
   DEFAULT_WORDLISTS,
   fuzzState,
@@ -699,8 +760,11 @@ export {
   stopFuzzScan,
   renderFuzzResults,
   exportFuzzResults,
+  copyMarkdown,
+  copyCurl,
   getFindings,
   setFilter,
   setSearch,
   setFuzzTarget,
+  sortResults,
 };

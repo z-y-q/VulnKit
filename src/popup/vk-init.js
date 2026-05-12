@@ -149,7 +149,17 @@ function initStatusBarAndKeyboard() {
 function initTheme() {
   var themes = ['light', 'dark'];
   var savedTheme = localStorage.getItem('pentest-theme');
-  if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  } else {
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+    document.documentElement.setAttribute('data-theme', prefersDark.matches ? 'dark' : 'light');
+    prefersDark.addEventListener('change', function (e) {
+      if (!localStorage.getItem('pentest-theme')) {
+        document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+      }
+    });
+  }
   utils.bindClick('settings-btn', function () {
     chrome.runtime.openOptionsPage();
   });
@@ -284,6 +294,53 @@ function initContextMenu() {
   });
 }
 
+// ====== Context scan from right-click menu ======
+function handleContextScan() {
+  chrome.storage.local.get(['contextScan'], function (data) {
+    if (!data.contextScan) return;
+    var scan = data.contextScan;
+    var module = scan.module;
+    var url = scan.url;
+    chrome.storage.local.remove(['contextScan']);
+    chrome.action.setBadgeText({ text: '' });
+
+    // Find and click the matching tab button
+    var tabBtn = document.querySelector('.tab-btn[data-panel="' + module + '"]');
+    if (!tabBtn) return;
+    tabBtn.click();
+
+    // After panel loads, fill URL and trigger scan
+    setTimeout(function () {
+      var urlInputMap = {
+        cors: 'cors-url',
+        headers: 'headers-url',
+        redirect: 'redirect-url',
+      };
+      var urlInputId = urlInputMap[module];
+      if (urlInputId) {
+        var urlInput = utils.get(urlInputId);
+        if (urlInput) urlInput.value = url;
+      }
+
+      // Auto-trigger scan after a short delay for the panel to initialize
+      setTimeout(function () {
+        var btnMap = {
+          cors: 'cors-scan-btn',
+          waf: 'waf-scan-btn',
+          headers: 'headers-scan-btn',
+          redirect: 'redirect-scan-btn',
+          subdomain: 'subdomain-scan-btn',
+        };
+        var btnId = btnMap[module];
+        if (btnId) {
+          var btn = utils.get(btnId);
+          if (btn && !btn.disabled) btn.click();
+        }
+      }, 300);
+    }, 200);
+  });
+}
+
 // ====== Settings restoration (lazy encoding/asset) ======
 function initSettings(savedState) {
   if (savedState && savedState['encoding-subtab']) {
@@ -367,6 +424,7 @@ async function initApp() {
   await utils.loadSettings();
   initTheme();
   initContextMenu();
+  handleContextScan();
   var savedState = await utils.restoreUIState();
   initSettings(savedState);
   initTabPagination();

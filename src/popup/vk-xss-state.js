@@ -4,6 +4,7 @@
 let xssPoints = [];
 let xssFilterType = 'all';
 let xssSearchText = '';
+let xssSortKey = '';
 let xssInterceptTimer = null;
 let xssInterceptActive = false;
 let xssInterceptCountdown = 0;
@@ -22,19 +23,39 @@ chrome.storage.onChanged.addListener(function (changes, area) {
   }
 });
 
-function setXssPointsVal(v) { xssPoints = v; }
-function appendXssPoints(newPoints) { xssPoints = [...xssPoints, ...newPoints]; }
-function setXssFilterType(v) { xssFilterType = v; }
-function setXssSearchText(v) { xssSearchText = v; }
-function setXssInterceptTimer(v) { xssInterceptTimer = v; }
-function setXssInterceptActive(v) { xssInterceptActive = v; }
-function setXssInterceptCountdown(v) { xssInterceptCountdown = v; }
-function setLastVerifyResults(v) { lastVerifyResults = v; }
+function setXssPointsVal(v) {
+  xssPoints = v;
+}
+function appendXssPoints(newPoints) {
+  xssPoints = [...xssPoints, ...newPoints];
+}
+function setXssFilterType(v) {
+  xssFilterType = v;
+}
+function setXssSearchText(v) {
+  xssSearchText = v;
+}
+function setXssSortKey(v) {
+  xssSortKey = v;
+}
+function setXssInterceptTimer(v) {
+  xssInterceptTimer = v;
+}
+function setXssInterceptActive(v) {
+  xssInterceptActive = v;
+}
+function setXssInterceptCountdown(v) {
+  xssInterceptCountdown = v;
+}
+function setLastVerifyResults(v) {
+  lastVerifyResults = v;
+}
 
 export {
   xssPoints,
   xssFilterType,
   xssSearchText,
+  xssSortKey,
   xssInterceptTimer,
   xssInterceptActive,
   xssInterceptCountdown,
@@ -44,6 +65,7 @@ export {
   appendXssPoints,
   setXssFilterType,
   setXssSearchText,
+  setXssSortKey,
   setXssInterceptTimer,
   setXssInterceptActive,
   setXssInterceptCountdown,

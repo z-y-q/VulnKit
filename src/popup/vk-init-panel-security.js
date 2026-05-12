@@ -46,7 +46,12 @@ function initSecurityDetectors2(bindFilterSearch) {
           headers.exportHeadersResults(format);
         });
 
+        utils.bindClick('headers-copy-md-btn', headers.copyMarkdown);
+
         bindFilterSearch('#headers-filter-row .filter-btn', 'headers-search', headers);
+        utils.on('headers-sort', 'change', function () {
+          headers.sortResults(this.value);
+        });
       })();
 
       // --- Open Redirect ---
@@ -101,7 +106,12 @@ function initSecurityDetectors2(bindFilterSearch) {
           redirect.exportRedirectResults(format);
         });
 
+        utils.bindClick('redirect-copy-md-btn', redirect.copyMarkdown);
+
         bindFilterSearch('#redirect-filter-row .filter-btn', 'redirect-search', redirect);
+        utils.on('redirect-sort', 'change', function () {
+          redirect.sortResults(this.value);
+        });
       })();
 
       // --- Directory Fuzzing ---
@@ -195,6 +205,11 @@ function initSecurityDetectors2(bindFilterSearch) {
         utils.bindClick('fuzz-export-btn', function () {
           var format = (utils.get('fuzz-export-format') || {}).value || 'txt';
           fuzz.exportFuzzResults(format);
+        });
+        utils.bindClick('fuzz-copy-md-btn', fuzz.copyMarkdown);
+        utils.bindClick('fuzz-copy-curl-btn', fuzz.copyCurl);
+        utils.on('fuzz-sort', 'change', function () {
+          fuzz.sortResults(this.value);
         });
       })();
     }

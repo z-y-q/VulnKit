@@ -356,6 +356,7 @@ function initXssAndSourcemap(bindFilterSearch) {
     utils.bindClick('xssscan-verify-btn', xss.handleVerifyReflection);
     utils.bindClick('xssscan-open-reflected-btn', xss.handleOpenReflected);
     utils.bindClick('xssscan-copyall-btn', xss.handleCopyXssUrls);
+    utils.bindClick('xssscan-copy-md-btn', xss.copyMarkdown);
     utils.bindClick('xssscan-export-btn', xss.xssExportData);
     utils.bindClick('xss-send-console-btn', xss.sendToConsole);
     utils.bindClick('xssscan-sink-btn', xss.analyzeDomSinks);
@@ -363,6 +364,9 @@ function initXssAndSourcemap(bindFilterSearch) {
     utils.bindClick('xssscan-autofuzz-stop-btn', xss.handleStopAutoFuzz);
     utils.bindClick('xssscan-autofuzz-export-btn', xss.handleAutoFuzzExport);
     utils.bindClick('xssscan-poc-btn', xss.handleGeneratePoc);
+    utils.on('xssscan-sort', 'change', function () {
+      xss.sortResults(this.value);
+    });
     utils.bindClick('xssscan-sink-clear-btn', function () {
       utils.setEmpty('xssscan-sink-results', '暂无分析结果');
       var st = utils.get('xssscan-sink-status');
@@ -409,7 +413,11 @@ function initXssAndSourcemap(bindFilterSearch) {
 }
 
 function initReport() {
-  import('./vk-report.js').then(function (report) {
+  Promise.all([import('./vk-report.js'), import('./vk-scan-history.js')]).then(function (mods) {
+    var report = mods[0];
+    var scanHistory = mods[1];
+    scanHistory.renderHistoryContainer();
+
     utils.bindClick('report-collect-btn', report.handleCollectFindings);
 
     utils.bindClick('report-audit-btn', async function () {
@@ -442,6 +450,15 @@ function initReport() {
         return;
       }
       report.exportMarkdown(findings);
+    });
+
+    utils.bindClick('report-export-json-btn', function () {
+      var collected = report.getLastFindings();
+      if (!collected || !collected.findings || collected.findings.length === 0) {
+        utils.showToast('没有可导出的结果', 'warning');
+        return;
+      }
+      report.exportJson(collected);
     });
   });
 }

@@ -4,7 +4,13 @@
 import { utilsProxy as utils } from './vk-namespace.js';
 import { CATEGORY_LABELS, CATEGORY_ICONS, STATUS_ICONS } from './vk-headers-data.js';
 
-function renderHeadersResults(analysis, lastAnalysisResult, currentFilter, currentSearch) {
+function renderHeadersResults(
+  analysis,
+  lastAnalysisResult,
+  currentFilter,
+  currentSearch,
+  currentSort
+) {
   var container = utils.get('headers-results');
   var scoreContainer = utils.get('headers-score-container');
   var gradeEl = utils.get('headers-grade');
@@ -12,6 +18,7 @@ function renderHeadersResults(analysis, lastAnalysisResult, currentFilter, curre
   var scoreText = utils.get('headers-score-text');
   var summaryEl = utils.get('headers-summary');
   var exportBtn = utils.get('headers-export-btn');
+  var copyMdBtn = utils.get('headers-copy-md-btn');
 
   if (!container || !analysis) return;
 
@@ -45,6 +52,16 @@ function renderHeadersResults(analysis, lastAnalysisResult, currentFilter, curre
   var filtered = analysis.results.filter(function (r) {
     return applyHeaderFilter(r, currentFilter, currentSearch);
   });
+  var sortFns = {
+    status: function (a, b) {
+      var o = { missing: 0, warn: 1, pass: 2 };
+      return (o[a.status] || 2) - (o[b.status] || 2);
+    },
+    name: function (a, b) {
+      return (a.header || '').localeCompare(b.header || '');
+    },
+  };
+  filtered = utils.applySort(filtered, currentSort, sortFns);
   var grouped = groupByCategory(filtered);
 
   var html = '';
@@ -189,6 +206,7 @@ function renderHeadersResults(analysis, lastAnalysisResult, currentFilter, curre
 
   container.innerHTML = html;
   if (exportBtn) exportBtn.hidden = false;
+  if (copyMdBtn) copyMdBtn.hidden = false;
 }
 
 function groupByCategory(results) {

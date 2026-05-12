@@ -20,6 +20,7 @@
       <button class="filter-btn" data-filter="vulnerable">可利用</button>
       <button class="filter-btn" data-filter="safe">安全</button>
       <input type="text" id="redirect-search" class="filter-search" placeholder="搜索参数/URL...">
+      <select id="redirect-sort" class="sort-select"><option value="">排序</option><option value="status">状态（可利用优先）</option><option value="param">参数</option></select>
     </div>
     <div class="redirect-results" id="redirect-results">
       <div class="empty-state">点击「开始扫描」检测 URL 中的开放重定向漏洞</div>
@@ -30,6 +31,7 @@
         <option value="csv">CSV</option>
       </select>
       <button class="btn btn-outline" id="redirect-export-btn" hidden>导出结果</button>
+      <button class="btn btn-sm btn-outline" id="redirect-copy-md-btn" hidden>Markdown</button>
     </div>
   </div>
 </div>

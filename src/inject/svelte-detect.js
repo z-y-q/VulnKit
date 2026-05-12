@@ -53,7 +53,7 @@
 
   // SvelteKit specific: data-sveltekit attributes
   var kitElements = document.querySelectorAll(
-    '[data-sveltekit-*], [data-sveltekit], [class*="sveltekit"]'
+    '[data-sveltekit-preload-data], [data-sveltekit-reload], [data-sveltekit-ignore], [class*="sveltekit"]'
   );
   if (kitElements.length > 0) {
     result.detected = true;

@@ -252,6 +252,7 @@ function initSecurityDetectors() {
 
     utils.bindClick('waf-scan-btn', waf.scanWaf);
     utils.bindClick('waf-copy-btn', waf.copyResults);
+    utils.bindClick('waf-copy-md-btn', waf.copyMarkdown);
     utils.bindClick('waf-export-btn', waf.exportResults);
     utils.on('waf-search', 'input', function () {
       waf.searchResults(this.value.trim());
@@ -265,9 +266,13 @@ function initSecurityDetectors() {
         waf.filterByStatus(btn.dataset.wfilter);
       });
     });
+    utils.on('waf-sort', 'change', function () {
+      waf.sortResults(this.value);
+    });
 
     utils.bindClick('cookie-audit-btn', cookieAudit.auditCookies);
     utils.bindClick('cookie-audit-copy-btn', cookieAudit.copyResults);
+    utils.bindClick('cookie-audit-copy-md-btn', cookieAudit.copyMarkdown);
     utils.bindClick('cookie-audit-export-btn', cookieAudit.exportResults);
     utils.on('cookie-audit-search', 'input', function () {
       cookieAudit.searchResults(this.value.trim());
@@ -280,6 +285,9 @@ function initSecurityDetectors() {
         btn.classList.add('active');
         cookieAudit.filterBySeverity(btn.dataset.cafilter);
       });
+    });
+    utils.on('cookie-audit-sort', 'change', function () {
+      cookieAudit.sortResults(this.value);
     });
 
     react.initSubTabs();
@@ -355,6 +363,7 @@ function initNetworkTools() {
 
     utils.bindClick('cors-scan-btn', cors.scanCors);
     utils.bindClick('cors-copy-btn', cors.copyResults);
+    utils.bindClick('cors-copy-md-btn', cors.copyMarkdown);
     utils.bindClick('cors-export-btn', cors.exportJson);
     utils.on('cors-search', 'input', function () {
       cors.searchResults(this.value.trim());
@@ -368,12 +377,16 @@ function initNetworkTools() {
         cors.filterBySeverity(btn.dataset.cfilter);
       });
     });
+    utils.on('cors-sort', 'change', function () {
+      cors.sortResults(this.value);
+    });
 
     utils.bindClick('subdomain-scan-btn', subdomain.collectSubdomains);
     utils.bindClick('subdomain-page-btn', subdomain.extractFromPage);
     utils.bindClick('subdomain-dns-btn', subdomain.bruteForceDns);
     utils.bindClick('subdomain-all-btn', subdomain.runAllScans);
     utils.bindClick('subdomain-copy-btn', subdomain.copyResults);
+    utils.bindClick('subdomain-copy-md-btn', subdomain.copyMarkdown);
     utils.bindClick('subdomain-export-btn', subdomain.exportResults);
     utils.bindClick('subdomain-send-fuzz-btn', subdomain.sendToFuzz);
     utils.bindClick('subdomain-certspotter-btn', subdomain.collectFromCertspotter);
@@ -391,6 +404,9 @@ function initNetworkTools() {
         subdomain.filterBySource(btn.dataset.sfilter);
       });
     });
+    utils.on('subdomain-sort', 'change', function () {
+      subdomain.sortResults(this.value);
+    });
 
     utils.bindClick('source-loader-load-btn', sourceLoader.loadToSources);
     utils.bindClick('source-loader-copy-btn', sourceLoader.copyResults);
@@ -404,7 +420,11 @@ function initNetworkTools() {
     utils.bindClick('graphql-scan-btn', graphql.scanGraphQL);
     utils.bindClick('graphql-exec-btn', graphql.executeCustomQuery);
     utils.bindClick('graphql-copy-btn', graphql.copyResults);
+    utils.bindClick('graphql-copy-md-btn', graphql.copyMarkdown);
     utils.bindClick('graphql-export-btn', graphql.exportResults);
+    utils.on('graphql-sort', 'change', function () {
+      graphql.sortResults(this.value);
+    });
   });
 }
 
@@ -527,6 +547,12 @@ function initStorageChecker() {
     sc.bindFilterSearch('session');
     sc.bindEventDelegation('local');
     sc.bindEventDelegation('session');
+    utils.on('sc-local-sort', 'change', function () {
+      sc.sortResults('local', this.value);
+    });
+    utils.on('sc-session-sort', 'change', function () {
+      sc.sortResults('session', this.value);
+    });
 
     utils.bindClick('sc-local-read-btn', async function () {
       utils.setStatus('sc-local-status', '正在读取 localStorage...');

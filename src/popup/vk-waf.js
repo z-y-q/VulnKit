@@ -2,12 +2,24 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { saveScanResult } from './vk-scan-history.js';
 
 let lastWafResult = null;
 let wafScanActive = false;
 let wafScanAborted = false;
 let currentFilter = 'all';
 let currentSearch = '';
+let currentSort = '';
+var WAF_SORT_FNS = {
+  severity: function (a, b) {
+    var o = { critical: 0, high: 1, medium: 2, low: 3 };
+    return (o[a.severity] || 3) - (o[b.severity] || 3);
+  },
+  confidence: function (a, b) {
+    var o = { high: 0, medium: 1, low: 2 };
+    return (o[a.confidence] || 2) - (o[b.confidence] || 2);
+  },
+};
 let scanStartTime = 0;
 let lastHeaders = null;
 
@@ -335,6 +347,7 @@ function renderResults(detected, probeHeaders, probeUrl) {
   let resultsEl = utils.get('waf-results');
   let copyBtn = utils.get('waf-copy-btn');
   let exportBtn = utils.get('waf-export-btn');
+  let copyMdBtn = utils.get('waf-copy-md-btn');
   if (!resultsEl) return;
 
   if (detected.length === 0) {
@@ -348,6 +361,7 @@ function renderResults(detected, probeHeaders, probeUrl) {
     ].join('');
     if (copyBtn) copyBtn.style.display = 'none';
     if (exportBtn) exportBtn.style.display = 'none';
+    if (copyMdBtn) copyMdBtn.style.display = 'none';
     lastWafResult = null;
     return;
   }
@@ -395,8 +409,15 @@ function renderResults(detected, probeHeaders, probeUrl) {
   resultsEl.innerHTML = html;
   if (copyBtn) copyBtn.style.display = '';
   if (exportBtn) exportBtn.style.display = '';
+  if (copyMdBtn) copyMdBtn.style.display = '';
   lastWafResult = detected;
   lastHeaders = probeHeaders || null;
+  utils
+    .getCurrentDomain()
+    .then(function (d) {
+      if (d) saveScanResult('waf', d, getFindings());
+    })
+    .catch(() => {});
 }
 
 function filterByStatus(filter) {
@@ -421,7 +442,8 @@ function applyFilter() {
       return d.name.toLowerCase().indexOf(currentSearch) !== -1;
     });
   }
-  renderResults(filtered, lastHeaders);
+  var sorted = utils.applySort(filtered, currentSort, WAF_SORT_FNS);
+  renderResults(sorted, lastHeaders);
 }
 
 async function scanWaf() {
@@ -601,6 +623,29 @@ function copyResults() {
   utils.copyAndToast(text, '已复制 WAF 检测结果');
 }
 
+function copyMarkdown() {
+  if (!lastWafResult || lastWafResult.length === 0) {
+    utils.showToast('没有可复制的结果', 'warning');
+    return;
+  }
+  var rows = lastWafResult.map(function (d) {
+    return [
+      d.name,
+      d.severity,
+      d.confidence,
+      d.evidence
+        .map(function (e) {
+          return e.value;
+        })
+        .join('; '),
+    ];
+  });
+  var md =
+    '# WAF Detection Results\n\n' +
+    utils.buildMarkdownTable(['Name', 'Severity', 'Confidence', 'Evidence'], rows);
+  utils.copyAndToast(md, '已复制 Markdown', 'success');
+}
+
 function exportResults() {
   if (!lastWafResult || lastWafResult.length === 0) {
     utils.showToast('没有可导出的结果', 'warning');
@@ -645,4 +690,18 @@ function getFindings() {
   });
 }
 
-export { scanWaf, copyResults, exportResults, filterByStatus, searchResults, getFindings };
+function sortResults(key) {
+  currentSort = key;
+  applyFilter();
+}
+
+export {
+  scanWaf,
+  copyResults,
+  copyMarkdown,
+  exportResults,
+  filterByStatus,
+  searchResults,
+  sortResults,
+  getFindings,
+};

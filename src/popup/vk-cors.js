@@ -2,12 +2,23 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { saveScanResult } from './vk-scan-history.js';
 
 let lastResult = null;
 let scanAborted = false;
 let scanActive = false;
 let currentFilter = 'all';
 let currentSearch = '';
+let currentSort = '';
+var CORS_SORT_FNS = {
+  risk: function (a, b) {
+    var order = { critical: 0, danger: 1, warning: 2, info: 3, safe: 4 };
+    return (order[a.severity] || 3) - (order[b.severity] || 3);
+  },
+  url: function (a, b) {
+    return (a.url || '').localeCompare(b.url || '');
+  },
+};
 let scanStartTime = 0;
 
 const PROBE_TIMEOUT_MS = 10000;
@@ -195,6 +206,7 @@ async function scanCors() {
   const resultsEl = utils.get('cors-results');
   const copyBtn = utils.get('cors-copy-btn');
   const exportBtn = utils.get('cors-export-btn');
+  const copyMdBtn = utils.get('cors-copy-md-btn');
   const scanBtn = utils.get('cors-scan-btn');
 
   if (statusEl) statusEl.textContent = '正在检测 CORS 配置...';
@@ -241,12 +253,19 @@ async function scanCors() {
       const analysis = analyzeResults(ctx.allResults);
       analysis.errors = ctx.errors;
       lastResult = analysis;
+      utils
+        .getCurrentDomain()
+        .then(function (d) {
+          if (d) saveScanResult('cors', d, getFindings());
+        })
+        .catch(() => {});
       renderResults(analysis);
       if (statusEl) {
         statusEl.textContent = `检测完成: ${ctx.completed} 个请求${ctx.errors.length > 0 ? `，${ctx.errors.length} 个失败` : ''}`;
       }
       if (copyBtn) copyBtn.hidden = false;
       if (exportBtn) exportBtn.hidden = false;
+      if (copyMdBtn) copyMdBtn.hidden = false;
     } else {
       if (statusEl) statusEl.textContent = '检测已取消';
     }
@@ -392,8 +411,9 @@ function applyCorsFilter() {
     }
     return true;
   });
+  const sorted = utils.applySort(filtered, currentSort, CORS_SORT_FNS);
   const filteredAnalysis = {
-    issues: filtered,
+    issues: sorted,
     safeCount: filtered.filter(function (i) {
       return i.severity === 'safe';
     }).length,
@@ -616,6 +636,30 @@ function copyResults() {
   utils.copyAndToast(lines.join('\n'));
 }
 
+function copyMarkdown() {
+  if (!lastResult || !lastResult.issues.length) {
+    utils.showToast('没有检测结果', 'warning');
+    return;
+  }
+  var rows = lastResult.issues.map(function (issue) {
+    return [
+      issue.severity.toUpperCase(),
+      issue.method,
+      issue.url,
+      String(issue.statusCode),
+      issue.origin.value,
+      (issue.findings || []).join('; '),
+    ];
+  });
+  var md = '# CORS Scan Results\n\n';
+  md += '**Target:** ' + (lastResult.url || '') + '\n\n';
+  md += utils.buildMarkdownTable(
+    ['Severity', 'Method', 'URL', 'Status', 'Origin', 'Findings'],
+    rows
+  );
+  utils.copyAndToast(md, '已复制 Markdown', 'success');
+}
+
 function exportJson() {
   if (!lastResult) {
     utils.showToast('没有检测结果', 'warning');
@@ -667,12 +711,19 @@ function getFindings() {
     });
 }
 
+function sortResults(key) {
+  currentSort = key;
+  applyCorsFilter();
+}
+
 export {
   scanCors,
   copyResults,
+  copyMarkdown,
   exportJson,
   filterBySeverity,
   searchResults,
+  sortResults,
   verifyCredentials,
   getFindings,
 };

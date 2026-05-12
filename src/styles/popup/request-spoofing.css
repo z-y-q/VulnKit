@@ -293,3 +293,5 @@
 [data-theme='dark'] .cookie-copy-btn:hover { color: var(--accent); }
 [data-theme='dark'] .cookie-badge { background: var(--bg-tertiary); color: var(--text-secondary); }
 [data-theme='dark'] .cookie-edit-flags { color: var(--text-secondary); }
+[data-theme='dark'] .spoof-ua-status { color: var(--text-secondary); }
+[data-theme='dark'] .cookie-editor { color: var(--text-secondary); }

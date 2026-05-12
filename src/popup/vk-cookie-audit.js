@@ -2,10 +2,21 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { saveScanResult } from './vk-scan-history.js';
 
 let lastResult = null;
 let currentFilter = 'all';
 let currentSearch = '';
+let currentSort = '';
+var CA_SORT_FNS = {
+  severity: function (a, b) {
+    var o = { critical: 0, high: 1, medium: 2, info: 3 };
+    return (o[a._maxSev] || 3) - (o[b._maxSev] || 3);
+  },
+  name: function (a, b) {
+    return (a.cookie.name || '').localeCompare(b.cookie.name || '');
+  },
+};
 
 const SENSITIVE_NAMES = [
   'session',
@@ -48,6 +59,7 @@ function auditCookies() {
   const resultsEl = utils.get('cookie-audit-results');
   const copyBtn = utils.get('cookie-audit-copy-btn');
   const exportBtn = utils.get('cookie-audit-export-btn');
+  const copyMdBtn = utils.get('cookie-audit-copy-md-btn');
 
   if (statusEl) statusEl.textContent = '正在审计 Cookie...';
 
@@ -98,6 +110,7 @@ function showNoCookies(statusEl, resultsEl, copyBtn, exportBtn) {
   if (resultsEl) resultsEl.innerHTML = '<div class="cookie-no-cookies">当前域名没有 Cookie</div>';
   if (copyBtn) copyBtn.style.display = 'none';
   if (exportBtn) exportBtn.style.display = 'none';
+  if (copyMdBtn) copyMdBtn.style.display = 'none';
 }
 
 function processCookies(cookies, isHttpsSite, statusEl, resultsEl, copyBtn, exportBtn) {
@@ -123,9 +136,14 @@ function processCookies(cookies, isHttpsSite, statusEl, resultsEl, copyBtn, expo
   if (statusEl) statusEl.textContent = `审计完成: ${cookies.length} 个 Cookie`;
   if (copyBtn) copyBtn.style.display = '';
   if (exportBtn) exportBtn.style.display = '';
+  if (copyMdBtn) copyMdBtn.style.display = '';
 
   renderStats(severityCounts);
   renderResults(results);
+
+  utils.getCurrentDomain().then(function (d) {
+    if (d) saveScanResult('cookie-audit', d, getFindings());
+  });
 }
 
 function analyzeCookie(cookie, isHttpsSite) {
@@ -280,6 +298,34 @@ function copyResults() {
   utils.copyAndToast(lines.join('\n'), `已复制 ${lastResult.length} 条审计结果`);
 }
 
+function copyMarkdown() {
+  if (!lastResult || lastResult.length === 0) {
+    utils.showToast('没有审计结果', 'warning');
+    return;
+  }
+  var headers = ['Cookie', 'Secure', 'HttpOnly', 'SameSite', 'Issues'];
+  var rows = lastResult.map(function (r) {
+    var c = r.cookie;
+    var issuesText =
+      r.issues.length > 0
+        ? r.issues
+            .map(function (i) {
+              return '[' + i.severity.toUpperCase() + '] ' + i.text;
+            })
+            .join('; ')
+        : '-';
+    return [
+      c.name,
+      c.secure ? 'Yes' : 'No',
+      c.httpOnly ? 'Yes' : 'No',
+      c.sameSite || 'none',
+      issuesText,
+    ];
+  });
+  var md = utils.buildMarkdownTable(headers, rows);
+  utils.copyAndToast(md, '已复制 Markdown');
+}
+
 function exportResults() {
   if (!lastResult || lastResult.length === 0) {
     utils.showToast('没有可导出的结果', 'warning');
@@ -337,7 +383,8 @@ function applyFilter() {
     }
     return true;
   });
-  renderResults(filtered);
+  var sorted = utils.applySort(filtered, currentSort, CA_SORT_FNS);
+  renderResults(sorted);
 }
 
 function getFindings() {
@@ -358,4 +405,18 @@ function getFindings() {
   return findings;
 }
 
-export { auditCookies, copyResults, exportResults, filterBySeverity, searchResults, getFindings };
+function sortResults(key) {
+  currentSort = key;
+  applyFilter();
+}
+
+export {
+  auditCookies,
+  copyResults,
+  copyMarkdown,
+  exportResults,
+  filterBySeverity,
+  searchResults,
+  sortResults,
+  getFindings,
+};

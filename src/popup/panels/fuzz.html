@@ -29,6 +29,7 @@
       <button class="filter-btn" data-filter="403">403</button>
       <button class="filter-btn" data-filter="interesting">感兴趣的</button>
       <input type="text" id="fuzz-search" class="filter-search" placeholder="搜索路径...">
+      <select id="fuzz-sort" class="sort-select"><option value="">排序</option><option value="status">状态码</option><option value="size">大小</option><option value="time">耗时</option></select>
     </div>
     <div class="fuzz-results" id="fuzz-results">
       <div class="empty-state">输入目标 URL，选择字典后开始目录扫描</div>
@@ -39,6 +40,8 @@
         <option value="csv">CSV</option>
       </select>
       <button class="btn btn-outline" id="fuzz-export-btn" hidden>导出结果</button>
+      <button class="btn btn-sm btn-outline" id="fuzz-copy-md-btn" hidden>Markdown</button>
+      <button class="btn btn-sm btn-outline" id="fuzz-copy-curl-btn" hidden>cURL</button>
     </div>
   </div>
 </div>

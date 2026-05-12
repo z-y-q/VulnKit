@@ -816,20 +816,109 @@ function createContextMenus() {
       return;
     }
     chrome.contextMenus.removeAll(() => {
+      // Page context → 灵眸 parent
       chrome.contextMenus.create({
-        id: 'vulnkit-extract-links',
-        title: '灵眸: Extract Links',
+        id: 'vulnkit-page',
+        title: '灵眸',
         contexts: ['page'],
       });
       chrome.contextMenus.create({
+        id: 'vulnkit-extract-links',
+        parentId: 'vulnkit-page',
+        title: '提取链接',
+        contexts: ['page'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-cors-scan',
+        parentId: 'vulnkit-page',
+        title: 'CORS 检测',
+        contexts: ['page'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-waf-scan',
+        parentId: 'vulnkit-page',
+        title: 'WAF 指纹',
+        contexts: ['page'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-headers-scan',
+        parentId: 'vulnkit-page',
+        title: '安全头分析',
+        contexts: ['page'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-subdomain-scan',
+        parentId: 'vulnkit-page',
+        title: '子域名收集',
+        contexts: ['page'],
+      });
+
+      // Selection context → 灵眸 parent
+      chrome.contextMenus.create({
+        id: 'vulnkit-selection',
+        title: '灵眸',
+        contexts: ['selection'],
+      });
+      chrome.contextMenus.create({
         id: 'vulnkit-encode',
-        title: '灵眸: Encode Selection',
+        parentId: 'vulnkit-selection',
+        title: 'URL 编码',
         contexts: ['selection'],
       });
       chrome.contextMenus.create({
         id: 'vulnkit-decode',
-        title: '灵眸: Decode Selection',
+        parentId: 'vulnkit-selection',
+        title: 'URL 解码',
         contexts: ['selection'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-base64-encode',
+        parentId: 'vulnkit-selection',
+        title: 'Base64 编码',
+        contexts: ['selection'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-base64-decode',
+        parentId: 'vulnkit-selection',
+        title: 'Base64 解码',
+        contexts: ['selection'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-md5-hash',
+        parentId: 'vulnkit-selection',
+        title: 'MD5 哈希',
+        contexts: ['selection'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-sha256-hash',
+        parentId: 'vulnkit-selection',
+        title: 'SHA256 哈希',
+        contexts: ['selection'],
+      });
+
+      // Link context → 灵眸 parent
+      chrome.contextMenus.create({
+        id: 'vulnkit-link',
+        title: '灵眸',
+        contexts: ['link'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-link-cors',
+        parentId: 'vulnkit-link',
+        title: '发送到 CORS 检测',
+        contexts: ['link'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-link-headers',
+        parentId: 'vulnkit-link',
+        title: '发送到安全头分析',
+        contexts: ['link'],
+      });
+      chrome.contextMenus.create({
+        id: 'vulnkit-link-redirect',
+        parentId: 'vulnkit-link',
+        title: '发送到重定向检测',
+        contexts: ['link'],
       });
     });
   });
@@ -860,6 +949,33 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         });
       }, 500);
       break;
+
+    // --- Page context scan menus ---
+    case 'vulnkit-cors-scan':
+    case 'vulnkit-waf-scan':
+    case 'vulnkit-headers-scan':
+    case 'vulnkit-subdomain-scan': {
+      var scanMap = {
+        'vulnkit-cors-scan': 'cors',
+        'vulnkit-waf-scan': 'waf',
+        'vulnkit-headers-scan': 'headers',
+        'vulnkit-subdomain-scan': 'subdomain',
+      };
+      var scanModule = scanMap[info.menuItemId];
+      chrome.storage.local.set({ contextScan: { module: scanModule, url: tab.url } });
+      chrome.action.setBadgeText({ text: 'S' });
+      chrome.action.setBadgeBackgroundColor({ color: '#2196F3' });
+      if (typeof chrome.action.openPopup === 'function') {
+        try {
+          chrome.action.openPopup({ windowId: tab.windowId });
+        } catch (e) {
+          console.debug('openPopup failed', e);
+        }
+      }
+      break;
+    }
+
+    // --- Selection context: encode/decode (open popup) ---
     case 'vulnkit-encode':
     case 'vulnkit-decode':
       if (info.selectionText) {
@@ -878,5 +994,313 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         }
       }
       break;
+
+    // --- Selection context: base64 (copy in background) ---
+    case 'vulnkit-base64-encode':
+      if (info.selectionText) {
+        try {
+          var encoded = btoa(unescape(encodeURIComponent(info.selectionText)));
+          navigator.clipboard.writeText(encoded).then(function () {
+            chrome.scripting
+              .executeScript({
+                target: { tabId: tab.id },
+                func: function (msg) {
+                  var el = document.createElement('div');
+                  el.textContent = msg;
+                  el.style.cssText =
+                    'position:fixed;top:12px;right:12px;z-index:999999;background:#4CAF50;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;opacity:0;transition:opacity .3s';
+                  document.body.appendChild(el);
+                  requestAnimationFrame(function () {
+                    el.style.opacity = '1';
+                  });
+                  setTimeout(function () {
+                    el.style.opacity = '0';
+                    setTimeout(function () {
+                      el.remove();
+                    }, 300);
+                  }, 1500);
+                },
+                args: ['灵眸: Base64 编码已复制'],
+              })
+              .catch(function () {});
+          });
+        } catch (e) {
+          console.debug('base64 encode failed', e);
+        }
+      }
+      break;
+
+    case 'vulnkit-base64-decode':
+      if (info.selectionText) {
+        try {
+          var decoded = decodeURIComponent(escape(atob(info.selectionText.trim())));
+          navigator.clipboard.writeText(decoded).then(function () {
+            chrome.scripting
+              .executeScript({
+                target: { tabId: tab.id },
+                func: function (msg) {
+                  var el = document.createElement('div');
+                  el.textContent = msg;
+                  el.style.cssText =
+                    'position:fixed;top:12px;right:12px;z-index:999999;background:#4CAF50;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;opacity:0;transition:opacity .3s';
+                  document.body.appendChild(el);
+                  requestAnimationFrame(function () {
+                    el.style.opacity = '1';
+                  });
+                  setTimeout(function () {
+                    el.style.opacity = '0';
+                    setTimeout(function () {
+                      el.remove();
+                    }, 300);
+                  }, 1500);
+                },
+                args: ['灵眸: Base64 解码已复制'],
+              })
+              .catch(function () {});
+          });
+        } catch (e) {
+          chrome.scripting
+            .executeScript({
+              target: { tabId: tab.id },
+              func: function (msg) {
+                var el = document.createElement('div');
+                el.textContent = msg;
+                el.style.cssText =
+                  'position:fixed;top:12px;right:12px;z-index:999999;background:#F44336;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;opacity:0;transition:opacity .3s';
+                document.body.appendChild(el);
+                requestAnimationFrame(function () {
+                  el.style.opacity = '1';
+                });
+                setTimeout(function () {
+                  el.style.opacity = '0';
+                  setTimeout(function () {
+                    el.remove();
+                  }, 300);
+                }, 1500);
+              },
+              args: ['灵眸: Base64 解码失败（无效输入）'],
+            })
+            .catch(function () {});
+        }
+      }
+      break;
+
+    // --- Selection context: hash (async in background) ---
+    case 'vulnkit-md5-hash':
+    case 'vulnkit-sha256-hash':
+      if (info.selectionText) {
+        var algo = info.menuItemId === 'vulnkit-md5-hash' ? 'SHA-256' : 'SHA-256';
+        (async function () {
+          try {
+            var encoder = new TextEncoder();
+            var data = encoder.encode(info.selectionText);
+            var algoName = info.menuItemId === 'vulnkit-md5-hash' ? 'MD5' : 'SHA-256';
+            if (algoName === 'MD5') {
+              // MD5 not in crypto.subtle — use simple fallback message
+              var hex = await simpleMd5(data);
+            } else {
+              var hashBuf = await crypto.subtle.digest(algoName, data);
+              var hashArr = new Uint8Array(hashBuf);
+              var hex = Array.from(hashArr)
+                .map(function (b) {
+                  return b.toString(16).padStart(2, '0');
+                })
+                .join('');
+            }
+            navigator.clipboard.writeText(hex).then(function () {
+              chrome.scripting
+                .executeScript({
+                  target: { tabId: tab.id },
+                  func: function (msg) {
+                    var el = document.createElement('div');
+                    el.textContent = msg;
+                    el.style.cssText =
+                      'position:fixed;top:12px;right:12px;z-index:999999;background:#4CAF50;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;opacity:0;transition:opacity .3s';
+                    document.body.appendChild(el);
+                    requestAnimationFrame(function () {
+                      el.style.opacity = '1';
+                    });
+                    setTimeout(function () {
+                      el.style.opacity = '0';
+                      setTimeout(function () {
+                        el.remove();
+                      }, 300);
+                    }, 1500);
+                  },
+                  args: ['灵眸: ' + algoName + ' 哈希已复制'],
+                })
+                .catch(function () {});
+            });
+          } catch (e) {
+            console.debug('hash failed', e);
+          }
+        })();
+      }
+      break;
+
+    // --- Link context ---
+    case 'vulnkit-link-cors':
+    case 'vulnkit-link-headers':
+    case 'vulnkit-link-redirect': {
+      var linkScanMap = {
+        'vulnkit-link-cors': 'cors',
+        'vulnkit-link-headers': 'headers',
+        'vulnkit-link-redirect': 'redirect',
+      };
+      var linkModule = linkScanMap[info.menuItemId];
+      var linkUrl = info.linkUrl || tab.url;
+      chrome.storage.local.set({ contextScan: { module: linkModule, url: linkUrl } });
+      chrome.action.setBadgeText({ text: 'S' });
+      chrome.action.setBadgeBackgroundColor({ color: '#2196F3' });
+      if (typeof chrome.action.openPopup === 'function') {
+        try {
+          chrome.action.openPopup({ windowId: tab.windowId });
+        } catch (e) {
+          console.debug('openPopup failed', e);
+        }
+      }
+      break;
+    }
   }
 });
+
+// Simple MD5 implementation for service worker context
+async function simpleMd5(data) {
+  // Use SHA-256 as fallback since crypto.subtle doesn't support MD5
+  // For a real MD5, we implement it inline
+  var msg = new Uint8Array(data);
+  function safeAdd(x, y) {
+    var lsw = (x & 0xffff) + (y & 0xffff);
+    return (((x >> 16) + (y >> 16) + (lsw >> 16)) << 16) | (lsw & 0xffff);
+  }
+  function bitRotateLeft(num, cnt) {
+    return (num << cnt) | (num >>> (32 - cnt));
+  }
+  function md5cmn(q, a, b, x, s, t) {
+    return safeAdd(bitRotateLeft(safeAdd(safeAdd(a, q), safeAdd(x, t)), s), b);
+  }
+  function md5ff(a, b, c, d, x, s, t) {
+    return md5cmn((b & c) | (~b & d), a, b, x, s, t);
+  }
+  function md5gg(a, b, c, d, x, s, t) {
+    return md5cmn((b & d) | (c & ~d), a, b, x, s, t);
+  }
+  function md5hh(a, b, c, d, x, s, t) {
+    return md5cmn(b ^ c ^ d, a, b, x, s, t);
+  }
+  function md5ii(a, b, c, d, x, s, t) {
+    return md5cmn(c ^ (b | ~d), a, b, x, s, t);
+  }
+  function binlMD5(x, len) {
+    x[len >> 5] |= 0x80 << (len % 32);
+    x[(((len + 64) >>> 9) << 4) + 14] = len;
+    var a = 1732584193,
+      b = -271733879,
+      c = -1732584194,
+      d = 271733878;
+    for (var i = 0; i < x.length; i += 16) {
+      var olda = a,
+        oldb = b,
+        oldc = c,
+        oldd = d;
+      a = md5ff(a, b, c, d, x[i], 7, -680876936);
+      d = md5ff(d, a, b, c, x[i + 1], 12, -389564586);
+      c = md5ff(c, d, a, b, x[i + 2], 17, 606105819);
+      b = md5ff(b, c, d, a, x[i + 3], 22, -1044525330);
+      a = md5ff(a, b, c, d, x[i + 4], 7, -176418897);
+      d = md5ff(d, a, b, c, x[i + 5], 12, 1200080426);
+      c = md5ff(c, d, a, b, x[i + 6], 17, -1473231341);
+      b = md5ff(b, c, d, a, x[i + 7], 22, -45705983);
+      a = md5ff(a, b, c, d, x[i + 8], 7, 1770035416);
+      d = md5ff(d, a, b, c, x[i + 9], 12, -1958414417);
+      c = md5ff(c, d, a, b, x[i + 10], 17, -42063);
+      b = md5ff(b, c, d, a, x[i + 11], 22, -1990404162);
+      a = md5ff(a, b, c, d, x[i + 12], 7, 1804603682);
+      d = md5ff(d, a, b, c, x[i + 13], 12, -40341101);
+      c = md5ff(c, d, a, b, x[i + 14], 17, -1502002290);
+      b = md5ff(b, c, d, a, x[i + 15], 22, 1236535329);
+      a = md5gg(a, b, c, d, x[i + 1], 5, -165796510);
+      d = md5gg(d, a, b, c, x[i + 6], 9, -1069501632);
+      c = md5gg(c, d, a, b, x[i + 11], 14, 643717713);
+      b = md5gg(b, c, d, a, x[i], 20, -373897302);
+      a = md5gg(a, b, c, d, x[i + 5], 5, -701558691);
+      d = md5gg(d, a, b, c, x[i + 10], 9, 38016083);
+      c = md5gg(c, d, a, b, x[i + 15], 14, -660478335);
+      b = md5gg(b, c, d, a, x[i + 4], 20, -405537848);
+      a = md5gg(a, b, c, d, x[i + 9], 5, 568446438);
+      d = md5gg(d, a, b, c, x[i + 14], 9, -1019803690);
+      c = md5gg(c, d, a, b, x[i + 3], 14, -187363961);
+      b = md5gg(b, c, d, a, x[i + 8], 20, 1163531501);
+      a = md5gg(a, b, c, d, x[i + 13], 5, -1444681467);
+      d = md5gg(d, a, b, c, x[i + 2], 9, -51403784);
+      c = md5gg(c, d, a, b, x[i + 7], 14, 1735328473);
+      b = md5gg(b, c, d, a, x[i + 12], 20, -1926607734);
+      a = md5hh(a, b, c, d, x[i + 5], 4, -378558);
+      d = md5hh(d, a, b, c, x[i + 8], 11, -2022574463);
+      c = md5hh(c, d, a, b, x[i + 11], 16, 1839030562);
+      b = md5hh(b, c, d, a, x[i + 14], 23, -35309556);
+      a = md5hh(a, b, c, d, x[i + 1], 4, -1530992060);
+      d = md5hh(d, a, b, c, x[i + 4], 11, 1272893353);
+      c = md5hh(c, d, a, b, x[i + 7], 16, -155497632);
+      b = md5hh(b, c, d, a, x[i + 10], 23, -1094730640);
+      a = md5hh(a, b, c, d, x[i + 13], 4, 681279174);
+      d = md5hh(d, a, b, c, x[i], 11, -358537222);
+      c = md5hh(c, d, a, b, x[i + 3], 16, -722521979);
+      b = md5hh(b, c, d, a, x[i + 6], 23, 76029189);
+      a = md5hh(a, b, c, d, x[i + 9], 4, -640364487);
+      d = md5hh(d, a, b, c, x[i + 12], 11, -421815835);
+      c = md5hh(c, d, a, b, x[i + 15], 16, 530742520);
+      b = md5hh(b, c, d, a, x[i + 2], 23, -995338651);
+      a = md5ii(a, b, c, d, x[i], 6, -198630844);
+      d = md5ii(d, a, b, c, x[i + 7], 10, 1126891415);
+      c = md5ii(c, d, a, b, x[i + 14], 15, -1416354905);
+      b = md5ii(b, c, d, a, x[i + 5], 21, -57434055);
+      a = md5ii(a, b, c, d, x[i + 12], 6, 1700485571);
+      d = md5ii(d, a, b, c, x[i + 3], 10, -1894986606);
+      c = md5ii(c, d, a, b, x[i + 10], 15, -1051523);
+      b = md5ii(b, c, d, a, x[i + 1], 21, -2054922799);
+      a = md5ii(a, b, c, d, x[i + 8], 6, 1873313359);
+      d = md5ii(d, a, b, c, x[i + 15], 10, -30611744);
+      c = md5ii(c, d, a, b, x[i + 6], 15, -1560198380);
+      b = md5ii(b, c, d, a, x[i + 13], 21, 1309151649);
+      a = md5ii(a, b, c, d, x[i + 4], 6, -145523070);
+      d = md5ii(d, a, b, c, x[i + 11], 10, -1120210379);
+      c = md5ii(c, d, a, b, x[i + 2], 15, 718787259);
+      b = md5ii(b, c, d, a, x[i + 9], 21, -343485551);
+      a = safeAdd(a, olda);
+      b = safeAdd(b, oldb);
+      c = safeAdd(c, oldc);
+      d = safeAdd(d, oldd);
+    }
+    return [a, b, c, d];
+  }
+  function rstrMD5(s) {
+    var bin = binlMD5(s, s.length * 8);
+    var str = '';
+    for (var i = 0; i < bin.length; i++) {
+      str +=
+        String.fromCharCode(bin[i] & 0xff) +
+        String.fromCharCode((bin[i] >>> 8) & 0xff) +
+        String.fromCharCode((bin[i] >>> 16) & 0xff) +
+        String.fromCharCode((bin[i] >>> 24) & 0xff);
+    }
+    return str;
+  }
+  function rstr2hex(input) {
+    var hexTab = '0123456789abcdef';
+    var output = '';
+    for (var i = 0; i < input.length; i++) {
+      var x = input.charCodeAt(i);
+      output += hexTab.charAt((x >>> 4) & 0x0f) + hexTab.charAt(x & 0x0f);
+    }
+    return output;
+  }
+  // Convert byte array to int32 array
+  var len = msg.length;
+  var padLen = (((len + 8) >>> 6) << 4) + 14;
+  var words = new Array(padLen);
+  for (var i = 0; i < padLen; i++) words[i] = 0;
+  for (var i = 0; i < len; i++) words[i >>> 2] |= msg[i] << ((i % 4) << 3);
+  words[len >>> 2] |= 0x80 << ((len % 4) << 3);
+  return rstr2hex(rstrMD5(words));
+}

@@ -268,3 +268,55 @@
   border-color: #e74c3c;
   background: rgba(231, 76, 60, 0.12);
 }
+
+/* ====== Scan History ====== */
+
+.scan-history-list {
+  max-height: 260px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+.scan-history-entry {
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  background: var(--bg-card, #f9fafb);
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  cursor: default;
+  transition: background 0.15s;
+}
+
+.scan-history-entry:hover {
+  background: var(--bg-secondary, #f0f2f5);
+}
+
+.scan-history-sev {
+  font-size: 10px;
+  display: inline-flex;
+  gap: 3px;
+}
+
+.scan-history-diff-view {
+  margin: 8px 0;
+  padding: 10px;
+  background: var(--bg-card, #f9fafb);
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+[data-theme='dark'] .scan-history-entry {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme='dark'] .scan-history-entry:hover {
+  background: var(--bg-tertiary, #2a2a3e);
+}
+
+[data-theme='dark'] .scan-history-diff-view {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}

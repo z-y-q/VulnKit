@@ -25,6 +25,7 @@
         <div class="panel-actions">
           <button class="btn btn-primary" id="cors-scan-btn">CORS 配置检测</button>
           <button class="btn btn-outline" id="cors-copy-btn" hidden>复制结果</button>
+          <button class="btn btn-sm btn-outline" id="cors-copy-md-btn" hidden>Markdown</button>
           <button class="btn btn-outline" id="cors-export-btn" hidden>导出 JSON</button>
         </div>
         <div class="status-bar" id="cors-status"></div>
@@ -38,6 +39,7 @@
           <button class="cors-filter-btn" data-cfilter="info">低危</button>
           <button class="cors-filter-btn" data-cfilter="safe">安全</button>
           <input type="text" id="cors-search" class="input cors-filter-search" placeholder="搜索 URL...">
+          <select id="cors-sort" class="sort-select"><option value="">排序</option><option value="risk">风险等级</option><option value="url">URL</option></select>
         </div>
 
         <div class="cors-results" id="cors-results">

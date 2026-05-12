@@ -6,16 +6,19 @@ import { XSS_DATA } from './vk-payload-data.js';
 import { XSS_SCAN_PAYLOADS } from './vk-xss-data.js';
 import { analyzeDomSinks } from './vk-xss-sinks.js';
 import { COPY_SVG } from './vk-icons.js';
+import { saveScanResult } from './vk-scan-history.js';
 
 import {
   xssPoints,
   xssFilterType,
   xssSearchText,
+  xssSortKey,
   lastVerifyResults,
   setXssPointsVal,
   appendXssPoints,
   setXssFilterType as _setXssFilterType,
   setXssSearchText as _setXssSearchText,
+  setXssSortKey as _setXssSortKey,
   setLastVerifyResults,
 } from './vk-xss-state.js';
 import { verifySinglePoint, renderVerifyResults, updateVerifyStatus } from './vk-xss-verify.js';
@@ -36,6 +39,18 @@ import {
 } from './vk-xss-autofuzz.js';
 
 var REFLECTION_PROBE = 'vkprobe\'"><xyz';
+
+var XSS_SORT_FNS = {
+  source: function (a, b) {
+    return (a.source || '').localeCompare(b.source || '');
+  },
+  url: function (a, b) {
+    return (a.url || '').localeCompare(b.url || '');
+  },
+  param: function (a, b) {
+    return (a.param || '').localeCompare(b.param || '');
+  },
+};
 
 // ====== Filter / Render ======
 
@@ -64,8 +79,10 @@ function renderXssPoints() {
   const countEl = utils.get('xssscan-count');
   if (!container) return;
   var consoleBtn = utils.get('xss-send-console-btn');
+  var copyMdBtn = utils.get('xssscan-copy-md-btn');
   if (consoleBtn) consoleBtn.hidden = xssPoints.length === 0;
-  const filtered = getFilteredXssPoints();
+  if (copyMdBtn) copyMdBtn.hidden = xssPoints.length === 0;
+  const filtered = utils.applySort(getFilteredXssPoints(), xssSortKey, XSS_SORT_FNS);
   if (countEl) {
     let hasFilter = xssFilterType !== 'all' || xssSearchText;
     countEl.innerHTML =
@@ -229,6 +246,9 @@ async function handleXssHarvest() {
     }
     if (newPoints.length > 0) utils.showToast(`发现 ${newPoints.length} 个注入点`, 'success');
     else utils.showToast('未发现新的注入点', 'info');
+    utils.getCurrentDomain().then(function (d) {
+      if (d) saveScanResult('xssscan', d, getFindings());
+    });
   } catch (e) {
     if (statusEl) {
       statusEl.textContent = `采集失败: ${e.message}`;
@@ -410,6 +430,21 @@ function handleCopyXssUrls() {
   utils.showToast(`已复制 ${lines.length} 个URL`, 'success');
 }
 
+function copyMarkdown() {
+  var selected = getSelectedXssPoints();
+  if (selected.length === 0) {
+    utils.showToast('没有选中的注入点', 'warning');
+    return;
+  }
+  var rows = selected.map(function (p) {
+    return [p.url || '', p.param || '', p.source || '', p.method || ''];
+  });
+  var md = '# XSS Injection Points\n\n';
+  md += '**Total:** ' + selected.length + '\n\n';
+  md += utils.buildMarkdownTable(['URL', 'Parameter', 'Source', 'Payload'], rows);
+  utils.copyAndToast(md, '已复制 Markdown 表格');
+}
+
 // ====== Init / Clear / Export ======
 
 function initXssScanPayloadSelect() {
@@ -522,6 +557,11 @@ function getFindings() {
 
 // ====== Export ======
 
+function sortResults(key) {
+  _setXssSortKey(key);
+  renderXssPoints();
+}
+
 export {
   startXssIntercept,
   stopXssIntercept,
@@ -532,6 +572,7 @@ export {
   handleVerifyReflection,
   handleOpenReflected,
   handleCopyXssUrls,
+  copyMarkdown,
   initXssScanPayloadSelect,
   clearResults,
   exportData,
@@ -549,6 +590,7 @@ export {
   handleStopAutoFuzz,
   handleAutoFuzzExport,
   handleGeneratePoc,
+  sortResults,
 };
 
 function sendToConsole() {

@@ -2,6 +2,7 @@
 // HTTP Security Headers Analysis — barrel + core logic
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { saveScanResult } from './vk-scan-history.js';
 import { SECURITY_HEADERS, SERVER_SIGNATURES } from './vk-headers-data.js';
 import { HEADER_CHECKERS, deepAnalyzeCSP } from './vk-headers-checkers.js';
 import { renderHeadersResults, groupByCategory, applyHeaderFilter } from './vk-headers-render.js';
@@ -10,6 +11,16 @@ var lastAnalysisResult = null;
 var scanning = false;
 var currentFilter = 'all';
 var currentSearch = '';
+var currentSort = '';
+var HEADERS_SORT_FNS = {
+  status: function (a, b) {
+    var o = { missing: 0, warn: 1, pass: 2 };
+    return (o[a.status] || 2) - (o[b.status] || 2);
+  },
+  name: function (a, b) {
+    return (a.header || '').localeCompare(b.header || '');
+  },
+};
 
 // ====== Info leak detection ======
 
@@ -241,6 +252,9 @@ async function scanSecurityHeaders(url) {
       cspDeep: cspDeep,
       grouped: groupByCategory(analysis.results),
     };
+    utils.getCurrentDomain().then(function (d) {
+      if (d) saveScanResult('headers', d, getFindings());
+    });
     return analysis;
   } catch (e) {
     console.debug('[Security Headers] scan error:', e.message);
@@ -260,7 +274,8 @@ function setFilter(filter) {
       lastAnalysisResult.analysis,
       lastAnalysisResult,
       currentFilter,
-      currentSearch
+      currentSearch,
+      currentSort
     );
 }
 
@@ -271,12 +286,13 @@ function setSearch(query) {
       lastAnalysisResult.analysis,
       lastAnalysisResult,
       currentFilter,
-      currentSearch
+      currentSearch,
+      currentSort
     );
 }
 
 function renderHeadersResultsWrapper(analysis) {
-  renderHeadersResults(analysis, lastAnalysisResult, currentFilter, currentSearch);
+  renderHeadersResults(analysis, lastAnalysisResult, currentFilter, currentSearch, currentSort);
 }
 
 // ====== Export ======
@@ -338,6 +354,31 @@ function exportHeadersResults(format) {
   } else {
     exportTxt();
   }
+}
+
+function copyMarkdown() {
+  if (
+    !lastAnalysisResult ||
+    !lastAnalysisResult.analysis ||
+    !lastAnalysisResult.analysis.results.length
+  ) {
+    utils.showToast('没有检测结果', 'warning');
+    return;
+  }
+  var results = lastAnalysisResult.analysis.results;
+  var rows = results.map(function (r) {
+    return [r.name, r.status, r.detail || '-', r.recommendation || '-'];
+  });
+  var md = '# Security Headers Report\n\n';
+  md += '**Target:** ' + (lastAnalysisResult.url || '') + '\n';
+  md +=
+    '**Score:** ' +
+    lastAnalysisResult.analysis.score +
+    ' (' +
+    lastAnalysisResult.analysis.grade +
+    ')\n\n';
+  md += utils.buildMarkdownTable(['Header', 'Status', 'Value', 'Description'], rows);
+  utils.copyAndToast(md, '已复制 Markdown', 'success');
 }
 
 // ====== getFindings for unified report ======
@@ -425,13 +466,27 @@ function getFindings() {
   return findings;
 }
 
+function sortResults(key) {
+  currentSort = key;
+  if (lastAnalysisResult)
+    renderHeadersResults(
+      lastAnalysisResult.analysis,
+      lastAnalysisResult,
+      currentFilter,
+      currentSearch,
+      currentSort
+    );
+}
+
 export {
   lastAnalysisResult,
   scanning,
   scanSecurityHeaders,
   renderHeadersResultsWrapper as renderHeadersResults,
   exportHeadersResults,
+  copyMarkdown,
   getFindings,
   setFilter,
   setSearch,
+  sortResults,
 };

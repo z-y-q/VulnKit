@@ -2,6 +2,7 @@
 // Browser storage inspector: localStorage, sessionStorage, IndexedDB
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { saveScanResult } from './vk-scan-history.js';
 
 // ====== Sensitive patterns ======
 
@@ -84,6 +85,15 @@ var VALUE_PATTERNS = [
 ];
 
 // ====== State ======
+
+var SC_SORT_FNS = {
+  sensitivity: function (a, b) {
+    return (b.isSensitive ? 1 : 0) - (a.isSensitive ? 1 : 0);
+  },
+  key: function (a, b) {
+    return (a.key || '').localeCompare(b.key || '');
+  },
+};
 
 var state = {
   localItems: [],
@@ -302,15 +312,19 @@ function renderStorageResults(type) {
     return true;
   });
 
-  if (filtered.length === 0) {
+  var sortEl = utils.get('sc-' + type + '-sort');
+  var sortKey = sortEl ? sortEl.value : '';
+  var sorted = utils.applySort(filtered, sortKey, SC_SORT_FNS);
+
+  if (sorted.length === 0) {
     container.innerHTML =
       '<div class="empty-state">' + (items.length === 0 ? '存储为空' : '无匹配结果') + '</div>';
     return;
   }
 
   var html = '';
-  for (var i = 0; i < filtered.length; i++) {
-    var item = filtered[i];
+  for (var i = 0; i < sorted.length; i++) {
+    var item = sorted[i];
     var cls = item.isSensitive ? 'sc-item sc-item-sensitive' : 'sc-item';
     html += '<div class="' + cls + '">';
     html += '<div class="sc-item-header">';
@@ -575,7 +589,19 @@ function getFindings() {
     }
   }
 
+  utils.getCurrentDomain().then(function (d) {
+    if (d) saveScanResult('storage-check', d, findings);
+  });
+
   return findings;
+}
+
+function sortResults(type, key) {
+  var el = utils.get('sc-' + type + '-sort');
+  if (el) {
+    el.value = key;
+    renderStorageResults(type);
+  }
 }
 
 export {
@@ -591,4 +617,5 @@ export {
   bindEventDelegation,
   getFindings,
   state,
+  sortResults,
 };

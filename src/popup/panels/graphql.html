@@ -11,10 +11,14 @@
     <div class="graphql-quick-actions">
       <button class="btn btn-sm" id="graphql-batch-btn" disabled>批量查询测试</button>
       <button class="btn btn-sm" id="graphql-copy-btn" disabled>复制结果</button>
+      <button class="btn btn-sm" id="graphql-copy-md-btn" disabled>Markdown</button>
       <button class="btn btn-sm" id="graphql-export-btn" disabled>导出 JSON</button>
     </div>
 
     <div class="status-bar" id="graphql-status">就绪</div>
+    <div class="filter-row">
+      <select id="graphql-sort" class="sort-select"><option value="">排序</option><option value="severity">严重程度</option><option value="testType">测试类型</option></select>
+    </div>
 
     <div class="graphql-results" id="graphql-results"></div>
 

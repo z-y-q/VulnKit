@@ -25,6 +25,7 @@
       <button class="filter-btn" data-filter="warn">警告</button>
       <button class="filter-btn" data-filter="pass">通过</button>
       <input type="text" id="headers-search" class="filter-search" placeholder="搜索安全头...">
+      <select id="headers-sort" class="sort-select"><option value="">排序</option><option value="status">状态（缺失优先）</option><option value="name">名称</option></select>
     </div>
     <div class="headers-results" id="headers-results">
       <div class="empty-state">点击「扫描安全头」分析当前页面的 HTTP 安全响应头</div>
@@ -35,6 +36,7 @@
         <option value="csv">CSV</option>
       </select>
       <button class="btn btn-outline" id="headers-export-btn" hidden>导出结果</button>
+      <button class="btn btn-sm btn-outline" id="headers-copy-md-btn" hidden>Markdown</button>
     </div>
   </div>
 </div>

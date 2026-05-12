@@ -175,6 +175,14 @@
   background: #10b981;
 }
 
+[data-theme='dark'] .param-item label { color: var(--text-secondary); }
+[data-theme='dark'] .history-status { color: var(--text-secondary); }
+[data-theme='dark'] .summary-item { background: var(--bg-tertiary); }
+[data-theme='dark'] .summary-value { color: var(--accent); }
+[data-theme='dark'] .summary-label { color: var(--text-secondary); }
+[data-theme='dark'] .timeline-item { border-bottom-color: var(--border-color); }
+[data-theme='dark'] .timeline-item:hover { background: var(--bg-tertiary); }
+[data-theme='dark'] .timeline-date { color: var(--text-primary); }
 [data-theme='dark'] .timeline-open { background: var(--accent); }
 [data-theme='dark'] .timeline-open:hover { background: var(--accent-hover); }
 [data-theme='dark'] .quick-link-btn { background: var(--accent); }

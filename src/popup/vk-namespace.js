@@ -119,6 +119,47 @@ utils.copyAndToast = function (text, msg, type, duration) {
   utils.showToast(msg || '已复制', type || 'success', duration);
 };
 
+utils.buildMarkdownTable = function (headers, rows) {
+  if (!rows || rows.length === 0) return '';
+  var hdr = '| ' + headers.join(' | ') + ' |';
+  var sep =
+    '| ' +
+    headers
+      .map(function () {
+        return '---';
+      })
+      .join(' | ') +
+    ' |';
+  var body = rows
+    .map(function (row) {
+      return (
+        '| ' +
+        row
+          .map(function (cell) {
+            return String(cell == null ? '' : cell);
+          })
+          .join(' | ') +
+        ' |'
+      );
+    })
+    .join('\n');
+  return hdr + '\n' + sep + '\n' + body;
+};
+
+utils.buildCurlCommands = function (items, opts) {
+  opts = opts || {};
+  var method = opts.method || 'GET';
+  var urlKey = opts.urlKey || 'url';
+  var cmds = items
+    .map(function (item) {
+      var url = item[urlKey] || item;
+      if (!url) return null;
+      return 'curl -X ' + method + " '" + url + "'";
+    })
+    .filter(Boolean);
+  return cmds.join('\n');
+};
+
 utils.bindClick = function (id, handler) {
   let el = utils.get(id);
   if (el) el.addEventListener('click', handler);
@@ -361,6 +402,12 @@ utils.filterByQuery = function (items, query, fields) {
     }
     return false;
   });
+};
+
+utils.applySort = function (items, sortKey, sortFns) {
+  if (!sortKey || !sortFns || !sortFns[sortKey]) return items;
+  var fn = sortFns[sortKey];
+  return items.slice().sort(fn);
 };
 
 utils.bindEnterKey = function (id, callback) {
