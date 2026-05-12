@@ -121,7 +121,7 @@ src/
 │   ├── vk-leakscan-scanner.js     # 泄露扫描引擎（validate 验证 + 上下文分析）
 │   ├── vk-leak-render.js          # 泄露扫描结果渲染
 │   ├── vk-sniff.js                # 网站嗅探 barrel（统一导出）
-│   ├── vk-sniff-state.js          # 嗅探指纹数据库（97 项技术 / 19 个分类）
+│   ├── vk-sniff-state.js          # 嗅探指纹数据库（~112 项技术 / 19 个分类）
 │   ├── vk-sniff-scanner.js        # 嗅探扫描引擎（DOM + Runtime + Header 信号采集）
 │   ├── vk-sniff-render.js         # 嗅探结果渲染
 │   │
@@ -131,7 +131,7 @@ src/
 │   ├── vk-sourcemap-scanner.js    # Source Map 扫描主流程
 │   ├── vk-sourcemap-render.js     # Source Map 模块列表渲染
 │   ├── vk-sourcemap-utils.js      # Source Map 文件下载/解析工具
-│   ├── vk-sourcemap-analysis.js   # Source Map API 端点/依赖分析
+│   ├── vk-sourcemap-analysis.js   # Source Map API 端点/GraphQL/WebSocket 分析
 │   ├── vk-sourcemap-actions.js    # Source Map 批量操作（导出/下载/DevTools）
 │   │
 │   ├── vk-vue.js                  # Vue barrel（统一导出）
@@ -162,7 +162,7 @@ src/
 │   ├── vk-fuzz.js                 # 目录扫描（4 个字典 + 智能内容分析）
 │   ├── vk-graphql.js              # GraphQL 端点探测 + 安全检查
 │   ├── vk-storage-check.js        # 存储检查（localStorage/sessionStorage/IndexedDB）
-│   ├── vk-report.js               # 统一报告（聚合 12 模块发现 + 一键审计）
+│   ├── vk-report.js               # 统一报告（聚合 18 模块发现 + 动态审计 + Markdown 摘要）
 │   └── lib/                       # 第三方库（crypto-js, jsrsasign, sm2, sm4, bcrypt, exifr）
 ├── styles/
 │   ├── popup/                     # Popup 样式（27 个文件，按模块拆分）
@@ -470,11 +470,15 @@ src/
 
 #### 第二步：分析数据
 
-**自动分类：**
+**自动分类与智能触发：**
 - **全开放** — 所有菜单项都已返回，无隐藏
 - **半开放** — 部分菜单可见，部分被隐藏
 - **特殊0开放** — 返回空数组 `[]`，但路由中实际定义了页面
 - **其他** — 非菜单类响应
+
+拦截完成后自动分析数据类型并触发对应操作：
+- 检测到 **0 开放** → 自动搜索 JS 文件中的菜单定义，提示发现隐藏路由
+- 检测到 **角色控制字段（值=0）** → 弹窗提示可点击「提权至管理员」
 
 #### 第三步：修改数据
 
@@ -647,6 +651,29 @@ PHP 一句话木马和混淆 WebShell：
 - **载荷编码** — 支持原始 / URL 编码 / HTML 实体 / Base64 四种编码方式
 - **导出** — 导出检测结果为 CSV
 
+### 13.3 Auto Fuzz 引擎
+
+自动对反射型注入点进行深度模糊测试，分为两个阶段。
+
+**Phase 1 — 探针过滤：**
+- 使用轻量级探针载荷（`<xss>`）对每个注入点测试
+- 分析反射上下文（script 标签 / HTML 属性 / 标签注入 / 纯文本）
+- 仅对确认反射的注入点进入 Phase 2，跳过无反射的输入点
+
+**Phase 2 — 上下文感知载荷：**
+- 根据每个注入点的反射上下文自动选择最匹配的载荷集：
+
+| 反射上下文 | 载荷策略 | 示例载荷 |
+|-----------|---------|---------|
+| `<script>` 标签内 | 闭合 script + 表达式注入 | `</script><script>alert(1)</script>`、`${alert(1)}` |
+| HTML 属性值内 | 引号逃逸 + 事件注入 | `"><img src=x onerror=alert(1)>` |
+| HTML 属性名 | 标签闭合 + SVG/script | `"><svg onload=alert(1)>` |
+| 标签上下文 | 闭合标签 + 注入新标签 | `><script>alert(1)</script>` |
+| HTML 文本 | 直接标签注入 | `<img src=x onerror=alert(1)>` |
+
+- 每个反射点独立测试，互不干扰
+- 进度实时显示当前注入点和上下文信息
+
 ### 13.2 DOM Sink 分析
 
 分析页面中危险的 DOM Sink 点，发现潜在的 DOM XSS。
@@ -696,13 +723,12 @@ PHP 一句话木马和混淆 WebShell：
 
 ### 14.2 API 端点发现
 
-从模块源码中自动提取 API 端点路径。
+从模块源码中自动提取 REST API、GraphQL 和 WebSocket 端点。
 
 **提取规则：**
-- `fetch('/api/...')` 调用
-- `axios.get/post/put/delete('/api/...')` 调用
-- `request({ url: '/api/...' })` 调用
-- 字符串中的 URL 模式
+- REST API — `fetch()`、`axios.get/post/put/delete()`、`request({ url })`、`/api/` 路径模式
+- GraphQL — `gql` 模板字面量、`/graphql` 端点、`query/mutation/subscription` 定义
+- WebSocket — `new WebSocket()`、`wss://` URL、`socket.io` 连接
 
 ### 14.3 安全发现
 
@@ -916,7 +942,7 @@ RuoYi 后台管理系统的路由分析与权限测试工具。发现被权限�
 
 ### 22.1 技术指纹
 
-识别网站使用的全部技术栈，覆盖 19 个分类、97 项技术。
+识别网站使用的全部技术栈，覆盖 19 个分类、~112 项技术。
 
 **信号采集：**
 - **DOM 信号** — meta 标签、body HTML、script src 属性
@@ -1113,7 +1139,7 @@ RuoYi 后台管理系统的路由分析与权限测试工具。发现被权限�
 
 聚合所有扫描模块的发现，生成综合渗透测试报告。
 
-**聚合模块（12 个）：**
+**聚合模块（18 个）：**
 
 | 模块 | 来源 |
 |------|------|
@@ -1129,13 +1155,25 @@ RuoYi 后台管理系统的路由分析与权限测试工具。发现被权限�
 | 目录扫描 | `vk-fuzz.js` |
 | JWT 分析 | `vk-jwt.js` |
 | 存储检查 | `vk-storage-check.js` |
+| Angular 分析 | `vk-angular.js` |
+| Svelte 分析 | `vk-svelte.js` |
+| 若依检测 | `vk-ruoyi.js` |
+| Vue 分析 | `vk-vue.js` |
+| React 分析 | `vk-react.js` |
+| SourceMap | `vk-sourcemap.js` |
 
 **一键审计：**
-自动执行 5 个核心扫描（技术栈识别 → XSS 注入点采集 → CORS 配置检测 → WAF 指纹检测 → Cookie 安全审计），进度条实时显示。
+自动执行 10+ 个核心扫描，根据嗅探结果动态追加框架检测步骤：
+
+1. 技术栈识别 → 2. 安全头检测 → 3. XSS 注入点采集 → 4. CORS 配置检测 → 5. WAF 指纹检测 → 6. Cookie 安全审计 → 7. 信息泄露扫描 → 8. JWT 令牌分析 → 9. Web 存储检查 → 10. 重定向检测
+11+. 如果嗅探检测到框架（Vue/React/Angular/Svelte），自动追加对应框架分析步骤
+
+进度条使用流光动画实时显示进度，完成后切换为绿色。
 
 **报告功能：**
 - 严重性分级（严重/高危/中危/低危/信息）自动排序
-- 内置仪表盘（彩色统计卡片）
+- 内置仪表盘（彩色统计卡片 + 模块覆盖网格）
+- **Markdown 摘要** — 自动生成简洁 Markdown 摘要，包含目标、时间、覆盖模块数、高危发现列表和统计表格，一键复制到剪贴板
 - 导出 HTML 报告（独立文件，含样式，可打印）
 - 导出 Markdown 报告
 
