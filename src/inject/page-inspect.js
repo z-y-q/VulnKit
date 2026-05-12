@@ -364,6 +364,70 @@
       }
     }
 
+    // React DOM-based detection (for production builds)
+    var reactDetected =
+      detectedGlobals.indexOf('React') !== -1 || detectedGlobals.indexOf('ReactDOM') !== -1;
+    if (!reactDetected) {
+      try {
+        var reactFound = false;
+        var sampleEls = document.querySelectorAll(
+          '#root, #app, #__next, [data-reactroot], body > div'
+        );
+        if (sampleEls.length === 0) sampleEls = document.querySelectorAll('body > *');
+        for (var ri = 0; ri < Math.min(sampleEls.length, 10) && !reactFound; ri++) {
+          var rEl = sampleEls[ri];
+          // React 16+: fiber keys
+          var rKeys = Object.keys(rEl);
+          for (var rk = 0; rk < rKeys.length; rk++) {
+            if (
+              rKeys[rk].indexOf('__reactFiber$') === 0 ||
+              rKeys[rk].indexOf('__reactInternalInstance$') === 0
+            ) {
+              detectedGlobals.push('React (DOM)');
+              reactFound = true;
+              break;
+            }
+          }
+        }
+        if (!reactFound && document.querySelector('[data-reactroot]')) {
+          detectedGlobals.push('React (DOM)');
+        }
+        if (!reactFound && document.querySelector('[data-reactid]')) {
+          detectedGlobals.push('React (DOM)');
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    // Angular DOM-based detection
+    var angularDetected =
+      detectedGlobals.indexOf('ng') !== -1 ||
+      detectedGlobals.indexOf('angular') !== -1 ||
+      detectedGlobals.indexOf('Angular (zone)') !== -1;
+    if (!angularDetected) {
+      try {
+        var ngAppEl = document.querySelector('[ng-version]');
+        if (ngAppEl) {
+          detectedGlobals.push('Angular (DOM)');
+          var ngVer = ngAppEl.getAttribute('ng-version');
+          if (ngVer) {
+            versions['Angular (DOM)'] = ngVer;
+            versions['Angular'] = ngVer;
+          }
+        } else if (document.querySelector('[_nghost]') || document.querySelector('[_ngcontent]')) {
+          detectedGlobals.push('Angular (DOM)');
+        } else if (
+          document.querySelector('[ng-app]') ||
+          document.querySelector('[ng-controller]')
+        ) {
+          detectedGlobals.push('Angular (DOM)');
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
     // Cookies
     var cookies = '';
     try {

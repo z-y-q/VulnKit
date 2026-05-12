@@ -198,6 +198,18 @@ const TECH_SIGNATURES = [
     ],
   },
 
+  {
+    name: '若依框架',
+    category: '框架',
+    matchers: [
+      { source: 'scriptSrc', type: 'regex', value: /\/ruoyi\//i },
+      { source: 'meta', type: 'regex', value: /generator.*ruoyi/i },
+      { source: 'body', type: 'regex', value: /ruoyi-sidebar|ruoyi-vue|ruoyi-layout/i },
+      { source: 'body', type: 'regex', value: /若依|RuoYi\s*管理系统/i },
+      { source: 'classNames', type: 'regex', value: /ruoyi-/i },
+    ],
+  },
+
   // ====== CDN / WAF ======
   {
     name: 'Cloudflare',
@@ -270,6 +282,7 @@ const TECH_SIGNATURES = [
       { source: 'globals', type: 'equals', value: 'React' },
       { source: 'globals', type: 'equals', value: 'ReactDOM' },
       { source: 'globals', type: 'equals', value: 'React DevTools' },
+      { source: 'globals', type: 'equals', value: 'React (DOM)' },
     ],
   },
   {
@@ -279,6 +292,7 @@ const TECH_SIGNATURES = [
       { source: 'globals', type: 'equals', value: 'ng' },
       { source: 'globals', type: 'equals', value: 'angular' },
       { source: 'globals', type: 'equals', value: 'Angular (zone)' },
+      { source: 'globals', type: 'equals', value: 'Angular (DOM)' },
     ],
   },
   {

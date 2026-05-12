@@ -375,16 +375,38 @@ async function initApp() {
   initStatusBarAndKeyboard();
   initSharedEvents();
   initStateRestoration();
-  // 恢复嗅探角标
-  import('./vk-sniff-render.js')
-    .then(function (sniffRender) {
-      import('./vk-sniff-scanner.js').then(function (sniffScanner) {
-        if (sniffScanner.sniffState && sniffScanner.sniffState.lastResults) {
-          sniffRender.updateFrameworkBadges(sniffScanner.sniffState.lastResults);
+  // 恢复嗅探角标（优先 session storage 持久化，其次内存中的 sniffState）
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    if (!tabs || !tabs[0] || !tabs[0].id) return;
+    var tabId = tabs[0].id;
+    try {
+      chrome.storage.session.get('sniff_badges_' + tabId, function (data) {
+        var badgeMap = data['sniff_badges_' + tabId];
+        if (badgeMap && Object.keys(badgeMap).length > 0) {
+          import('./vk-sniff-render.js')
+            .then(function (sniffRender) {
+              sniffRender.restoreFrameworkBadges(badgeMap);
+            })
+            .catch(function () {});
+          return;
         }
+        // fallback: 尝试从 sniffState 内存恢复
+        import('./vk-sniff-scanner.js')
+          .then(function (sniffScanner) {
+            if (sniffScanner.sniffState && sniffScanner.sniffState.lastResults) {
+              import('./vk-sniff-render.js')
+                .then(function (sniffRender) {
+                  sniffRender.updateFrameworkBadges(sniffScanner.sniffState.lastResults);
+                })
+                .catch(function () {});
+            }
+          })
+          .catch(function () {});
       });
-    })
-    .catch(function () {});
+    } catch (e) {
+      /* session storage unavailable */
+    }
+  });
   // Deferred: restore gather/links cached data (fire-and-forget, no eager module parse)
   import('./vk-init-detectors.js')
     .then(function (mod) {

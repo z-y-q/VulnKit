@@ -10,6 +10,7 @@ var PANEL_MAP = {
   Angular: 'angular',
   Svelte: 'svelte',
   'Next.js': 'react',
+  '若依框架': 'ruoyi',
 };
 
 var SOURCE_LABELS = {
@@ -251,6 +252,16 @@ function updateFrameworkBadges(results) {
     badge.textContent = badgeMap[panelId];
     btn.appendChild(badge);
   });
+
+  // 持久化角标到 chrome.storage.session
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    if (!tabs || !tabs[0] || !tabs[0].id) return;
+    try {
+      chrome.storage.session.set({ 'sniff_badges_' + tabs[0].id: badgeMap });
+    } catch (e) {
+      /* session storage unavailable */
+    }
+  });
 }
 
 function renderAll(results) {
@@ -258,6 +269,21 @@ function renderAll(results) {
   renderCategoryFilter(results);
   renderResults(results, 'all');
   updateFrameworkBadges(results);
+}
+
+function restoreFrameworkBadges(badgeMap) {
+  document.querySelectorAll('.tab-btn .detect-badge').forEach(function (b) { b.remove(); });
+  document.querySelectorAll('.tab-btn.has-detect-badge').forEach(function (b) { b.classList.remove('has-detect-badge'); });
+  if (!badgeMap) return;
+  Object.keys(badgeMap).forEach(function (panelId) {
+    var btn = document.querySelector('.tab-btn[data-panel="' + panelId + '"]');
+    if (!btn) return;
+    btn.classList.add('has-detect-badge');
+    var badge = document.createElement('span');
+    badge.className = 'detect-badge';
+    badge.textContent = badgeMap[panelId];
+    btn.appendChild(badge);
+  });
 }
 
 function copyResults() {
@@ -307,4 +333,4 @@ function exportResults() {
   utils.showToast('已导出 JSON', 'success');
 }
 
-export { renderAll, copyResults, exportResults, updateFrameworkBadges };
+export { renderAll, copyResults, exportResults, updateFrameworkBadges, restoreFrameworkBadges };
