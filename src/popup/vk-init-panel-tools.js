@@ -359,6 +359,9 @@ function initXssAndSourcemap(bindFilterSearch) {
     utils.bindClick('xssscan-export-btn', xss.xssExportData);
     utils.bindClick('xss-send-console-btn', xss.sendToConsole);
     utils.bindClick('xssscan-sink-btn', xss.analyzeDomSinks);
+    utils.bindClick('xssscan-autofuzz-btn', xss.handleAutoFuzz);
+    utils.bindClick('xssscan-autofuzz-stop-btn', xss.handleStopAutoFuzz);
+    utils.bindClick('xssscan-autofuzz-export-btn', xss.handleAutoFuzzExport);
     utils.bindClick('xssscan-sink-clear-btn', function () {
       utils.setEmpty('xssscan-sink-results', '暂无分析结果');
       var st = utils.get('xssscan-sink-status');

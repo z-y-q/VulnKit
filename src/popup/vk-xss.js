@@ -25,6 +25,14 @@ import {
   updateXssInterceptStatus,
   harvestXssParamsFromDom,
 } from './vk-xss-intercept.js';
+import {
+  runAutoFuzz,
+  stopAutoFuzz,
+  renderAutoFuzzResults,
+  exportAutoFuzzResults,
+  getAutoFuzzFindings,
+  autofuzzState,
+} from './vk-xss-autofuzz.js';
 
 var REFLECTION_PROBE = 'vkprobe\'"><xyz';
 
@@ -461,18 +469,50 @@ var setFilter = function (v) {
 };
 var setSearch = setXssSearchText;
 
+// ====== Auto Fuzz handlers ======
+
+async function handleAutoFuzz() {
+  var selected = getSelectedXssPoints();
+  if (selected.length === 0) {
+    utils.showToast('没有选中的注入点', 'warning');
+    return;
+  }
+  var ok = await utils.confirmDanger('即将对 ' + selected.length + ' 个注入点进行自动 Fuzz 测试');
+  if (!ok) return;
+  var statusEl = utils.get('xssscan-autofuzz-status');
+  var panel = utils.get('xssscan-autofuzz-results');
+  var container = utils.get('xssscan-autofuzz-list');
+  if (panel) panel.style.display = '';
+  var results = await runAutoFuzz(selected, 5, function (progress) {
+    if (statusEl) statusEl.textContent = progress.text;
+  });
+  renderAutoFuzzResults(container, results);
+}
+
+function handleStopAutoFuzz() {
+  stopAutoFuzz();
+  var statusEl = utils.get('xssscan-autofuzz-status');
+  if (statusEl) statusEl.textContent = '正在停止...';
+}
+
+function handleAutoFuzzExport() {
+  exportAutoFuzzResults('csv');
+}
+
 // ====== getFindings for unified report ======
 
 function getFindings() {
-  return xssPoints.map(function (p) {
+  var pointFindings = xssPoints.map(function (p) {
     return {
       severity: 'high',
       title: 'XSS 注入点',
-      detail: `${p.source} | ${p.param} (${p.method})`,
+      detail: p.source + ' | ' + p.param + ' (' + p.method + ')',
       module: 'xss',
       url: p.url,
     };
   });
+  var fuzzFindings = getAutoFuzzFindings();
+  return pointFindings.concat(fuzzFindings);
 }
 
 // ====== Export ======
@@ -500,6 +540,9 @@ export {
   setSearch,
   getFindings,
   sendToConsole,
+  handleAutoFuzz,
+  handleStopAutoFuzz,
+  handleAutoFuzzExport,
 };
 
 function sendToConsole() {
