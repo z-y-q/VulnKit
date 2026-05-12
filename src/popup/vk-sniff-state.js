@@ -260,6 +260,7 @@ const TECH_SIGNATURES = [
       { source: 'globals', type: 'equals', value: 'Vue' },
       { source: 'globals', type: 'equals', value: 'Vue (devtools)' },
       { source: 'globals', type: 'equals', value: 'Vue Router' },
+      { source: 'globals', type: 'equals', value: 'Vue.js (DOM)' },
     ],
   },
   {

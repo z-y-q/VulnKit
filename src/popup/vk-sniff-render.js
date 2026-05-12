@@ -224,10 +224,40 @@ function renderResults(results, categoryFilter) {
   }
 }
 
+function updateFrameworkBadges(results) {
+  document.querySelectorAll('.tab-btn .detect-badge').forEach(function (b) {
+    b.remove();
+  });
+  document.querySelectorAll('.tab-btn.has-detect-badge').forEach(function (b) {
+    b.classList.remove('has-detect-badge');
+  });
+  if (!results || results.length === 0) return;
+
+  var badgeMap = {};
+  results.forEach(function (r) {
+    var panelId = PANEL_MAP[r.name];
+    if (!panelId) return;
+    if (!badgeMap[panelId] && r.version) {
+      badgeMap[panelId] = r.version;
+    }
+  });
+
+  Object.keys(badgeMap).forEach(function (panelId) {
+    var btn = document.querySelector('.tab-btn[data-panel="' + panelId + '"]');
+    if (!btn) return;
+    btn.classList.add('has-detect-badge');
+    var badge = document.createElement('span');
+    badge.className = 'detect-badge';
+    badge.textContent = badgeMap[panelId];
+    btn.appendChild(badge);
+  });
+}
+
 function renderAll(results) {
   renderSummary(results);
   renderCategoryFilter(results);
   renderResults(results, 'all');
+  updateFrameworkBadges(results);
 }
 
 function copyResults() {
@@ -277,4 +307,4 @@ function exportResults() {
   utils.showToast('已导出 JSON', 'success');
 }
 
-export { renderAll, copyResults, exportResults };
+export { renderAll, copyResults, exportResults, updateFrameworkBadges };

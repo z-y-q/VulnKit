@@ -293,6 +293,77 @@
       }
     });
 
+    // Vue DOM-based detection (for production builds where window.Vue is unavailable)
+    var vueDetected =
+      detectedGlobals.indexOf('Vue.js') !== -1 || detectedGlobals.indexOf('Vue (devtools)') !== -1;
+    if (!vueDetected) {
+      try {
+        var vueSelectors = [
+          '#app',
+          '[data-v-app]',
+          '[id^="app"]',
+          '#root',
+          '#application',
+          '#main',
+        ];
+        var vueFound = false;
+        for (var vi = 0; vi < vueSelectors.length && !vueFound; vi++) {
+          var mountEl = document.querySelector(vueSelectors[vi]);
+          if (!mountEl) continue;
+          // Vue 3: __vue_app__
+          if (mountEl.__vue_app__) {
+            detectedGlobals.push('Vue.js (DOM)');
+            var v3ver = mountEl.__vue_app__.version;
+            if (v3ver) {
+              versions['Vue.js (DOM)'] = v3ver;
+              versions['Vue.js'] = v3ver;
+            }
+            vueFound = true;
+            break;
+          }
+          // Vue 2: __vue__
+          if (mountEl.__vue__) {
+            var vm = mountEl.__vue__.$root || mountEl.__vue__;
+            var v2ver =
+              (vm && vm.$options && vm.$options.version) ||
+              (mountEl.__vue__.constructor && mountEl.__vue__.constructor.version) ||
+              null;
+            detectedGlobals.push('Vue.js (DOM)');
+            if (v2ver) {
+              versions['Vue.js (DOM)'] = v2ver;
+              versions['Vue.js'] = v2ver;
+            }
+            vueFound = true;
+            break;
+          }
+        }
+        // Fallback: scan any element with data-v-* (Vue SFC scoped style)
+        if (!vueFound) {
+          var scopedEl = document.querySelector('[data-v-app]');
+          if (!scopedEl) scopedEl = document.querySelector('[data-v-]');
+          if (!scopedEl) {
+            var allEls = document.querySelectorAll('*');
+            for (var sv = 0; sv < Math.min(allEls.length, 500); sv++) {
+              var elAttrs = allEls[sv].attributes;
+              if (!elAttrs) continue;
+              for (var ai = 0; ai < elAttrs.length; ai++) {
+                if (elAttrs[ai].name.indexOf('data-v-') === 0) {
+                  scopedEl = allEls[sv];
+                  break;
+                }
+              }
+              if (scopedEl) break;
+            }
+          }
+          if (scopedEl) {
+            detectedGlobals.push('Vue.js (DOM)');
+          }
+        }
+      } catch (e) {
+        /* ignore DOM access errors */
+      }
+    }
+
     // Cookies
     var cookies = '';
     try {

@@ -375,6 +375,16 @@ async function initApp() {
   initStatusBarAndKeyboard();
   initSharedEvents();
   initStateRestoration();
+  // 恢复嗅探角标
+  import('./vk-sniff-render.js')
+    .then(function (sniffRender) {
+      import('./vk-sniff-scanner.js').then(function (sniffScanner) {
+        if (sniffScanner.sniffState && sniffScanner.sniffState.lastResults) {
+          sniffRender.updateFrameworkBadges(sniffScanner.sniffState.lastResults);
+        }
+      });
+    })
+    .catch(function () {});
   // Deferred: restore gather/links cached data (fire-and-forget, no eager module parse)
   import('./vk-init-detectors.js')
     .then(function (mod) {

@@ -591,6 +591,40 @@ body {
   background: rgba(255, 255, 255, 0.7);
 }
 
+/* 框架检测角标 */
+.tab-btn.has-detect-badge::after {
+  display: none;
+}
+.detect-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 28px;
+  height: 14px;
+  line-height: 14px;
+  padding: 0 4px;
+  background: #e74c3c;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 7px;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.tab-btn.active .detect-badge {
+  background: rgba(255,255,255,0.3);
+  color: #4A90E2;
+}
+[data-theme='dark'] .detect-badge {
+  background: #e74c3c;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+[data-theme='dark'] .tab-btn.active .detect-badge {
+  background: rgba(255,255,255,0.2);
+  color: var(--accent);
+}
+
 .tab-btn.category-filtered {
   display: none !important;
 }
