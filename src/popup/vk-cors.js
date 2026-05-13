@@ -726,4 +726,5 @@ export {
   sortResults,
   verifyCredentials,
   getFindings,
+  analyzeResults,
 };

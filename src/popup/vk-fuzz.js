@@ -767,4 +767,8 @@ export {
   setSearch,
   setFuzzTarget,
   sortResults,
+  extractHeader,
+  extractContentLength,
+  analyzeContent,
+  formatSize,
 };

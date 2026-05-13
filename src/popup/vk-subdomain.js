@@ -1144,4 +1144,5 @@ export {
   getFindings,
   sendToFuzz,
   sortResults,
+  extractBaseDomain,
 };
