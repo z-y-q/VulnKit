@@ -515,9 +515,14 @@ function restoreData(url) {
           loadedRules.length > 0
             ? loadedRules
             : getHaeRules()
-              ? getHaeRules().getDefaultRules()
+              ? getHaeRules().getDefaultRulesCopy()
               : [];
-        renderSubTabs();
+        loadedRules.then
+          ? loadedRules.then(function (r) {
+              loadedRules = r;
+              renderSubTabs();
+            })
+          : renderSubTabs();
       }
       const firstGroup = Object.keys(gatherData)[0] || DOM_GROUP;
       currentGatherTab = firstGroup;

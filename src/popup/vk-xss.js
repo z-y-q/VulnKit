@@ -3,7 +3,15 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 import { XSS_DATA } from './vk-payload-data.js';
-import { XSS_SCAN_PAYLOADS } from './vk-xss-data.js';
+import { getXssScanPayloads } from './vk-xss-data.js';
+
+var _scanPayloads = null;
+
+async function ensureXssPayloads() {
+  if (_scanPayloads) return _scanPayloads;
+  _scanPayloads = await getXssScanPayloads();
+  return _scanPayloads;
+}
 import { analyzeDomSinks } from './vk-xss-sinks.js';
 import { COPY_SVG } from './vk-icons.js';
 import { saveScanResult } from './vk-scan-history.js';
@@ -207,7 +215,7 @@ function getSelectedPayload() {
   const customEl = utils.get('xssscan-custom-payload');
   if (customEl && customEl.value.trim()) return customEl.value.trim();
   if (selectEl && selectEl.value) return selectEl.value;
-  return XSS_SCAN_PAYLOADS[0].value;
+  return _scanPayloads ? _scanPayloads[0].value : '<script>console.log(1)</script>';
 }
 
 function getEncodedPayload() {
@@ -447,10 +455,11 @@ function copyMarkdown() {
 
 // ====== Init / Clear / Export ======
 
-function initXssScanPayloadSelect() {
+async function initXssScanPayloadSelect() {
+  const payloads = await ensureXssPayloads();
   const select = utils.get('xssscan-payload-select');
   if (!select) return;
-  XSS_SCAN_PAYLOADS.forEach(p => {
+  payloads.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p.value;
     opt.textContent = p.name;

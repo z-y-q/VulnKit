@@ -1,7 +1,7 @@
 // 灵眸 - HaE Rules Engine
 'use strict';
 
-import { DEFAULT_RULES } from './vk-hae-default-rules.js';
+import { getDefaultRules } from './vk-hae-default-rules.js';
 
 const STORAGE_KEY = 'haeRules';
 const PAGE_SCOPE = ['response body', 'response', 'any', 'request', 'response header', 'any header'];
@@ -89,8 +89,9 @@ function getGroups(rules) {
   });
 }
 
-function getDefaultRules() {
-  return JSON.parse(JSON.stringify(DEFAULT_RULES));
+async function getDefaultRulesCopy() {
+  const rules = await getDefaultRules();
+  return JSON.parse(JSON.stringify(rules));
 }
 
 function parseYaml(yamlText) {
@@ -200,7 +201,7 @@ function quoteYamlString(str) {
   return str;
 }
 
-function loadRules(callback) {
+async function loadRules(callback) {
   chrome.storage.local.get(STORAGE_KEY, function (result) {
     if (result[STORAGE_KEY]) {
       try {
@@ -210,9 +211,10 @@ function loadRules(callback) {
         // corrupted, use default
       }
     }
-    const defaults = getDefaultRules();
-    saveRules(defaults);
-    callback(defaults);
+    getDefaultRulesCopy().then(function (defaults) {
+      saveRules(defaults);
+      callback(defaults);
+    });
   });
 }
 
@@ -249,7 +251,7 @@ function importRules(yamlText) {
 export {
   applyFormat,
   matchSingleRule,
-  getDefaultRules,
+  getDefaultRulesCopy,
   matchRules,
   getGroups,
   parseYaml,

@@ -332,7 +332,7 @@ function initXssAndSourcemap(bindFilterSearch) {
     var xss = mods[0];
     var sourcemap = mods[1];
 
-    xss.initXssScanPayloadSelect();
+    xss.initXssScanPayloadSelect().catch(function () {});
     utils.bindPersist('xssscan-payload-select');
     utils.bindPersist('xssscan-encoding');
     utils.bindClick('xssscan-harvest-btn', xss.handleXssHarvest);

@@ -690,7 +690,57 @@ function loadDefaultFromPopup(filePath, varName) {
 }
 
 function loadDefaultForConfig(config) {
-  return loadDefaultFromPopup(config.defaultSource.file, config.defaultSource.varName);
+  var src = config.defaultSource;
+  if (src.jsonFile) {
+    return loadDefaultFromJson(src.jsonFile, src.dataKey);
+  }
+  return loadDefaultFromPopup(src.file, src.varName);
+}
+
+function hydrateRegexFields(obj) {
+  if (obj === null || obj === undefined) return obj;
+  if (obj.__regexp__) {
+    return new RegExp(obj.source, obj.flags || '');
+  }
+  if (Array.isArray(obj)) {
+    for (var i = 0; i < obj.length; i++) {
+      obj[i] = hydrateRegexFields(obj[i]);
+    }
+    return obj;
+  }
+  if (typeof obj === 'object') {
+    var keys = Object.keys(obj);
+    for (var k = 0; k < keys.length; k++) {
+      var val = obj[keys[k]];
+      if (val !== null && val !== undefined && typeof val === 'object') {
+        obj[keys[k]] = hydrateRegexFields(val);
+      }
+    }
+  }
+  return obj;
+}
+
+function loadDefaultFromJson(jsonFile, dataKey) {
+  var cacheKey = 'json::' + jsonFile + (dataKey ? '::' + dataKey : '');
+  if (_defaultCache[cacheKey] !== undefined) {
+    return Promise.resolve(_defaultCache[cacheKey]);
+  }
+  var url = chrome.runtime.getURL('src/popup/' + jsonFile);
+  return fetch(url)
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var target = dataKey ? data[dataKey] : data;
+      hydrateRegexFields(target);
+      _defaultCache[cacheKey] = target;
+      return target;
+    })
+    .catch(function (err) {
+      console.error('[rule-manager] loadDefaultFromJson failed:', jsonFile, err);
+      return null;
+    });
 }
 
 // ====== Storage Layer ======
@@ -1447,7 +1497,11 @@ function resetToDefaults(config) {
   var obj = {};
   obj[config.storageKey] = null;
   chrome.storage.local.remove(config.storageKey, function () {
-    delete _defaultCache[config.defaultSource.file + '::' + config.defaultSource.varName];
+    var src = config.defaultSource;
+    var cacheKey = src.jsonFile
+      ? 'json::' + src.jsonFile + (src.dataKey ? '::' + src.dataKey : '')
+      : src.file + '::' + src.varName;
+    delete _defaultCache[cacheKey];
     renderCurrentSection();
     showStatus('已恢复为默认数据', 'success');
   });

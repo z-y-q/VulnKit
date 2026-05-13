@@ -3,18 +3,34 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 import {
-  CONTEXT_PAYLOADS,
-  SINK_PATTERNS,
-  SANITIZER_PATTERNS,
   SEVERITY_CONFIG,
+  getContextPayloads as loadContextPayloads,
+  getSinkPatterns,
+  getSanitizerPatterns,
 } from './vk-xss-data.js';
+
+var _sinkPatterns = null;
+var _sanitizerPatterns = null;
+var _contextPayloads = null;
+
+async function ensureSinkData() {
+  if (_sinkPatterns) return;
+  var results = await Promise.all([
+    getSinkPatterns(),
+    getSanitizerPatterns(),
+    loadContextPayloads(),
+  ]);
+  _sinkPatterns = results[0];
+  _sanitizerPatterns = results[1];
+  _contextPayloads = results[2];
+}
 
 let domSinks = [];
 
 function analyzeSingleSink(sink) {
   let code = sink.code || '';
   let matchedPatterns = [];
-  SINK_PATTERNS.forEach(function (sp) {
+  _sinkPatterns.forEach(function (sp) {
     let regex = new RegExp(sp.regex.source, sp.regex.flags);
     let matches = code.match(regex);
     if (matches && matches.length > 0) {
@@ -26,7 +42,7 @@ function analyzeSingleSink(sink) {
   }
   let sanitizers = [];
   let totalReduction = 0;
-  SANITIZER_PATTERNS.forEach(function (sp) {
+  _sanitizerPatterns.forEach(function (sp) {
     let regex = new RegExp(sp.regex.source, sp.regex.flags);
     if (regex.test(code)) {
       sanitizers.push(sp.name);
@@ -71,10 +87,10 @@ function analyzeSingleSink(sink) {
   });
 }
 
-function getContextPayloads(sink) {
+function getContextPayloadsForSink(sink) {
   let payloads = [];
   (sink.contexts || []).forEach(function (ctx) {
-    let ctxPayloads = CONTEXT_PAYLOADS[ctx];
+    let ctxPayloads = _contextPayloads[ctx];
     if (ctxPayloads) {
       payloads = payloads.concat(ctxPayloads);
     }
@@ -114,10 +130,10 @@ function renderDomSinks() {
       })
       .join('');
     html += `<div class="xssscan-sink-item">
-<div class="xssscan-sink-header">
-<span class="xssscan-severity-badge" style="background:${sevConf.color}">${sevConf.label}</span>
-<span class="xssscan-score-badge">评分: ${sink.score}/10</span>
-<span class="xssscan-source-label">${sourceLabels[sink.source] || sink.source}</span>`;
+	<div class="xssscan-sink-header">
+	<span class="xssscan-severity-badge" style="background:${sevConf.color}">${sevConf.label}</span>
+	<span class="xssscan-score-badge">评分: ${sink.score}/10</span>
+	<span class="xssscan-source-label">${sourceLabels[sink.source] || sink.source}</span>`;
     if (sink.sinkCount > 1) {
       html += `<span class="xssscan-count-tag">x${sink.sinkCount}</span>`;
     }
@@ -127,7 +143,7 @@ function renderDomSinks() {
     if (contextTags) {
       html += `<div class="xssscan-sink-contexts">${contextTags}</div>`;
     }
-    let ctxPayloads = getContextPayloads(sink);
+    let ctxPayloads = getContextPayloadsForSink(sink);
     if (ctxPayloads.length > 0) {
       html += '<div class="xssscan-sink-payloads">';
       ctxPayloads.slice(0, 3).forEach(function (p) {
@@ -153,6 +169,8 @@ function renderDomSinks() {
 }
 
 async function analyzeDomSinks() {
+  await ensureSinkData();
+
   const tab = await utils.requireTabId();
   if (!tab) return [];
   const statusEl = utils.get('xssscan-sink-status');
@@ -256,4 +274,4 @@ async function analyzeDomSinks() {
   }
 }
 
-export { analyzeSingleSink, getContextPayloads, analyzeDomSinks, domSinks };
+export { analyzeDomSinks, domSinks };

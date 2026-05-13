@@ -1,0 +1,311 @@
+{
+  "XSS_SCAN_PAYLOADS": [
+    { "name": "console.log", "value": "<script>console.log(1)</script>" },
+    { "name": "img onerror", "value": "<img src=x onerror=console.log(1)>" },
+    { "name": "svg onload", "value": "<svg onload=console.log(1)>" },
+    { "name": "body onload", "value": "<body onload=console.log(1)>" },
+    { "name": "svg script", "value": "<svg><script>console.log(1)</script></svg>" },
+    { "name": "details ontoggle", "value": "<details open ontoggle=console.log(1)>" },
+    { "name": "img src onerror", "value": "<img src=1 onerror=console.log(1)>" },
+    { "name": "input onfocus", "value": "<input onfocus=console.log(1) autofocus>" },
+    { "name": "marquee onstart", "value": "<marquee onstart=console.log(1)>" },
+    { "name": "select onchange", "value": "<select onchange=console.log(1)><option>1</option></select>" },
+    { "name": "textarea onfocus", "value": "<textarea onfocus=console.log(1) autofocus>" },
+    { "name": "keyframe anim", "value": "<style>@keyframes x{}</style><div style=\"animation-name:x\" onanimationstart=\"console.log(1)\">" },
+    { "name": "math xss", "value": "<math><mtext><table><mglyph><style><!--</style><img title=\"--><img src=1 onerror=console.log(1)>" },
+    { "name": "h1 inject", "value": "<h1>xss</h1>" },
+    { "name": "a href js", "value": "<a href=\"javascript:console.log(1)\">click</a>" },
+    { "name": "constructor", "value": "''.constructor.constructor('console.log(1)')()" },
+    { "name": "mXSS-SVG", "value": "<svg><style></style><img src=x onerror=console.log(1)>" },
+    { "name": "mXSS-Math", "value": "<math><mtext><table><mglyph><style><!--</style><img src=x onerror=console.log(1)>" },
+    { "name": "DOM-Clobber", "value": "<form id=x><input name=y></form><img src=x onerror=console.log(x.y)>" },
+    { "name": "Template-Literal", "value": "`;console.log(1)//`" },
+    { "name": "Import-Mapping", "value": "<script type=\"importmap\">{\"imports\":{\"x\":\"data:text/javascript,console.log(1)\"}}</script><script>import\"x\"</script>" }
+  ],
+  "CONTEXT_PAYLOADS": {
+    "innerHTML": [
+      "<img src=x onerror=console.log(1)>",
+      "<svg onload=console.log(1)>",
+      "<details open ontoggle=console.log(1)>",
+      "<math><mtext><table><mglyph><style><!--</style><img title=\"--><img src=1 onerror=console.log(1)>",
+      "<style>@keyframes x{}</style><div style=\"animation-name:x\" onanimationstart=\"console.log(1)\">"
+    ],
+    "outerHTML": [
+      "<img src=x onerror=console.log(1)>",
+      "<svg onload=console.log(1)>",
+      "<details open ontoggle=console.log(1)>"
+    ],
+    "documentWrite": [
+      "<script>console.log(1)</script>",
+      "<img src=x onerror=console.log(1)>",
+      "<svg onload=console.log(1)>"
+    ],
+    "eval": [
+      "console.log(1)",
+      "''.constructor.constructor('console.log(1)')()"
+    ],
+    "location": [
+      "javascript:console.log(1)"
+    ],
+    "setTimeout": [
+      "console.log(1)",
+      "eval('console.log(1)')"
+    ],
+    "srcdoc": [
+      "<script>console.log(1)</script>",
+      "<img src=x onerror=console.log(1)>"
+    ],
+    "attribute": [
+      "\" onerror=console.log(1) ",
+      "\" onfocus=console.log(1) autofocus=\"",
+      "\" onmouseover=console.log(1) \"",
+      "\" onfocus=console.log(1) autofocus=\"",
+      "' onfocus=console.log(1) autofocus='",
+      "` onfocus=console.log(1) autofocus=`"
+    ],
+    "script-src": [
+      "\";console.log(1)//",
+      "';console.log(1)//",
+      "</script><script>console.log(1)</script>"
+    ],
+    "url": [
+      "javascript:console.log(1)"
+    ],
+    "insertAdjacentHTML": [
+      "<img src=x onerror=console.log(1)>",
+      "<svg onload=console.log(1)>",
+      "<details open ontoggle=console.log(1)>"
+    ],
+    "createContextualFragment": [
+      "<img src=x onerror=console.log(1)>",
+      "<svg onload=console.log(1)>",
+      "<details open ontoggle=console.log(1)>"
+    ],
+    "scriptSrc": [
+      "javascript:console.log(1)"
+    ],
+    "iframeWrite": [
+      "<script>console.log(parent.document.cookie)</script>",
+      "<img src=x onerror=console.log(parent.document.cookie)>"
+    ]
+  },
+  "SINK_PATTERNS": [
+    {
+      "context": "innerHTML",
+      "regex": { "__regexp__": true, "source": "\\.innerHTML\\s*=|\\.innerHTML\\s*\\+", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "outerHTML",
+      "regex": { "__regexp__": true, "source": "\\.outerHTML\\s*=|\\.outerHTML\\s*\\+", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "documentWrite",
+      "regex": { "__regexp__": true, "source": "document\\.write\\(|document\\.writeln\\(", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "eval",
+      "regex": { "__regexp__": true, "source": "\\beval\\s*\\(|\\bnew\\s+Function\\s*\\(", "flags": "g" },
+      "severity": "critical"
+    },
+    {
+      "context": "setTimeout",
+      "regex": { "__regexp__": true, "source": "setTimeout\\s*\\(\\s*['\\\"`]", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "setInterval",
+      "regex": { "__regexp__": true, "source": "setInterval\\s*\\(\\s*['\\\"`]", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "location",
+      "regex": { "__regexp__": true, "source": "(?:window\\.)?location\\s*[\\.\\[]|location\\s*=\\s*['\\\"`]", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "srcdoc",
+      "regex": { "__regexp__": true, "source": "srcdoc\\s*=\\s*", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "attribute",
+      "regex": { "__regexp__": true, "source": "setAttribute\\s*\\(\\s*['\\\"`](?:on[a-z]+|href|src|action|style)['\\\"`]", "flags": "gi" },
+      "severity": "medium"
+    },
+    {
+      "context": "url",
+      "regex": { "__regexp__": true, "source": "(?:href|src|action)\\s*=\\s*(?:location|window\\.location|document\\.URL)", "flags": "gi" },
+      "severity": "medium"
+    },
+    {
+      "context": "eval",
+      "regex": { "__regexp__": true, "source": "\\bexecScript\\s*\\(", "flags": "g" },
+      "severity": "critical"
+    },
+    {
+      "context": "eval",
+      "regex": { "__regexp__": true, "source": "\\bFunction\\s*\\(\\s*['\\\"`]", "flags": "g" },
+      "severity": "critical"
+    },
+    {
+      "context": "innerHTML",
+      "regex": { "__regexp__": true, "source": "(?:insertAdjacentHTML|\\.append|\\.before|\\.after|\\.insertBefore|\\.replaceChildren)\\s*\\(", "flags": "g" },
+      "severity": "medium"
+    },
+    {
+      "context": "insertAdjacentHTML",
+      "regex": { "__regexp__": true, "source": "insertAdjacentHTML\\s*\\(\\s*['\\\"`]", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "createContextualFragment",
+      "regex": { "__regexp__": true, "source": "createContextualFragment\\s*\\(", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "scriptSrc",
+      "regex": { "__regexp__": true, "source": "\\.src\\s*=\\s*(?:location|document\\.URL|window\\.location|[^\"'\\s]*\\+[^\"'\\s]*)", "flags": "g" },
+      "severity": "critical"
+    },
+    {
+      "context": "iframeWrite",
+      "regex": { "__regexp__": true, "source": "(?:contentDocument|contentWindow\\.document)\\.write\\s*\\(", "flags": "g" },
+      "severity": "critical"
+    },
+    {
+      "context": "eval",
+      "regex": { "__regexp__": true, "source": "(?:chrome\\.runtime\\.sendMessage|browser\\.runtime\\.sendMessage)\\s*\\(\\s*\\[\\s*['\\\"`]", "flags": "g" },
+      "severity": "medium"
+    },
+    {
+      "context": "location",
+      "regex": { "__regexp__": true, "source": "(?:window\\.)?open\\s*\\(\\s*(?:location|document\\.URL|window\\.location)", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "eval",
+      "regex": { "__regexp__": true, "source": "import\\s*\\(\\s*(?:location|document\\.URL|\\+)", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "dom",
+      "regex": { "__regexp__": true, "source": "\\b(location|document\\.location|window\\.location)\\s*[=+]", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "dom",
+      "regex": { "__regexp__": true, "source": "\\bdocument\\.write(ln)?\\s*\\(", "flags": "g" },
+      "severity": "high"
+    },
+    {
+      "context": "dom",
+      "regex": { "__regexp__": true, "source": "\\binnerHTML\\s*[=+]", "flags": "g" },
+      "severity": "medium"
+    },
+    {
+      "context": "dom",
+      "regex": { "__regexp__": true, "source": "\\boutertext\\s*[=+]", "flags": "g" },
+      "severity": "medium"
+    },
+    {
+      "context": "template",
+      "regex": { "__regexp__": true, "source": "\\{\\{.*\\}\\}", "flags": "g" },
+      "severity": "info"
+    },
+    {
+      "context": "csp",
+      "regex": { "__regexp__": true, "source": "script-src[^;]*", "flags": "g" },
+      "severity": "info"
+    }
+  ],
+  "SANITIZER_PATTERNS": [
+    {
+      "name": "DOMPurify",
+      "regex": { "__regexp__": true, "source": "DOMPurify\\.sanitize", "flags": "i" },
+      "reduction": 5
+    },
+    {
+      "name": "Trusted Types",
+      "regex": { "__regexp__": true, "source": "createPolicy|trustedTypes", "flags": "i" },
+      "reduction": 6
+    },
+    {
+      "name": "escapeHtml",
+      "regex": { "__regexp__": true, "source": "escapeHtml|escapeXML|htmlEncode|sanitizeHtml", "flags": "i" },
+      "reduction": 3
+    },
+    {
+      "name": "textContent",
+      "regex": { "__regexp__": true, "source": "\\.textContent\\s*=", "flags": "" },
+      "reduction": 4
+    },
+    {
+      "name": "innerText",
+      "regex": { "__regexp__": true, "source": "\\.innerText\\s*=", "flags": "" },
+      "reduction": 3
+    },
+    {
+      "name": "encodeURIComponent",
+      "regex": { "__regexp__": true, "source": "encodeURIComponent", "flags": "i" },
+      "reduction": 2
+    },
+    {
+      "name": "TextEncoder",
+      "regex": { "__regexp__": true, "source": "new\\s+TextEncoder", "flags": "i" },
+      "reduction": 2
+    },
+    {
+      "name": "JSON.stringify",
+      "regex": { "__regexp__": true, "source": "JSON\\.stringify", "flags": "i" },
+      "reduction": 1
+    },
+    {
+      "name": "parseInt/parseFloat",
+      "regex": { "__regexp__": true, "source": "\\b(?:parseInt|parseFloat)\\s*\\(", "flags": "" },
+      "reduction": 4
+    },
+    {
+      "name": "Number()",
+      "regex": { "__regexp__": true, "source": "Number\\s*\\([^)]*\\)", "flags": "" },
+      "reduction": 4
+    },
+    {
+      "name": "typeof check",
+      "regex": { "__regexp__": true, "source": "typeof\\s+\\w+\\s*===?\\s*['\\\"`](?:string|number)", "flags": "" },
+      "reduction": 3
+    },
+    {
+      "name": "CSP nonce",
+      "regex": { "__regexp__": true, "source": "nonce[=:_-]", "flags": "i" },
+      "reduction": 3
+    },
+    {
+      "name": "Angular sanitization",
+      "regex": { "__regexp__": true, "source": "\\$sce|DomSanitizer|sanitize\\.html", "flags": "i" },
+      "reduction": 5
+    },
+    {
+      "name": "Vue v-html",
+      "regex": { "__regexp__": true, "source": "v-html", "flags": "i" },
+      "reduction": -2
+    },
+    {
+      "name": "Sanitizer API",
+      "regex": { "__regexp__": true, "source": "new\\s+Sanitizer\\b", "flags": "i" },
+      "reduction": 4
+    },
+    {
+      "name": "URL validation",
+      "regex": { "__regexp__": true, "source": "(?:new\\s+URL|isURL|isValidUrl)\\s*\\(", "flags": "" },
+      "reduction": 2
+    },
+    {
+      "name": "innerHTML forbidden",
+      "regex": { "__regexp__": true, "source": "trusted-types\\s+[^\\s;]*\\s+[^;]*innerHTML", "flags": "i" },
+      "reduction": 5
+    }
+  ]
+}

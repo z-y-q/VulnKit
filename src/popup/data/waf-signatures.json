@@ -1,0 +1,497 @@
+[
+  {
+    "name": "Cloudflare",
+    "severity": "high",
+    "headerMatch": [
+      {"__regexp__": true, "source": "cf-ray", "flags": "i"},
+      {"__regexp__": true, "source": "cloudflare", "flags": "i"},
+      {"__regexp__": true, "source": "cf-cache-status", "flags": "i"},
+      {"__regexp__": true, "source": "cf-request-id", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "cloudflare", "flags": "i"},
+      {"__regexp__": true, "source": "cf-browser-verification", "flags": "i"},
+      {"__regexp__": true, "source": "attention required", "flags": "i"},
+      {"__regexp__": true, "source": "checking your browser", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "__cfduid", "flags": "i"},
+      {"__regexp__": true, "source": "cf_clearance", "flags": "i"}
+    ]
+  },
+  {
+    "name": "AWS WAF",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-amzn-requestid", "flags": "i"},
+      {"__regexp__": true, "source": "x-amz-cf-id", "flags": "i"},
+      {"__regexp__": true, "source": "awselb", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "awselb", "flags": "i"},
+      {"__regexp__": true, "source": "awswaf", "flags": "i"},
+      {"__regexp__": true, "source": "request blocked", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "awselb", "flags": "i"}
+    ]
+  },
+  {
+    "name": "ModSecurity",
+    "severity": "high",
+    "headerMatch": [
+      {"__regexp__": true, "source": "mod_security", "flags": "i"},
+      {"__regexp__": true, "source": "modsecurity", "flags": "i"},
+      {"__regexp__": true, "source": "noyb", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "mod_security", "flags": "i"},
+      {"__regexp__": true, "source": "modsecurity", "flags": "i"},
+      {"__regexp__": true, "source": "not acceptable", "flags": "i"},
+      {"__regexp__": true, "source": "access denied.*mod_security", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "modsecurity", "flags": "i"}
+    ]
+  },
+  {
+    "name": "Akamai",
+    "severity": "high",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-akamai", "flags": "i"},
+      {"__regexp__": true, "source": "akamai", "flags": "i"},
+      {"__regexp__": true, "source": "x-akamai-staging", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "akamai", "flags": "i"},
+      {"__regexp__": true, "source": "ak_bmsc", "flags": "i"},
+      {"__regexp__": true, "source": "reference.*#.*akamai", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "ak_bmsc", "flags": "i"}
+    ]
+  },
+  {
+    "name": "Sucuri",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-sucuri-id", "flags": "i"},
+      {"__regexp__": true, "source": "sucuri", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "sucuri", "flags": "i"},
+      {"__regexp__": true, "source": "cloudproxy", "flags": "i"},
+      {"__regexp__": true, "source": "website filtered", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "sucuri_cloudproxy_cookie", "flags": "i"}
+    ]
+  },
+  {
+    "name": "Imperva (Incapsula)",
+    "severity": "high",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-iinfo", "flags": "i"},
+      {"__regexp__": true, "source": "x-cdn", "flags": "i"},
+      {"__regexp__": true, "source": "visid_incap", "flags": "i"},
+      {"__regexp__": true, "source": "incap_ses", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "incapsula", "flags": "i"},
+      {"__regexp__": true, "source": "incap_ses", "flags": "i"},
+      {"__regexp__": true, "source": "visid_incap", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "incap_ses", "flags": "i"},
+      {"__regexp__": true, "source": "visid_incap", "flags": "i"},
+      {"__regexp__": true, "source": "utmvc", "flags": "i"}
+    ]
+  },
+  {
+    "name": "F5 BIG-IP ASM",
+    "severity": "high",
+    "headerMatch": [
+      {"__regexp__": true, "source": "bigip", "flags": "i"},
+      {"__regexp__": true, "source": "x-wa-info", "flags": "i"},
+      {"__regexp__": true, "source": "ts[i0-9]{5,}", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "bigip", "flags": "i"},
+      {"__regexp__": true, "source": "f5", "flags": "i"},
+      {"__regexp__": true, "source": "request rejected", "flags": "i"},
+      {"__regexp__": true, "source": "traffic intercepted", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "bigipserver", "flags": "i"},
+      {"__regexp__": true, "source": "f5_.*", "flags": "i"}
+    ]
+  },
+  {
+    "name": "阿里云盾 (Yundun)",
+    "severity": "high",
+    "headerMatch": [
+      {"__regexp__": true, "source": "aliyun", "flags": "i"},
+      {"__regexp__": true, "source": "yundun", "flags": "i"},
+      {"__regexp__": true, "source": "x-yd-.*", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "yundun", "flags": "i"},
+      {"__regexp__": true, "source": "aliyun", "flags": "i"},
+      {"__regexp__": true, "source": "error.*yun", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "acw_tc", "flags": "i"},
+      {"__regexp__": true, "source": "acw_sc__v2", "flags": "i"}
+    ]
+  },
+  {
+    "name": "腾讯云 WAF",
+    "severity": "high",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-tnwaf", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "tenpay", "flags": "i"},
+      {"__regexp__": true, "source": "tencent", "flags": "i"},
+      {"__regexp__": true, "source": "waf", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "qcloud_waf", "flags": "i"}
+    ]
+  },
+  {
+    "name": "华为云 WAF",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-hw-waf", "flags": "i"},
+      {"__regexp__": true, "source": "huaweicloud", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "huaweicloud", "flags": "i"},
+      {"__regexp__": true, "source": "hwclouds", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "SafeLine (雷池)",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "safeline", "flags": "i"},
+      {"__regexp__": true, "source": "x-safeline", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "safeline", "flags": "i"},
+      {"__regexp__": true, "source": "chaitin", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "safeline", "flags": "i"}
+    ]
+  },
+  {
+    "name": "长亭 (Chaitin) SafeLine",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "chaitin", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "chaitin", "flags": "i"},
+      {"__regexp__": true, "source": "safeline", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "DenyAll",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-denyall", "flags": "i"},
+      {"__regexp__": true, "source": "denyall", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "denyall", "flags": "i"},
+      {"__regexp__": true, "source": "session cookie", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "sessioncookie", "flags": "i"}
+    ]
+  },
+  {
+    "name": "Wallarm",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-wallarm", "flags": "i"},
+      {"__regexp__": true, "source": "nginx-wallarm", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "wallarm", "flags": "i"},
+      {"__regexp__": true, "source": "blocked by wallarm", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "wallarm", "flags": "i"}
+    ]
+  },
+  {
+    "name": "Trustwave ModSecurity",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-trustwave", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "trustwave", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Comodo WAF",
+    "severity": "low",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-comodo-waf", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "comodo", "flags": "i"},
+      {"__regexp__": true, "source": "security event", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "cwaf-session", "flags": "i"}
+    ]
+  },
+  {
+    "name": "Aqtronix WebKnight",
+    "severity": "low",
+    "headerMatch": [
+      {"__regexp__": true, "source": "webknight", "flags": "i"},
+      {"__regexp__": true, "source": "x-webknight", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "webknight", "flags": "i"},
+      {"__regexp__": true, "source": "request rejected", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Barikode (PT Application Firewall)",
+    "severity": "low",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-pt-environment", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "barikode", "flags": "i"},
+      {"__regexp__": true, "source": "pt application firewall", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Oracle (Barracuda)",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "bnmsg", "flags": "i"},
+      {"__regexp__": true, "source": "barracuda", "flags": "i"},
+      {"__regexp__": true, "source": "x-barracuda", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "barracuda", "flags": "i"},
+      {"__regexp__": true, "source": "blocked by barracuda", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "barracuda", "flags": "i"},
+      {"__regexp__": true, "source": "bnmsg", "flags": "i"}
+    ]
+  },
+  {
+    "name": "Radware AppWall",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-rdwaf", "flags": "i"},
+      {"__regexp__": true, "source": "radware", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "radware", "flags": "i"},
+      {"__regexp__": true, "source": "appwall", "flags": "i"},
+      {"__regexp__": true, "source": "request blocked", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "rdwaf", "flags": "i"}
+    ]
+  },
+  {
+    "name": "Fortinet FortiWeb",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "fortiweb", "flags": "i"},
+      {"__regexp__": true, "source": "x-fortiweb", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "fortiweb", "flags": "i"},
+      {"__regexp__": true, "source": "fortinet", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "fortiweb", "flags": "i"},
+      {"__regexp__": true, "source": "apbfw.*_.* Fortiweb", "flags": "i"}
+    ]
+  },
+  {
+    "name": "Microsoft Azure Front Door",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-azurefdid", "flags": "i"},
+      {"__regexp__": true, "source": "x-fd-ref", "flags": "i"},
+      {"__regexp__": true, "source": "x-msedge-ref", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "azure", "flags": "i"},
+      {"__regexp__": true, "source": "microsoft", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Palo Alto",
+    "severity": "low",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-pan-waf", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "paloalto", "flags": "i"},
+      {"__regexp__": true, "source": "panwaf", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Squarespace",
+    "severity": "low",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-sq-.*", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "squarespace", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Kona (Akamai Bot Manager)",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-akamai", "flags": "i"},
+      {"__regexp__": true, "source": "ak_bmsc", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "akamai", "flags": "i"},
+      {"__regexp__": true, "source": "_abck", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "_abck", "flags": "i"},
+      {"__regexp__": true, "source": "ak_bmsc", "flags": "i"}
+    ]
+  },
+  {
+    "name": "Citrix WAF",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "ns_af=|citrix_", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "citrix", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Sophos WAF",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "Sophos", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "Sophos", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "NSFOCUS WAF",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "NSFOCUS|nsfocus", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "NSFOCUS|nsfocus", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Google Cloud Armor",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-gcloud", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "google.*cloud.*armor|cloud armor", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Azure WAF",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "X-Azure-Ref", "flags": "i"},
+      {"__regexp__": true, "source": "Microsoft-Azure", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "azure.*waf|requestblocked", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Fastly WAF",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "Fastly", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "fastly", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Baidu Cloud WAF",
+    "severity": "low",
+    "headerMatch": [
+      {"__regexp__": true, "source": "yunjiasu", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "baiducloud|yunjiasu", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "JD Cloud WAF",
+    "severity": "low",
+    "headerMatch": [
+      {"__regexp__": true, "source": "jcloud", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "jcloud|jdcloud", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Varnish WAF",
+    "severity": "low",
+    "headerMatch": [
+      {"__regexp__": true, "source": "X-Varnish", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "varnish", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "OpenAppSec",
+    "severity": "low",
+    "headerMatch": [
+      {"__regexp__": true, "source": "openappsec", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "openappsec", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "openappsec", "flags": "i"}
+    ]
+  }
+]

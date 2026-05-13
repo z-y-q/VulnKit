@@ -1,7 +1,7 @@
 // vk-sourcemap-analysis.js -- 灵眸 Chrome Extension
 // Security analysis, API endpoint extraction
 import { utilsProxy as utils } from './vk-namespace.js';
-import { smState } from './vk-sourcemap-state.js';
+import { smState, initSmSecurityRules } from './vk-sourcemap-state.js';
 import { smBatchFetch } from './vk-sourcemap-utils.js';
 import { showSourcemapModuleDetail } from './vk-sourcemap-render.js';
 
@@ -56,6 +56,7 @@ async function analyzeSourcemaps() {
   resultsEl.innerHTML = '';
   progressEl.innerHTML = `<div class="sm-analysis-progress-text">正在分析 ${resolvedModules.length} 个源码模块（Source Map）...</div>`;
 
+  await initSmSecurityRules();
   const securityRules = smState.SM_SECURITY_RULES;
 
   const allFindings = [];

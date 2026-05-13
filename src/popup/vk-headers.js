@@ -3,7 +3,7 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 import { saveScanResult } from './vk-scan-history.js';
-import { SECURITY_HEADERS, SERVER_SIGNATURES } from './vk-headers-data.js';
+import { getSecurityHeaders, getServerSignatures } from './vk-headers-data.js';
 import { HEADER_CHECKERS, deepAnalyzeCSP } from './vk-headers-checkers.js';
 import { renderHeadersResults, groupByCategory, applyHeaderFilter } from './vk-headers-render.js';
 
@@ -24,14 +24,15 @@ var HEADERS_SORT_FNS = {
 
 // ====== Info leak detection ======
 
-function detectInfoLeaks(parsedHeaders) {
+async function detectInfoLeaks(parsedHeaders) {
   var leaks = [];
   var serverVal = parsedHeaders['server'] || '';
+  var signatures = await getServerSignatures();
   if (serverVal) {
     var serverLower = serverVal.toLowerCase();
     var detected = [];
-    for (var i = 0; i < SERVER_SIGNATURES.length; i++) {
-      if (serverLower.indexOf(SERVER_SIGNATURES[i]) !== -1) detected.push(SERVER_SIGNATURES[i]);
+    for (var i = 0; i < signatures.length; i++) {
+      if (serverLower.indexOf(signatures[i]) !== -1) detected.push(signatures[i]);
     }
     if (detected.length > 0) {
       leaks.push({
@@ -160,7 +161,8 @@ function parseHeaders(headerResult) {
   return headers;
 }
 
-function analyzeHeaders(parsedHeaders) {
+async function analyzeHeaders(parsedHeaders) {
+  var SECURITY_HEADERS = await getSecurityHeaders();
   var totalWeight = 0;
   var earnedWeight = 0;
   var passedCount = 0;
@@ -233,9 +235,9 @@ async function scanSecurityHeaders(url) {
     }
 
     var parsed = parseHeaders(headerResult);
-    var analysis = analyzeHeaders(parsed);
+    var analysis = await analyzeHeaders(parsed);
 
-    var infoLeaks = detectInfoLeaks(parsed);
+    var infoLeaks = await detectInfoLeaks(parsed);
 
     var cookieResp = await fetchWithCookies(url);
     var cookieHeaders = cookieResp ? parseHeaders(cookieResp) : {};

@@ -1,5 +1,8 @@
 // vk-headers-data.js -- 灵眸 Chrome Extension
-// Pure data constants for security headers analysis
+// Security headers analysis data (detection data loaded from JSON, UI constants inline)
+'use strict';
+
+import { loadJsonData } from './vk-data-loader.js';
 
 var CATEGORY_LABELS = {
   security: '安全防护',
@@ -10,61 +13,6 @@ var CATEGORY_LABELS = {
   infoleak: '信息泄露',
   monitoring: '监控报告',
 };
-
-var SECURITY_HEADERS = [
-  { name: 'Content-Security-Policy', weight: 10, category: 'security' },
-  { name: 'Strict-Transport-Security', weight: 8, category: 'security' },
-  { name: 'X-Frame-Options', weight: 7, category: 'security' },
-  { name: 'X-Content-Type-Options', weight: 5, category: 'security' },
-  { name: 'Content-Security-Policy-Report-Only', weight: 5, category: 'security' },
-  { name: 'Clear-Site-Data', weight: 3, category: 'privacy' },
-  { name: 'Referrer-Policy', weight: 6, category: 'privacy' },
-  { name: 'Permissions-Policy', weight: 5, category: 'privacy' },
-  { name: 'X-Robots-Tag', weight: 2, category: 'privacy' },
-  { name: 'Cross-Origin-Opener-Policy', weight: 4, category: 'cross-origin' },
-  { name: 'Cross-Origin-Resource-Policy', weight: 4, category: 'cross-origin' },
-  { name: 'Cross-Origin-Embedder-Policy', weight: 4, category: 'cross-origin' },
-  { name: 'X-Permitted-Cross-Domain-Policies', weight: 3, category: 'cross-origin' },
-  { name: 'Cache-Control', weight: 3, category: 'caching' },
-  { name: 'Pragma', weight: 2, category: 'legacy' },
-  { name: 'X-XSS-Protection', weight: 3, category: 'legacy' },
-  { name: 'X-Download-Options', weight: 2, category: 'security' },
-  { name: 'Report-To', weight: 2, category: 'monitoring' },
-  { name: 'NEL', weight: 2, category: 'monitoring' },
-  { name: 'Reporting-Endpoints', weight: 1, category: 'monitoring' },
-  { name: 'Content-Digest', weight: 1, category: 'security' },
-  { name: 'Accept-CH', weight: 1, category: 'privacy' },
-  { name: 'Origin-Agent-Cluster', weight: 1, category: 'security' },
-  { name: 'X-Permitted-Cross-Domain-Policies', weight: 3, category: 'cross-origin' },
-];
-
-var SERVER_SIGNATURES = [
-  'apache',
-  'nginx',
-  'iis',
-  'tomcat',
-  'express',
-  'openresty',
-  'caddy',
-  'liteSpeed',
-  'cloudflare',
-  'microsoft',
-  'jetty',
-  'weblogic',
-  'websphere',
-];
-
-var FRAMEWORK_SIGNATURES = [
-  'php',
-  'asp.net',
-  'django',
-  'rails',
-  'spring',
-  'laravel',
-  'next.js',
-  'nuxt',
-  'struts',
-];
 
 var CATEGORY_ICONS = {
   security:
@@ -87,11 +35,35 @@ var STATUS_ICONS = {
   miss: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
 };
 
+var _data = null;
+
+async function ensureHeadersData() {
+  if (_data) return _data;
+  _data = await loadJsonData('data/headers-data.json');
+  return _data;
+}
+
+async function getSecurityHeaders() {
+  var d = await ensureHeadersData();
+  return d ? d.SECURITY_HEADERS : [];
+}
+
+async function getServerSignatures() {
+  var d = await ensureHeadersData();
+  return d ? d.SERVER_SIGNATURES : [];
+}
+
+async function getFrameworkSignatures() {
+  var d = await ensureHeadersData();
+  return d ? d.FRAMEWORK_SIGNATURES : [];
+}
+
 export {
   CATEGORY_LABELS,
-  SECURITY_HEADERS,
-  SERVER_SIGNATURES,
-  FRAMEWORK_SIGNATURES,
   CATEGORY_ICONS,
   STATUS_ICONS,
+  ensureHeadersData,
+  getSecurityHeaders,
+  getServerSignatures,
+  getFrameworkSignatures,
 };

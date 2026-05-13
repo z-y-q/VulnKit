@@ -89,23 +89,31 @@ function auditCookies() {
                 return;
               }
               if (parentCookies && parentCookies.length > 0) {
-                processCookies(parentCookies, isHttpsSite, statusEl, resultsEl, copyBtn, exportBtn);
+                processCookies(
+                  parentCookies,
+                  isHttpsSite,
+                  statusEl,
+                  resultsEl,
+                  copyBtn,
+                  exportBtn,
+                  copyMdBtn
+                );
               } else {
-                showNoCookies(statusEl, resultsEl, copyBtn, exportBtn);
+                showNoCookies(statusEl, resultsEl, copyBtn, exportBtn, copyMdBtn);
               }
             });
             return;
           }
-          showNoCookies(statusEl, resultsEl, copyBtn, exportBtn);
+          showNoCookies(statusEl, resultsEl, copyBtn, exportBtn, copyMdBtn);
           return;
         }
-        processCookies(cookies, isHttpsSite, statusEl, resultsEl, copyBtn, exportBtn);
+        processCookies(cookies, isHttpsSite, statusEl, resultsEl, copyBtn, exportBtn, copyMdBtn);
       });
     });
   });
 }
 
-function showNoCookies(statusEl, resultsEl, copyBtn, exportBtn) {
+function showNoCookies(statusEl, resultsEl, copyBtn, exportBtn, copyMdBtn) {
   if (statusEl) statusEl.textContent = '当前域名没有 Cookie';
   if (resultsEl) resultsEl.innerHTML = '<div class="cookie-no-cookies">当前域名没有 Cookie</div>';
   if (copyBtn) copyBtn.style.display = 'none';
@@ -113,7 +121,7 @@ function showNoCookies(statusEl, resultsEl, copyBtn, exportBtn) {
   if (copyMdBtn) copyMdBtn.style.display = 'none';
 }
 
-function processCookies(cookies, isHttpsSite, statusEl, resultsEl, copyBtn, exportBtn) {
+function processCookies(cookies, isHttpsSite, statusEl, resultsEl, copyBtn, exportBtn, copyMdBtn) {
   const results = cookies.map(function (c) {
     return analyzeCookie(c, isHttpsSite);
   });

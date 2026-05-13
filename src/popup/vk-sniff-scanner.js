@@ -1,7 +1,7 @@
 // vk-sniff-scanner.js -- 灵眸 Chrome Extension
 // 3-source signal collection + matching engine for technology fingerprinting
 
-import { TECH_SIGNATURES, scoreConfidence, extractVersion } from './vk-sniff-state.js';
+import { getTechSignatures, scoreConfidence, extractVersion } from './vk-sniff-state.js';
 
 var sniffState = {
   lastResults: null,
@@ -159,7 +159,7 @@ function evaluateMatcher(matcher, pool) {
   return { matched: false };
 }
 
-function matchAllTechnologies(pool) {
+function matchAllTechnologies(pool, TECH_SIGNATURES) {
   var results = [];
 
   for (var i = 0; i < TECH_SIGNATURES.length; i++) {
@@ -233,7 +233,8 @@ async function runSniffScan() {
     var headerResult = await collectHeaderSignals(tab.id);
 
     var pool = buildSignalPool(domResult, runtimeResult, headerResult);
-    var results = matchAllTechnologies(pool);
+    var techSigs = await getTechSignatures();
+    var results = matchAllTechnologies(pool, techSigs);
 
     sniffState.lastResults = results;
     return results;

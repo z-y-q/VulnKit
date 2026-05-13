@@ -1,8 +1,15 @@
 // vk-leak-rules.js -- 灵眸 Chrome Extension
-// Barrel: re-exports from split modules + inline Cloud/SaaS rules
+// Barrel: re-exports from split modules + async-loaded Cloud/SaaS rules
 'use strict';
 
-import { b64urlToStr, luhnOk, shannonEntropy, isPlaceholder, inCryptoContext } from './vk-leak-utils.js';
+import {
+  b64urlToStr,
+  luhnOk,
+  shannonEntropy,
+  isPlaceholder,
+  inCryptoContext,
+} from './vk-leak-utils.js';
+import { loadJsonData, attachValidateFns } from './vk-data-loader.js';
 import {
   SEVERITY_ORDER,
   CONFIDENCE_ORDER,
@@ -11,517 +18,112 @@ import {
   SEVERITY_COLOR,
   CATEGORY_LABELS,
 } from './vk-leak-constants.js';
-import { DOM_LEAK_RULES } from './vk-leak-dom-rules.js';
-import { RULES_CRYPTO } from './vk-leak-rules-crypto.js';
-import { RULES_EXPOSURE } from './vk-leak-rules-exposure.js';
+import { getDomLeakRules } from './vk-leak-dom-rules.js';
+import { getCryptoRules } from './vk-leak-rules-crypto.js';
+import { getExposureRules } from './vk-leak-rules-exposure.js';
 
-// ---------- Cloud / SaaS Credentials (inline — ~500 lines, no external deps beyond utils) ----------
+// ---------- Validate callbacks (cannot be serialized to JSON) ----------
 
-var RULES_CLOUD = [
-  {
-    id: 'aws-access-key-id',
-    name: 'AWS Access Key ID',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\b(?:AKIA|ASIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA)[0-9A-Z]{16}\b/g,
-    description: 'AWS 访问密钥 ID 格式精确匹配，泄漏可直接用于 AWS 控制平面调用。',
-    exploit: '`aws sts get-caller-identity` 立即验证账户/权限；若同时泄漏 SecretKey 即可完全控制。',
-    recommendation: '在 IAM 控制台 deactivate 该 Key，审计 CloudTrail。',
-    validate: function (ctx) {
-      if (
-        ctx.match.startsWith('ASIA') &&
-        !/(?:x-amz-security-token|sessionToken|session_token)/i.test(
-          ctx.source.slice(
-            Math.max(0, ctx.offset - 500),
-            Math.min(ctx.source.length, ctx.offset + 500)
-          )
+var VALIDATE_FNS = {
+  'aws-access-key-id': function (ctx) {
+    if (
+      ctx.match.startsWith('ASIA') &&
+      !/(?:x-amz-security-token|sessionToken|session_token)/i.test(
+        ctx.source.slice(
+          Math.max(0, ctx.offset - 500),
+          Math.min(ctx.source.length, ctx.offset + 500)
         )
-      ) {
-        return { confidence: 'likely', evidence: 'STS 临时凭证但未见配套 SessionToken' };
-      }
-      return null;
-    },
+      )
+    ) {
+      return { confidence: 'likely', evidence: 'STS 临时凭证但未见配套 SessionToken' };
+    }
+    return null;
   },
-  {
-    id: 'aws-secret-access-key',
-    name: 'AWS Secret Access Key',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex:
-      /(?:aws_secret_access_key|AWS_SECRET_ACCESS_KEY|secret_access_key|SecretAccessKey)["'\s:=]+["']?([A-Za-z0-9/+=]{40})["']?/g,
-    description: '与 AWS Access Key 配套的密钥本体，泄漏后等同于完整凭证。',
-    exploit: '配合 Access Key ID 即可直接 sign API 请求。',
-    recommendation: '立即吊销并轮换；前端绝不可硬编码。',
-    validate: function (ctx) {
-      if (isPlaceholder(ctx.captured)) return { drop: true };
-      if (shannonEntropy(ctx.captured) < 4.0) return { drop: true };
-      return null;
-    },
+
+  'aws-secret-access-key': function (ctx) {
+    if (isPlaceholder(ctx.captured)) return { drop: true };
+    if (shannonEntropy(ctx.captured) < 4.0) return { drop: true };
+    return null;
   },
-  {
-    id: 'aliyun-accesskey-id',
-    name: '阿里云 AccessKey ID',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\bLTAI(?:5t|4G|4F)[A-Za-z0-9]{12,20}\b/g,
-    description: '阿里云 AccessKey ID（LTAI 前缀含子类型）。',
-    exploit:
-      '使用 aliyun-cli `aliyun sts GetCallerIdentity` 验证；若搭配 Secret 可直接控制 ECS/OSS/RAM。',
-    recommendation: 'RAM 控制台禁用 Key，迁至 STS 临时凭证。',
+
+  'stripe-secret-key': function (ctx) {
+    if (ctx.match.startsWith('sk_test_') || ctx.match.startsWith('rk_test_'))
+      return { severity: 'medium', confidence: 'likely', evidence: '测试环境 Key' };
+    return null;
   },
-  {
-    id: 'tencent-secret-id',
-    name: '腾讯云 SecretId',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\bAKID[A-Za-z0-9]{32,40}\b/g,
-    description: '腾讯云 API SecretId。',
-    exploit: '搭配 SecretKey 可调用 TencentCloud API。',
-    recommendation: 'CAM 控制台禁用 Key。',
+
+  'cloudflare-token': function (ctx) {
+    if (isPlaceholder(ctx.captured)) return { drop: true };
+    if (shannonEntropy(ctx.captured) < 3.2) return { drop: true };
+    return null;
   },
-  {
-    id: 'gcp-api-key',
-    name: 'Google API Key',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'confirmed',
-    regex: /\bAIza[0-9A-Za-z\-_]{35}\b/g,
-    description: 'Google/Firebase API Key（39 字符精确格式）。',
-    exploit: '调用未限制 referer 的 Google Maps/YouTube API 产生费用。',
-    recommendation: '在 GCP 控制台为 Key 配置 HTTP referer / IP / API 白名单。',
+
+  'vercel-token': function (ctx) {
+    if (isPlaceholder(ctx.captured)) return { drop: true };
+    if (shannonEntropy(ctx.captured) < 3.1) return { drop: true };
+    return null;
   },
-  {
-    id: 'gcp-oauth-token',
-    name: 'Google OAuth Access Token',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'confirmed',
-    regex: /\bya29\.[0-9A-Za-z\-_]{30,}\b/g,
-    description: 'Google OAuth 2.0 访问令牌。',
-    exploit: '直接 `Authorization: Bearer ya29.xxx` 调用 Google APIs。',
-    recommendation: '吊销 token 并审计 OAuth 授权应用。',
+
+  'netlify-token': function (ctx) {
+    if (isPlaceholder(ctx.captured)) return { drop: true };
+    if (shannonEntropy(ctx.captured) < 3.1) return { drop: true };
+    return null;
   },
-  {
-    id: 'azure-storage-conn',
-    name: 'Azure Storage 连接字符串',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex:
-      /DefaultEndpointsProtocol=https?;AccountName=[A-Za-z0-9]+;AccountKey=[A-Za-z0-9+\/=]{86,90}(?:;EndpointSuffix=[\w.]+)?/g,
-    description: 'Azure 存储账户完整连接串。',
-    exploit: '使用 Azure Storage Explorer 直接登录。',
-    recommendation: '轮换 Account Key，改用 SAS 短期令牌。',
+
+  'bearer-auth-token': function (ctx) {
+    var token = ctx.captured;
+    if (isPlaceholder(token)) return { drop: true };
+    if (/^eyJ[A-Za-z0-9\-_]+\./.test(token))
+      return {
+        severity: 'critical',
+        confidence: 'confirmed',
+        evidence: 'Bearer 中包含 JWT 结构',
+      };
+    if (shannonEntropy(token) < 3.2) return { drop: true };
+    return null;
   },
-  {
-    id: 'stripe-secret-key',
-    name: 'Stripe Secret Key',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\b(?:sk|rk)_live_[0-9A-Za-z]{24,99}\b/g,
-    description: 'Stripe 生产环境私钥。',
-    exploit: '调用 Stripe API 创建/退款/导出客户付款数据。',
-    recommendation: 'Dashboard 立即 roll key；前端只能使用 pk_ 公钥。',
-    validate: function (ctx) {
-      if (ctx.match.startsWith('sk_test_') || ctx.match.startsWith('rk_test_'))
-        return { severity: 'medium', confidence: 'likely', evidence: '测试环境 Key' };
-      return null;
-    },
+
+  'api-key-header': function (ctx) {
+    var v = ctx.captured;
+    if (/^(?:Bearer|Basic)\s+/i.test(v)) return { drop: true };
+    if (isPlaceholder(v)) return { drop: true };
+    if (shannonEntropy(v) < 3.0) return { drop: true };
+    return null;
   },
-  {
-    id: 'sendgrid-api-key',
-    name: 'SendGrid API Key',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\bSG\.[A-Za-z0-9\-_]{22}\.[A-Za-z0-9\-_]{43}\b/g,
-    description: 'SendGrid API Key（前缀 SG. + 两段固定长度）。',
-    exploit: '直接调用 SendGrid 发送任意邮件。',
-    recommendation: 'Dashboard 删除该 Key 并轮换。',
+
+  'oauth-client-secret': function (ctx) {
+    if (isPlaceholder(ctx.captured)) return { drop: true };
+    if (shannonEntropy(ctx.captured) < 3.0) return { drop: true };
+    return null;
   },
-  {
-    id: 'github-token',
-    name: 'GitHub Token',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{36,255}\b/g,
-    description: 'GitHub PAT / OAuth / Refresh / App Token。',
-    exploit: '直接调用 GitHub API 验证身份，可读写授权范围内的仓库。',
-    recommendation: 'Settings > Developer settings 立即吊销。',
+
+  'jwt-session-signing-secret': function (ctx) {
+    if (isPlaceholder(ctx.captured)) return { drop: true };
+    if (/^(?:true|false|null|undefined)$/i.test(ctx.captured)) return { drop: true };
+    if (shannonEntropy(ctx.captured) < 2.8) return { drop: true };
+    return null;
   },
-  {
-    id: 'gitlab-pat',
-    name: 'GitLab Personal Access Token',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\bglpat-[A-Za-z0-9\-_]{20,}\b/g,
-    description: 'GitLab PAT。',
-    exploit: '调用 GitLab API 读写仓库、CI 变量。',
-    recommendation: '吊销并启用 IP 限制。',
-  },
-  {
-    id: 'slack-token',
-    name: 'Slack Token',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\bxox[abprs]-(?:\d+-){2,}[A-Za-z0-9]{24,40}\b/g,
-    description: 'Slack Bot/User/App/Refresh Token。',
-    exploit: '调用 chat.postMessage、users.list 等 API。',
-    recommendation: 'Slack App 控制台 revoke token。',
-  },
-  {
-    id: 'slack-webhook',
-    name: 'Slack Incoming Webhook',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'confirmed',
-    regex: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]{8,}\/B[A-Z0-9]{8,}\/[A-Za-z0-9]{20,}/g,
-    description: 'Slack 入站 Webhook URL。',
-    exploit: 'POST JSON 到该 URL 即可向绑定频道发送任意消息。',
-    recommendation: 'Slack App 删除该 Webhook 并替换。',
-  },
-  {
-    id: 'discord-webhook',
-    name: 'Discord Webhook',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'confirmed',
-    regex: /https:\/\/(?:canary\.|ptb\.)?discord(?:app)?\.com\/api\/webhooks\/\d{15,}\/[\w-]{60,}/g,
-    description: 'Discord Webhook URL。',
-    exploit: 'POST 即可发消息/上传文件到目标频道。',
-    recommendation: '服务器设置删除该 Webhook。',
-  },
-  {
-    id: 'wechat-work-webhook',
-    name: '企业微信 Webhook',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'confirmed',
-    regex: /https:\/\/qyapi\.weixin\.qq\.com\/cgi-bin\/webhook\/send\?key=[A-Za-z0-9\-]{25,80}/g,
-    description: '企业微信机器人 Webhook URL。',
-    exploit: 'POST JSON 到该 URL 可向绑定群发送消息。',
-    recommendation: '删除或轮换 Webhook key，并限制机器人使用范围。',
-  },
-  {
-    id: 'dingtalk-robot-webhook',
-    name: '钉钉机器人 Webhook',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'confirmed',
-    regex: /https:\/\/oapi\.dingtalk\.com\/robot\/send\?access_token=[a-f0-9]{50,90}/g,
-    description: '钉钉机器人 Webhook access_token。',
-    exploit: '可向钉钉群发送任意消息。',
-    recommendation: '重置 access_token，并开启加签和关键词限制。',
-  },
-  {
-    id: 'feishu-bot-webhook',
-    name: '飞书机器人 Webhook',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'confirmed',
-    regex: /https:\/\/open\.feishu\.cn\/open-apis\/bot\/v2\/hook\/[A-Za-z0-9\-]{25,90}/g,
-    description: '飞书机器人 Webhook URL。',
-    exploit: '可向飞书群发送任意消息，造成钓鱼或告警污染。',
-    recommendation: '重置 Webhook 并开启签名校验。',
-  },
-  {
-    id: 'npm-token',
-    name: 'npm Access Token',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\bnpm_[A-Za-z0-9]{36}\b/g,
-    description: 'npm 发布令牌。',
-    exploit: '`npm whoami --registry ...` 验证；可发布恶意包到所属 scope。',
-    recommendation: 'npmjs.com 立即 revoke。',
-  },
-  {
-    id: 'mailgun-key',
-    name: 'Mailgun API Key',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\bkey-[a-f0-9]{32}\b/g,
-    description: 'Mailgun API Key（key- + 32 hex）。',
-    exploit: '直接调用 Mailgun 发邮件 API。',
-    recommendation: 'Dashboard 轮换 Key。',
-  },
-  {
-    id: 'openai-api-key',
-    name: 'OpenAI API Key',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\bsk-(?:proj-|svcacct-)?[A-Za-z0-9\-_]{32,}\b/g,
-    description: 'OpenAI API Key，泄露后可直接调用模型接口产生费用和数据风险。',
-    exploit: '使用 Authorization: Bearer 调用 OpenAI API 验证权限。',
-    recommendation: '立即在 OpenAI 控制台撤销并轮换 Key。',
-  },
-  {
-    id: 'anthropic-api-key',
-    name: 'Anthropic API Key',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\bsk-ant-[A-Za-z0-9\-_]{20,}\b/g,
-    description: 'Anthropic API Key，泄露后可直接调用 Claude API。',
-    exploit: '携带 x-api-key 请求 Anthropic API 即可验证。',
-    recommendation: '立即 revoke 并改为服务端保存。',
-  },
-  {
-    id: 'telegram-bot-token',
-    name: 'Telegram Bot Token',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\b\d{8,10}:[A-Za-z0-9\-_]{35}\b/g,
-    description: 'Telegram Bot Token，泄露后可控制机器人发送消息、读取更新。',
-    exploit: '访问 https://api.telegram.org/bot/getMe 验证机器人身份。',
-    recommendation: '通过 BotFather revoke 并重新生成 Token。',
-  },
-  {
-    id: 'discord-bot-token',
-    name: 'Discord Bot/User Token',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex:
-      /\b(?:mfa\.[A-Za-z0-9\-_]{80,}|[MN][A-Za-z0-9\-_]{23}\.[A-Za-z0-9\-_]{6}\.[A-Za-z0-9\-_]{27,})\b/g,
-    description: 'Discord Bot 或用户 Token，泄露后可控制账号或机器人。',
-    exploit: '使用 Authorization 头访问 Discord API 验证身份。',
-    recommendation: '在 Discord Developer Portal 轮换 Bot Token。',
-  },
-  {
-    id: 'notion-integration-token',
-    name: 'Notion Integration Token',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\bsecret_[A-Za-z0-9]{43}\b/g,
-    description: 'Notion 内部集成 Token，泄露后可访问已授权 workspace 页面和数据库。',
-    exploit: '携带 `Authorization: Bearer secret_xxx` 调用 Notion API。',
-    recommendation: '立即在 Notion integrations 中 rotate/revoke。',
-  },
-  {
-    id: 'linear-api-key',
-    name: 'Linear API Key',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\blin_api_[A-Za-z0-9]{32,}\b/g,
-    description: 'Linear API Key，可访问组织 issue、团队和项目数据。',
-    exploit: '携带 `Authorization: ` 调用 Linear GraphQL API。',
-    recommendation: '立即撤销并重新生成 Linear API Key。',
-  },
-  {
-    id: 'shopify-access-token',
-    name: 'Shopify Access Token',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'confirmed',
-    regex: /\bshp(?:at|ss|ca|ua)_[a-fA-F0-9]{32}\b/g,
-    description: 'Shopify Admin/Storefront/Custom App Token。',
-    exploit: '携带 `X-Shopify-Access-Token` 调用对应店铺 Admin API。',
-    recommendation: '在 Shopify 后台撤销应用 Token。',
-  },
-  {
-    id: 'sentry-dsn',
-    name: 'Sentry DSN',
-    category: 'secret',
-    severity: 'low',
-    confidence: 'confirmed',
-    regex: /https:\/\/[A-Fa-f0-9]{16,64}@o\d+\.ingest\.sentry\.io\/\d+/g,
-    description: 'Sentry DSN 暴露通常不是高危凭证，但可能被用于污染错误日志。',
-    exploit: '向 DSN 发送伪造事件，观察是否污染告警。',
-    recommendation: '配置速率限制、来源过滤和告警降噪。',
-  },
-  {
-    id: 'cloudflare-token',
-    name: 'Cloudflare Token / API Key',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'likely',
-    regex:
-      /(?:CLOUDFLARE_API_TOKEN|CF_API_TOKEN|CF_TOKEN|cloudflare[\-_]?(?:api[\-_]?)?(?:token|key))["'\s:=]+["']?([A-Za-z0-9\-_]{30,120})["']?/gi,
-    description: 'Cloudflare API Token 或 Global API Key。',
-    exploit: '可调用 Cloudflare API 修改 DNS、Worker、Zone 配置。',
-    recommendation: 'Cloudflare Dashboard 立即撤销 Token。',
-    validate: function (ctx) {
-      if (isPlaceholder(ctx.captured)) return { drop: true };
-      if (shannonEntropy(ctx.captured) < 3.2) return { drop: true };
-      return null;
-    },
-  },
-  {
-    id: 'vercel-token',
-    name: 'Vercel Token',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'likely',
-    regex: /(?:VERCEL_TOKEN|vercel[\-_]?token)["'\s:=]+["']?([A-Za-z0-9\-_]{24,120})["']?/gi,
-    description: 'Vercel API Token，可能访问项目、部署、环境变量。',
-    exploit: '使用 `Authorization: Bearer` 调用 Vercel API。',
-    recommendation: 'Vercel Account Settings 中撤销 Token。',
-    validate: function (ctx) {
-      if (isPlaceholder(ctx.captured)) return { drop: true };
-      if (shannonEntropy(ctx.captured) < 3.1) return { drop: true };
-      return null;
-    },
-  },
-  {
-    id: 'netlify-token',
-    name: 'Netlify Access Token',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'likely',
-    regex:
-      /(?:NETLIFY_AUTH_TOKEN|NETLIFY_TOKEN|netlify[\-_]?(?:auth[\-_]?)?token)["'\s:=]+["']?([A-Za-z0-9\-_]{32,120})["']?/gi,
-    description: 'Netlify Personal Access Token。',
-    exploit: '携带 Bearer Token 调用 Netlify API。',
-    recommendation: 'Netlify User Settings 中撤销 Token。',
-    validate: function (ctx) {
-      if (isPlaceholder(ctx.captured)) return { drop: true };
-      if (shannonEntropy(ctx.captured) < 3.1) return { drop: true };
-      return null;
-    },
-  },
-  {
-    id: 'huggingface-token',
-    name: 'HuggingFace Access Token',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'confirmed',
-    regex: /\bhf_[A-Za-z0-9]{30,}\b/g,
-    description: 'HuggingFace 访问令牌，可能拥有模型、数据集或推理 API 权限。',
-    exploit: '调用 HuggingFace API /whoami-v2 验证令牌权限。',
-    recommendation: '在 HuggingFace Settings > Access Tokens 中撤销并重建。',
-  },
-  {
-    id: 'supabase-service-role-key',
-    name: 'Supabase Service Role Key',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'likely',
-    regex:
-      /(?:supabase(?:ServiceRole|_SERVICE_ROLE)?|service[\-_]?role(?:[\-_]?key)?|SUPABASE_SERVICE_ROLE_KEY)["'\s:=]+["']?(eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+)["']?/gi,
-    description: 'Supabase service_role JWT 具备绕过 RLS 的高权限。',
-    exploit: '携带 apikey/Authorization Bearer 调用 Supabase REST API，可绕过行级安全策略。',
-    recommendation: '仅在后端环境变量中保存 service_role。',
-  },
-  {
-    id: 'firebase-config-exposure',
-    name: 'Firebase 配置暴露',
-    category: 'secret',
-    severity: 'medium',
-    confidence: 'likely',
-    regex:
-      /apiKey\s*:\s*["'](AIza[0-9A-Za-z\-_]{35})["'][\s\S]{0,600}authDomain\s*:\s*["'][^"']+firebaseapp\.com["']/g,
-    description: 'Firebase Web 配置暴露。apiKey 本身不等同私钥，但常用于定位项目。',
-    exploit:
-      '结合 projectId/authDomain 测试 Firestore/Realtime Database/Storage Rules 是否允许未授权读写。',
-    recommendation: '确认 Firebase Security Rules 严格限制读写。',
-  },
-  {
-    id: 'bearer-auth-token',
-    name: 'Bearer 认证 Token',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'likely',
-    regex: /["']Bearer\s+([A-Za-z0-9.~+\/=\-_]{20,500})["']/g,
-    description: '硬编码 Bearer Token，可能是 OAuth/JWT/API 访问令牌。',
-    exploit: '直接放入 `Authorization: Bearer` 请求头复用。',
-    recommendation: 'Bearer Token 不应写入前端源码。',
-    validate: function (ctx) {
-      var token = ctx.captured;
-      if (isPlaceholder(token)) return { drop: true };
-      if (/^eyJ[A-Za-z0-9\-_]+\./.test(token))
-        return {
-          severity: 'critical',
-          confidence: 'confirmed',
-          evidence: 'Bearer 中包含 JWT 结构',
-        };
-      if (shannonEntropy(token) < 3.2) return { drop: true };
-      return null;
-    },
-  },
-  {
-    id: 'api-key-header',
-    name: 'API Key 请求头',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'likely',
-    regex:
-      /["'](?:x-api-key|api-key|apikey|x-auth-token|authorization)["']\s*:\s*["']([A-Za-z0-9.~+\/=\-_]{16,180})["']/gi,
-    description: '常见认证请求头中硬编码 API Key / Token。',
-    exploit: '复用对应 Header 即可尝试访问后端 API。',
-    recommendation: '认证 Header 值应由后端签发或运行时短期下发。',
-    validate: function (ctx) {
-      var v = ctx.captured;
-      if (/^(?:Bearer|Basic)\s+/i.test(v)) return { drop: true };
-      if (isPlaceholder(v)) return { drop: true };
-      if (shannonEntropy(v) < 3.0) return { drop: true };
-      return null;
-    },
-  },
-  {
-    id: 'oauth-client-secret',
-    name: 'OAuth Client Secret',
-    category: 'secret',
-    severity: 'high',
-    confidence: 'likely',
-    regex:
-      /(?:client[\-_]?secret|oauth[\-_]?secret|OIDC_CLIENT_SECRET|GOOGLE_CLIENT_SECRET)["'\s:=]+["']?([A-Za-z0-9_\-./+=]{20,160})["']?/gi,
-    description: 'OAuth/OIDC Client Secret 硬编码。',
-    exploit: '结合 client_id、redirect_uri、授权码流程尝试换取 access_token。',
-    recommendation: 'Client Secret 仅存后端；公开客户端使用 PKCE。',
-    validate: function (ctx) {
-      if (isPlaceholder(ctx.captured)) return { drop: true };
-      if (shannonEntropy(ctx.captured) < 3.0) return { drop: true };
-      return null;
-    },
-  },
-  {
-    id: 'jwt-session-signing-secret',
-    name: 'JWT/Session 签名密钥',
-    category: 'secret',
-    severity: 'critical',
-    confidence: 'likely',
-    regex:
-      /(?:jwt[\-_]?secret|secretOrKey|signing[\-_]?key|session[\-_]?secret|cookie[\-_]?secret|csrf[\-_]?secret)["'\s:=]+["']?([^"'\s,;}{]{16,160})["']?/gi,
-    description: 'JWT、Session、Cookie 或 CSRF 签名密钥硬编码。',
-    exploit: '攻击者可离线签发 JWT、伪造 Session Cookie 或 CSRF Token。',
-    recommendation: '立即轮换签名密钥并使旧 Token/Session 失效。',
-    validate: function (ctx) {
-      if (isPlaceholder(ctx.captured)) return { drop: true };
-      if (/^(?:true|false|null|undefined)$/i.test(ctx.captured)) return { drop: true };
-      if (shannonEntropy(ctx.captured) < 2.8) return { drop: true };
-      return null;
-    },
-  },
-  {
-    id: 'wechat-app-id',
-    name: '微信/企业微信 AppID',
-    category: 'exposure',
-    severity: 'low',
-    confidence: 'likely',
-    regex: /\b(?:wx[a-z0-9]{15,18}|ww[a-z0-9]{15,18})\b/g,
-    description: '微信小程序、公众号或企业微信 AppID 暴露。',
-    exploit: '结合 AppSecret、回调地址可用于进一步攻击面定位。',
-    recommendation: '确认仅暴露允许公开的 AppID。',
-  },
-];
+};
+
+// ---------- Async data loading ----------
+
+var _rules = null;
+
+async function ensureLoaded() {
+  if (_rules) return _rules;
+  _rules = await loadJsonData('data/leak-rules-cloud.json');
+  attachValidateFns(_rules, VALIDATE_FNS);
+  return _rules;
+}
+
+async function getAllRules() {
+  var cloud = await ensureLoaded();
+  var crypto = await getCryptoRules();
+  var exposure = await getExposureRules();
+  return cloud.concat(crypto, exposure);
+}
 
 // ---------- Combined rules + legacy compat ----------
-
-var RULES = RULES_CLOUD.concat(RULES_CRYPTO, RULES_EXPOSURE);
 
 function rulesToTuples(rules) {
   return rules.map(function (r) {
@@ -529,12 +131,18 @@ function rulesToTuples(rules) {
   });
 }
 
-var LEAK_RULES_LEGACY = rulesToTuples(RULES);
+async function getLeakRulesLegacy() {
+  var rules = await getAllRules();
+  return rulesToTuples(rules);
+}
 
 export {
-  RULES,
-  DOM_LEAK_RULES,
-  LEAK_RULES_LEGACY,
+  ensureLoaded,
+  getAllRules,
+  getLeakRulesLegacy,
+  getDomLeakRules,
+  getCryptoRules,
+  getExposureRules,
   SEVERITY_ORDER,
   CONFIDENCE_ORDER,
   SEVERITY_LABELS,

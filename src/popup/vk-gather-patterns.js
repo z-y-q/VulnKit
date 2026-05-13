@@ -2,64 +2,15 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { loadJsonData } from './vk-data-loader.js';
 
-var SENSITIVE_PATTERNS = [
-  { regex: /AKIA[0-9A-Z]{16}/g, label: 'AWS Access Key', color: 'red' },
-  {
-    regex: /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
-    label: 'Private Key',
-    color: 'red',
-  },
-  {
-    regex: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}/g,
-    label: 'JWT Token',
-    color: 'yellow',
-  },
-  {
-    regex: /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g,
-    label: 'IP Address',
-    color: 'cyan',
-  },
-  {
-    regex: /(?:mongodb|mysql|postgres|redis):\/\/[^\s'"]+/gi,
-    label: 'DB Connection',
-    color: 'red',
-  },
-  {
-    regex: /(?:password|passwd|pwd)\s*[:=]\s*['"][^'"]{4,}['"]/gi,
-    label: 'Hardcoded Password',
-    color: 'red',
-  },
-  { regex: /AIza[0-9A-Za-z_-]{35}/g, label: 'Google API Key', color: 'yellow' },
-  { regex: /xox[baprs]-[0-9a-zA-Z-]{10,}/g, label: 'Slack Token', color: 'red' },
-  { regex: /(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}/g, label: 'GitHub Token', color: 'red' },
-  {
-    regex: /["'](api[_-]?key|apikey|api[_-]?secret)["']\s*[:=]\s*["']([^"']{8,})["']/gi,
-    label: 'API Key',
-    color: 'yellow',
-    captureIdx: 2,
-  },
-];
+var _data = null;
 
-var API_PATTERNS = [
-  {
-    regex:
-      /(?:fetch|axios|\.get|\.post|\.put|\.delete|\.patch|\.request)\s*\(\s*["']([^"']+)["']/gi,
-    label: 'fetch',
-  },
-  {
-    regex: /(?:url|endpoint|api|baseUrl|baseURL|apiUrl|apiURL)["']?\s*[:=]\s*["']([^"']+)["']/gi,
-    label: 'config',
-  },
-  { regex: /["'](\/api\/[a-zA-Z0-9_\-./{}:?&=]*)["']/gi, label: 'api-path' },
-  { regex: /["'](\/v\d+(?:\/[a-zA-Z0-9_\-./{}:?&=]*)*)["']/gi, label: 'versioned' },
-  { regex: /path:\s*["']([^"']+)["']/gi, label: 'route-path' },
-  { regex: /@(?:Get|Post|Put|Delete|Patch|Route)\s*\(\s*["']([^"']+)["']/gi, label: 'decorator' },
-  {
-    regex: /["']((?:\/[a-zA-Z0-9_-]+){2,}(?:\/[a-zA-Z0-9_-{}:?&=]*)*)["']/g,
-    label: 'path',
-  },
-];
+async function ensureLoaded() {
+  if (_data) return _data;
+  _data = await loadJsonData('data/gather-patterns.json') || { SENSITIVE_PATTERNS: [], API_PATTERNS: [] };
+  return _data;
+}
 
 var DEFAULT_EXCLUDE_REGEX =
   /^(https?:)?\/\/([^/]+\.)?(?:google|facebook|github\.com|jquery|analytics|doubleclick|googletagmanager|fontawesome|bootstrapcdn|unpkg\.com|cdn\.)/i;
@@ -106,6 +57,10 @@ function isValidApiPath(path) {
 }
 
 async function extractApiFromJsFiles(scriptSrcs, pageUrl, abortFlag) {
+  var data = await ensureLoaded();
+  var SENSITIVE_PATTERNS = data.SENSITIVE_PATTERNS;
+  var API_PATTERNS = data.API_PATTERNS;
+
   const seen = {};
   const endpoints = [];
   const sensitiveItems = [];
@@ -200,8 +155,6 @@ async function extractApiFromJsFiles(scriptSrcs, pageUrl, abortFlag) {
 }
 
 export {
-  SENSITIVE_PATTERNS,
-  API_PATTERNS,
   isValidApiPath,
   extractApiFromJsFiles,
   refreshExcludeRegex,

@@ -2,8 +2,8 @@
 // Deep leak scan: multi-source sensitive information detection with validate() support
 
 import {
-  RULES,
-  DOM_LEAK_RULES,
+  getAllRules,
+  getDomLeakRules,
   SEVERITY_ORDER,
   SEVERITY_COLOR,
   CONFIDENCE_ORDER,
@@ -67,10 +67,10 @@ function buildTextSources(inspectResult, apiEntries) {
   return sources;
 }
 
-function matchRules(sources) {
+function matchRules(sources, rules, domRules) {
   var findings = [];
   var seen = {};
-  var allRules = RULES.concat(DOM_LEAK_RULES);
+  var allRules = rules.concat(domRules || []);
 
   for (var s = 0; s < sources.length; s++) {
     var source = sources[s];
@@ -147,7 +147,9 @@ async function runDeepLeakScan(existingGatherData, tabId) {
 
   if (sources.length === 0) return [];
 
-  var findings = matchRules(sources);
+  var domRules = await getDomLeakRules();
+  var rules = await getAllRules();
+  var findings = matchRules(sources, rules, domRules);
   console.debug('[Deep Leak Scan] findings:', findings.length);
   return findings;
 }

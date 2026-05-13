@@ -3,6 +3,7 @@
 
 import { utilsProxy as utils } from './vk-namespace.js';
 import { saveScanResult } from './vk-scan-history.js';
+import { loadJsonData } from './vk-data-loader.js';
 
 let lastWafResult = null;
 let wafScanActive = false;
@@ -23,258 +24,13 @@ var WAF_SORT_FNS = {
 let scanStartTime = 0;
 let lastHeaders = null;
 
-let WAF_SIGNATURES = [
-  {
-    name: 'Cloudflare',
-    severity: 'high',
-    headerMatch: [/cf-ray/i, /cloudflare/i, /cf-cache-status/i, /cf-request-id/i],
-    bodyMatch: [
-      /cloudflare/i,
-      /cf-browser-verification/i,
-      /attention required/i,
-      /checking your browser/i,
-    ],
-    cookieMatch: [/__cfduid/i, /cf_clearance/i],
-  },
-  {
-    name: 'AWS WAF',
-    severity: 'medium',
-    headerMatch: [/x-amzn-requestid/i, /x-amz-cf-id/i, /awselb/i],
-    bodyMatch: [/awselb/i, /awswaf/i, /request blocked/i],
-    cookieMatch: [/awselb/i],
-  },
-  {
-    name: 'ModSecurity',
-    severity: 'high',
-    headerMatch: [/mod_security/i, /modsecurity/i, /noyb/i],
-    bodyMatch: [/mod_security/i, /modsecurity/i, /not acceptable/i, /access denied.*mod_security/i],
-    cookieMatch: [/modsecurity/i],
-  },
-  {
-    name: 'Akamai',
-    severity: 'high',
-    headerMatch: [/x-akamai/i, /akamai/i, /x-akamai-staging/i],
-    bodyMatch: [/akamai/i, /ak_bmsc/i, /reference.*#.*akamai/i],
-    cookieMatch: [/ak_bmsc/i],
-  },
-  {
-    name: 'Sucuri',
-    severity: 'medium',
-    headerMatch: [/x-sucuri-id/i, /sucuri/i],
-    bodyMatch: [/sucuri/i, /cloudproxy/i, /website filtered/i],
-    cookieMatch: [/sucuri_cloudproxy_cookie/i],
-  },
-  {
-    name: 'Imperva (Incapsula)',
-    severity: 'high',
-    headerMatch: [/x-iinfo/i, /x-cdn/i, /visid_incap/i, /incap_ses/i],
-    bodyMatch: [/incapsula/i, /incap_ses/i, /visid_incap/i],
-    cookieMatch: [/incap_ses/i, /visid_incap/i, /utmvc/i],
-  },
-  {
-    name: 'F5 BIG-IP ASM',
-    severity: 'high',
-    headerMatch: [/bigip/i, /x-wa-info/i, /ts[i0-9]{5,}/i],
-    bodyMatch: [/bigip/i, /f5/i, /request rejected/i, /traffic intercepted/i],
-    cookieMatch: [/bigipserver/i, /f5_.*/i],
-  },
-  {
-    name: '阿里云盾 (Yundun)',
-    severity: 'high',
-    headerMatch: [/aliyun/i, /yundun/i, /x-yd-.*/i],
-    bodyMatch: [/yundun/i, /aliyun/i, /error.*yun/i],
-    cookieMatch: [/acw_tc/i, /acw_sc__v2/i],
-  },
-  {
-    name: '腾讯云 WAF',
-    severity: 'high',
-    headerMatch: [/x-tnwaf/i],
-    bodyMatch: [/tenpay/i, /tencent/i, /waf/i],
-    cookieMatch: [/qcloud_waf/i],
-  },
-  {
-    name: '华为云 WAF',
-    severity: 'medium',
-    headerMatch: [/x-hw-waf/i, /huaweicloud/i],
-    bodyMatch: [/huaweicloud/i, /hwclouds/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'SafeLine (雷池)',
-    severity: 'medium',
-    headerMatch: [/safeline/i, /x-safeline/i],
-    bodyMatch: [/safeline/i, /chaitin/i],
-    cookieMatch: [/safeline/i],
-  },
-  {
-    name: '长亭 (Chaitin) SafeLine',
-    severity: 'medium',
-    headerMatch: [/chaitin/i],
-    bodyMatch: [/chaitin/i, /safeline/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'DenyAll',
-    severity: 'medium',
-    headerMatch: [/x-denyall/i, /denyall/i],
-    bodyMatch: [/denyall/i, /session cookie/i],
-    cookieMatch: [/sessioncookie/i],
-  },
-  {
-    name: 'Wallarm',
-    severity: 'medium',
-    headerMatch: [/x-wallarm/i, /nginx-wallarm/i],
-    bodyMatch: [/wallarm/i, /blocked by wallarm/i],
-    cookieMatch: [/wallarm/i],
-  },
-  {
-    name: 'Trustwave ModSecurity',
-    severity: 'medium',
-    headerMatch: [/x-trustwave/i],
-    bodyMatch: [/trustwave/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Comodo WAF',
-    severity: 'low',
-    headerMatch: [/x-comodo-waf/i],
-    bodyMatch: [/comodo/i, /security event/i],
-    cookieMatch: [/cwaf-session/i],
-  },
-  {
-    name: 'Aqtronix WebKnight',
-    severity: 'low',
-    headerMatch: [/webknight/i, /x-webknight/i],
-    bodyMatch: [/webknight/i, /request rejected/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Barikode (PT Application Firewall)',
-    severity: 'low',
-    headerMatch: [/x-pt-environment/i],
-    bodyMatch: [/barikode/i, /pt application firewall/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Oracle (Barracuda)',
-    severity: 'medium',
-    headerMatch: [/bnmsg/i, /barracuda/i, /x-barracuda/i],
-    bodyMatch: [/barracuda/i, /blocked by barracuda/i],
-    cookieMatch: [/barracuda/i, /bnmsg/i],
-  },
-  {
-    name: 'Radware AppWall',
-    severity: 'medium',
-    headerMatch: [/x-rdwaf/i, /radware/i],
-    bodyMatch: [/radware/i, /appwall/i, /request blocked/i],
-    cookieMatch: [/rdwaf/i],
-  },
-  {
-    name: 'Fortinet FortiWeb',
-    severity: 'medium',
-    headerMatch: [/fortiweb/i, /x-fortiweb/i],
-    bodyMatch: [/fortiweb/i, /fortinet/i],
-    cookieMatch: [/fortiweb/i, /apbfw.*_.* Fortiweb/i],
-  },
-  {
-    name: 'Microsoft Azure Front Door',
-    severity: 'medium',
-    headerMatch: [/x-azurefdid/i, /x-fd-ref/i, /x-msedge-ref/i],
-    bodyMatch: [/azure/i, /microsoft/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Palo Alto',
-    severity: 'low',
-    headerMatch: [/x-pan-waf/i],
-    bodyMatch: [/paloalto/i, /panwaf/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Squarespace',
-    severity: 'low',
-    headerMatch: [/x-sq-.*/i],
-    bodyMatch: [/squarespace/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Kona (Akamai Bot Manager)',
-    severity: 'medium',
-    headerMatch: [/x-akamai/i, /ak_bmsc/i],
-    bodyMatch: [/akamai/i, /_abck/i],
-    cookieMatch: [/_abck/i, /ak_bmsc/i],
-  },
-  {
-    name: 'Citrix WAF',
-    severity: 'medium',
-    headerMatch: [/ns_af=|citrix_/i],
-    bodyMatch: [/citrix/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Sophos WAF',
-    severity: 'medium',
-    headerMatch: [/Sophos/i],
-    bodyMatch: [/Sophos/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'NSFOCUS WAF',
-    severity: 'medium',
-    headerMatch: [/NSFOCUS|nsfocus/i],
-    bodyMatch: [/NSFOCUS|nsfocus/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Google Cloud Armor',
-    severity: 'medium',
-    headerMatch: [/x-gcloud/i],
-    bodyMatch: [/google.*cloud.*armor|cloud armor/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Azure WAF',
-    severity: 'medium',
-    headerMatch: [/X-Azure-Ref/i, /Microsoft-Azure/i],
-    bodyMatch: [/azure.*waf|requestblocked/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Fastly WAF',
-    severity: 'medium',
-    headerMatch: [/Fastly/i],
-    bodyMatch: [/fastly/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Baidu Cloud WAF',
-    severity: 'low',
-    headerMatch: [/yunjiasu/i],
-    bodyMatch: [/baiducloud|yunjiasu/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'JD Cloud WAF',
-    severity: 'low',
-    headerMatch: [/jcloud/i],
-    bodyMatch: [/jcloud|jdcloud/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'Varnish WAF',
-    severity: 'low',
-    headerMatch: [/X-Varnish/i],
-    bodyMatch: [/varnish/i],
-    cookieMatch: [],
-  },
-  {
-    name: 'OpenAppSec',
-    severity: 'low',
-    headerMatch: [/openappsec/i],
-    bodyMatch: [/openappsec/i],
-    cookieMatch: [/openappsec/i],
-  },
-];
+var _signatures = null;
+
+async function loadWafSignatures() {
+  if (_signatures) return _signatures;
+  _signatures = await loadJsonData('data/waf-signatures.json') || [];
+  return _signatures;
+}
 
 function matchAgainst(text, patterns) {
   if (!text) return [];
@@ -286,7 +42,7 @@ function matchAgainst(text, patterns) {
   return matches;
 }
 
-function analyzeResponse(headers, body) {
+function analyzeResponse(headers, body, WAF_SIGNATURES) {
   let detected = [];
   let headerStr = '';
   if (headers) {
@@ -466,6 +222,8 @@ async function scanWaf() {
     return;
   }
 
+  var WAF_SIGNATURES = await loadWafSignatures();
+
   wafScanAborted = false;
   wafScanActive = true;
   scanStartTime = Date.now();
@@ -534,7 +292,7 @@ async function scanWaf() {
 
         if (probeResult && probeResult.headers) {
           lastHeaders = probeResult.headers;
-          let found = analyzeResponse(probeResult.headers, probeResult.body || '');
+          let found = analyzeResponse(probeResult.headers, probeResult.body || '', WAF_SIGNATURES);
           for (let d = 0; d < found.length; d++) {
             let name = found[d].name;
             if (detectedMap[name]) {

@@ -1,0 +1,23 @@
+{
+  "SENSITIVE_PATTERNS": [
+    { "regex": {"__regexp__": true, "source": "AKIA[0-9A-Z]{16}", "flags": "g"}, "label": "AWS Access Key", "color": "red" },
+    { "regex": {"__regexp__": true, "source": "-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----", "flags": "g"}, "label": "Private Key", "color": "red" },
+    { "regex": {"__regexp__": true, "source": "eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}", "flags": "g"}, "label": "JWT Token", "color": "yellow" },
+    { "regex": {"__regexp__": true, "source": "\\b(?:(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\b", "flags": "g"}, "label": "IP Address", "color": "cyan" },
+    { "regex": {"__regexp__": true, "source": "(?:mongodb|mysql|postgres|redis):\\/\\/[^\\s'\"]+", "flags": "gi"}, "label": "DB Connection", "color": "red" },
+    { "regex": {"__regexp__": true, "source": "(?:password|passwd|pwd)\\s*[:=]\\s*['\"][^'\"]{4,}['\"]", "flags": "gi"}, "label": "Hardcoded Password", "color": "red" },
+    { "regex": {"__regexp__": true, "source": "AIza[0-9A-Za-z_-]{35}", "flags": "g"}, "label": "Google API Key", "color": "yellow" },
+    { "regex": {"__regexp__": true, "source": "xox[baprs]-[0-9a-zA-Z-]{10,}", "flags": "g"}, "label": "Slack Token", "color": "red" },
+    { "regex": {"__regexp__": true, "source": "(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}", "flags": "g"}, "label": "GitHub Token", "color": "red" },
+    { "regex": {"__regexp__": true, "source": "[\"'](api[_-]?key|apikey|api[_-]?secret)[\"']\\s*[:=]\\s*[\"']([^\"']{8,})[\"']", "flags": "gi"}, "label": "API Key", "color": "yellow", "captureIdx": 2 }
+  ],
+  "API_PATTERNS": [
+    { "regex": {"__regexp__": true, "source": "(?:fetch|axios|\\.get|\\.post|\\.put|\\.delete|\\.patch|\\.request)\\s*\\(\\s*[\"']([^\"']+)[\"']", "flags": "gi"}, "label": "fetch" },
+    { "regex": {"__regexp__": true, "source": "(?:url|endpoint|api|baseUrl|baseURL|apiUrl|apiURL)[\"']?\\s*[:=]\\s*[\"']([^\"']+)[\"']", "flags": "gi"}, "label": "config" },
+    { "regex": {"__regexp__": true, "source": "[\"'](\\/api\\/[a-zA-Z0-9_\\-./{}:?&=]*)[\"']", "flags": "gi"}, "label": "api-path" },
+    { "regex": {"__regexp__": true, "source": "[\"'](\\/v\\d+(?:\\/[a-zA-Z0-9_\\-./{}:?&=]*)*)[\"']", "flags": "gi"}, "label": "versioned" },
+    { "regex": {"__regexp__": true, "source": "path:\\s*[\"']([^\"']+)[\"']", "flags": "gi"}, "label": "route-path" },
+    { "regex": {"__regexp__": true, "source": "@(?:Get|Post|Put|Delete|Patch|Route)\\s*\\(\\s*[\"']([^\"']+)[\"']", "flags": "gi"}, "label": "decorator" },
+    { "regex": {"__regexp__": true, "source": "[\"']((?:\\/[a-zA-Z0-9_-]+){2,}(?:\\/[a-zA-Z0-9_-{}:?&=]*)*)[\"']", "flags": "g"}, "label": "path" }
+  ]
+}
