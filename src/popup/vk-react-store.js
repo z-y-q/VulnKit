@@ -2,29 +2,10 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { createRenderStoreTree, createInitStoreExplorerEvents, createCopyStoreJson } from './vk-store-tree-utils.js';
 
+var renderStoreTree = createRenderStoreTree('react-store');
 let lastReactStores = null;
-
-function nodeMatches(key, val, filter) {
-  if (!filter) return true;
-  var lower = filter.toLowerCase();
-  if (key.toLowerCase().indexOf(lower) !== -1) return true;
-  if (typeof val === 'string' && val.toLowerCase().indexOf(lower) !== -1) return true;
-  if (typeof val === 'number' || typeof val === 'boolean') {
-    if (String(val).toLowerCase().indexOf(lower) !== -1) return true;
-  }
-  return false;
-}
-
-function subtreeHasMatch(obj, filter) {
-  if (!filter || !obj || typeof obj !== 'object') return false;
-  return Object.keys(obj).some(function (k) {
-    var v = obj[k];
-    if (nodeMatches(k, v, filter)) return true;
-    if (v && typeof v === 'object') return subtreeHasMatch(v, filter);
-    return false;
-  });
-}
 
 async function exploreReactStore() {
   const statusEl = utils.get('react-store-status');
@@ -79,19 +60,14 @@ async function exploreReactStore() {
       }
     }
 
-    // Render stores
     renderStores(storeEl, stores, storeKeys, '');
 
     var searchInput = utils.get('react-store-search');
     if (searchInput) searchInput.style.display = storeKeys.length > 0 ? '' : 'none';
 
-    // Render routes
     if (routesEl) renderRoutes(routesEl, routes);
-
-    // Render API endpoints
     if (apiEl) renderApiEndpoints(apiEl, apiEndpoints);
 
-    // Show errors in status
     if (errors.length > 0 && statusEl) {
       statusEl.textContent += ' | ' + errors.slice(0, 2).join('; ');
     }
@@ -138,7 +114,6 @@ function renderRoutes(container, routes) {
     return;
   }
 
-  // Group by source
   var grouped = {};
   routes.forEach(function (r) {
     var src = r.source || 'unknown';
@@ -206,143 +181,6 @@ function renderApiEndpoints(container, endpoints) {
   });
 }
 
-function renderStoreTree(obj, prefix, depth, filter) {
-  if (depth > 5) return '<div class="react-store-node react-store-truncated">...</div>';
-  if (obj === null || obj === undefined) return '';
-  if (typeof obj !== 'object') return '';
-  if (Array.isArray(obj)) {
-    return (
-      '<div class="react-store-node"><div class="react-store-key-row">' +
-      '<span class="react-store-toggle react-store-toggle-leaf"></span>' +
-      '<span class="react-store-type-badge">Array[' +
-      obj.length +
-      ']</span>' +
-      '<span class="react-store-val">' +
-      utils.escapeHtml(JSON.stringify(obj).substring(0, 120)) +
-      '</span>' +
-      '</div></div>'
-    );
-  }
-
-  let html = '';
-  var keys = Object.keys(obj);
-  var maxShow = 30;
-  var shown = 0;
-
-  keys.forEach(function (key) {
-    if (shown >= maxShow) return;
-    var val = obj[key];
-    if (filter) {
-      var directMatch = nodeMatches(key, val, filter);
-      var childMatch = val && typeof val === 'object' && subtreeHasMatch(val, filter);
-      if (!directMatch && !childMatch) return;
-    }
-    shown++;
-    var path = prefix ? prefix + '.' + key : key;
-    var isExpandable =
-      val !== null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0;
-    var isArr = Array.isArray(val);
-
-    var toggleIcon = isExpandable
-      ? '<span class="react-store-toggle react-store-toggle-collapsed">&#9654;</span>'
-      : '<span class="react-store-toggle react-store-toggle-leaf"></span>';
-
-    var valHtml = '';
-    if (isArr) {
-      valHtml =
-        '<span class="react-store-type-badge">Array[' +
-        val.length +
-        ']</span>' +
-        '<span class="react-store-val">' +
-        utils.escapeHtml(JSON.stringify(val).substring(0, 120)) +
-        '</span>';
-    } else if (typeof val === 'string') {
-      valHtml =
-        '<span class="react-store-val">"' +
-        utils.escapeHtml(val.substring(0, 100)) +
-        (val.length > 100 ? '...' : '') +
-        '"</span>';
-    } else if (typeof val === 'number' || typeof val === 'boolean') {
-      valHtml = '<span class="react-store-val">' + String(val) + '</span>';
-    } else if (val === null) {
-      valHtml = '<span class="react-store-val react-store-null">null</span>';
-    }
-
-    var childrenHtml = isExpandable
-      ? '<div class="react-store-children hidden">' +
-        renderStoreTree(val, path, depth + 1, filter) +
-        '</div>'
-      : '';
-
-    html +=
-      '<div class="react-store-node">' +
-      '<div class="react-store-key-row" data-path="' +
-      utils.escapeHtml(path) +
-      '">' +
-      toggleIcon +
-      '<span class="react-store-key">' +
-      utils.escapeHtml(key) +
-      '</span>' +
-      valHtml +
-      '</div>' +
-      childrenHtml +
-      '</div>';
-  });
-
-  if (keys.length > maxShow) {
-    html += '<div class="react-store-more">... 还有 ' + (keys.length - maxShow) + ' 个键</div>';
-  }
-
-  return html;
-}
-
-function initStoreExplorerEvents() {
-  var storeEl = utils.get('react-store-results');
-  if (!storeEl) return;
-
-  var searchInput = utils.get('react-store-search');
-  if (searchInput) {
-    var searchTimer = null;
-    searchInput.addEventListener('input', function () {
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(function () {
-        searchReactStore(searchInput.value.trim());
-      }, 200);
-    });
-  }
-
-  storeEl.addEventListener('click', function (e) {
-    var toggle = e.target.closest('.react-store-toggle-collapsed, .react-store-toggle-expanded');
-    if (!toggle) return;
-    var node = toggle.closest('.react-store-node');
-    if (!node) return;
-    var children = node.querySelector('.react-store-children');
-    if (!children) return;
-    var isHidden = children.classList.contains('hidden');
-    children.classList.toggle('hidden');
-    toggle.classList.toggle('react-store-toggle-collapsed');
-    toggle.classList.toggle('react-store-toggle-expanded');
-    toggle.textContent = isHidden ? '▼' : '▶';
-  });
-}
-
-async function copyReactStoreJson() {
-  try {
-    return utils.withTab(async function (tab) {
-      var data = await chrome.tabs.sendMessage(tab.id, { type: 'VK_REACT_STORE_EXPLORE' });
-      if (!data || data.error) {
-        utils.showToast('获取 Store 失败', 'error');
-        return;
-      }
-      var json = JSON.stringify(data.stores || {}, null, 2);
-      await utils.copyText(json);
-      utils.showToast('Store JSON 已复制 (' + json.length + ' 字符)', 'success');
-    });
-  } catch (e) {
-    utils.showToast('复制失败: ' + e.message, 'error');
-  }
-}
-
 function searchReactStore(text) {
   if (!lastReactStores) return;
   var storeEl = utils.get('react-store-results');
@@ -350,5 +188,16 @@ function searchReactStore(text) {
   var storeKeys = Object.keys(lastReactStores);
   renderStores(storeEl, lastReactStores, storeKeys, text);
 }
+
+var copyReactStoreJson = createCopyStoreJson('VK_REACT_STORE_EXPLORE', function (data) {
+  return data.stores || {};
+});
+
+var initStoreExplorerEvents = createInitStoreExplorerEvents({
+  resultsId: 'react-store-results',
+  searchId: 'react-store-search',
+  prefix: 'react-store',
+  searchFn: searchReactStore,
+});
 
 export { exploreReactStore, copyReactStoreJson, initStoreExplorerEvents };

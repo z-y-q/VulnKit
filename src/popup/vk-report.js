@@ -431,7 +431,9 @@ function generateShortMarkdownSummary(findings, activeModules, totalModules) {
   try {
     var tab = utils.getActiveTab ? utils.getActiveTab() : null;
     if (tab && tab.url) domain = new URL(tab.url).hostname;
-  } catch (_) {}
+  } catch (_) {
+    console.debug('report domain parse:', _.message);
+  }
 
   var lines = [];
   lines.push('## 灵眸渗透测试摘要');
@@ -515,7 +517,9 @@ function exportJson(collected) {
   try {
     var tab = utils.getActiveTab ? utils.getActiveTab() : null;
     if (tab && tab.url) domain = new URL(tab.url).hostname;
-  } catch (_) {}
+  } catch (_) {
+    console.debug('json report domain parse:', _.message);
+  }
 
   var report = {
     tool: '灵眸 VulnKit',

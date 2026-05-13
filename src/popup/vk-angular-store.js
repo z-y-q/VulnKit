@@ -2,30 +2,11 @@
 'use strict';
 
 import { utilsProxy as utils } from './vk-namespace.js';
+import { createRenderStoreTree, createInitStoreExplorerEvents, createCopyStoreJson } from './vk-store-tree-utils.js';
 
+var renderStoreTree = createRenderStoreTree('ng-store');
 let lastAngularStores = null;
 let lastAngularRoutes = null;
-
-function nodeMatches(key, val, filter) {
-  if (!filter) return true;
-  var lower = filter.toLowerCase();
-  if (key.toLowerCase().indexOf(lower) !== -1) return true;
-  if (typeof val === 'string' && val.toLowerCase().indexOf(lower) !== -1) return true;
-  if (typeof val === 'number' || typeof val === 'boolean') {
-    if (String(val).toLowerCase().indexOf(lower) !== -1) return true;
-  }
-  return false;
-}
-
-function subtreeHasMatch(obj, filter) {
-  if (!filter || !obj || typeof obj !== 'object') return false;
-  return Object.keys(obj).some(function (k) {
-    var v = obj[k];
-    if (nodeMatches(k, v, filter)) return true;
-    if (v && typeof v === 'object') return subtreeHasMatch(v, filter);
-    return false;
-  });
-}
 
 async function exploreAngularStore() {
   var statusEl = utils.get('angular-store-status');
@@ -163,96 +144,6 @@ function renderApiEndpoints(container, endpoints) {
   });
 }
 
-function renderStoreTree(obj, prefix, depth, filter) {
-  if (depth > 5) return '<div class="ng-store-node ng-store-truncated">...</div>';
-  if (obj === null || obj === undefined) return '';
-  if (typeof obj !== 'object') return '';
-  if (Array.isArray(obj)) {
-    return (
-      '<div class="ng-store-node"><div class="ng-store-key-row">' +
-      '<span class="ng-store-toggle ng-store-toggle-leaf"></span>' +
-      '<span class="ng-store-type-badge">Array[' +
-      obj.length +
-      ']</span>' +
-      '<span class="ng-store-val">' +
-      utils.escapeHtml(JSON.stringify(obj).substring(0, 120)) +
-      '</span>' +
-      '</div></div>'
-    );
-  }
-
-  var html = '';
-  var keys = Object.keys(obj);
-  var maxShow = 30;
-  var shown = 0;
-
-  keys.forEach(function (key) {
-    if (shown >= maxShow) return;
-    var val = obj[key];
-    if (filter) {
-      var directMatch = nodeMatches(key, val, filter);
-      var childMatch = val && typeof val === 'object' && subtreeHasMatch(val, filter);
-      if (!directMatch && !childMatch) return;
-    }
-    shown++;
-    var path = prefix ? prefix + '.' + key : key;
-    var isExpandable =
-      val !== null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0;
-    var isArr = Array.isArray(val);
-
-    var toggleIcon = isExpandable
-      ? '<span class="ng-store-toggle ng-store-toggle-collapsed">&#9654;</span>'
-      : '<span class="ng-store-toggle ng-store-toggle-leaf"></span>';
-
-    var valHtml = '';
-    if (isArr) {
-      valHtml =
-        '<span class="ng-store-type-badge">Array[' +
-        val.length +
-        ']</span>' +
-        '<span class="ng-store-val">' +
-        utils.escapeHtml(JSON.stringify(val).substring(0, 120)) +
-        '</span>';
-    } else if (typeof val === 'string') {
-      valHtml =
-        '<span class="ng-store-val">"' +
-        utils.escapeHtml(val.substring(0, 100)) +
-        (val.length > 100 ? '...' : '') +
-        '"</span>';
-    } else if (typeof val === 'number' || typeof val === 'boolean') {
-      valHtml = '<span class="ng-store-val">' + String(val) + '</span>';
-    } else if (val === null) {
-      valHtml = '<span class="ng-store-val ng-store-null">null</span>';
-    }
-
-    var childrenHtml = isExpandable
-      ? '<div class="ng-store-children hidden">' +
-        renderStoreTree(val, path, depth + 1, filter) +
-        '</div>'
-      : '';
-
-    html +=
-      '<div class="ng-store-node">' +
-      '<div class="ng-store-key-row" data-path="' +
-      utils.escapeHtml(path) +
-      '">' +
-      toggleIcon +
-      '<span class="ng-store-key">' +
-      utils.escapeHtml(key) +
-      '</span>' +
-      valHtml +
-      '</div>' +
-      childrenHtml +
-      '</div>';
-  });
-
-  if (keys.length > maxShow) {
-    html += '<div class="ng-store-more">... 还有 ' + (keys.length - maxShow) + ' 个键</div>';
-  }
-
-  return html;
-}
-
 function renderAngularRoutes(routes) {
   var routesEl = utils.get('angular-routes-results');
   var statusEl = utils.get('angular-router-status');
@@ -289,52 +180,24 @@ function renderAngularRoutes(routes) {
   routesEl.innerHTML = html;
 }
 
-function initStoreExplorerEvents() {
+function searchAngularStore(text) {
+  if (!lastAngularStores) return;
   var storeEl = utils.get('angular-store-results');
   if (!storeEl) return;
-
-  var searchInput = utils.get('angular-store-search');
-  if (searchInput) {
-    var searchTimer = null;
-    searchInput.addEventListener('input', function () {
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(function () {
-        searchAngularStore(searchInput.value.trim());
-      }, 200);
-    });
-  }
-
-  storeEl.addEventListener('click', function (e) {
-    var toggle = e.target.closest('.ng-store-toggle-collapsed, .ng-store-toggle-expanded');
-    if (!toggle) return;
-    var node = toggle.closest('.ng-store-node');
-    if (!node) return;
-    var children = node.querySelector('.ng-store-children');
-    if (!children) return;
-    var isHidden = children.classList.contains('hidden');
-    children.classList.toggle('hidden');
-    toggle.classList.toggle('ng-store-toggle-collapsed');
-    toggle.classList.toggle('ng-store-toggle-expanded');
-    toggle.textContent = isHidden ? '▼' : '▶';
-  });
+  var storeKeys = Object.keys(lastAngularStores);
+  renderStores(storeEl, lastAngularStores, storeKeys, text, []);
 }
 
-async function copyAngularStoreJson() {
-  try {
-    return utils.withTab(async function (tab) {
-      var data = await chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_STORE_EXPLORE' });
-      if (!data || data.error) {
-        utils.showToast('获取 Store 失败', 'error');
-        return;
-      }
-      var json = JSON.stringify(data.stores || {}, null, 2);
-      await utils.copyText(json);
-      utils.showToast('Store JSON 已复制 (' + json.length + ' 字符)', 'success');
-    });
-  } catch (e) {
-    utils.showToast('复制失败: ' + e.message, 'error');
-  }
-}
+var copyAngularStoreJson = createCopyStoreJson('VK_ANGULAR_STORE_EXPLORE', function (data) {
+  return data.stores || {};
+});
+
+var initStoreExplorerEvents = createInitStoreExplorerEvents({
+  resultsId: 'angular-store-results',
+  searchId: 'angular-store-search',
+  prefix: 'ng-store',
+  searchFn: searchAngularStore,
+});
 
 async function copyAngularRoutesJson() {
   try {
@@ -353,41 +216,36 @@ async function copyAngularRoutesJson() {
   }
 }
 
-function searchAngularStore(text) {
-  if (!lastAngularStores) return;
-  var storeEl = utils.get('angular-store-results');
-  if (!storeEl) return;
-  var storeKeys = Object.keys(lastAngularStores);
-  renderStores(storeEl, lastAngularStores, storeKeys, text, []);
-}
-
 function handleRouterRead() {
   var statusEl = utils.get('angular-router-status');
   var routesEl = utils.get('angular-routes-results');
   if (statusEl) statusEl.textContent = '正在读取路由...';
   if (routesEl) routesEl.innerHTML = '';
 
-  utils.requireTabId().then(function (tab) {
-    if (!tab) {
-      if (statusEl) statusEl.textContent = '无法获取标签页';
-      return;
-    }
-    chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_STORE_EXPLORE' }, function (data) {
-      if (chrome.runtime.lastError || !data) {
-        if (statusEl) statusEl.textContent = '无响应，请刷新页面后重试';
+  utils
+    .requireTabId()
+    .then(function (tab) {
+      if (!tab) {
+        if (statusEl) statusEl.textContent = '无法获取标签页';
         return;
       }
-      if (data.error) {
-        if (statusEl) statusEl.textContent = '错误: ' + data.error;
-        return;
-      }
-      var routes = data.routes || [];
-      lastAngularRoutes = routes;
-      renderAngularRoutes(routes);
+      chrome.tabs.sendMessage(tab.id, { type: 'VK_ANGULAR_STORE_EXPLORE' }, function (data) {
+        if (chrome.runtime.lastError || !data) {
+          if (statusEl) statusEl.textContent = '无响应，请刷新页面后重试';
+          return;
+        }
+        if (data.error) {
+          if (statusEl) statusEl.textContent = '错误: ' + data.error;
+          return;
+        }
+        var routes = data.routes || [];
+        lastAngularRoutes = routes;
+        renderAngularRoutes(routes);
+      });
+    })
+    .catch(function () {
+      if (statusEl) statusEl.textContent = '获取标签页失败';
     });
-  }).catch(function () {
-    if (statusEl) statusEl.textContent = '获取标签页失败';
-  });
 }
 
 export {

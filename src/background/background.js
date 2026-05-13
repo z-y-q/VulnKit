@@ -1089,12 +1089,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     case 'vulnkit-md5-hash':
     case 'vulnkit-sha256-hash':
       if (info.selectionText) {
-        var algo = info.menuItemId === 'vulnkit-md5-hash' ? 'SHA-256' : 'SHA-256';
+        var algoName = info.menuItemId === 'vulnkit-md5-hash' ? 'MD5' : 'SHA-256';
         (async function () {
           try {
             var encoder = new TextEncoder();
             var data = encoder.encode(info.selectionText);
-            var algoName = info.menuItemId === 'vulnkit-md5-hash' ? 'MD5' : 'SHA-256';
             if (algoName === 'MD5') {
               // MD5 not in crypto.subtle — use simple fallback message
               var hex = await simpleMd5(data);
