@@ -35,30 +35,33 @@
   }
 </script>
 
-<aside class="w-44 shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">
+<aside class="w-44 shrink-0 border-r border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-800 overflow-y-auto">
   {#each Object.entries(categories) as [catId, cat]}
-    <div class="border-b border-gray-100 dark:border-gray-700/50">
+    <div class="border-b border-gray-100 dark:border-gray-700/40">
       <button
-        class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        class="w-full flex items-center justify-between px-3 py-2 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
         onclick={() => toggleCat(catId)}
       >
         <span class="flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full" style="background: {cat.color}"></span>
           {cat.label}
         </span>
-        <svg class="w-3 h-3 transition-transform {collapsedCats[catId] ? '' : 'rotate-90'}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        <svg class="w-3 h-3 transition-transform duration-200 {collapsedCats[catId] ? '' : 'rotate-90'}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
         </svg>
       </button>
       {#if !collapsedCats[catId]}
         {#each cat.panels as panel}
           <button
-            class="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors {activePanel === panel.id
-              ? 'bg-blue-50 dark:bg-blue-900/30 text-primary font-medium'
-              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'}"
+            class="group w-full text-left pl-2.5 pr-3 py-1.5 text-sm flex items-center gap-2 transition-all duration-150 relative {activePanel === panel.id
+              ? 'bg-blue-50/70 dark:bg-blue-900/25 text-primary font-semibold'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40'}"
             onclick={() => select(panel.id)}
           >
-            <span class="text-base">{panel.icon}</span>
+            {#if activePanel === panel.id}
+              <span class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r" style="background: {cat.color}"></span>
+            {/if}
+            <span class="text-base w-5 text-center transition-transform duration-150 {activePanel === panel.id ? 'scale-110' : 'group-hover:scale-110'}">{panel.icon}</span>
             <span class="truncate">{panel.label}</span>
           </button>
         {/each}

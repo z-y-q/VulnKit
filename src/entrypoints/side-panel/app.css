@@ -1,4 +1,4 @@
-/* Global app styles */
+/* ===== 全局基础 ===== */
 html, body {
   margin: 0;
   padding: 0;
@@ -7,6 +7,9 @@ html, body {
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 #app {
@@ -14,17 +17,89 @@ html, body {
   height: 100%;
 }
 
-/* Scrollbar */
+/* 深色模式背景基色（更柔和的深灰，替代纯灰） */
+.dark body {
+  background: #0f172a;
+}
+body {
+  background: #f8fafc;
+}
+
+/* ===== 文本选中 ===== */
+::selection {
+  background: rgba(74, 144, 226, 0.25);
+}
+.dark ::selection {
+  background: rgba(74, 144, 226, 0.35);
+}
+
+/* ===== 滚动条 ===== */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 3px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  background-clip: padding-box;
 }
 .dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+  background-clip: padding-box;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
   background: #475569;
+  background-clip: padding-box;
+}
+
+/* ===== 动画 ===== */
+
+/* 面板切换淡入 */
+@keyframes vk-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.vk-fade-in {
+  animation: vk-fade-in 0.18s ease-out;
+}
+
+/* 结果项逐个淡入 */
+@keyframes vk-pop-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.vk-pop-in {
+  animation: vk-pop-in 0.2s ease-out both;
+}
+
+/* Toast 滑入 */
+@keyframes vk-slide-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.vk-slide-in {
+  animation: vk-slide-in 0.2s ease-out;
+}
+
+/* 品牌渐变文字 */
+.vk-brand-gradient {
+  background: linear-gradient(135deg, #4A90E2 0%, #6dd5ed 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 尊重动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .vk-fade-in, .vk-pop-in, .vk-slide-in {
+    animation: none;
+  }
 }
