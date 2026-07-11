@@ -1,0 +1,53 @@
+{
+  "SECURITY_HEADERS": [
+    { "name": "Content-Security-Policy", "weight": 10, "category": "security" },
+    { "name": "Strict-Transport-Security", "weight": 8, "category": "security" },
+    { "name": "X-Frame-Options", "weight": 7, "category": "security" },
+    { "name": "X-Content-Type-Options", "weight": 5, "category": "security" },
+    { "name": "Content-Security-Policy-Report-Only", "weight": 5, "category": "security" },
+    { "name": "Clear-Site-Data", "weight": 3, "category": "privacy" },
+    { "name": "Referrer-Policy", "weight": 6, "category": "privacy" },
+    { "name": "Permissions-Policy", "weight": 5, "category": "privacy" },
+    { "name": "X-Robots-Tag", "weight": 2, "category": "privacy" },
+    { "name": "Cross-Origin-Opener-Policy", "weight": 4, "category": "cross-origin" },
+    { "name": "Cross-Origin-Resource-Policy", "weight": 4, "category": "cross-origin" },
+    { "name": "Cross-Origin-Embedder-Policy", "weight": 4, "category": "cross-origin" },
+    { "name": "X-Permitted-Cross-Domain-Policies", "weight": 3, "category": "cross-origin" },
+    { "name": "Cache-Control", "weight": 3, "category": "caching" },
+    { "name": "Pragma", "weight": 2, "category": "legacy" },
+    { "name": "X-XSS-Protection", "weight": 3, "category": "legacy" },
+    { "name": "X-Download-Options", "weight": 2, "category": "security" },
+    { "name": "Report-To", "weight": 2, "category": "monitoring" },
+    { "name": "NEL", "weight": 2, "category": "monitoring" },
+    { "name": "Reporting-Endpoints", "weight": 1, "category": "monitoring" },
+    { "name": "Content-Digest", "weight": 1, "category": "security" },
+    { "name": "Accept-CH", "weight": 1, "category": "privacy" },
+    { "name": "Origin-Agent-Cluster", "weight": 1, "category": "security" }
+  ],
+  "SERVER_SIGNATURES": [
+    "apache",
+    "nginx",
+    "iis",
+    "tomcat",
+    "express",
+    "openresty",
+    "caddy",
+    "liteSpeed",
+    "cloudflare",
+    "microsoft",
+    "jetty",
+    "weblogic",
+    "websphere"
+  ],
+  "FRAMEWORK_SIGNATURES": [
+    "php",
+    "asp.net",
+    "django",
+    "rails",
+    "spring",
+    "laravel",
+    "next.js",
+    "nuxt",
+    "struts"
+  ]
+}

