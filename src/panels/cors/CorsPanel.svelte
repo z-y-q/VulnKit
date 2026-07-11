@@ -51,14 +51,6 @@
 
   let vulnCount = $derived(issues.filter(i => i.severity !== 'safe').length);
 
-  const SEV_COLOR: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    danger: 'bg-red-500 text-white',
-    warning: 'bg-yellow-500 text-white',
-    info: 'bg-blue-500 text-white',
-    safe: 'bg-gray-400 text-white',
-  };
-
   async function probeOne(
     url: string,
     method: string,

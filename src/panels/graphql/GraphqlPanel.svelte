@@ -60,14 +60,6 @@
 
   let vulnCount = $derived(findings.filter(f => f.severity !== 'info').length);
 
-  const SEV_COLOR: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-red-500 text-white',
-    medium: 'bg-yellow-500 text-white',
-    low: 'bg-blue-500 text-white',
-    info: 'bg-gray-400 text-white',
-  };
-
   // 映射 GraphqlFinding[] → ScanFinding[]
   function mapGraphqlToFindings(items: GraphqlFinding[]): ScanFinding[] {
     return items.map((f) => ({

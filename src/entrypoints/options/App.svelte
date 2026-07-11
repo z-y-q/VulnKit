@@ -9,8 +9,7 @@
 
   const ZOEYEYE_KEY = 'lingmou_zoomeye_key';
 
-  let isDark = $state(false);
-  themeStore.subscribe(v => { isDark = v; });
+  let isDark = $derived($themeStore);
 
   let apiKey = $state('');
   let history = $state<ScanHistoryEntry[]>([]);
@@ -26,7 +25,6 @@
   ];
 
   $effect(() => {
-    isDark;
     browser.storage.local.get(ZOEYEYE_KEY).then(r => {
       apiKey = (r[ZOEYEYE_KEY] as string) || '';
     });

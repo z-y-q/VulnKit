@@ -18,20 +18,16 @@
   } from '@/lib/report/report-builder';
 
   // —— 状态 ——
-  let entries = $state<ScanHistoryEntry[]>([]);
+  let entries = $derived($scanHistoryStore);
   let domainFilter = $state<string>('');
   let sevFilter = $state<string>('');
   let loading = $state(true);
 
-  // 订阅 store
-  scanHistoryStore.subscribe(v => {
-    entries = v;
-    loading = false;
-  });
-
-  // 挂载时刷新数据
+  // 挂载时刷新数据（订阅由 $scanHistoryStore 自动管理）
   $effect(() => {
-    scanHistoryStore.refresh();
+    scanHistoryStore.refresh().finally(() => {
+      loading = false;
+    });
   });
 
   // —— 派生数据 ——

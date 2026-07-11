@@ -4,16 +4,13 @@
   import { scanHistoryStore, MODULE_LABELS, SEV_ORDER, type ScanHistoryEntry, type ScanSeverity } from '@/stores/scan-history';
   import { toastStore } from '@/stores/ui';
 
-  let entries = $state<ScanHistoryEntry[]>([]);
+  let entries = $derived($scanHistoryStore);
   let filterDomain = $state('');
   let filterModule = $state('');
   let expandedId = $state<string | null>(null);
 
-  // 加载数据
+  // 挂载时刷新数据（订阅由 $scanHistoryStore 自动管理）
   $effect(() => {
-    scanHistoryStore.subscribe(v => {
-      entries = v;
-    });
     scanHistoryStore.refresh();
   });
 

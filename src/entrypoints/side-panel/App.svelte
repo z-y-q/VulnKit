@@ -6,15 +6,13 @@
   import Toast from '@/components/ui/Toast.svelte';
   import { panels } from '@/panels';
 
-  // 当前活跃面板（订阅 store）
-  let activePanel = $state('encoding');
-  activePanelStore.subscribe(v => { activePanel = v; });
+  // 当前活跃面板（$store 自动订阅/取消）
+  let activePanel = $derived($activePanelStore);
 
   // 查找当前面板配置
   let currentPanel = $derived(panels.find(p => p.id === activePanel));
 
-  let isDark = $state(false);
-  themeStore.subscribe(v => { isDark = v; });
+  let isDark = $derived($themeStore);
 
   // Popup 快捷入口跳转：popup 写入 pendingPanel，此处消费并切到对应面板
   $effect(() => {
