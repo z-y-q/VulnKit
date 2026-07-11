@@ -26,14 +26,17 @@ function collectHeaders(resp: Response): Record<string, string> {
   return hdrs;
 }
 
-/** 抓取文本，可选 Range 尾部。 */
+/** 抓取文本，可选 Range 尾部。tailOnly 传数字则取最后 N 字节，true 默认 500 字节。 */
 export async function fetchUrl(
   url: string,
-  tailOnly?: boolean,
+  tailOnly?: boolean | number,
   timeoutMs?: number,
 ): Promise<FetchResult> {
   const opts: RequestInit = {};
-  if (tailOnly) opts.headers = { Range: 'bytes=-500' };
+  if (tailOnly) {
+    const bytes = typeof tailOnly === 'number' ? tailOnly : 500;
+    opts.headers = { Range: `bytes=-${bytes}` };
+  }
   const tc = createTimeoutController(timeoutMs || 10000);
   opts.signal = tc.controller.signal;
   const release = await acquire(hostnameOf(url));

@@ -185,10 +185,12 @@
 
   /** 扫描单个 Bundle：抓取 JS → 查找 sourceMappingURL → 抓取 .map → 解析分析 */
   async function scanBundle(bundleUrl: string): Promise<SourceMapResult> {
-    // 1. 抓取 JS Bundle
+    // 1. 抓取 JS Bundle 尾部（sourceMappingURL 必在末行，只需尾部即可，
+    //    避免对动辄数 MB 的 bundle 全量下载，节省 ~90% 带宽）
     const jsRes = await sendMessage({
       type: 'FETCH_URL',
       url: bundleUrl,
+      tailOnly: 4096,
       timeout: FETCH_TIMEOUT,
     }) as FetchResult<string>;
 

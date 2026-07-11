@@ -28,6 +28,19 @@ interface TechSignature {
   matchers: SerializedMatcher[];
 }
 
+/** 预编译后的 matcher：value 已水合为 RegExp 或 string，避免每次扫描重建正则 */
+interface CompiledMatcher {
+  source: SerializedMatcher['source'];
+  type: SerializedMatcher['type'];
+  pattern: RegExp | string;
+}
+
+interface CompiledSignature {
+  name: string;
+  category: string;
+  matchers: CompiledMatcher[];
+}
+
 export interface SniffMatch {
   name: string;
   category: string;
@@ -115,6 +128,25 @@ export function hydrateMatcher(
   return String(value);
 }
 
+/**
+ * 签名预编译缓存 — 模块加载时一次性把所有 matcher 的 value 水合为
+ * RegExp/string，避免每次 scan 重复 new RegExp（134 签名 × 多 matcher）。
+ */
+const COMPILED_SIGNATURES: CompiledSignature[] = (TECH_SIGNATURES as TechSignature[]).map(sig => ({
+  name: sig.name,
+  category: sig.category,
+  matchers: sig.matchers.map(m => ({
+    source: m.source,
+    type: m.type,
+    pattern: hydrateMatcher(m.value),
+  })),
+}));
+
+/** 暴露编译缓存（供测试验证预编译单例性） */
+export function getCompiledSignatures(): CompiledSignature[] {
+  return COMPILED_SIGNATURES;
+}
+
 // ====== 信号池构建 ======
 
 function buildSignalPool(input: SniffInput) {
@@ -153,17 +185,15 @@ function buildSignalPool(input: SniffInput) {
 // ====== 单条匹配 ======
 
 function evaluateMatcher(
-  matcher: SerializedMatcher,
+  matcher: CompiledMatcher,
   pool: Record<string, string>,
 ): SniffEvidence | null {
   const source = matcher.source;
   const type = matcher.type;
-  const raw = matcher.value;
+  const pattern = matcher.pattern;
 
   const haystack = pool[source];
   if (!haystack) return null;
-
-  const pattern = hydrateMatcher(raw);
 
   if (type === 'regex' && pattern instanceof RegExp) {
     const match = pattern.exec(haystack);
@@ -197,7 +227,7 @@ function evaluateMatcher(
  */
 export function scan(input: SniffInput): SniffMatch[] {
   const pool = buildSignalPool(input);
-  const signatures = TECH_SIGNATURES as TechSignature[];
+  const signatures = COMPILED_SIGNATURES;
   const results: SniffMatch[] = [];
 
   for (const sig of signatures) {

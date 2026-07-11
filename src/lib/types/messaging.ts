@@ -4,7 +4,7 @@
 // ====== Background 消息（UI/content → background）======
 export type BackgroundMessage =
   // —— 抓取代理（绕过 CORS）——
-  | { type: 'FETCH_URL'; url: string; tailOnly?: boolean; timeout?: number }
+  | { type: 'FETCH_URL'; url: string; tailOnly?: boolean | number; timeout?: number }
   | { type: 'FETCH_URL_AUTH'; url: string; provider: 'zoomeye'; key: string }
   // —— 探测类（保留响应头/状态/耗时）——
   | { type: 'FETCH_PROBE'; url: string; method?: string; headers?: Record<string, string>; body?: string; timeout?: number; followRedirect?: boolean; includeBody?: boolean }

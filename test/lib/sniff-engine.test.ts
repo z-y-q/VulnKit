@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   hydrateMatcher,
   scan,
+  getCompiledSignatures,
   CATEGORY_LABELS,
   CATEGORY_ORDER,
   type SniffInput,
@@ -233,5 +234,39 @@ describe('sniff-engine: CATEGORY_ORDER 完整性', () => {
     for (const cat of CATEGORY_ORDER) {
       expect(CATEGORY_LABELS).toHaveProperty(cat);
     }
+  });
+});
+
+describe('sniff-engine: 签名预编译', () => {
+  it('编译缓存为模块级单例（多次获取同一引用）', () => {
+    const a = getCompiledSignatures();
+    const b = getCompiledSignatures();
+    expect(a).toBe(b); // 同一数组引用 → 不随 scan 重建
+  });
+
+  it('所有 regex matcher 已预编译为 RegExp 实例', () => {
+    const sigs = getCompiledSignatures();
+    expect(sigs.length).toBeGreaterThan(100); // 134 条
+    let regexCount = 0;
+    for (const sig of sigs) {
+      for (const m of sig.matchers) {
+        if (m.type === 'regex') {
+          expect(m.pattern).toBeInstanceOf(RegExp);
+          regexCount++;
+        }
+      }
+    }
+    expect(regexCount).toBeGreaterThan(50); // 大量正则均已预编译
+  });
+
+  it('多次 scan 复用同一编译缓存（regex 引用不变）', () => {
+    const before = getCompiledSignatures();
+    const firstRegex = before[0].matchers.find(m => m.pattern instanceof RegExp)?.pattern;
+    scan({ html: '<html></html>', headers: {}, scriptSrcs: [], cookies: {}, meta: [] });
+    scan({ html: '<script src="jquery.js"></script>', headers: { server: 'nginx' }, scriptSrcs: ['jquery.js'], cookies: {}, meta: [] });
+    const after = getCompiledSignatures();
+    const afterRegex = after[0].matchers.find(m => m.pattern instanceof RegExp)?.pattern;
+    expect(after).toBe(before);
+    expect(afterRegex).toBe(firstRegex); // 同一 RegExp 对象，未重建
   });
 });
