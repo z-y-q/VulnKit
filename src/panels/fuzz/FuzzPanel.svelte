@@ -28,6 +28,7 @@
   let foundOnly = $state(true);
   let sortBy = $state<'status' | 'size' | 'time'>('status');
   let customPaths = $state('');
+  let cancelled = $state(false);
 
   const wordlistKeys = getWordlistKeys();
 
@@ -114,6 +115,7 @@
     scanning = true;
     results = [];
     scanned = 0;
+    cancelled = false;
 
     let paths = getWordlist(wordlistKey);
     if (customPaths.trim()) {
@@ -126,6 +128,7 @@
     let idx = 0;
     async function worker() {
       while (idx < paths.length) {
+        if (cancelled) return;
         const cur = idx++;
         const path = paths[cur];
         const cleanPath = path.replace(/^\/+/, '');
@@ -139,6 +142,11 @@
     results = collected;
     scanning = false;
 
+    if (cancelled) {
+      toastStore.show('扫描已取消', 'info');
+      return;
+    }
+
     try {
       await scanHistoryStore.addScan({ url: targetUrl, module: 'fuzz', findings: mapToFindings(results) });
     } catch { /* store failure must not break scan */ }
@@ -146,6 +154,8 @@
     const found = collected.filter(r => isFoundStatus(r.status)).length;
     toastStore.show(`扫描完成，发现 ${found} 个有效路径（共 ${total}）`, found > 0 ? 'warning' : 'success');
   }
+
+  function cancel() { cancelled = true; }
 
   function exportResults() {
     const rows = [['path', 'url', 'status', 'size', 'method']];
@@ -163,7 +173,12 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <UrlInput bind:value={targetUrl} {scanning} buttonText="扫描" onscan={scan} />
+    <div class="flex gap-1">
+      <UrlInput bind:value={targetUrl} {scanning} buttonText="扫描" onscan={scan} />
+      {#if scanning}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      {/if}
+    </div>
     <div class="flex items-center gap-2 text-xs">
       <span class="text-gray-400">字典:</span>
       <select class="input text-xs flex-1" bind:value={wordlistKey}>

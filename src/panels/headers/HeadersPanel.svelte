@@ -28,6 +28,7 @@
   let filter = $state<'all' | 'miss' | 'warn' | 'pass'>('all');
   let searchQuery = $state('');
   let sortBy = $state<'severity' | 'name' | 'category'>('severity');
+  let cancelled = $state(false);
 
   // 自动填充当前页 URL
   $effect(() => {
@@ -121,6 +122,7 @@
     }
 
     scanning = true;
+    cancelled = false;
     result = null;
 
     try {
@@ -140,6 +142,12 @@
       const normalizedHeaders: Record<string, string> = {};
       for (const [k, val] of Object.entries(r.headers)) {
         normalizedHeaders[k.toLowerCase()] = val;
+      }
+
+      if (cancelled) {
+        scanning = false;
+        toastStore.show('扫描已取消', 'info');
+        return;
       }
 
       result = analyzeHeaders(normalizedHeaders);
@@ -163,6 +171,8 @@
       scanning = false;
     }
   }
+
+  function cancel() { cancelled = true; }
 
   function copyText() {
     if (!result) return;
@@ -207,7 +217,12 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
+    <div class="flex gap-1">
+      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
+      {#if scanning}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      {/if}
+    </div>
     {#if scanning}
       <div class="text-xs text-gray-400">正在获取响应头...</div>
     {/if}

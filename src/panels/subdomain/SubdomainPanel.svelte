@@ -27,6 +27,7 @@
   let results = $state<SubdomainResult[]>([]);
   let searchQuery = $state('');
   let sortBy = $state<'name' | 'ips'>('name');
+  let cancelled = $state(false);
 
   $effect(() => {
     getActiveTabUrl().then(u => {
@@ -83,6 +84,7 @@
     scanning = true;
     results = [];
     scanned = 0;
+    cancelled = false;
     total = candidates.length;
     const startMs = Date.now();
     elapsed = 0;
@@ -92,6 +94,7 @@
 
     async function worker() {
       while (idx < candidates.length) {
+        if (cancelled) return;
         const cur = idx++;
         const r = await resolveOne(candidates[cur].full);
         results.push(r);
@@ -103,6 +106,11 @@
     await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
     elapsed = Date.now() - startMs;
     scanning = false;
+
+    if (cancelled) {
+      toastStore.show('扫描已取消', 'info');
+      return;
+    }
 
     const aliveCount = results.filter(r => r.status === 'alive').length;
     if (aliveCount > 0) {
@@ -121,6 +129,8 @@
       });
     } catch { /* store failure must not break scan */ }
   }
+
+  function cancel() { cancelled = true; }
 
   function copyAll() {
     if (filteredResults.length === 0) {
@@ -167,7 +177,12 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <UrlInput bind:value={targetUrl} {scanning} buttonText="枚举" scanningText="枚举中..." onscan={scan} />
+    <div class="flex gap-1">
+      <UrlInput bind:value={targetUrl} {scanning} buttonText="枚举" scanningText="枚举中..." onscan={scan} />
+      {#if scanning}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      {/if}
+    </div>
     <div class="flex items-center gap-2 text-xs text-gray-400">
       <span>词表: {SUBDOMAIN_WORDLIST.length} 条</span>
       <span>·</span>

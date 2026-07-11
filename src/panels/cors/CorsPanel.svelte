@@ -31,6 +31,7 @@
   let issues = $state<CorsIssue[]>([]);
   let safeCount = $state(0);
   let useDynamic = $state(true);
+  let cancelled = $state(false);
   let sortBy = $state<'risk' | 'url'>('risk');
   let filter = $state<'all' | 'vuln'>('all');
 
@@ -109,6 +110,7 @@
       return;
     }
     scanning = true;
+    cancelled = false;
     issues = [];
     safeCount = 0;
     scanned = 0;
@@ -135,6 +137,7 @@
     let idx = 0;
     async function worker() {
       while (idx < tasks.length) {
+        if (cancelled) return;
         const cur = idx++;
         const r = await tasks[cur]();
         if (r) results.push(r);
@@ -142,6 +145,12 @@
       }
     }
     await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+
+    if (cancelled) {
+      scanning = false;
+      toastStore.show('扫描已取消', 'info');
+      return;
+    }
 
     const analyzed = analyzeResults(results);
     issues = analyzed.issues;
@@ -158,6 +167,8 @@
       toastStore.show(`CORS 检测完成，未发现风险（${safeCount} 安全）`, 'success');
     }
   }
+
+  function cancel() { cancelled = true; }
 
   function copyIssue(issue: CorsIssue) {
     const text = [
@@ -177,7 +188,12 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
+    <div class="flex gap-1">
+      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
+      {#if scanning}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      {/if}
+    </div>
     <div class="flex items-center gap-3 text-xs">
       <label class="flex items-center gap-1 cursor-pointer">
         <input type="checkbox" bind:checked={useDynamic} />

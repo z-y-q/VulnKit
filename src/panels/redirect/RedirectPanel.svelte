@@ -23,6 +23,7 @@
   let scanning = $state(false);
   let scanned = $state(0);
   let total = $state(0);
+  let cancelled = $state(false);
   let results = $state<RedirectResult[]>([]);
   let filter = $state<'all' | 'vuln'>('all');
 
@@ -87,6 +88,7 @@
       return;
     }
     scanning = true;
+    cancelled = false;
     results = [];
     scanned = 0;
 
@@ -98,6 +100,7 @@
     let idx = 0;
     async function worker() {
       while (idx < tests.length) {
+        if (cancelled) return;
         const cur = idx++;
         const t = tests[cur];
         const r = await probe(t.url);
@@ -106,6 +109,12 @@
       }
     }
     await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+
+    if (cancelled) {
+      scanning = false;
+      toastStore.show('扫描已取消', 'info');
+      return;
+    }
 
     // 漏洞优先
     results = collected.sort((a, b) => {
@@ -124,12 +133,19 @@
       toastStore.show(`检测完成，未发现开放重定向（${total} 个测试）`, 'success');
     }
   }
+
+  function cancel() { cancelled = true; }
 </script>
 
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
+    <div class="flex gap-1">
+      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
+      {#if scanning}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      {/if}
+    </div>
     <div class="text-xs text-gray-400">
       {REDIRECT_PAYLOADS.length} 个参数 × {PROTOCOL_VARIANTS.length} 个协议变体 = {REDIRECT_PAYLOADS.length * PROTOCOL_VARIANTS.length} 个测试
     </div>

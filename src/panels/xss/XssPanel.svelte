@@ -36,6 +36,7 @@
   let filter = $state<'all' | 'vuln'>('all');
   let customPayload = $state('');
   let useCustom = $state(false);
+  let cancelled = $state(false);
 
   $effect(() => {
     getActiveTabUrl().then(u => {
@@ -192,6 +193,7 @@
     scanning = true;
     findings = [];
     scanned = 0;
+    cancelled = false;
 
     let payloads: string[];
     if (useCustom && customPayload.trim()) {
@@ -219,6 +221,7 @@
 
       async function probeWorker() {
         while (probeIdx < probeTasks.length) {
+          if (cancelled) return;
           const cur = probeIdx++;
           const r = await probeTasks[cur]();
           probeResults[cur] = r;
@@ -253,6 +256,7 @@
 
     async function worker() {
       while (idx < tasks.length) {
+        if (cancelled) return;
         const cur = idx++;
         const r = await tasks[cur]();
         if (r) collected.push(r);
@@ -264,6 +268,11 @@
     // 按严重性排序
     findings = collected.sort(XSS_SORT_FNS.severity);
     scanning = false;
+
+    if (cancelled) {
+      toastStore.show('扫描已取消', 'info');
+      return;
+    }
 
     try {
       await scanHistoryStore.addScan({ url: targetUrl, module: 'xssscan', findings: mapToFindings(findings) });
@@ -277,6 +286,8 @@
       toastStore.show(`XSS 检测完成，未发现漏洞（${total} 个测试）`, 'success');
     }
   }
+
+  function cancel() { cancelled = true; }
 
   function copyFinding(f: XssFinding) {
     const text = [
@@ -296,7 +307,12 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
+    <div class="flex gap-1">
+      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
+      {#if scanning}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      {/if}
+    </div>
 
     <div class="flex items-center gap-2 text-xs">
       <label class="flex items-center gap-1 cursor-pointer">
