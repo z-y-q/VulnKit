@@ -24,6 +24,7 @@
   let results = $state<SniffMatch[]>([]);
   let filter = $state('all');
   let expandedName = $state<string | null>(null);
+  let cancelled = $state(false);
 
   // 自动填充当前页 URL
   $effect(() => {
@@ -105,6 +106,7 @@
     }
 
     scanning = true;
+    cancelled = false;
     results = [];
     expandedName = null;
 
@@ -114,6 +116,12 @@
         sendMessage({ type: 'FETCH_URL', url: v.parsed.href, timeout: 12000 }) as Promise<FetchResult<string>>,
         sendMessage({ type: 'FETCH_PROBE', url: v.parsed.href, method: 'GET', timeout: 12000 }) as Promise<ProbeResult>,
       ]);
+
+      if (cancelled) {
+        scanning = false;
+        toastStore.show('扫描已取消', 'info');
+        return;
+      }
 
       // 检查 HTML 获取
       let html = '';
@@ -167,6 +175,8 @@
     }
   }
 
+  function cancel() { cancelled = true; }
+
   function toggleExpand(name: string) {
     expandedName = expandedName === name ? null : name;
   }
@@ -209,7 +219,12 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={startScan} />
+    <div class="flex gap-1">
+      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={startScan} />
+      {#if scanning}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      {/if}
+    </div>
     {#if scanning}
       <div class="text-xs text-gray-400">正在获取页面并分析技术指纹...</div>
     {/if}

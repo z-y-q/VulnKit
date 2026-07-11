@@ -34,6 +34,7 @@
   let scanned = $state(0);
   let total = $state(0);
   let filter = $state<'all' | 'vuln'>('all');
+  let cancelled = $state(false);
 
   const CONCURRENCY = 8;
   const MAX_SCRIPTS = 50;
@@ -136,6 +137,7 @@
     }
 
     phase = 'scanning';
+    cancelled = false;
     results = [];
     scanned = 0;
 
@@ -152,6 +154,7 @@
     let idx = 0;
     async function worker() {
       while (idx < tasks.length) {
+        if (cancelled) return;
         const cur = idx++;
         const r = await tasks[cur]();
         collected.push(r);
@@ -161,6 +164,13 @@
     await Promise.all(
       Array.from({ length: CONCURRENCY }, () => worker()),
     );
+
+    if (cancelled) {
+      results = collected;
+      phase = 'done';
+      toastStore.show('扫描已取消', 'info');
+      return;
+    }
 
     results = collected;
     phase = 'done';
@@ -261,6 +271,8 @@
     };
   }
 
+  function cancel() { cancelled = true; }
+
   /** 复制单条结果 */
   function copyResult(r: SourceMapResult) {
     const lines = [
@@ -345,13 +357,18 @@
 
     <!-- 检测到 Bundle 后显示扫描按钮 -->
     {#if phase === 'detected' || phase === 'scanning' || phase === 'done'}
-      <button
-        class="btn btn-sm btn-primary w-full"
-        disabled={phase === 'scanning'}
-        onclick={scan}
-      >
-        {phase === 'scanning' ? '扫描中...' : `扫描 ${bundleUrls.length} 个 Bundle`}
-      </button>
+      <div class="flex gap-1">
+        <button
+          class="btn btn-sm btn-primary flex-1"
+          disabled={phase === 'scanning'}
+          onclick={scan}
+        >
+          {phase === 'scanning' ? '扫描中...' : `扫描 ${bundleUrls.length} 个 Bundle`}
+        </button>
+        {#if phase === 'scanning'}
+          <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+        {/if}
+      </div>
     {/if}
 
     <!-- 进度条 -->

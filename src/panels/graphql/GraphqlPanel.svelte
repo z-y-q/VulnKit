@@ -41,6 +41,7 @@
   let filter = $state<'all' | 'vuln'>('all');
   let showSchema = $state(false);
   let customPath = $state('');
+  let cancelled = $state(false);
 
   $effect(() => {
     getActiveTabUrl().then(u => {
@@ -94,6 +95,7 @@
       return;
     }
     scanning = true;
+    cancelled = false;
     scanned = 0;
     total = 0;
     endpoints = [];
@@ -114,6 +116,12 @@
     let foundEndpointUrl: string | null = null;
 
     for (const path of allPaths) {
+      if (cancelled) {
+        phase = '';
+        scanning = false;
+        toastStore.show('扫描已取消', 'info');
+        return;
+      }
       phase = `探测 ${path}...`;
       const url = origin + path;
       const resp = await probeEndpoint(url, INTROSPECTION_QUERIES[0]);
@@ -201,11 +209,19 @@
     let idx = 0;
     async function worker() {
       while (idx < tasks.length) {
+        if (cancelled) return;
         const cur = idx++;
         await tasks[cur]();
       }
     }
     await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+
+    if (cancelled) {
+      phase = '';
+      scanning = false;
+      toastStore.show('扫描已取消', 'info');
+      return;
+    }
 
     // 补充 batch/suggestion 状态
     batchSupported = findings.some(f => f.test === 'batch-query');
@@ -228,6 +244,8 @@
       });
     } catch { /* store failure must not break scan */ }
   }
+
+  function cancel() { cancelled = true; }
 
   function copyFinding(f: GraphqlFinding) {
     const text = [
@@ -287,7 +305,12 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
+    <div class="flex gap-1">
+      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
+      {#if scanning}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      {/if}
+    </div>
     <div class="flex items-center gap-2 text-xs">
       <input class="input text-xs flex-1" placeholder="自定义路径，如 /api/gateway" bind:value={customPath} />
       <span class="text-gray-400 shrink-0">端点: {COMMON_GRAPHQL_PATHS.length}</span>
