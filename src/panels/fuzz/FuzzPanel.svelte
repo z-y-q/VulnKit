@@ -6,6 +6,7 @@
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import { scanSettingsStore } from '@/stores/settings';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
@@ -83,7 +84,7 @@
         type: 'FETCH_PROBE',
         url: u,
         method,
-        timeout: 8000,
+        timeout: $scanSettingsStore.requestTimeoutMs,
       });
       const r = res as ProbeResult;
       const size = extractContentLength(r.headers) || (r.body ? r.body.length : 0);
@@ -124,7 +125,7 @@
     total = paths.length;
     const collected: FuzzResult[] = [];
 
-    const CONCURRENCY = 8;
+    const CONCURRENCY = $scanSettingsStore.concurrency;
     let idx = 0;
     async function worker() {
       while (idx < paths.length) {

@@ -6,6 +6,7 @@
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import { scanSettingsStore } from '@/stores/settings';
   import type { DnsResolveResult } from '@/lib/types/messaging';
   import {
     SUBDOMAIN_WORDLIST,
@@ -89,7 +90,7 @@
     const startMs = Date.now();
     elapsed = 0;
 
-    const CONCURRENCY = 8;
+    const CONCURRENCY = $scanSettingsStore.concurrency;
     let idx = 0;
 
     async function worker() {

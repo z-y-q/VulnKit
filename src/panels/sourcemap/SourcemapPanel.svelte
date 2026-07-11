@@ -10,6 +10,7 @@
   import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
   import FilterBar from '@/components/scanner/FilterBar.svelte';
   import type { FetchResult } from '@/lib/types/messaging';
+  import { scanSettingsStore } from '@/stores/settings';
   import {
     extractScriptUrls,
     extractInlineSourceMapHints,
@@ -36,9 +37,9 @@
   let filter = $state<'all' | 'vuln'>('all');
   let cancelled = $state(false);
 
-  const CONCURRENCY = 8;
+  const CONCURRENCY = $derived($scanSettingsStore.concurrency);
   const MAX_SCRIPTS = 50;
-  const FETCH_TIMEOUT = 12000;
+  const FETCH_TIMEOUT = $derived($scanSettingsStore.requestTimeoutMs);
 
   $effect(() => {
     getActiveTabUrl().then(u => {

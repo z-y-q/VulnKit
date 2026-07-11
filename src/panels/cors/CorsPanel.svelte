@@ -6,6 +6,7 @@
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import { scanSettingsStore } from '@/stores/settings';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
@@ -65,7 +66,7 @@
         method,
         headers: { Origin: origin.value },
         credentials: 'include',
-        timeout: 10000,
+        timeout: $scanSettingsStore.requestTimeoutMs,
       });
       const r = res as ProbeResult;
       return {
@@ -133,7 +134,7 @@
     total = tasks.length;
     const results: CorsProbeResult[] = [];
     // 并发限流（每批 6 个）
-    const CONCURRENCY = 6;
+    const CONCURRENCY = $scanSettingsStore.concurrency;
     let idx = 0;
     async function worker() {
       while (idx < tasks.length) {

@@ -21,6 +21,7 @@
     type GraphqlSchemaInfo,
   } from '@/lib/scanners/graphql-engine';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import { scanSettingsStore } from '@/stores/settings';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
@@ -72,7 +73,7 @@
     }));
   }
 
-  async function probeEndpoint(url: string, body: string, timeout = 10000): Promise<ProbeResult | null> {
+  async function probeEndpoint(url: string, body: string, timeout = $scanSettingsStore.requestTimeoutMs): Promise<ProbeResult | null> {
     try {
       const res = await sendMessage({
         type: 'FETCH_PROBE',
@@ -205,7 +206,7 @@
     scanned = 0;
 
     // 并发限流
-    const CONCURRENCY = 8;
+    const CONCURRENCY = $scanSettingsStore.concurrency;
     let idx = 0;
     async function worker() {
       while (idx < tasks.length) {

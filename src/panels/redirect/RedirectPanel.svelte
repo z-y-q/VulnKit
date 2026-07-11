@@ -6,6 +6,7 @@
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import { scanSettingsStore } from '@/stores/settings';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
@@ -55,7 +56,7 @@
         url,
         method: 'GET',
         followRedirect: false,
-        timeout: 8000,
+        timeout: $scanSettingsStore.requestTimeoutMs,
       });
       const r = res as ProbeResult;
       const resp = {
@@ -96,7 +97,7 @@
     total = tests.length;
     const collected: RedirectResult[] = [];
 
-    const CONCURRENCY = 8;
+    const CONCURRENCY = $scanSettingsStore.concurrency;
     let idx = 0;
     async function worker() {
       while (idx < tests.length) {

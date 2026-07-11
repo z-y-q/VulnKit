@@ -16,6 +16,7 @@
     type SniffEvidence,
   } from '@/lib/scanners/sniff-engine';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import { scanSettingsStore } from '@/stores/settings';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
 
@@ -113,8 +114,8 @@
     try {
       // 并发获取 HTML 和 headers
       const [fetchRes, probeRes] = await Promise.all([
-        sendMessage({ type: 'FETCH_URL', url: v.parsed.href, timeout: 12000 }) as Promise<FetchResult<string>>,
-        sendMessage({ type: 'FETCH_PROBE', url: v.parsed.href, method: 'GET', timeout: 12000 }) as Promise<ProbeResult>,
+        sendMessage({ type: 'FETCH_URL', url: v.parsed.href, timeout: $scanSettingsStore.requestTimeoutMs }) as Promise<FetchResult<string>>,
+        sendMessage({ type: 'FETCH_PROBE', url: v.parsed.href, method: 'GET', timeout: $scanSettingsStore.requestTimeoutMs }) as Promise<ProbeResult>,
       ]);
 
       if (cancelled) {

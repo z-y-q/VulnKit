@@ -21,6 +21,7 @@
     type HeaderSeverity,
   } from '@/lib/scanners/headers-engine';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import { scanSettingsStore } from '@/stores/settings';
 
   let targetUrl = $state('');
   let scanning = $state(false);
@@ -129,7 +130,7 @@
       const probe = await sendMessage({
         type: 'FETCH_HEADER_PROBE',
         url: v.parsed.href,
-        timeout: 10000,
+        timeout: $scanSettingsStore.requestTimeoutMs,
       });
       const r = probe as ProbeResult;
 

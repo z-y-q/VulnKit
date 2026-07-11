@@ -30,6 +30,7 @@ import {
   restoreRuoYiHook,
   cleanupRuoYiTabOnClose,
 } from '@/lib/background/ruoyi-hook';
+import { initRateLimiter } from '@/lib/background/rate-limit';
 import type { BackgroundMessage } from '@/lib/types/messaging';
 
 export default defineBackground(() => {
@@ -169,6 +170,7 @@ export default defineBackground(() => {
   // ====== 启动恢复 ======
   restoreSpoofState();
   restoreRuoYiHook();
+  initRateLimiter(); // 加载限流设置并订阅变更（不阻塞，首次请求前就绪）
 
   // ====== 右键菜单 ======
   browser.runtime.onInstalled.addListener(() => {

@@ -6,6 +6,8 @@
   // 4. 主题切换 / 关于
   import { themeStore, toastStore } from '@/stores/ui';
   import { scanHistoryStore, MODULE_LABELS, type ScanHistoryEntry } from '@/stores/scan-history';
+  import { scanSettingsStore } from '@/stores/settings';
+  import { SCAN_SETTINGS_BOUNDS } from '@/lib/core/settings';
 
   const ZOEYEYE_KEY = 'lingmou_zoomeye_key';
 
@@ -16,12 +18,32 @@
   let storageItems = $state<{ key: string; label: string; bytes: number }[]>([]);
   let storageTotal = $state(0);
 
+  // 扫描参数（从 store 拉到本地编辑态，保存时写回）
+  let scanSettings = $derived($scanSettingsStore);
+  let editTimeout = $state(0);
+  let editConcurrency = $state(0);
+  let editMaxPerHost = $state(0);
+  let editMinInterval = $state(0);
+  let settingsLoaded = $state(false);
+
+  $effect(() => {
+    // store 首次加载后同步到编辑态
+    if (!settingsLoaded && scanSettings.requestTimeoutMs) {
+      editTimeout = scanSettings.requestTimeoutMs / 1000;
+      editConcurrency = scanSettings.concurrency;
+      editMaxPerHost = scanSettings.maxConcurrentPerHost;
+      editMinInterval = scanSettings.minIntervalPerHostMs;
+      settingsLoaded = true;
+    }
+  });
+
   const KNOWN_STORAGE_KEYS: { key: string; label: string }[] = [
     { key: 'pentest_scan_history', label: '扫描历史' },
     { key: ZOEYEYE_KEY, label: 'ZoomEye 密钥' },
     { key: 'lingmou-theme', label: '主题设置' },
     { key: 'pendingPanel', label: '待跳转面板' },
     { key: 'pentest_spoof', label: '伪装状态' },
+    { key: 'pentestSettings', label: '扫描参数/右键菜单' },
   ];
 
   $effect(() => {
@@ -68,6 +90,23 @@
     await browser.storage.local.remove(ZOEYEYE_KEY);
     apiKey = '';
     toastStore.show('已清除 API 密钥', 'success');
+  }
+
+  async function saveScanSettings() {
+    await scanSettingsStore.update({
+      requestTimeoutMs: Math.round(editTimeout * 1000),
+      concurrency: editConcurrency,
+      maxConcurrentPerHost: editMaxPerHost,
+      minIntervalPerHostMs: editMinInterval,
+    });
+    toastStore.show('扫描参数已保存', 'success');
+  }
+
+  function resetScanSettings() {
+    editTimeout = 10;
+    editConcurrency = 6;
+    editMaxPerHost = 6;
+    editMinInterval = 0;
   }
 
   async function clearHistory() {
@@ -122,6 +161,69 @@
         <button class="btn btn-sm" onclick={clearApiKey} disabled={!apiKey}>清除</button>
       </div>
       <p class="text-xs text-gray-400 mt-1">用于「资产测绘」面板。密钥仅本地存储，不上传任何服务器。</p>
+    </div>
+  </section>
+
+  <!-- 扫描参数 -->
+  <section class="card p-4 space-y-3">
+    <div class="flex items-center justify-between">
+      <h2 class="text-sm font-semibold">⚡ 扫描参数</h2>
+      <span class="text-xs text-gray-400">实时生效 · background 侧</span>
+    </div>
+    <p class="text-xs text-gray-400 -mt-1">控制测试强度，避免对目标造成压力（SRC 合规要求）。限流按目标主机全局生效，跨面板共享。</p>
+    <div class="grid grid-cols-2 gap-3">
+      <label class="space-y-1">
+        <span class="text-xs text-gray-500">请求超时（秒）</span>
+        <input
+          class="input text-sm"
+          type="number"
+          min={SCAN_SETTINGS_BOUNDS.requestTimeoutMs.min / 1000}
+          max={SCAN_SETTINGS_BOUNDS.requestTimeoutMs.max / 1000}
+          step="1"
+          bind:value={editTimeout}
+        />
+        <span class="text-[10px] text-gray-400">单个 HTTP 请求的最大等待</span>
+      </label>
+      <label class="space-y-1">
+        <span class="text-xs text-gray-500">面板并发数</span>
+        <input
+          class="input text-sm"
+          type="number"
+          min={SCAN_SETTINGS_BOUNDS.concurrency.min}
+          max={SCAN_SETTINGS_BOUNDS.concurrency.max}
+          step="1"
+          bind:value={editConcurrency}
+        />
+        <span class="text-[10px] text-gray-400">单个扫描面板的并发 worker</span>
+      </label>
+      <label class="space-y-1">
+        <span class="text-xs text-gray-500">每主机最大并发</span>
+        <input
+          class="input text-sm"
+          type="number"
+          min={SCAN_SETTINGS_BOUNDS.maxConcurrentPerHost.min}
+          max={SCAN_SETTINGS_BOUNDS.maxConcurrentPerHost.max}
+          step="1"
+          bind:value={editMaxPerHost}
+        />
+        <span class="text-[10px] text-gray-400">同一目标主机同时在飞的请求上限</span>
+      </label>
+      <label class="space-y-1">
+        <span class="text-xs text-gray-500">每主机最小间隔（毫秒）</span>
+        <input
+          class="input text-sm"
+          type="number"
+          min={SCAN_SETTINGS_BOUNDS.minIntervalPerHostMs.min}
+          max={SCAN_SETTINGS_BOUNDS.minIntervalPerHostMs.max}
+          step="50"
+          bind:value={editMinInterval}
+        />
+        <span class="text-[10px] text-gray-400">同主机相邻请求间隔，0=不限速</span>
+      </label>
+    </div>
+    <div class="flex gap-1 pt-1">
+      <button class="btn btn-sm btn-primary" onclick={saveScanSettings}>保存</button>
+      <button class="btn btn-sm" onclick={resetScanSettings}>恢复默认</button>
     </div>
   </section>
 

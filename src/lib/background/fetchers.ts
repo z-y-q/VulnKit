@@ -7,6 +7,7 @@ import type {
   ProbeResult,
   DnsResolveResult,
 } from '@/lib/types/messaging';
+import { acquire, hostnameOf } from '@/lib/background/rate-limit';
 
 function createTimeoutController(timeoutMs: number) {
   const controller = new AbortController();
@@ -35,6 +36,7 @@ export async function fetchUrl(
   if (tailOnly) opts.headers = { Range: 'bytes=-500' };
   const tc = createTimeoutController(timeoutMs || 10000);
   opts.signal = tc.controller.signal;
+  const release = await acquire(hostnameOf(url));
   try {
     const resp = await fetch(url, opts);
     if (!resp.ok && resp.status !== 206) {
@@ -46,6 +48,7 @@ export async function fetchUrl(
   } catch (e) {
     return { success: false, error: (e as Error).message || '请求超时' };
   } finally {
+    release();
     tc.cleanup();
   }
 }
@@ -53,6 +56,7 @@ export async function fetchUrl(
 /** 抓取图片为 data URL（base64）。 */
 export async function fetchImage(url: string): Promise<FetchResult> {
   const tc = createTimeoutController(15000);
+  const release = await acquire(hostnameOf(url));
   try {
     const resp = await fetch(url, { signal: tc.controller.signal });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -69,6 +73,7 @@ export async function fetchImage(url: string): Promise<FetchResult> {
   } catch (e) {
     return { success: false, error: (e as Error).message };
   } finally {
+    release();
     tc.cleanup();
   }
 }
@@ -85,6 +90,7 @@ export async function fetchZoomEyeAuth(
   apiKey: string,
 ): Promise<FetchResult> {
   const now = Date.now();
+  const release = await acquire(hostnameOf(url));
   try {
     if (zoomEyeTokenCache.token && zoomEyeTokenCache.expiresAt > now) {
       const resp = await fetch(url, {
@@ -121,6 +127,8 @@ export async function fetchZoomEyeAuth(
     return { success: true, data: await apiResp.text() };
   } catch (e) {
     return { success: false, error: (e as Error).message || '请求超时' };
+  } finally {
+    release();
   }
 }
 
@@ -137,6 +145,7 @@ export interface ProbeOptions {
 export async function fetchProbe(url: string, opts: ProbeOptions = {}): Promise<ProbeResult> {
   const tc = createTimeoutController(opts.timeout || 5000);
   const t0 = performance.now();
+  const release = await acquire(hostnameOf(url));
   try {
     const resp = await fetch(url, {
       method: opts.method || 'GET',
@@ -161,6 +170,7 @@ export async function fetchProbe(url: string, opts: ProbeOptions = {}): Promise<
   } catch (e) {
     return { error: (e as Error).message, status: 0, body: '', headers: {}, time: 0 };
   } finally {
+    release();
     tc.cleanup();
   }
 }
@@ -171,6 +181,7 @@ export async function fetchCorsProbe(
   opts: ProbeOptions & { credentials?: RequestCredentials } = {},
 ): Promise<ProbeResult> {
   const tc = createTimeoutController(opts.timeout || 10000);
+  const release = await acquire(hostnameOf(url));
   try {
     const resp = await fetch(url, {
       method: opts.method || 'GET',
@@ -191,6 +202,7 @@ export async function fetchCorsProbe(
   } catch (e) {
     return { error: (e as Error).message, status: 0 };
   } finally {
+    release();
     tc.cleanup();
   }
 }
@@ -198,6 +210,7 @@ export async function fetchCorsProbe(
 /** HEAD 探测响应头（失败回退 GET）。 */
 export async function fetchHeaderProbe(url: string, timeout = 8000): Promise<ProbeResult> {
   const tc = createTimeoutController(timeout);
+  const release = await acquire(hostnameOf(url));
   try {
     const resp = await fetch(url, {
       method: 'HEAD',
@@ -228,6 +241,7 @@ export async function fetchHeaderProbe(url: string, timeout = 8000): Promise<Pro
       return { error: (e2 as Error).message, status: 0 };
     }
   } finally {
+    release();
     tc.cleanup();
   }
 }
@@ -238,6 +252,7 @@ export async function fetchWafProbe(
   opts: ProbeOptions = {},
 ): Promise<ProbeResult> {
   const tc = createTimeoutController(opts.timeout || 8000);
+  const release = await acquire(hostnameOf(url));
   try {
     const resp = await fetch(url, {
       method: opts.method || 'GET',
@@ -259,6 +274,7 @@ export async function fetchWafProbe(
   } catch (e) {
     return { error: (e as Error).message, status: 0 };
   } finally {
+    release();
     tc.cleanup();
   }
 }
@@ -270,6 +286,7 @@ export async function fetchDnsProbe(
   timeout = 5000,
 ): Promise<ProbeResult> {
   const tc = createTimeoutController(timeout);
+  const release = await acquire(hostnameOf(url));
   try {
     const resp = await fetch(url, {
       method,
@@ -281,6 +298,7 @@ export async function fetchDnsProbe(
   } catch (e) {
     return { error: (e as Error).message, status: 0 };
   } finally {
+    release();
     tc.cleanup();
   }
 }

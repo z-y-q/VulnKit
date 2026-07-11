@@ -6,6 +6,7 @@
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import { scanSettingsStore } from '@/stores/settings';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
@@ -118,7 +119,7 @@
         url: testUrl,
         method: 'GET',
         includeBody: true,
-        timeout: 10000,
+        timeout: $scanSettingsStore.requestTimeoutMs,
       });
       const r = res as ProbeResult;
       const body = r.body ?? '';
@@ -166,7 +167,7 @@
         url: u.href,
         method: 'GET',
         includeBody: true,
-        timeout: 10000,
+        timeout: $scanSettingsStore.requestTimeoutMs,
       });
       const r = res as ProbeResult;
       const body = r.body ?? '';
@@ -212,7 +213,7 @@
     // Phase 1: 快速反射过滤（如果不用自定义 payload）
     let reflectedParams: string[] = [];
     if (!useCustom) {
-      const CONCURRENCY = 8;
+      const CONCURRENCY = $scanSettingsStore.concurrency;
       let probeIdx = 0;
       const probeTasks = params.map(p => () => probeReflection(targetUrl, p));
       const probeResults: { reflected: boolean; context: XssContext }[] = [];
