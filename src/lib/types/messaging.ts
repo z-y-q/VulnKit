@@ -11,7 +11,6 @@ export type BackgroundMessage =
   | { type: 'FETCH_CORS_PROBE'; url: string; method?: string; headers?: Record<string, string>; body?: string; credentials?: RequestCredentials; timeout?: number }
   | { type: 'FETCH_HEADER_PROBE'; url: string; timeout?: number }
   | { type: 'FETCH_DNS_RESOLVE'; hostname: string; recordType?: string }
-  | { type: 'FETCH_DNS_PROBE'; url: string; method?: string; timeout?: number }
   | { type: 'FETCH_WAF_PROBE'; url: string; method?: string; headers?: Record<string, string>; timeout?: number }
   | { type: 'FETCH_IMAGE'; url: string }
   // —— JS 阻断（declarativeNetRequest）——

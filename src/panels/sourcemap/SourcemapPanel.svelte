@@ -11,6 +11,7 @@
   import FilterBar from '@/components/scanner/FilterBar.svelte';
   import type { FetchResult } from '@/lib/types/messaging';
   import { scanSettingsStore } from '@/stores/settings';
+  import { runConcurrent } from '@/lib/core/concurrency';
   import {
     extractScriptUrls,
     extractInlineSourceMapHints,
@@ -152,19 +153,10 @@
       (url) => (): Promise<SourceMapResult> => scanBundle(url),
     );
 
-    let idx = 0;
-    async function worker() {
-      while (idx < tasks.length) {
-        if (cancelled) return;
-        const cur = idx++;
-        const r = await tasks[cur]();
-        collected.push(r);
-        scanned++;
-      }
-    }
-    await Promise.all(
-      Array.from({ length: CONCURRENCY }, () => worker()),
-    );
+    await runConcurrent(tasks, async (task) => {
+      collected.push(await task());
+      scanned++;
+    }, { concurrency: CONCURRENCY, cancelled: () => cancelled });
 
     if (cancelled) {
       results = collected;

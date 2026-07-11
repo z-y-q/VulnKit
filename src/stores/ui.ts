@@ -44,6 +44,14 @@ function createToastStore() {
   const toasts = writable<ToastItem[]>([]);
 
   function show(message: string, type: ToastItem['type'] = 'info', duration = 2000) {
+    // 去重：相同 message+type 在窗口期内只弹一次，避免并发扫描刷屏
+    let dup = false;
+    toasts.update(t => {
+      dup = t.some(item => item.message === message && item.type === type);
+      return t;
+    });
+    if (dup) return;
+
     const id = _toastId++;
     toasts.update(t => [...t, { id, message, type, duration }]);
     setTimeout(() => {

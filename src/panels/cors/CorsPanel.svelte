@@ -7,6 +7,8 @@
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
+  import { runConcurrent } from '@/lib/core/concurrency';
+  import { compareSeverity } from '@/lib/types/severity';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
@@ -44,10 +46,9 @@
 
   let sortedIssues = $derived.by(() => {
     const list = filter === 'vuln' ? issues.filter(i => i.severity !== 'safe') : issues;
-    const order: Record<string, number> = { critical: 0, danger: 1, warning: 2, info: 3, safe: 4 };
     return [...list].sort((a, b) => {
       if (sortBy === 'url') return (a.url || '').localeCompare(b.url || '');
-      return (order[a.severity] ?? 3) - (order[b.severity] ?? 3);
+      return compareSeverity(a.severity, b.severity);
     });
   });
 
@@ -133,19 +134,11 @@
 
     total = tasks.length;
     const results: CorsProbeResult[] = [];
-    // 并发限流（每批 6 个）
-    const CONCURRENCY = $scanSettingsStore.concurrency;
-    let idx = 0;
-    async function worker() {
-      while (idx < tasks.length) {
-        if (cancelled) return;
-        const cur = idx++;
-        const r = await tasks[cur]();
-        if (r) results.push(r);
-        scanned++;
-      }
-    }
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    await runConcurrent(tasks, async (task) => {
+      const r = await task();
+      if (r) results.push(r);
+      scanned++;
+    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
 
     if (cancelled) {
       scanning = false;

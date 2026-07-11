@@ -22,6 +22,7 @@
   } from '@/lib/scanners/graphql-engine';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
+  import { runConcurrent } from '@/lib/core/concurrency';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
@@ -206,16 +207,9 @@
     scanned = 0;
 
     // 并发限流
-    const CONCURRENCY = $scanSettingsStore.concurrency;
-    let idx = 0;
-    async function worker() {
-      while (idx < tasks.length) {
-        if (cancelled) return;
-        const cur = idx++;
-        await tasks[cur]();
-      }
-    }
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    await runConcurrent(tasks, async (task) => {
+      await task();
+    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
 
     if (cancelled) {
       phase = '';

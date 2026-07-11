@@ -7,6 +7,8 @@
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
+  import { runConcurrent } from '@/lib/core/concurrency';
+  import { compareSeverity } from '@/lib/types/severity';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
@@ -48,11 +50,10 @@
   let filteredFindings = $derived.by(() => {
     let list = findings;
     if (filter === 'vuln') list = list.filter(f => f.reflected && !f.sanitized);
-    const order: Record<XssSeverity, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
     return [...list].sort((a, b) => {
       if (sortBy === 'param') return a.param.localeCompare(b.param);
       if (sortBy === 'context') return a.context.localeCompare(b.context);
-      return (order[a.severity] ?? 4) - (order[b.severity] ?? 4);
+      return compareSeverity(a.severity, b.severity);
     });
   });
 
@@ -213,23 +214,14 @@
     // Phase 1: 快速反射过滤（如果不用自定义 payload）
     let reflectedParams: string[] = [];
     if (!useCustom) {
-      const CONCURRENCY = $scanSettingsStore.concurrency;
-      let probeIdx = 0;
       const probeTasks = params.map(p => () => probeReflection(targetUrl, p));
       const probeResults: { reflected: boolean; context: XssContext }[] = [];
-      let probeTotal = probeTasks.length;
       let probeScanned = 0;
 
-      async function probeWorker() {
-        while (probeIdx < probeTasks.length) {
-          if (cancelled) return;
-          const cur = probeIdx++;
-          const r = await probeTasks[cur]();
-          probeResults[cur] = r;
-          probeScanned++;
-        }
-      }
-      await Promise.all(Array.from({ length: CONCURRENCY }, () => probeWorker()));
+      await runConcurrent(probeTasks, async (task, i) => {
+        probeResults[i] = await task();
+        probeScanned++;
+      }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
 
       reflectedParams = params.filter((_, i) => probeResults[i]?.reflected);
       if (reflectedParams.length === 0) {
@@ -252,19 +244,11 @@
     total = tasks.length;
     scanned = 0;
     const collected: XssFinding[] = [];
-    const CONCURRENCY = 8;
-    let idx = 0;
-
-    async function worker() {
-      while (idx < tasks.length) {
-        if (cancelled) return;
-        const cur = idx++;
-        const r = await tasks[cur]();
-        if (r) collected.push(r);
-        scanned++;
-      }
-    }
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    await runConcurrent(tasks, async (task) => {
+      const r = await task();
+      if (r) collected.push(r);
+      scanned++;
+    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
 
     // 按严重性排序
     findings = collected.sort(XSS_SORT_FNS.severity);

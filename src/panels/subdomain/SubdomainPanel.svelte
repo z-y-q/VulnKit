@@ -7,6 +7,7 @@
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
+  import { runConcurrent } from '@/lib/core/concurrency';
   import type { DnsResolveResult } from '@/lib/types/messaging';
   import {
     SUBDOMAIN_WORDLIST,
@@ -90,21 +91,12 @@
     const startMs = Date.now();
     elapsed = 0;
 
-    const CONCURRENCY = $scanSettingsStore.concurrency;
-    let idx = 0;
-
-    async function worker() {
-      while (idx < candidates.length) {
-        if (cancelled) return;
-        const cur = idx++;
-        const r = await resolveOne(candidates[cur].full);
-        results.push(r);
-        scanned++;
-        elapsed = Date.now() - startMs;
-      }
-    }
-
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    await runConcurrent(candidates, async (c) => {
+      const r = await resolveOne(c.full);
+      results.push(r);
+      scanned++;
+      elapsed = Date.now() - startMs;
+    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
     elapsed = Date.now() - startMs;
     scanning = false;
 

@@ -7,6 +7,7 @@
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
+  import { runConcurrent } from '@/lib/core/concurrency';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
@@ -98,18 +99,11 @@
     const collected: RedirectResult[] = [];
 
     const CONCURRENCY = $scanSettingsStore.concurrency;
-    let idx = 0;
-    async function worker() {
-      while (idx < tests.length) {
-        if (cancelled) return;
-        const cur = idx++;
-        const t = tests[cur];
-        const r = await probe(t.url);
-        if (r) collected.push({ ...r, param: t.param, variant: t.variant });
-        scanned++;
-      }
-    }
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    await runConcurrent(tests, async (t) => {
+      const r = await probe(t.url);
+      if (r) collected.push({ ...r, param: t.param, variant: t.variant });
+      scanned++;
+    }, { concurrency: CONCURRENCY, cancelled: () => cancelled });
 
     if (cancelled) {
       scanning = false;

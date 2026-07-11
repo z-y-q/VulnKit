@@ -279,29 +279,7 @@ export async function fetchWafProbe(
   }
 }
 
-/** no-cors 探测（仅判断连通性，opaque 响应 status 记为 1）。 */
-export async function fetchDnsProbe(
-  url: string,
-  method = 'HEAD',
-  timeout = 5000,
-): Promise<ProbeResult> {
-  const tc = createTimeoutController(timeout);
-  const release = await acquire(hostnameOf(url));
-  try {
-    const resp = await fetch(url, {
-      method,
-      redirect: 'follow',
-      signal: tc.controller.signal,
-      mode: 'no-cors',
-    });
-    return { status: resp.type === 'opaque' ? 1 : resp.status, type: resp.type as ResponseType };
-  } catch (e) {
-    return { error: (e as Error).message, status: 0 };
-  } finally {
-    release();
-    tc.cleanup();
-  }
-}
+/** no-cors 探测已下线（无调用方，FETCH_DNS_PROBE 已从协议删除）。 */
 
 /** 通过 dns.google 解析域名。 */
 export async function fetchDnsResolve(

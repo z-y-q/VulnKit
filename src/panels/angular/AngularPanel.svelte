@@ -4,6 +4,7 @@
   // 2. NgRx Store / Angular Signals / Router / API 端点探索
   import { sendToContent } from '@/lib/core/messaging';
   import { toastStore } from '@/stores/ui';
+  import { flattenStoreTree } from '@/lib/analyzers/vue-analyzer';
 
   // ===== 类型（与 inject/angular-detect.ts / inject/angular-store-explorer.ts 返回值一致）=====
   interface AngularDetectResult {
@@ -119,32 +120,7 @@
     );
   }
 
-  // ===== 辅助：渲染 state 树为扁平行 =====
-  function flattenState(obj: unknown, prefix = '', depth = 0): { key: string; value: string; depth: number }[] {
-    if (depth > 6 || obj === null || obj === undefined) {
-      if (obj === null) return [{ key: prefix, value: 'null', depth }];
-      if (obj === undefined) return [{ key: prefix, value: 'undefined', depth }];
-      if (depth > 6) return [{ key: prefix, value: '[Max Depth]', depth }];
-    }
-    if (typeof obj !== 'object') {
-      return [{ key: prefix, value: String(obj), depth }];
-    }
-    const rows: { key: string; value: string; depth: number }[] = [];
-    const record = obj as Record<string, unknown>;
-    for (const [k, v] of Object.entries(record)) {
-      const fullKey = prefix ? `${prefix}.${k}` : k;
-      if (v === null || v === undefined) {
-        rows.push({ key: fullKey, value: v === null ? 'null' : 'undefined', depth });
-      } else if (typeof v !== 'object') {
-        rows.push({ key: fullKey, value: String(v), depth });
-      } else if (Array.isArray(v)) {
-        rows.push({ key: fullKey, value: `Array(${v.length})`, depth });
-      } else {
-        rows.push(...flattenState(v, fullKey, depth + 1));
-      }
-    }
-    return rows;
-  }
+  // state 树扁平化复用 vue-analyzer 的 flattenStoreTree（含敏感字段检测）
 
   // ===== 复制 / 导出 =====
   function copyDetectResults() {
@@ -389,7 +365,7 @@
         {#each storeKeys as storeId}
           {@const storeData = storeResult.stores[storeId] || { state: {}, type: 'unknown' }}
           {@const state = storeData.state || {}}
-          {@const rows = flattenState(state, '', 0)}
+          {@const rows = flattenStoreTree(state)}
           <div class="card p-3 space-y-1">
             <div class="flex items-center gap-2">
               <span class="text-xs font-medium font-mono">{storeId}</span>
@@ -398,9 +374,10 @@
             {#if rows.length > 0}
               <div class="space-y-0.5 overflow-x-auto">
                 {#each rows as row}
-                  <div class="flex items-start gap-2 text-xs font-mono" style="padding-left: {row.depth * 16}px">
-                    <span class="text-blue-600 dark:text-blue-400 shrink-0">{row.key}</span>
-                    <span class="text-gray-500 break-all">{row.value}</span>
+                  <div class="flex items-baseline gap-1 text-xs" style="padding-left: {row.depth * 16}px">
+                    <span class="font-mono text-gray-600 dark:text-gray-400 w-32 shrink-0 truncate">{row.key}</span>
+                    <span class="text-gray-400 w-12 shrink-0">{row.type}</span>
+                    <span class="font-mono break-all flex-1 {row.sensitive ? 'text-red-500 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}">{row.valuePreview}</span>
                   </div>
                 {/each}
               </div>

@@ -11,7 +11,6 @@ import {
   fetchCorsProbe,
   fetchHeaderProbe,
   fetchWafProbe,
-  fetchDnsProbe,
   fetchDnsResolve,
 } from '@/lib/background/fetchers';
 import {
@@ -89,12 +88,6 @@ export default defineBackground(() => {
           return { error: 'Invalid hostname' };
         }
         return fetchDnsResolve(message.hostname, message.recordType);
-      }
-      case 'FETCH_DNS_PROBE': {
-        const v = validateProbeUrl(message.url);
-        if ('error' in v) return { error: v.error };
-        if (!isAllowedUrl(v.parsed.href)) return { error: 'URL not allowed (no private IPs)' };
-        return fetchDnsProbe(v.parsed.href, message.method, message.timeout);
       }
       case 'FETCH_WAF_PROBE': {
         const v = validateProbeUrl(message.url);

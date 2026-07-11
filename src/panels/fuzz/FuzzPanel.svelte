@@ -7,6 +7,7 @@
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
+  import { runConcurrent } from '@/lib/core/concurrency';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
@@ -125,20 +126,12 @@
     total = paths.length;
     const collected: FuzzResult[] = [];
 
-    const CONCURRENCY = $scanSettingsStore.concurrency;
-    let idx = 0;
-    async function worker() {
-      while (idx < paths.length) {
-        if (cancelled) return;
-        const cur = idx++;
-        const path = paths[cur];
-        const cleanPath = path.replace(/^\/+/, '');
-        const r = await probe(cleanPath, 'GET');
-        if (r) collected.push(r);
-        scanned++;
-      }
-    }
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    await runConcurrent(paths, async (path) => {
+      const cleanPath = path.replace(/^\/+/, '');
+      const r = await probe(cleanPath, 'GET');
+      if (r) collected.push(r);
+      scanned++;
+    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
 
     results = collected;
     scanning = false;
