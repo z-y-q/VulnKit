@@ -8,6 +8,8 @@ import { writable, type Readable } from 'svelte/store';
 const STORAGE_KEY = 'pentest_scan_history';
 const MAX_PER_DOMAIN = 50;
 const TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
+const HARD_CAP = 500; // 条目硬上限：超过才在 addScan 触发裁剪，否则延迟到 refresh
+const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 同域同模块 1h 内合并，避免历史堆叠
 
 export type ScanSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
@@ -146,7 +148,8 @@ function createScanHistoryStore(): ScanHistoryStore {
   }
 
   async function refresh() {
-    const raw = pruneExpired(await readRaw());
+    // 面板打开时做完整 compact：清过期 + 每域名裁剪
+    const raw = pruneByDomain(pruneExpired(await readRaw()));
     store.set(raw);
   }
 
@@ -166,9 +169,39 @@ function createScanHistoryStore(): ScanHistoryStore {
       findings: params.findings,
       summary: buildSummary(params.findings),
     };
-    const entries = pruneByDomain(pruneExpired([...(await readRaw()), entry]));
-    await writeRaw(entries);
-    store.set(entries);
+
+    const existing = await readRaw();
+
+    // L2 去重合并：同域同模块在 DEDUP_WINDOW_MS 内 → 覆盖 findings 而非新增
+    const recentIdx = existing.findIndex(
+      e =>
+        e.domain === entry.domain &&
+        e.module === entry.module &&
+        entry.timestamp - e.timestamp < DEDUP_WINDOW_MS,
+    );
+
+    let next: ScanHistoryEntry[];
+    if (recentIdx >= 0) {
+      next = [...existing];
+      next[recentIdx] = {
+        ...next[recentIdx],
+        findings: entry.findings,
+        summary: entry.summary,
+        timestamp: entry.timestamp,
+        url: entry.url,
+      };
+    } else {
+      next = [...existing, entry];
+    }
+
+    // P1 写放大优化：仅在超 HARD_CAP 时做双重 prune；否则完整 prune 延迟到 refresh。
+    // 避免每次扫描都 O(n) 双重扫描整个历史。
+    if (next.length > HARD_CAP) {
+      next = pruneByDomain(pruneExpired(next));
+    }
+
+    await writeRaw(next);
+    store.set(next);
   }
 
   async function clear() {
