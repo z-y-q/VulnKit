@@ -16,6 +16,8 @@
     type SniffEvidence,
   } from '@/lib/scanners/sniff-engine';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import UrlInput from '@/components/scanner/UrlInput.svelte';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
 
   let targetUrl = $state('');
   let scanning = $state(false);
@@ -207,12 +209,7 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <div class="flex gap-1">
-      <input class="input flex-1 text-sm" placeholder="目标 URL (https://...)" bind:value={targetUrl} />
-      <button class="btn btn-sm btn-primary" disabled={scanning || !targetUrl} onclick={startScan}>
-        {scanning ? '扫描中...' : '检测'}
-      </button>
-    </div>
+    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={startScan} />
     {#if scanning}
       <div class="text-xs text-gray-400">正在获取页面并分析技术指纹...</div>
     {/if}
@@ -290,8 +287,10 @@
       {/each}
     </div>
   {:else if !scanning && results.length === 0 && techCount === 0}
-    <div class="text-center text-gray-400 text-sm py-8">
-      输入目标 URL，点击「检测」开始技术指纹嗅探
-    </div>
+    <EmptyState
+      message="输入目标 URL，点击「检测」开始技术指纹嗅探"
+      hint="自动识别 Web 框架、JS 库、CDN、CMS 等技术栈"
+      icon="🔍"
+    />
   {/if}
 </div>

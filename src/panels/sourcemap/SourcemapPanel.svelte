@@ -4,6 +4,11 @@
   import { sendToContent, sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
+  import UrlInput from '@/components/scanner/UrlInput.svelte';
+  import ScanProgress from '@/components/scanner/ScanProgress.svelte';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
+  import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
+  import FilterBar from '@/components/scanner/FilterBar.svelte';
   import type { FetchResult } from '@/lib/types/messaging';
   import {
     extractScriptUrls,
@@ -14,7 +19,6 @@
     hasSourceContent,
     assessRisk,
     severityLabel,
-    SEV_COLOR,
     type DetectResult,
     type SourceMapResult,
   } from '@/lib/analyzers/sourcemap-analyzer';
@@ -315,16 +319,7 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <div class="flex gap-1">
-      <input class="input flex-1 text-sm" placeholder="目标 URL (https://...)" bind:value={targetUrl} />
-      <button
-        class="btn btn-sm btn-primary"
-        disabled={phase === 'detecting' || phase === 'scanning' || !targetUrl}
-        onclick={detect}
-      >
-        {phase === 'detecting' ? '检测中...' : '检测'}
-      </button>
-    </div>
+    <UrlInput bind:value={targetUrl} scanning={phase === 'detecting' || phase === 'scanning'} buttonText="检测" scanningText="检测中..." onscan={detect} />
 
     <!-- 构建工具信息 -->
     {#if detectResult}
@@ -360,36 +355,23 @@
     {/if}
 
     <!-- 进度条 -->
-    {#if phase === 'detecting' || phase === 'scanning'}
-      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-        <div
-          class="bg-primary h-full transition-all"
-          style="width: {total ? (scanned / total) * 100 : 0}%"
-        ></div>
-      </div>
-      <div class="text-xs text-gray-400">{scanned} / {total}</div>
-    {/if}
+    <ScanProgress {scanned} {total} scanning={phase === 'detecting' || phase === 'scanning'} label="Bundle 扫描" />
   </div>
 
   <!-- 统计栏 -->
   {#if results.length > 0}
-    <div class="flex gap-2 text-xs">
-      <button
-        class="badge {filter === 'all' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-        onclick={() => (filter = 'all')}
-      >
-        全部 {results.length}
-      </button>
-      <button
-        class="badge {filter === 'vuln' ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-        onclick={() => (filter = 'vuln')}
-      >
-        风险 {vulnCount}
-      </button>
+    <FilterBar
+      active={filter}
+      options={[
+        { key: 'all', label: '全部', count: results.length, color: 'bg-primary text-white' },
+        { key: 'vuln', label: '风险', count: vulnCount, color: 'bg-red-500 text-white' },
+      ]}
+      onchange={(k) => (filter = k as 'all' | 'vuln')}
+    >
       <span class="badge bg-green-500 text-white">Map {mapCount}</span>
       <span class="badge bg-orange-500 text-white">泄露 {leakCount}</span>
-      <button class="btn btn-sm ml-auto" onclick={exportResults}>导出</button>
-    </div>
+      <button class="btn btn-sm" onclick={exportResults}>导出</button>
+    </FilterBar>
   {/if}
 
   <!-- 结果列表 -->
@@ -399,7 +381,7 @@
         {@const sev = assessRisk(r)}
         <div class="card p-2.5 space-y-1.5">
           <div class="flex items-center gap-2">
-            <span class="badge text-xs {SEV_COLOR[sev]}">{severityLabel(sev)}</span>
+            <SeverityBadge severity={sev} />
             {#if r.mapUrl}
               <span class="badge text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">MAP</span>
             {/if}
@@ -441,12 +423,8 @@
       {/each}
     </div>
   {:else if phase === 'done' && results.length === 0}
-    <div class="text-center text-gray-400 text-sm py-8">
-      未发现 Source Map 文件
-    </div>
+    <EmptyState message="未发现 Source Map 文件" icon="✅" />
   {:else if phase === 'idle'}
-    <div class="text-center text-gray-400 text-sm py-8">
-      输入目标 URL，点击「检测」发现 JS Bundle 和 Source Map 文件
-    </div>
+    <EmptyState message="输入目标 URL，点击「检测」发现 JS Bundle 和 Source Map 文件" icon="🔍" />
   {/if}
 </div>

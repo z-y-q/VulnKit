@@ -21,6 +21,11 @@
     type GraphqlSchemaInfo,
   } from '@/lib/scanners/graphql-engine';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import UrlInput from '@/components/scanner/UrlInput.svelte';
+  import ScanProgress from '@/components/scanner/ScanProgress.svelte';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
+  import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
+  import FilterBar from '@/components/scanner/FilterBar.svelte';
 
   let targetUrl = $state('');
   let scanning = $state(false);
@@ -290,22 +295,12 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <div class="flex gap-1">
-      <input class="input flex-1 text-sm" placeholder="目标 URL (https://...)" bind:value={targetUrl} />
-      <button class="btn btn-sm btn-primary" disabled={scanning || !targetUrl} onclick={scan}>
-        {scanning ? '扫描中...' : '检测'}
-      </button>
-    </div>
+    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
     <div class="flex items-center gap-2 text-xs">
       <input class="input text-xs flex-1" placeholder="自定义路径，如 /api/gateway" bind:value={customPath} />
       <span class="text-gray-400 shrink-0">端点: {COMMON_GRAPHQL_PATHS.length}</span>
     </div>
-    {#if scanning}
-      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-        <div class="bg-primary h-full transition-all" style="width: {total ? (scanned / total) * 100 : 0}%"></div>
-      </div>
-      <div class="text-xs text-gray-400">{phase || '处理中...'} {scanned}/{total}</div>
-    {/if}
+    <ScanProgress {scanned} {total} {scanning} label={phase || 'GraphQL 安全测试'} />
   </div>
 
   <!-- 端点发现 -->
@@ -374,20 +369,21 @@
 
   <!-- 工具栏 -->
   {#if findings.length > 0}
-    <div class="flex gap-2 text-xs">
-      <button
-        class="badge {filter === 'all' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-        onclick={() => (filter = 'all')}>全部 {findings.length}</button>
-      <button
-        class="badge {filter === 'vuln' ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-        onclick={() => (filter = 'vuln')}>风险 {vulnCount}</button>
-      <select class="input text-xs ml-auto w-24" bind:value={sortBy}>
+    <FilterBar
+      active={filter}
+      options={[
+        { key: 'all', label: '全部', count: findings.length, color: 'bg-primary text-white' },
+        { key: 'vuln', label: '风险', count: vulnCount, color: 'bg-red-500 text-white' },
+      ]}
+      onchange={(k) => (filter = k as 'all' | 'vuln')}
+    >
+      <select class="input text-xs w-24" bind:value={sortBy}>
         <option value="severity">按风险</option>
         <option value="test">按类型</option>
       </select>
       <button class="btn btn-sm" onclick={copyAll}>复制</button>
       <button class="btn btn-sm" onclick={exportResults}>导出</button>
-    </div>
+    </FilterBar>
   {/if}
 
   <!-- 安全发现 -->
@@ -396,7 +392,7 @@
       {#each sortedFindings as f (f.test + f.severity)}
         <div class="card p-2.5 space-y-1">
           <div class="flex items-center gap-2">
-            <span class="badge text-xs {SEV_COLOR[f.severity] || 'bg-gray-400 text-white'}">{severityLabel(f.severity)}</span>
+            <SeverityBadge severity={f.severity} />
             <span class="text-xs text-gray-500 dark:text-gray-400">{f.test}</span>
             <button class="ml-auto text-xs text-gray-400 hover:text-primary" onclick={() => copyFinding(f)}>复制</button>
           </div>
@@ -408,10 +404,12 @@
       {/each}
     </div>
   {:else if !scanning && findings.length === 0 && scanned > 0}
-    <div class="text-center text-gray-400 text-sm py-8">未发现安全问题</div>
+    <EmptyState message="未发现安全问题" icon="✅" />
   {:else if !scanning}
-    <div class="text-center text-gray-400 text-sm py-8">
-      输入目标 URL，点击「检测」开始 GraphQL 安全扫描
-    </div>
+    <EmptyState
+      message="输入目标 URL，点击「检测」开始 GraphQL 安全扫描"
+      hint="支持常见路径探测 + 多项安全测试"
+      icon="🔍"
+    />
   {/if}
 </div>

@@ -6,6 +6,11 @@
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import UrlInput from '@/components/scanner/UrlInput.svelte';
+  import ScanProgress from '@/components/scanner/ScanProgress.svelte';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
+  import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
+  import FilterBar from '@/components/scanner/FilterBar.svelte';
   import type { ProbeResult } from '@/lib/types/messaging';
   import {
     buildPayloadsForContext,
@@ -51,14 +56,6 @@
 
   let vulnCount = $derived(findings.filter(f => f.reflected && !f.sanitized).length);
   let reflectedCount = $derived(findings.filter(f => f.reflected).length);
-
-  const SEV_COLOR: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-red-500 text-white',
-    medium: 'bg-yellow-500 text-white',
-    low: 'bg-blue-500 text-white',
-    info: 'bg-gray-400 text-white',
-  };
 
   const CTX_LABELS: Record<XssContext, string> = {
     html: 'HTML 文本',
@@ -299,12 +296,7 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <div class="flex gap-1">
-      <input class="input flex-1 text-sm" placeholder="目标 URL (https://...)" bind:value={targetUrl} />
-      <button class="btn btn-sm btn-primary" disabled={scanning || !targetUrl} onclick={scan}>
-        {scanning ? '扫描中...' : '检测'}
-      </button>
-    </div>
+    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
 
     <div class="flex items-center gap-2 text-xs">
       <label class="flex items-center gap-1 cursor-pointer">
@@ -326,12 +318,7 @@
       </div>
     {/if}
 
-    {#if scanning}
-      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-        <div class="bg-primary h-full transition-all" style="width: {total ? (scanned / total) * 100 : 0}%"></div>
-      </div>
-      <div class="text-xs text-gray-400">{scanned} / {total}</div>
-    {/if}
+    <ScanProgress {scanned} {total} {scanning} label="XSS 检测" />
   </div>
 
   <!-- 统计 -->
@@ -358,7 +345,7 @@
       {#each filteredFindings as f (f.param + f.payload + f.context)}
         <div class="card p-2.5 space-y-1">
           <div class="flex items-center gap-2">
-            <span class="badge text-xs {SEV_COLOR[f.severity]}">{severityLabel(f.severity)}</span>
+            <SeverityBadge severity={f.severity} />
             <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{f.param}</span>
             <span class="badge text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
               {CTX_LABELS[f.context] ?? f.context}

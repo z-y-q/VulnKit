@@ -3,6 +3,7 @@
   // ZoomEye API 集成：搜索主机/服务，结果分页，导出 CSV/JSON，复制 IP 列表
   import { sendMessage } from '@/lib/core/messaging';
   import { toastStore } from '@/stores/ui';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
   import {
     buildZoomEyeUrl,
     normalizeResults,
@@ -292,13 +293,9 @@
       </div>
     </div>
   {:else if !searching && results.length === 0 && statusText}
-    <div class="text-center text-gray-400 text-sm py-8">
-      未找到匹配结果
-    </div>
+    <EmptyState message="未找到匹配结果" />
   {:else if !searching}
-    <div class="text-center text-gray-400 text-sm py-8">
-      输入 ZoomEye API Key 和查询语句开始资产测绘
-    </div>
+    <EmptyState message="输入 ZoomEye API Key 和查询语句开始资产测绘" />
   {/if}
 
   <!-- 分页 -->

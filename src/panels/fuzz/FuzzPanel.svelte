@@ -6,6 +6,9 @@
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import UrlInput from '@/components/scanner/UrlInput.svelte';
+  import ScanProgress from '@/components/scanner/ScanProgress.svelte';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
   import type { ProbeResult } from '@/lib/types/messaging';
   import {
     analyzeContent,
@@ -160,12 +163,7 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <div class="flex gap-1">
-      <input class="input flex-1 text-sm" placeholder="目标 URL (https://...)" bind:value={targetUrl} />
-      <button class="btn btn-sm btn-primary" disabled={scanning || !targetUrl} onclick={scan}>
-        {scanning ? '扫描中...' : '扫描'}
-      </button>
-    </div>
+    <UrlInput bind:value={targetUrl} {scanning} buttonText="扫描" onscan={scan} />
     <div class="flex items-center gap-2 text-xs">
       <span class="text-gray-400">字典:</span>
       <select class="input text-xs flex-1" bind:value={wordlistKey}>
@@ -178,12 +176,7 @@
       <summary class="cursor-pointer text-gray-400">自定义路径（每行一个，合并到字典）</summary>
       <textarea class="input w-full mt-1 font-mono" rows="3" placeholder="/admin&#10;/test&#10;/backup.zip" bind:value={customPaths}></textarea>
     </details>
-    {#if scanning}
-      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-        <div class="bg-primary h-full transition-all" style="width: {total ? (scanned / total) * 100 : 0}%"></div>
-      </div>
-      <div class="text-xs text-gray-400">{scanned} / {total}</div>
-    {/if}
+    <ScanProgress {scanned} {total} {scanning} label="目录扫描" />
   </div>
 
   <!-- 工具栏 -->
@@ -226,10 +219,12 @@
       {/each}
     </div>
   {:else if !scanning && results.length === 0 && scanned > 0}
-    <div class="text-center text-gray-400 text-sm py-8">未发现有效路径</div>
+    <EmptyState message="未发现有效路径" icon="🔍" />
   {:else if !scanning}
-    <div class="text-center text-gray-400 text-sm py-8">
-      选择字典，扫描目标站点的目录与敏感文件
-    </div>
+    <EmptyState
+      message="选择字典，扫描目标站点的目录与敏感文件"
+      hint="支持自定义路径，合并到所选字典中"
+      icon="📂"
+    />
   {/if}
 </div>

@@ -6,6 +6,10 @@
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import UrlInput from '@/components/scanner/UrlInput.svelte';
+  import ScanProgress from '@/components/scanner/ScanProgress.svelte';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
+  import FilterBar from '@/components/scanner/FilterBar.svelte';
   import type { ProbeResult } from '@/lib/types/messaging';
   import {
     buildTestUrls,
@@ -125,33 +129,23 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <div class="flex gap-1">
-      <input class="input flex-1 text-sm" placeholder="目标 URL (https://...)" bind:value={targetUrl} />
-      <button class="btn btn-sm btn-primary" disabled={scanning || !targetUrl} onclick={scan}>
-        {scanning ? '扫描中...' : '检测'}
-      </button>
-    </div>
+    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
     <div class="text-xs text-gray-400">
       {REDIRECT_PAYLOADS.length} 个参数 × {PROTOCOL_VARIANTS.length} 个协议变体 = {REDIRECT_PAYLOADS.length * PROTOCOL_VARIANTS.length} 个测试
     </div>
-    {#if scanning}
-      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-        <div class="bg-primary h-full transition-all" style="width: {total ? (scanned / total) * 100 : 0}%"></div>
-      </div>
-      <div class="text-xs text-gray-400">{scanned} / {total}</div>
-    {/if}
+    <ScanProgress {scanned} {total} {scanning} label="重定向检测" />
   </div>
 
   <!-- 统计 -->
   {#if results.length > 0}
-    <div class="flex gap-2 text-xs">
-      <button
-        class="badge {filter === 'all' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-        onclick={() => (filter = 'all')}>全部 {results.length}</button>
-      <button
-        class="badge {filter === 'vuln' ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-        onclick={() => (filter = 'vuln')}>漏洞 {vulnCount}</button>
-    </div>
+    <FilterBar
+      active={filter}
+      options={[
+        { key: 'all', label: '全部', count: results.length, color: 'bg-primary text-white' },
+        { key: 'vuln', label: '漏洞', count: vulnCount, color: 'bg-red-500 text-white' },
+      ]}
+      onchange={(k) => (filter = k as 'all' | 'vuln')}
+    />
   {/if}
 
   <!-- 结果 -->
@@ -176,10 +170,12 @@
       {/each}
     </div>
   {:else if !scanning && results.length === 0 && scanned > 0}
-    <div class="text-center text-gray-400 text-sm py-8">未发现开放重定向</div>
+    <EmptyState message="未发现开放重定向" icon="✅" />
   {:else if !scanning}
-    <div class="text-center text-gray-400 text-sm py-8">
-      输入目标 URL，检测开放重定向漏洞（参数注入测试）
-    </div>
+    <EmptyState
+      message="输入目标 URL，检测开放重定向漏洞（参数注入测试）"
+      hint="{REDIRECT_PAYLOADS.length} 个参数 × {PROTOCOL_VARIANTS.length} 个协议变体"
+      icon="🔀"
+    />
   {/if}
 </div>

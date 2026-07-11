@@ -16,6 +16,9 @@
     buildStats,
     type SubdomainResult,
   } from '@/lib/scanners/subdomain-engine';
+  import UrlInput from '@/components/scanner/UrlInput.svelte';
+  import ScanProgress from '@/components/scanner/ScanProgress.svelte';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
 
   let targetUrl = $state('');
   let scanning = $state(false);
@@ -164,25 +167,13 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <div class="flex gap-1">
-      <input class="input flex-1 text-sm" placeholder="目标 URL (https://...)" bind:value={targetUrl} />
-      <button class="btn btn-sm btn-primary" disabled={scanning || !targetUrl} onclick={scan}>
-        {scanning ? '枚举中...' : '枚举'}
-      </button>
-    </div>
+    <UrlInput bind:value={targetUrl} {scanning} buttonText="枚举" scanningText="枚举中..." onscan={scan} />
     <div class="flex items-center gap-2 text-xs text-gray-400">
       <span>词表: {SUBDOMAIN_WORDLIST.length} 条</span>
       <span>·</span>
       <span>并发: 8</span>
     </div>
-    {#if scanning}
-      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-        <div class="bg-primary h-full transition-all" style="width: {total ? (scanned / total) * 100 : 0}%"></div>
-      </div>
-      <div class="text-xs text-gray-400">
-        {scanned} / {total} · {formatElapsed(elapsed)}
-      </div>
-    {/if}
+    <ScanProgress {scanned} {total} {scanning} label="子域名枚举" />
   </div>
 
   <!-- 工具栏 -->
@@ -238,10 +229,12 @@
       {/each}
     </div>
   {:else if !scanning && results.length === 0 && scanned > 0}
-    <div class="text-center text-gray-400 text-sm py-8">未发现存活子域名</div>
+    <EmptyState message="未发现存活子域名" icon="✅" />
   {:else if !scanning}
-    <div class="text-center text-gray-400 text-sm py-8">
-      输入目标 URL，点击「枚举」开始 DNS 子域名扫描
-    </div>
+    <EmptyState
+      message="输入目标 URL，点击「枚举」开始 DNS 子域名扫描"
+      hint="自动提取根域，基于词表并发 DNS 解析"
+      icon="🌐"
+    />
   {/if}
 </div>

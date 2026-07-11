@@ -5,11 +5,13 @@
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
+  import UrlInput from '@/components/scanner/UrlInput.svelte';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
+  import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
+  import FilterBar from '@/components/scanner/FilterBar.svelte';
   import type { ProbeResult } from '@/lib/types/messaging';
   import {
     analyzeHeaders,
-    severityLabel,
-    SEVERITY_COLOR,
     STATUS_COLOR,
     CATEGORY_LABELS,
     CATEGORY_ORDER,
@@ -205,12 +207,7 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <div class="flex gap-1">
-      <input class="input flex-1 text-sm" placeholder="目标 URL (https://...)" bind:value={targetUrl} />
-      <button class="btn btn-sm btn-primary" disabled={scanning || !targetUrl} onclick={scan}>
-        {scanning ? '扫描中...' : '检测'}
-      </button>
-    </div>
+    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
     {#if scanning}
       <div class="text-xs text-gray-400">正在获取响应头...</div>
     {/if}
@@ -275,18 +272,23 @@
 
   <!-- 筛选工具栏 -->
   {#if result && result.results.length > 0}
-    <div class="flex flex-wrap items-center gap-1.5 text-xs">
-      <button class="badge {filter === 'all' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}" onclick={() => (filter = 'all')}>全部 {result.results.length}</button>
-      <button class="badge {filter === 'miss' ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}" onclick={() => (filter = 'miss')}>缺失 {result.missing}</button>
-      <button class="badge {filter === 'warn' ? 'bg-yellow-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}" onclick={() => (filter = 'warn')}>警告 {result.warning}</button>
-      <button class="badge {filter === 'pass' ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}" onclick={() => (filter = 'pass')}>通过 {result.passed}</button>
+    <FilterBar
+      active={filter}
+      options={[
+        { key: 'all', label: '全部', count: result.results.length, color: 'bg-primary text-white' },
+        { key: 'miss', label: '缺失', count: result.missing, color: 'bg-red-500 text-white' },
+        { key: 'warn', label: '警告', count: result.warning, color: 'bg-yellow-500 text-white' },
+        { key: 'pass', label: '通过', count: result.passed, color: 'bg-green-500 text-white' },
+      ]}
+      onchange={(k) => (filter = k as 'all' | 'miss' | 'warn' | 'pass')}
+    >
       <input class="input text-xs w-24" placeholder="搜索..." bind:value={searchQuery} />
-      <select class="input text-xs w-20 ml-auto" bind:value={sortBy}>
+      <select class="input text-xs w-20" bind:value={sortBy}>
         <option value="severity">按严重度</option>
         <option value="name">按名称</option>
         <option value="category">按分类</option>
       </select>
-    </div>
+    </FilterBar>
   {/if}
 
   <!-- 问题列表（按严重度排序，从 issues 汇总） -->
@@ -296,7 +298,7 @@
       <div class="space-y-1">
         {#each result.issues as issue (issue.header + issue.message)}
           <div class="flex items-start gap-2 text-xs">
-            <span class="badge shrink-0 {SEVERITY_COLOR[issue.severity]}">{severityLabel(issue.severity)}</span>
+            <SeverityBadge severity={issue.severity} />
             <div class="min-w-0">
               <span class="font-mono text-gray-700 dark:text-gray-200">{issue.header}</span>
               <span class="text-gray-500 dark:text-gray-400 ml-1">{issue.message}</span>
@@ -338,11 +340,13 @@
       {/each}
     </div>
   {:else if !scanning && result && filteredResults.length === 0}
-    <div class="text-center text-gray-400 text-sm py-8">无匹配结果</div>
+    <EmptyState message="无匹配结果" icon="🔍" />
   {:else if !scanning && !result}
-    <div class="text-center text-gray-400 text-sm py-8">
-      输入目标 URL，点击「检测」开始 HTTP 安全头扫描
-    </div>
+    <EmptyState
+      message="输入目标 URL，点击「检测」开始 HTTP 安全头扫描"
+      hint="自动分析 20+ 安全头配置并评分"
+      icon="🛡️"
+    />
   {/if}
 
   <!-- 信息泄露 -->
@@ -400,7 +404,7 @@
         {#each result.cspDeep.bypasses as bp (bp.type)}
           <div class="card p-2.5 space-y-1 border-l-2 border-red-500">
             <div class="flex items-center gap-2">
-              <span class="badge text-xs {SEVERITY_COLOR[bp.severity]}">{severityLabel(bp.severity)}</span>
+              <SeverityBadge severity={bp.severity} />
               <span class="text-xs font-mono">{bp.type}</span>
             </div>
             <div class="text-xs text-gray-400 dark:text-gray-500">{bp.description}</div>
@@ -412,7 +416,7 @@
         {#each result.cspDeep.missingCritical as mc (mc.directive)}
           <div class="card p-2.5 space-y-1">
             <div class="flex items-center gap-2">
-              <span class="badge text-xs {SEVERITY_COLOR[mc.severity]}">{severityLabel(mc.severity)}</span>
+              <SeverityBadge severity={mc.severity} />
               <span class="text-xs font-mono">{mc.directive}</span>
             </div>
             <div class="text-xs text-gray-400 dark:text-gray-500">{mc.impact}</div>

@@ -6,6 +6,11 @@
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import UrlInput from '@/components/scanner/UrlInput.svelte';
+  import ScanProgress from '@/components/scanner/ScanProgress.svelte';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
+  import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
+  import FilterBar from '@/components/scanner/FilterBar.svelte';
   import type { ProbeResult } from '@/lib/types/messaging';
   import {
     analyzeResults,
@@ -180,12 +185,7 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <div class="flex gap-1">
-      <input class="input flex-1 text-sm" placeholder="目标 URL (https://...)" bind:value={targetUrl} />
-      <button class="btn btn-sm btn-primary" disabled={scanning || !targetUrl} onclick={scan}>
-        {scanning ? '扫描中...' : '检测'}
-      </button>
-    </div>
+    <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
     <div class="flex items-center gap-3 text-xs">
       <label class="flex items-center gap-1 cursor-pointer">
         <input type="checkbox" bind:checked={useDynamic} />
@@ -193,29 +193,25 @@
       </label>
       <span class="text-gray-400">端点: {DEFAULT_CORS_ENDPOINTS.length} · Origin: {ORIGIN_VARIANTS.length}{useDynamic ? '+动态' : ''}</span>
     </div>
-    {#if scanning}
-      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-        <div class="bg-primary h-full transition-all" style="width: {total ? (scanned / total) * 100 : 0}%"></div>
-      </div>
-      <div class="text-xs text-gray-400">{scanned} / {total}</div>
-    {/if}
+    <ScanProgress {scanned} {total} {scanning} label="CORS 探测" />
   </div>
 
-  <!-- 统计 -->
+  <!-- 统计/筛选 -->
   {#if issues.length > 0}
-    <div class="flex gap-2 text-xs">
-      <button
-        class="badge {filter === 'all' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-        onclick={() => (filter = 'all')}>全部 {issues.length}</button>
-      <button
-        class="badge {filter === 'vuln' ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-        onclick={() => (filter = 'vuln')}>风险 {vulnCount}</button>
+    <FilterBar
+      active={filter}
+      options={[
+        { key: 'all', label: '全部', count: issues.length, color: 'bg-primary text-white' },
+        { key: 'vuln', label: '风险', count: vulnCount, color: 'bg-red-500 text-white' },
+      ]}
+      onchange={(k) => (filter = k as 'all' | 'vuln')}
+    >
       <span class="badge bg-green-500 text-white">安全 {safeCount}</span>
-      <select class="input text-xs ml-auto w-24" bind:value={sortBy}>
+      <select class="input text-xs w-24" bind:value={sortBy}>
         <option value="risk">按风险</option>
         <option value="url">按 URL</option>
       </select>
-    </div>
+    </FilterBar>
   {/if}
 
   <!-- 结果 -->
@@ -224,7 +220,7 @@
       {#each sortedIssues as issue (issue.url + issue.method + issue.origin.value)}
         <div class="card p-2.5 space-y-1.5">
           <div class="flex items-center gap-2">
-            <span class="badge text-xs {SEV_COLOR[issue.severity]}">{severityLabel(issue.severity)}</span>
+            <SeverityBadge severity={issue.severity} />
             <span class="text-xs text-gray-400">{issue.endpoint.label}</span>
             <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{issue.method}</span>
             {#if issue.statusCode}
@@ -248,10 +244,12 @@
       {/each}
     </div>
   {:else if !scanning && issues.length === 0 && scanned > 0}
-    <div class="text-center text-gray-400 text-sm py-8">未检测到 CORS 配置</div>
+    <EmptyState message="未检测到 CORS 配置" icon="✅" />
   {:else if !scanning}
-    <div class="text-center text-gray-400 text-sm py-8">
-      输入目标 URL，点击「检测」开始 CORS 跨域配置扫描
-    </div>
+    <EmptyState
+      message="输入目标 URL，点击「检测」开始 CORS 跨域配置扫描"
+      hint="支持 6 端点 × 多 Origin × GET/OPTIONS 组合探测"
+      icon="🔗"
+    />
   {/if}
 </div>
