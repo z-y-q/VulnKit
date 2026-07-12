@@ -62,6 +62,30 @@
     window.close();
   }
 
+  // 一键操作：开侧栏到目标面板并自动跑（对当前标签页）
+  async function quickAction(panelId: string) {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    const url = tab?.url || '';
+    await browser.storage.local.set({
+      pendingPanel: panelId,
+      pendingAutoRun: { panel: panelId, url, nonce: Date.now() },
+    });
+    if (tab?.id) {
+      try { await browser.sidePanel.open({ tabId: tab.id }); } catch { /* ignore */ }
+    }
+    window.close();
+  }
+
+  // 一键操作清单（高频，对当前页面即点即跑）
+  const QUICK_ACTIONS: { id: string; label: string; icon: string; color: string }[] = [
+    { id: 'cors', label: 'CORS', icon: '🔗', color: '#e74c3c' },
+    { id: 'headers', label: '安全头', icon: '🛡️', color: '#27ae60' },
+    { id: 'subdomain', label: '子域名', icon: '🌐', color: '#4A90E2' },
+    { id: 'sniff', label: '嗅探', icon: '👃', color: '#9b59b6' },
+    { id: 'waf', label: 'WAF', icon: '🔥', color: '#e67e22' },
+    { id: 'links', label: '提取链接', icon: '📥', color: '#16a085' },
+  ];
+
   function setCat(id: CatId) {
     activeCat = id;
   }
@@ -91,7 +115,7 @@
     <div class="popup-brand">
       <div class="popup-logo">灵</div>
       <span class="popup-title">灵眸</span>
-      <span class="popup-version">v6.0</span>
+      <span class="popup-version">v7.0</span>
     </div>
 
     <!-- Category Chips -->
@@ -108,6 +132,19 @@
       {/each}
     </div>
   </header>
+
+  <!-- 一键操作（对当前页面即点即跑） -->
+  <div class="quick-bar">
+    <div class="quick-title">⚡ 一键操作 · 当前页</div>
+    <div class="quick-grid">
+      {#each QUICK_ACTIONS as qa (qa.id)}
+        <button class="quick-btn" onclick={() => quickAction(qa.id)} title={`对当前页面运行 ${qa.label}`}>
+          <span class="quick-icon" style="color:{qa.color}">{qa.icon}</span>
+          <span class="quick-label">{qa.label}</span>
+        </button>
+      {/each}
+    </div>
+  </div>
 
   <!-- Tool Grid -->
   <div class="popup-grid">
@@ -239,6 +276,68 @@
     border-radius: 50%;
     flex-shrink: 0;
     transition: background 0.15s ease;
+  }
+
+  /* ===== Quick Action Bar ===== */
+  .quick-bar {
+    padding: 8px 10px 6px;
+    border-bottom: 1px solid #f0f0f0;
+    flex-shrink: 0;
+    background: linear-gradient(180deg, #f8fbff 0%, #fff 100%);
+  }
+
+  .quick-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #888;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+  }
+
+  .quick-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+  }
+
+  .quick-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 8px;
+    border: 1px solid #e4ecf5;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+  }
+
+  .quick-btn:hover {
+    border-color: #4A90E2;
+    background: #eef4fc;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(74, 144, 226, 0.18);
+  }
+
+  .quick-btn:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  .quick-icon {
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .quick-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #444;
+  }
+
+  .quick-btn:hover .quick-label {
+    color: #4A90E2;
   }
 
   /* ===== Tool Grid ===== */

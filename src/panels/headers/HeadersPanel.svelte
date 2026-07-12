@@ -4,7 +4,7 @@
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
-  import { toastStore } from '@/stores/ui';
+  import { toastStore, autoRunStore } from '@/stores/ui';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
   import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
@@ -36,6 +36,16 @@
     getActiveTabUrl().then(u => {
       if (u) targetUrl = u;
     });
+  });
+
+  // 一键操作（右键菜单 / Popup）：命中本面板则自动扫描
+  $effect(() => {
+    const sig = $autoRunStore;
+    if (sig && sig.panel === 'headers') {
+      autoRunStore.clear();
+      if (sig.url) targetUrl = sig.url;
+      scan();
+    }
   });
 
   // 按分类分组 + 过滤 + 排序

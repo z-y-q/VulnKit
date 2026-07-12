@@ -2,7 +2,7 @@
   // 链接提取面板 — 灵眸 v6.0
   // 提取当前页面所有链接/图片/脚本/资源/框架/表单，分类、去重、筛选、复制、导出
   import { getActiveTab, execInTab } from '@/lib/core/tabs';
-  import { toastStore } from '@/stores/ui';
+  import { toastStore, autoRunStore } from '@/stores/ui';
   import {
     classifyLink,
     dedupeLinks,
@@ -41,6 +41,15 @@
 
   // --- Derived ---
   let totalCount = $derived(rawLinks.length);
+
+  // 一键操作（右键菜单 / Popup）：命中本面板则自动提取
+  $effect(() => {
+    const sig = $autoRunStore;
+    if (sig && sig.panel === 'links') {
+      autoRunStore.clear();
+      extract();
+    }
+  });
 
   let typeCounts = $derived.by(() => {
     const counts: Record<string, number> = {};

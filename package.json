@@ -2,7 +2,7 @@
   "name": "lingmou-v6",
   "description": "灵眸 - 编码解码、图标识别、资产测绘、信息收集、权限分析",
   "private": true,
-  "version": "7.0.0",
+  "version": "7.1.0",
   "type": "module",
   "scripts": {
     "build:inject": "tsc -p tsconfig.inject.json",

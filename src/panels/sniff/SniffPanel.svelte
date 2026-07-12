@@ -4,7 +4,7 @@
   import { sendMessage, sendToContent } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
-  import { toastStore } from '@/stores/ui';
+  import { toastStore, autoRunStore } from '@/stores/ui';
   import type { FetchResult, ProbeResult } from '@/lib/types/messaging';
   import {
     scan,
@@ -46,6 +46,16 @@
     getActiveTabUrl().then(u => {
       if (u) targetUrl = u;
     });
+  });
+
+  // 一键操作（右键菜单 / Popup）：命中本面板则自动嗅探
+  $effect(() => {
+    const sig = $autoRunStore;
+    if (sig && sig.panel === 'sniff') {
+      autoRunStore.clear();
+      if (sig.url) targetUrl = sig.url;
+      startScan();
+    }
   });
 
   // 按分类分组（使用 CATEGORY_ORDER 排序）

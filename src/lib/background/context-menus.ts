@@ -145,12 +145,9 @@ export async function handleMenuClick(
     return;
   }
 
-  // 页面扫描菜单 → 写入 contextScan，打开 popup
+  // 页面扫描菜单 → 直接开侧栏到目标面板并自动跑
   if (SCAN_MODULE_MAP[id]) {
-    await browser.storage.local.set({ contextScan: { module: SCAN_MODULE_MAP[id], url: tab.url } });
-    browser.action.setBadgeText({ text: 'S' });
-    browser.action.setBadgeBackgroundColor({ color: '#2196F3' });
-    tryOpenPopup(tab);
+    await openSidePanelWithAction(SCAN_MODULE_MAP[id], tab.url || '', tab);
     return;
   }
 
@@ -203,14 +200,29 @@ export async function handleMenuClick(
     return;
   }
 
-  // 链接扫描菜单
+  // 链接扫描菜单 → 开侧栏到目标面板并自动跑（URL 取链接地址）
   if (LINK_MODULE_MAP[id]) {
     const linkUrl = info.linkUrl || tab.url || '';
-    await browser.storage.local.set({ contextScan: { module: LINK_MODULE_MAP[id], url: linkUrl } });
-    browser.action.setBadgeText({ text: 'S' });
-    browser.action.setBadgeBackgroundColor({ color: '#2196F3' });
-    tryOpenPopup(tab);
+    await openSidePanelWithAction(LINK_MODULE_MAP[id], linkUrl, tab);
     return;
+  }
+}
+
+/**
+ * 打开侧栏到指定面板，并写入 pendingAutoRun 让面板自动触发扫描。
+ * 信号带 nonce（时间戳），即使切到同一面板也会重新触发。
+ */
+async function openSidePanelWithAction(panel: string, url: string, tab: Browser.tabs.Tab): Promise<void> {
+  await browser.storage.local.set({
+    pendingPanel: panel,
+    pendingAutoRun: { panel, url, nonce: Date.now() },
+  });
+  try {
+    await browser.sidePanel.open({ tabId: tab.id });
+  } catch {
+    // sidePanel.open 在个别场景不可用 → 回退徽标提示用户手动打开
+    browser.action.setBadgeText({ text: '▶' });
+    browser.action.setBadgeBackgroundColor({ color: '#2196F3' });
   }
 }
 

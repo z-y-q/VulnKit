@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { themeStore, activePanelStore } from '@/stores/ui';
+  import { themeStore, activePanelStore, autoRunStore } from '@/stores/ui';
   import Sidebar from '@/components/layout/Sidebar.svelte';
   import PanelHeader from '@/components/layout/PanelHeader.svelte';
   import StatusBar from '@/components/layout/StatusBar.svelte';
@@ -14,17 +14,33 @@
 
   let isDark = $derived($themeStore);
 
-  // Popup 快捷入口跳转：popup 写入 pendingPanel，此处消费并切到对应面板
+  // Popup / 右键菜单写入 pendingPanel + pendingAutoRun。
+  // 挂载时读一次（覆盖「先写后开侧栏」），并监听 storage.onChanged（覆盖「侧栏已开着」）。
+  function consumePending(res: Record<string, any>) {
+    const target = res?.pendingPanel as string | undefined;
+    if (target && panels.some((p) => p.id === target)) {
+      activePanelStore.set(target);
+    }
+    if (target) {
+      browser.storage.local.remove('pendingPanel');
+    }
+    const auto = res?.pendingAutoRun;
+    if (auto && typeof auto === 'object' && auto.panel) {
+      autoRunStore.fire({ panel: auto.panel, url: auto.url || '', nonce: auto.nonce });
+      browser.storage.local.remove('pendingAutoRun');
+    }
+  }
+
   $effect(() => {
-    browser.storage.local.get('pendingPanel').then((res) => {
-      const target = res?.pendingPanel as string | undefined;
-      if (target && panels.some((p) => p.id === target)) {
-        activePanelStore.set(target);
+    browser.storage.local.get(['pendingPanel', 'pendingAutoRun']).then(consumePending);
+    const listener = (changes: Record<string, any>, area: string) => {
+      if (area !== 'local') return;
+      if (changes.pendingPanel || changes.pendingAutoRun) {
+        browser.storage.local.get(['pendingPanel', 'pendingAutoRun']).then(consumePending);
       }
-      if (target) {
-        browser.storage.local.remove('pendingPanel');
-      }
-    });
+    };
+    browser.storage.onChanged.addListener(listener);
+    return () => browser.storage.onChanged.removeListener(listener);
   });
 
   function handlePanelSelect(id: string) {
@@ -63,7 +79,7 @@
     <div class="flex items-center gap-2.5">
       <div class="w-7 h-7 rounded-lg vk-brand-bg flex items-center justify-center text-white text-xs font-bold shadow-md shadow-blue-500/30">灵</div>
       <span class="text-base font-bold vk-brand-gradient tracking-tight">灵眸</span>
-      <span class="text-[10px] text-gray-400 font-mono px-1.5 py-0.5 rounded-md bg-gray-100/80 dark:bg-gray-700/50 font-medium">v6.0</span>
+      <span class="text-[10px] text-gray-400 font-mono px-1.5 py-0.5 rounded-md bg-gray-100/80 dark:bg-gray-700/50 font-medium">v7.0</span>
     </div>
     <div class="flex items-center gap-1">
       <button onclick={toggleTheme} class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-500 dark:text-gray-400 transition-all duration-200 hover:text-gray-700 dark:hover:text-gray-200" title="切换主题">

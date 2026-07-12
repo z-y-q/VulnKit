@@ -3,7 +3,7 @@
   // 通过多路径探测 + 签名匹配识别目标 WAF 类型
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
-  import { toastStore } from '@/stores/ui';
+  import { toastStore, autoRunStore } from '@/stores/ui';
   import type { ProbeResult } from '@/lib/types/messaging';
   import wafSignaturesJson from '@/lib/data/waf-signatures.json';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
@@ -59,6 +59,16 @@
 
   // 严重程度排序
   const SEV_ORDER: Record<string, number> = { high: 3, medium: 2, low: 1 };
+
+  // 一键操作（右键菜单 / Popup）：命中本面板则自动填充并扫描
+  $effect(() => {
+    const sig = $autoRunStore;
+    if (sig && sig.panel === 'waf') {
+      autoRunStore.clear();
+      if (sig.url) targetUrl = sig.url;
+      startScan();
+    }
+  });
 
   // —— 签名匹配核心逻辑（纯函数，逐条保留原匹配规则）——
 

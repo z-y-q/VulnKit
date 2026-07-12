@@ -38,6 +38,27 @@ export const themeStore = createThemeStore();
 /** 当前活跃面板 store */
 export const activePanelStore = writable<string>('encoding');
 
+// ===== Auto-Run 信号 store =====
+// 右键菜单 / Popup 一键操作写入后，由 side-panel 转发到这里；
+// 被命中的扫描面板挂载时检测到 signal.panel === 自身 id 即自动触发扫描，
+// 消费后 clear()，避免后续手动切到该面板时误触发。
+export interface AutoRunSignal {
+  panel: string;
+  url: string;
+  nonce: number;
+}
+
+function createAutoRunStore() {
+  const { subscribe, set } = writable<AutoRunSignal | null>(null);
+  return {
+    subscribe,
+    fire: (s: AutoRunSignal) => set(s),
+    clear: () => set(null),
+  };
+}
+
+export const autoRunStore = createAutoRunStore();
+
 // ===== Toast Store =====
 let _toastId = 0;
 function createToastStore() {

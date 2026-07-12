@@ -7,7 +7,7 @@ export default defineConfig({
   manifest: {
     name: '灵眸',
     description: '灵眸 - 编码解码、图标识别、资产测绘、信息收集、权限分析',
-    version: '7.0.0',
+    version: '7.1.0',
     permissions: [
       'activeTab',
       'tabs',

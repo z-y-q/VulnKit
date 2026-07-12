@@ -4,7 +4,7 @@
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
-  import { toastStore } from '@/stores/ui';
+  import { toastStore, autoRunStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
   import { runConcurrent } from '@/lib/core/concurrency';
@@ -46,6 +46,16 @@
     getActiveTabUrl().then(u => {
       if (u) targetUrl = u;
     });
+  });
+
+  // 一键操作（右键菜单 / Popup）：命中本面板则自动扫描
+  $effect(() => {
+    const sig = $autoRunStore;
+    if (sig && sig.panel === 'cors') {
+      autoRunStore.clear();
+      if (sig.url) targetUrl = sig.url;
+      scan();
+    }
   });
 
   let sortedIssues = $derived.by(() => {
