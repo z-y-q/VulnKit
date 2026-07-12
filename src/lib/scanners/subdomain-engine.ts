@@ -202,6 +202,8 @@ export interface SubdomainResult {
   cname?: string;
   records: { type: string; data: string }[];
   status: 'alive' | 'dead';
+  /** 来源：brute=DNS暴力, ct=crt.sh证书透明, wayback=Wayback Machine, page=页面链接 */
+  source?: 'brute' | 'ct' | 'wayback' | 'page';
 }
 
 // ====== 工具函数 ======
@@ -402,4 +404,129 @@ export function buildStats(results: SubdomainResult[], elapsedMs: number): Subdo
     dead: results.length - alive,
     elapsed: elapsedMs,
   };
+}
+
+// ====== 被动枚举（证书透明 / Wayback）======
+
+/** 生成随机子域名（用于 Wildcard 检测） */
+function randomLabel(len = 12): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let s = '';
+  for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+/**
+ * Wildcard DNS 检测：解析 3 个随机子域名，若全部解析成功则存在泛解析。
+ * resolver: hostname -> 是否解析到 IP
+ */
+export async function detectWildcard(
+  rootDomain: string,
+  resolver: (host: string) => Promise<boolean>,
+): Promise<boolean> {
+  const probes = [randomLabel(), randomLabel(), randomLabel()].map(l => `${l}.${rootDomain}`);
+  try {
+    const results = await Promise.all(probes.map(resolver));
+    return results.every(Boolean);
+  } catch {
+    return false;
+  }
+}
+
+/** 从 crt.sh JSON 响应提取子域名（去重、限定根域）。 */
+export function parseCrtshResponse(jsonText: string, rootDomain: string): string[] {
+  try {
+    const arr = JSON.parse(jsonText);
+    if (!Array.isArray(arr)) return [];
+    const root = rootDomain.toLowerCase();
+    const found = new Set<string>();
+    for (const entry of arr) {
+      const name = (entry?.name_value || entry?.common_name || '') as string;
+      if (!name) continue;
+      // name_value 可能含多行（SAN）
+      for (let n of name.split('\n')) {
+        n = n.trim().toLowerCase().replace(/^\*\./, '');
+        if (n && n.endsWith(root) && n !== root) found.add(n);
+      }
+    }
+    return [...found];
+  } catch {
+    return [];
+  }
+}
+
+/** 从 Wayback CDX 响应提取子域名（去重、限定根域）。 */
+export function parseWaybackResponse(text: string, rootDomain: string): string[] {
+  const root = rootDomain.toLowerCase();
+  const found = new Set<string>();
+  const lines = text.split('\n');
+  for (const line of lines) {
+    // CDX 格式: key(timestamp) url ...
+    try {
+      const parts = line.split(/\s+/);
+      const urlStr = parts.find(p => p.startsWith('http')) || parts[2];
+      if (!urlStr) continue;
+      const host = (() => { try { return new URL(urlStr).hostname.toLowerCase(); } catch { return ''; } })();
+      if (host && host.endsWith(root) && host !== root) found.add(host);
+    } catch { /* ignore */ }
+  }
+  return [...found];
+}
+
+/**
+ * 从 CertSpotter API 响应提取子域名（去重、限定根域）。
+ * CertSpotter 返回 JSON 数组，每项含 dns_names[] / dns_name。
+ */
+export function parseCertspotterResponse(jsonText: string, rootDomain: string): string[] {
+  try {
+    const arr = JSON.parse(jsonText);
+    if (!Array.isArray(arr)) return [];
+    const root = rootDomain.toLowerCase();
+    const found = new Set<string>();
+    for (const entry of arr) {
+      const names: string[] = Array.isArray(entry?.dns_names)
+        ? entry.dns_names
+        : (entry?.dns_name ? [entry.dns_name] : []);
+      for (let n of names) {
+        if (typeof n !== 'string') continue;
+        n = n.trim().toLowerCase().replace(/^\*\./, '');
+        if (n && n.endsWith(root) && n !== root) found.add(n);
+      }
+    }
+    return [...found];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 从 DNS NS / MX 记录文本中提取子域名（去重、限定根域）。
+ * 这些记录常暴露邮件服务器、DNS 服务器等内部主机名。
+ * 输入：每行一条记录（如 "10 mail.example.com." 或 "ns1.example.com."）。
+ */
+export function parseDnsRecords(text: string, rootDomain: string): string[] {
+  const root = rootDomain.toLowerCase();
+  const found = new Set<string>();
+  // 提取所有看起来像主机名的 token
+  const hostRe = /[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+/gi;
+  let m: RegExpExecArray | null;
+  while ((m = hostRe.exec(text.toLowerCase())) !== null) {
+    let host = m[0].replace(/\.$/, ''); // 去尾点
+    if (host.endsWith(root) && host !== root) found.add(host);
+  }
+  return [...found];
+}
+
+
+/** 从页面链接文本（纯文本，每行一个 URL 或 hostname）提取属于根域的子域名。 */
+export function parsePageLinks(hrefs: string[], rootDomain: string): string[] {
+  const root = rootDomain.toLowerCase();
+  const found = new Set<string>();
+  for (const raw of hrefs) {
+    const host = (() => {
+      try { return new URL(raw, 'http://x.invalid').hostname.toLowerCase(); } catch { return ''; }
+    })();
+    if (host && host.endsWith(root) && host !== root) found.add(host);
+  }
+  return [...found];
 }

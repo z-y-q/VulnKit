@@ -34,6 +34,7 @@
   let activeTab = $state<'local' | 'session' | 'cookie' | 'window' | 'idb'>('local');
   let searchQuery = $state('');
   let filter = $state<'all' | 'sensitive'>('all');
+  let sortBy = $state<'default' | 'key' | 'size'>('default');
   let expandedKeys = $state<Set<string>>(new Set());
 
   // ---------- 导出计算 ----------
@@ -60,6 +61,11 @@
       filtered = filtered.filter(i =>
         (i.key + ' ' + i.value).toLowerCase().includes(q),
       );
+    }
+    if (sortBy === 'key') {
+      filtered = [...filtered].sort((a, b) => a.key.localeCompare(b.key));
+    } else if (sortBy === 'size') {
+      filtered = [...filtered].sort((a, b) => b.value.length - a.value.length);
     }
     return filtered;
   }
@@ -319,14 +325,32 @@
   // ---------- 操作 ----------
 
   function deleteStorageItem(storageType: string, key: string) {
-    const tab = getActiveTab();
-    tab.then(t => {
+    getActiveTab().then(t => {
       if (!t?.id) return;
-      const st = storageType as 'local' | 'session';
-      execInTab(t.id, function (params: { type: string; key: string }) {
-        const storage = params.type === 'local' ? localStorage : sessionStorage;
-        storage.removeItem(params.key);
-      }, { world: 'MAIN', args: [{ type: st, key }] });
+      if (storageType === 'local' || storageType === 'session') {
+        execInTab(t.id, function (params: { type: string; key: string }) {
+          const storage = params.type === 'local' ? localStorage : sessionStorage;
+          storage.removeItem(params.key);
+        }, { world: 'MAIN', args: [{ type: storageType, key }] });
+      } else if (storageType === 'cookie') {
+        // Cookie 需通过设置过期时间删除，逐 path/domain 尝试
+        execInTab(t.id, function (params: { key: string }) {
+          const paths = ['/', location.pathname.replace(/\/[^/]*$/, '') || '/'];
+          const host = location.hostname;
+          const domains = host ? [host, '.' + host.split('.').slice(-2).join('.')] : [''];
+          for (const p of [...new Set(paths)]) {
+            for (const d of [...new Set(domains)]) {
+              document.cookie = `${params.key}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${p}; domain=${d}`;
+              document.cookie = `${params.key}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${p}`;
+            }
+          }
+        }, { world: 'MAIN', args: [{ key }] });
+      } else {
+        // window 变量
+        execInTab(t.id, function (params: { key: string }) {
+          try { (window as any)[params.key] = undefined; } catch { /* ignore */ }
+        }, { world: 'MAIN', args: [{ key }] });
+      }
 
       // 更新本地状态
       if (storageType === 'local') localItems = localItems.filter(i => i.key !== key);
@@ -335,6 +359,8 @@
       else windowVars = windowVars.filter(i => i.key !== key);
 
       toastStore.show('已删除', 'success');
+    }).catch(() => {
+      toastStore.show('删除失败：无法访问当前标签页', 'error');
     });
   }
 
@@ -368,6 +394,88 @@
     navigator.clipboard.writeText(value);
     toastStore.show('已复制值', 'success');
   }
+
+  /** 导出当前分类全部数据为 JSON 文件 */
+  function exportJson() {
+    const dump: Record<string, any> = { _category: activeTab };
+    if (activeTab === 'local') dump.data = Object.fromEntries(localItems.map(i => [i.key, i.value]));
+    else if (activeTab === 'session') dump.data = Object.fromEntries(sessionItems.map(i => [i.key, i.value]));
+    else if (activeTab === 'cookie') dump.data = Object.fromEntries(cookies.map(i => [i.key, i.value]));
+    else if (activeTab === 'window') dump.data = Object.fromEntries(windowVars.map(i => [i.key, i.value]));
+    else if (activeTab === 'idb') dump.data = idbInfo;
+    if (!dump.data || (dump.data instanceof Object && Object.keys(dump.data).length === 0)) {
+      toastStore.show('无数据可导出', 'warning');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `storage-${activeTab}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toastStore.show('已导出 JSON', 'success');
+  }
+
+  function clearAllStorage() {
+    let count = 0;
+    if (activeTab === 'local') count = localFiltered.length;
+    else if (activeTab === 'session') count = sessionFiltered.length;
+    else if (activeTab === 'cookie') count = cookieFiltered.length;
+    else if (activeTab === 'window') count = windowFiltered.length;
+    if (count === 0) {
+      toastStore.show('当前分类无数据', 'warning');
+      return;
+    }
+    const label = activeTab === 'local' ? 'localStorage' : activeTab === 'session' ? 'sessionStorage' : activeTab === 'cookie' ? 'Cookie' : 'Window 全局变量';
+    if (!confirm(`确定清空当前页面的全部 ${label}（${count} 条）？此操作不可撤销。`)) return;
+
+    getActiveTab().then(t => {
+      if (!t?.id) return;
+      if (activeTab === 'local' || activeTab === 'session') {
+        execInTab(t.id, function (params: { type: string }) {
+          const storage = params.type === 'local' ? localStorage : sessionStorage;
+          storage.clear();
+        }, { world: 'MAIN', args: [activeTab] });
+      } else if (activeTab === 'cookie') {
+        execInTab(t.id, function () {
+          const raw = document.cookie || '';
+          const names: string[] = [];
+          raw.split(';').forEach(pair => {
+            const eq = pair.indexOf('=');
+            names.push(eq === -1 ? pair.trim() : pair.substring(0, eq).trim());
+          });
+          const paths = ['/', location.pathname.replace(/\/[^/]*$/, '') || '/'];
+          const host = location.hostname;
+          const domains = host ? [host, '.' + host.split('.').slice(-2).join('.')] : [''];
+          for (const name of names) {
+            for (const p of [...new Set(paths)]) {
+              for (const d of [...new Set(domains)]) {
+                document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${p}; domain=${d}`;
+                document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${p}`;
+              }
+            }
+          }
+        }, { world: 'MAIN' });
+      } else {
+        // window 变量
+        const keys = windowFiltered.map(i => i.key);
+        execInTab(t.id, function (params: { keys: string[] }) {
+          for (const k of params.keys) {
+            try { (window as any)[k] = undefined; } catch { /* ignore */ }
+          }
+        }, { world: 'MAIN', args: [{ keys }] });
+      }
+
+      if (activeTab === 'local') localItems = [];
+      else if (activeTab === 'session') sessionItems = [];
+      else if (activeTab === 'cookie') cookies = [];
+      else if (activeTab === 'window') windowVars = [];
+
+      toastStore.show(`已清空 ${label}`, 'success');
+    }).catch(() => {
+      toastStore.show('清空失败：无法访问当前标签页', 'error');
+    });
+  }
 </script>
 
 <div class="space-y-3">
@@ -379,6 +487,10 @@
       </button>
       {#if scanned}
         <button class="btn btn-sm" onclick={copyAllData}>复制全部</button>
+        <button class="btn btn-sm" onclick={exportJson}>导出</button>
+        {#if activeTab !== 'idb'}
+          <button class="btn btn-sm text-red-500" onclick={clearAllStorage}>清空全部</button>
+        {/if}
       {/if}
     </div>
   </div>
@@ -429,6 +541,11 @@
           class:btn-primary={filter === 'sensitive'}
           onclick={() => filter = 'sensitive'}
         >敏感</button>
+        <select class="input text-xs w-16 ml-auto" bind:value={sortBy}>
+          <option value="default">默认</option>
+          <option value="key">按键名</option>
+          <option value="size">按大小</option>
+        </select>
       </div>
     {/if}
 
@@ -458,6 +575,7 @@
         {#if idbInfo?.databases && idbInfo.databases.length > 0}
           <div class="flex justify-end">
             <button class="btn btn-xs" onclick={copyIdbData}>复制全部</button>
+            <button class="btn btn-xs" onclick={exportJson}>导出</button>
           </div>
           {#each idbInfo.databases as db}
             <div class="space-y-1">

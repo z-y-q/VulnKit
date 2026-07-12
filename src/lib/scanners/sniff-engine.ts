@@ -14,6 +14,14 @@ export interface SniffInput {
   scriptSrcs: string[];
   cookies: Record<string, string>;
   meta: { name: string; content: string }[];
+  /** JS 全局变量名列表（来自 page-inspect fingerprint） */
+  globals?: string[];
+  /** 页面 CSS 类名列表 */
+  classNames?: string[];
+  /** 元素 id 列表 */
+  ids?: string[];
+  /** 版本信息（如 { 'Vue.js': '3.4.0' }） */
+  versions?: Record<string, string>;
 }
 
 interface SerializedMatcher {
@@ -46,12 +54,69 @@ export interface SniffMatch {
   category: string;
   evidences: SniffEvidence[];
   matchedCount: number;
+  /** 置信度评分 0-100 */
+  confidence: number;
+  /** 置信度级别：strong(强)/moderate(稳)/weak(弱) */
+  confidenceLevel: 'strong' | 'moderate' | 'weak';
+  /** 提取到的版本号（如 '3.4.0'），无则 undefined */
+  version?: string;
 }
 
 export interface SniffEvidence {
   source: string;
   evidence: string;
 }
+
+// ====== 置信度评分（对齐 v5 sniff-state） ======
+
+/** 各信号源的基础分 */
+const CONFIDENCE_BASE_SCORES: Record<string, number> = {
+  headers: 30,
+  globals: 30,
+  meta: 20,
+  body: 20,
+  cookies: 25,
+  classNames: 15,
+  ids: 15,
+  scriptSrc: 18,
+};
+
+/** 置信度级别阈值 */
+export function levelFromScore(score: number): SniffMatch['confidenceLevel'] {
+  if (score >= 90) return 'strong';
+  if (score >= 75) return 'moderate';
+  return 'weak';
+}
+
+/**
+ * 计算单条命中的置信度评分。
+ * - 基础分：命中的各信号源 base 分之和
+ * - 多源加成：每多一个来源 +4
+ * - 多匹配加成：每多一个 matcher +20%
+ * 上限 100。
+ */
+export function scoreConfidence(evidences: SniffEvidence[]): number {
+  if (evidences.length === 0) return 0;
+  const sources = new Set(evidences.map(e => e.source));
+  let score = 0;
+  for (const s of sources) score += CONFIDENCE_BASE_SCORES[s] ?? 15;
+  score += (sources.size - 1) * 4; // 多源加成
+  score *= 1 + 0.2 * (evidences.length - 1); // 多 matcher 加成
+  return Math.min(100, Math.round(score));
+}
+
+export const CONFIDENCE_LABELS: Record<SniffMatch['confidenceLevel'], string> = {
+  strong: '强',
+  moderate: '稳',
+  weak: '弱',
+};
+
+/** 置信度级别 → UI 颜色类 */
+export const CONFIDENCE_COLORS: Record<SniffMatch['confidenceLevel'], string> = {
+  strong: 'bg-green-500 text-white',
+  moderate: 'bg-amber-500 text-white',
+  weak: 'bg-gray-400 text-white',
+};
 
 // ====== 分类标签与排序 ======
 
@@ -179,6 +244,21 @@ function buildSignalPool(input: SniffInput) {
   }
   pool.cookies = cookieLines.join('\n');
 
+  // globals: JS 全局变量名（每行一个，小写）
+  pool.globals = (input.globals || []).map(g => g.toLowerCase()).join('\n');
+
+  // classNames: CSS 类名（每行一个，小写）
+  pool.classNames = (input.classNames || []).map(c => c.toLowerCase()).join('\n');
+
+  // ids: 元素 id（每行一个，小写）
+  pool.ids = (input.ids || []).map(i => i.toLowerCase()).join('\n');
+
+  // versions: 拼接到 globals 池（如 "vue.js 3.4.0"），使版本签名也能命中
+  if (input.versions) {
+    const vLines = Object.entries(input.versions).map(([k, v]) => `${k.toLowerCase()} ${v.toLowerCase()}`);
+    pool.globals = (pool.globals ? pool.globals + '\n' : '') + vLines.join('\n');
+  }
+
   return pool;
 }
 
@@ -194,6 +274,17 @@ function evaluateMatcher(
 
   const haystack = pool[source];
   if (!haystack) return null;
+
+  // equals：精确整行匹配（globals/classNames/ids 池为换行分隔）。
+  // 关键修复：原先 equals 直接 return null，导致 92 个 globals 精确匹配器
+  // （Vue/React/Angular/jQuery/Webpack/Vite 等 29 项技术）完全失效。
+  if (type === 'equals' && typeof pattern === 'string') {
+    const lower = pattern.toLowerCase();
+    for (const line of haystack.split('\n')) {
+      if (line === lower) return { source, evidence: pattern };
+    }
+    return null;
+  }
 
   if (type === 'regex' && pattern instanceof RegExp) {
     const match = pattern.exec(haystack);
@@ -228,6 +319,7 @@ function evaluateMatcher(
 export function scan(input: SniffInput): SniffMatch[] {
   const pool = buildSignalPool(input);
   const signatures = COMPILED_SIGNATURES;
+  const versions = input.versions || {};
   const results: SniffMatch[] = [];
 
   for (const sig of signatures) {
@@ -240,16 +332,32 @@ export function scan(input: SniffInput): SniffMatch[] {
 
     if (evidences.length === 0) continue;
 
+    const confidence = scoreConfidence(evidences);
+    // 版本提取：优先精确匹配 versions[name]，其次按 name 前缀模糊匹配
+    let version: string | undefined = versions[sig.name];
+    if (!version) {
+      const lowerName = sig.name.toLowerCase();
+      for (const [k, v] of Object.entries(versions)) {
+        if (lowerName.startsWith(k.toLowerCase()) || k.toLowerCase().startsWith(lowerName)) {
+          version = v;
+          break;
+        }
+      }
+    }
+
     results.push({
       name: sig.name,
       category: sig.category,
       evidences,
       matchedCount: evidences.length,
+      confidence,
+      confidenceLevel: levelFromScore(confidence),
+      version,
     });
   }
 
-  // 按匹配数量降序
-  results.sort((a, b) => b.matchedCount - a.matchedCount);
+  // 按置信度降序，同级再按匹配数降序
+  results.sort((a, b) => b.confidence - a.confidence || b.matchedCount - a.matchedCount);
 
   return results;
 }

@@ -130,6 +130,42 @@
   }
 
   function cancel() { cancelled = true; }
+
+  function download(filename: string, content: string, mime: string) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportCsv() {
+    if (!results.length) { toastStore.show('无结果', 'warning'); return; }
+    const rows = ['param,variant,url,status,statusCode', ...results.map(r =>
+      `"${r.param}","${r.variant}","${r.url}","${r.status}","${r.statusCode}"`)];
+    download(`redirect-${Date.now()}.csv`, '﻿' + rows.join('\n'), 'text/csv;charset=utf-8');
+    toastStore.show('CSV 已导出', 'success');
+  }
+
+  function exportTxt() {
+    if (!results.length) { toastStore.show('无结果', 'warning'); return; }
+    const txt = results.map(r => `[${r.status}] ${r.param} (${r.variant}) [${r.statusCode}]\n  ${r.url}`).join('\n\n');
+    download(`redirect-${Date.now()}.txt`, txt, 'text/plain;charset=utf-8');
+    toastStore.show('TXT 已导出', 'success');
+  }
+
+  function copyMarkdown() {
+    if (!results.length) { toastStore.show('无结果', 'warning'); return; }
+    const md = ['| 参数 | 协议变体 | 状态 | 状态码 | URL |', '|------|---------|------|-------|-----|',
+      ...results.map(r => `| ${r.param} | ${r.variant} | ${r.status} | ${r.statusCode} | ${r.url} |`)].join('\n');
+    navigator.clipboard.writeText(md).then(() => toastStore.show('Markdown 已复制', 'success'));
+  }
+
+  function copyResults() {
+    if (!results.length) { toastStore.show('无结果', 'warning'); return; }
+    const txt = results.map(r => `[${r.status}] ${r.param} (${r.variant}) [${r.statusCode}]\n  ${r.url}`).join('\n\n');
+    navigator.clipboard.writeText(txt).then(() => toastStore.show('已复制纯文本', 'success'));
+  }
 </script>
 
 <div class="space-y-3">
@@ -156,7 +192,12 @@
         { key: 'vuln', label: '漏洞', count: vulnCount, color: 'bg-red-500 text-white' },
       ]}
       onchange={(k) => (filter = k as 'all' | 'vuln')}
-    />
+    >
+      <button class="btn btn-xs" onclick={copyResults}>复制</button>
+      <button class="btn btn-xs" onclick={exportCsv}>CSV</button>
+      <button class="btn btn-xs" onclick={exportTxt}>TXT</button>
+      <button class="btn btn-xs" onclick={copyMarkdown}>MD</button>
+    </FilterBar>
   {/if}
 
   <!-- 结果 -->

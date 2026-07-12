@@ -49,20 +49,18 @@ export default defineBackground(() => {
       // —— 抓取代理 ——
       case 'FETCH_URL': {
         if (!isAllowedUrl(message.url)) {
-          return { error: 'URL not allowed (must be http/https, no private IPs)' };
+          return { success: false, error: 'URL not allowed (must be http/https, no private IPs)' };
         }
-        const r = await fetchUrl(message.url, message.tailOnly, message.timeout);
-        return r.success ? { data: r.data } : { error: r.error };
+        return fetchUrl(message.url, message.tailOnly, message.timeout);
       }
       case 'FETCH_URL_AUTH': {
         if (!isAllowedUrl(message.url)) {
-          return { error: 'URL not allowed (must be http/https, no private IPs)' };
+          return { success: false, error: 'URL not allowed (must be http/https, no private IPs)' };
         }
         if (message.provider !== 'zoomeye') {
-          return { error: 'Unknown provider: ' + (message.provider || '(none)') };
+          return { success: false, error: 'Unknown provider: ' + (message.provider || '(none)') };
         }
-        const r = await fetchZoomEyeAuth(message.url, message.key);
-        return r.success ? { data: r.data } : { error: r.error };
+        return fetchZoomEyeAuth(message.url, message.key);
       }
 
       // —— 探测类 ——
@@ -97,10 +95,9 @@ export default defineBackground(() => {
       }
       case 'FETCH_IMAGE': {
         if (!isAllowedUrl(message.url)) {
-          return { error: 'URL not allowed (must be http/https, no private IPs)' };
+          return { success: false, error: 'URL not allowed (must be http/https, no private IPs)' };
         }
-        const r = await fetchImage(message.url);
-        return r.success ? { data: r.data } : { error: r.error };
+        return fetchImage(message.url);
       }
 
       // —— JS 阻断 ——

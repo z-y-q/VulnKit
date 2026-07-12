@@ -1,4 +1,4 @@
-/* ===== 全局基础 ===== */
+/* ===== 灵眸 v6 — 全局基础样式 ===== */
 html, body {
   margin: 0;
   padding: 0;
@@ -17,12 +17,17 @@ html, body {
   height: 100%;
 }
 
-/* 深色模式背景基色（更柔和的深灰，替代纯灰） */
+/* ===== 亮色主题 ===== */
+body {
+  background: #f8fafc;
+}
+
+/* ===== 暗色主题 — 深海军蓝（对齐 v5 设计语言） ===== */
 .dark body {
   background: #0f172a;
 }
-body {
-  background: #f8fafc;
+.dark {
+  color-scheme: dark;
 }
 
 /* ===== 文本选中 ===== */
@@ -33,17 +38,17 @@ body {
   background: rgba(74, 144, 226, 0.35);
 }
 
-/* ===== 滚动条 ===== */
+/* ===== 滚动条 — 纤细优雅 ===== */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 4px;
+  border-radius: 3px;
   border: 1px solid transparent;
   background-clip: padding-box;
 }
@@ -60,33 +65,42 @@ body {
   background-clip: padding-box;
 }
 
-/* ===== 动画 ===== */
+/* ===== 动画系统 ===== */
 
-/* 面板切换淡入 */
+/* 面板切换淡入 + 微上移 */
 @keyframes vk-fade-in {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .vk-fade-in {
-  animation: vk-fade-in 0.18s ease-out;
+  animation: vk-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 结果项逐个淡入 */
+/* 结果项逐个弹出 */
 @keyframes vk-pop-in {
-  from { opacity: 0; transform: translateY(6px) scale(0.99); }
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .vk-pop-in {
-  animation: vk-pop-in 0.2s ease-out both;
+  animation: vk-pop-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Toast 滑入 */
+/* Toast 右侧滑入 */
 @keyframes vk-slide-in {
-  from { opacity: 0; transform: translateX(20px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translateX(24px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
 }
 .vk-slide-in {
-  animation: vk-slide-in 0.2s ease-out;
+  animation: vk-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 柔和脉动（扫描进行中） */
+@keyframes vk-pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+.vk-pulse-soft {
+  animation: vk-pulse-soft 1.5s ease-in-out infinite;
 }
 
 /* 品牌渐变文字 */
@@ -97,9 +111,28 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
+/* 品牌渐变背景 */
+.vk-brand-bg {
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+}
+
+/* 发光效果（用于激活状态） */
+.vk-glow {
+  box-shadow: 0 0 12px rgba(74, 144, 226, 0.3);
+}
+.dark .vk-glow {
+  box-shadow: 0 0 16px rgba(74, 144, 226, 0.2);
+}
+
+/* 玻璃效果 */
+.vk-glass {
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+}
+
 /* 尊重动效偏好 */
 @media (prefers-reduced-motion: reduce) {
-  .vk-fade-in, .vk-pop-in, .vk-slide-in {
+  .vk-fade-in, .vk-pop-in, .vk-slide-in, .vk-pulse-soft {
     animation: none;
   }
 }

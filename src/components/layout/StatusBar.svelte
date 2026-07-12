@@ -13,7 +13,10 @@
   });
 </script>
 
-<footer class="flex items-center justify-between px-3 py-1 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0">
-  <span>灵眸 v6.0</span>
-  <span>{time}</span>
+<footer class="flex items-center justify-between px-4 py-1.5 text-[11px] text-gray-400 dark:text-gray-500 border-t border-gray-200/40 dark:border-gray-700/20 bg-gray-50/80 dark:bg-slate-900/40 shrink-0 vk-glass">
+  <div class="flex items-center gap-1.5">
+    <div class="w-3 h-3 rounded bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[6px] font-bold shadow-sm">灵</div>
+    <span class="font-medium">v6.0</span>
+  </div>
+  <span class="font-mono tabular-nums">{time}</span>
 </footer>

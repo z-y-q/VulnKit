@@ -42,11 +42,6 @@
     return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
-  function sevBadge(count: number, label: string, colorClass: string): string | null {
-    if (count <= 0) return null;
-    return `<span class="${colorClass} font-bold">${label}${count}</span>`;
-  }
-
   function sevColor(sev: ScanSeverity): string {
     switch (sev) {
       case 'critical': return 'text-red-600 dark:text-red-400';

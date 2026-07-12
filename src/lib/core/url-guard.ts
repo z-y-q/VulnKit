@@ -2,7 +2,8 @@
 // 所有 background 代理的请求都先经过这里，阻止访问私有/内网地址。
 
 const PRIVATE_HOST_RE = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|127\.|169\.254\.)/;
-const IPV6_PRIVATE_RE = /\[::ffff:(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.)/;
+// new URL().hostname 会去掉 IPv6 方括号，故此处用无括号形式匹配
+const IPV6_PRIVATE_RE = /^(::1|::ffff:(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.)|fe80:|fc00:|fd00:)/;
 const LINK_LOCAL_SUFFIX_RE = /\.(local|internal)$/;
 
 /**
@@ -17,8 +18,8 @@ export function isAllowedUrl(url: string): boolean {
     if (
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
-      hostname === '[::1]' ||
-      hostname === '[::ffff:127.0.0.1]'
+      hostname === '::1' ||
+      hostname.startsWith('::ffff:127.')
     ) {
       return false;
     }

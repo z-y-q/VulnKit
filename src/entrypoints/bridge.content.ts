@@ -17,6 +17,7 @@ const vueStoreUrl = 'inject/vue-store-explorer.js';
 const reactStoreUrl = 'inject/react-store-explorer.js';
 const angularStoreUrl = 'inject/angular-store-explorer.js';
 const pageInspectUrl = 'inject/page-inspect.js';
+const vueAttackUrl = 'inject/vue-attack.js';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -44,6 +45,7 @@ export default defineContentScript({
       '__vk_react_store',
       '__vk_angular_store',
       '__vk_svelte_detect',
+      '__vk_vue_attack',
     ];
     for (const k of DATA_KEYS) channels[k] = { resolve: null, token: null };
 
@@ -165,6 +167,39 @@ export default defineContentScript({
       });
     }
 
+    // ====== Vue 攻击层（bypass/navigate/restore，带 action+target dataset） ======
+    function injectVueAttack(action: string, target: string, timeout: number): Promise<unknown> {
+      return new Promise((resolve) => {
+        const ch = channels['__vk_vue_attack'];
+        const token = GEN_TOKEN();
+        ch.token = token;
+        const timer = setTimeout(() => {
+          ch.resolve = null;
+          resolve({ success: false, error: '注入超时（页面可能无 Vue Router）' });
+        }, timeout);
+
+        ch.resolve = (result: unknown) => {
+          clearTimeout(timer);
+          ch.resolve = null;
+          resolve(result);
+        };
+
+        const script = document.createElement('script');
+        script.src = browser.runtime.getURL(vueAttackUrl as any);
+        script.dataset.vkToken = token;
+        script.dataset.vkAction = action;
+        script.dataset.vkTarget = target || '';
+        script.onload = () => script.remove();
+        script.onerror = () => {
+          script.remove();
+          clearTimeout(timer);
+          ch.resolve = null;
+          resolve({ success: false, error: '脚本加载失败' });
+        };
+        (document.head || document.documentElement).appendChild(script);
+      });
+    }
+
     // ====== 同步：链接提取 ======
     function extractLinks(): { count: number } {
       const pageUrl = location.href;
@@ -245,6 +280,11 @@ export default defineContentScript({
           return true;
         }
         injectPageInspect(action, message.timeout || 5000).then(sendResponse);
+        return true;
+      }
+
+      if (type === 'VK_VUE_ATTACK') {
+        injectVueAttack(message.action || 'bypass', message.target || '', message.timeout || 4000).then(sendResponse);
         return true;
       }
 

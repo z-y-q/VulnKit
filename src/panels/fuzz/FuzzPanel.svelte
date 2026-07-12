@@ -18,6 +18,8 @@
     getWordlist,
     getWordlistKeys,
     isFoundStatus,
+    gradeSeverity,
+    markDuplicates,
     type FuzzResult,
   } from '@/lib/scanners/fuzz-engine';
 
@@ -31,6 +33,8 @@
   let sortBy = $state<'status' | 'size' | 'time'>('status');
   let customPaths = $state('');
   let cancelled = $state(false);
+  let paused = $state(false);
+  let statusFilter = $state<number | null>(null);
 
   const wordlistKeys = getWordlistKeys();
 
@@ -40,15 +44,38 @@
     });
   });
 
+  // 消费来自其他面板（如 Wayback 历史档案）发送的路径
+  $effect(() => {
+    browser.storage.local.get('lingmou:fuzz-pending').then((res) => {
+      const pending = res?.['lingmou:fuzz-pending'] as string | undefined;
+      if (pending) {
+        customPaths = pending;
+        browser.storage.local.remove('lingmou:fuzz-pending');
+      }
+    }).catch(() => { /* ignore */ });
+  });
+
   let filtered = $derived.by(() => {
     let list = results;
-    if (foundOnly) list = list.filter(r => isFoundStatus(r.status));
+    if (statusFilter !== null) {
+      list = list.filter(r => r.status === statusFilter);
+    } else if (foundOnly) {
+      list = list.filter(r => isFoundStatus(r.status));
+    }
     const fns: Record<string, (a: FuzzResult, b: FuzzResult) => number> = {
       status: (a, b) => a.status - b.status,
       size: (a, b) => b.size - a.size,
       time: (a, b) => a.time - b.time,
     };
     return [...list].sort(fns[sortBy]);
+  });
+
+  let uniqueStatusCodes = $derived.by(() => {
+    const codes = new Set<number>();
+    for (const r of results) {
+      if (r.status > 0) codes.add(r.status);
+    }
+    return [...codes].sort((a, b) => a - b);
   });
 
   const SENSITIVE_TAGS = new Set(['敏感信息', 'WAF', '管理界面']);
@@ -104,6 +131,22 @@
     }
   }
 
+  /**
+   * HEAD 优先策略：先发 HEAD（省带宽），仅在 405/501 或 HEAD 无有效状态时回退 GET。
+   * GET 才做内容分析（识别备份/SQL/配置等）。
+   */
+  async function probeSmart(path: string): Promise<FuzzResult | null> {
+    const head = await probe(path, 'HEAD');
+    if (head && head.status !== 0 && head.status !== 405 && head.status !== 501) {
+      head.severity = gradeSeverity(head);
+      return head;
+    }
+    // 回退 GET（需要 body 做内容分析）
+    const get = await probe(path, 'GET');
+    if (get) get.severity = gradeSeverity(get);
+    return get;
+  }
+
   async function scan() {
     const v = validateProbeUrl(targetUrl);
     if ('error' in v) {
@@ -118,6 +161,8 @@
     results = [];
     scanned = 0;
     cancelled = false;
+    paused = false;
+    statusFilter = null;
 
     let paths = getWordlist(wordlistKey);
     if (customPaths.trim()) {
@@ -128,11 +173,16 @@
 
     await runConcurrent(paths, async (path) => {
       const cleanPath = path.replace(/^\/+/, '');
-      const r = await probe(cleanPath, 'GET');
+      const r = await probeSmart(cleanPath);
       if (r) collected.push(r);
       scanned++;
-    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
+    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled, paused: () => paused });
 
+    // 去重（软 404 标记）+ 严重级别评估
+    markDuplicates(collected);
+    for (const r of collected) {
+      if (!r.severity) r.severity = gradeSeverity(r);
+    }
     results = collected;
     scanning = false;
 
@@ -149,7 +199,9 @@
     toastStore.show(`扫描完成，发现 ${found} 个有效路径（共 ${total}）`, found > 0 ? 'warning' : 'success');
   }
 
-  function cancel() { cancelled = true; }
+  function cancel() { cancelled = true; paused = false; }
+
+  function togglePause() { paused = !paused; }
 
   function exportResults() {
     const rows = [['path', 'url', 'status', 'size', 'method']];
@@ -157,10 +209,87 @@
     const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    a.href = url;
     a.download = 'fuzz-results.csv';
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportTxt() {
+    if (filtered.length === 0) return;
+    const found = filtered.filter(r => r.status > 0 && r.status !== 404);
+    const lines = [
+      '目录扫描报告',
+      '==================',
+      '目标: ' + targetUrl,
+      '字典: ' + wordlistKey,
+      '发现: ' + found.length,
+      '',
+    ];
+    for (const e of found) {
+      lines.push(`[${e.status}] ${e.path} (${e.size}B, ${e.time}ms${e.method === 'GET' ? ', GET' : ''})`);
+      if (e.analysis?.title) lines.push('  Title: ' + e.analysis.title);
+      if (e.analysis?.tags?.length) lines.push('  Tags: ' + e.analysis.tags.join(', '));
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'fuzz-report.txt';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toastStore.show('TXT 报告已导出', 'success');
+  }
+
+  function copyMarkdown() {
+    if (filtered.length === 0) {
+      toastStore.show('没有可复制的结果', 'warning');
+      return;
+    }
+    const found = filtered.filter(r => r.status > 0 && r.status !== 404);
+    if (found.length === 0) {
+      toastStore.show('没有有效结果', 'warning');
+      return;
+    }
+    const lines = ['| Path | Status | Size | Time |', '| --- | --- | --- | --- |'];
+    for (const e of found) {
+      lines.push(`| ${e.path} | ${e.status} | ${e.size} | ${e.time} |`);
+    }
+    navigator.clipboard.writeText(lines.join('\n'));
+    toastStore.show('已复制 Markdown 表格', 'success');
+  }
+
+  function copyResults() {
+    if (filtered.length === 0) {
+      toastStore.show('没有可复制的结果', 'warning');
+      return;
+    }
+    const found = filtered.filter(r => r.status > 0 && r.status !== 404);
+    if (found.length === 0) {
+      toastStore.show('没有有效结果', 'warning');
+      return;
+    }
+    const lines = [`目录扫描 @ ${targetUrl}`, `字典: ${wordlistKey}`, `发现: ${found.length}`, ''];
+    for (const e of found) {
+      lines.push(`[${e.status}] ${e.path} (${e.size}B, ${e.time}ms)`);
+    }
+    navigator.clipboard.writeText(lines.join('\n'));
+    toastStore.show('已复制纯文本', 'success');
+  }
+
+  function copyCurl() {
+    if (filtered.length === 0) {
+      toastStore.show('没有可复制的结果', 'warning');
+      return;
+    }
+    const found = filtered.filter(r => r.status > 0 && r.status !== 404);
+    if (found.length === 0) {
+      toastStore.show('没有有效结果', 'warning');
+      return;
+    }
+    const cmds = found.map(r => `curl -I -s "${r.url}"`).join('\n');
+    navigator.clipboard.writeText(cmds);
+    toastStore.show('已复制 cURL 命令', 'success');
   }
 </script>
 
@@ -171,6 +300,13 @@
       <UrlInput bind:value={targetUrl} {scanning} buttonText="扫描" onscan={scan} />
       {#if scanning}
         <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+        <button
+          class="btn btn-sm shrink-0"
+          class:btn-primary={paused}
+          onclick={togglePause}
+        >
+          {paused ? '继续' : '暂停'}
+        </button>
       {/if}
     </div>
     <div class="flex items-center gap-2 text-xs">
@@ -190,19 +326,35 @@
 
   <!-- 工具栏 -->
   {#if results.length > 0}
+    <!-- 状态码过滤 -->
+    <div class="flex flex-wrap items-center gap-1.5 text-xs">
+      <button
+        class="badge cursor-pointer {statusFilter === null ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
+        onclick={() => statusFilter = null}
+      >
+        有效
+      </button>
+      {#each uniqueStatusCodes as code}
+        <button
+          class="badge cursor-pointer {statusFilter === code ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
+          onclick={() => statusFilter = statusFilter === code ? null : code}
+        >
+          {code}
+        </button>
+      {/each}
+    </div>
     <div class="flex items-center gap-2 text-xs">
-      <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={foundOnly} />
-        <span>仅有效</span>
-      </label>
-      <span class="text-gray-400">·</span>
       <span>{filtered.length} 条</span>
       <select class="input text-xs w-24 ml-auto" bind:value={sortBy}>
         <option value="status">按状态码</option>
         <option value="size">按大小</option>
         <option value="time">按耗时</option>
       </select>
-      <button class="btn btn-sm" onclick={exportResults}>导出</button>
+      <button class="btn btn-sm" onclick={copyResults} title="复制纯文本">复制</button>
+      <button class="btn btn-sm" onclick={exportResults} title="导出 CSV">CSV</button>
+      <button class="btn btn-sm" onclick={exportTxt} title="导出 TXT">TXT</button>
+      <button class="btn btn-sm" onclick={copyMarkdown} title="复制 Markdown">MD</button>
+      <button class="btn btn-sm" onclick={copyCurl} title="复制 cURL">cURL</button>
     </div>
   {/if}
 

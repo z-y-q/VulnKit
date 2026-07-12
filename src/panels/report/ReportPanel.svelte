@@ -14,6 +14,7 @@
     buildCsv,
     buildJson,
     buildMarkdown,
+    buildHtml,
     type ModuleGroup,
   } from '@/lib/report/report-builder';
 
@@ -96,6 +97,27 @@
     toastStore.show('Markdown 报告已导出', 'success');
   }
 
+  function exportHtmlReport() {
+    if (filteredEntries.length === 0) {
+      toastStore.show('没有可导出的数据', 'warning');
+      return;
+    }
+    downloadBlob(buildHtml(filteredEntries), 'lingmou-report.html', 'text/html;charset=utf-8');
+    toastStore.show('HTML 报告已导出（含严重度分布 + 模块覆盖）', 'success');
+  }
+
+  /** 一键全量审计：聚合所有扫描记录生成 HTML 报告（忽略当前过滤） */
+  function fullAuditReport() {
+    const all = entries;
+    if (all.length === 0) {
+      toastStore.show('暂无扫描记录，请先运行各检测面板', 'warning');
+      return;
+    }
+    const totalFindings = all.reduce((n, e) => n + e.findings.length, 0);
+    downloadBlob(buildHtml(all), `lingmou-audit-${new Date().toISOString().slice(0, 10)}.html`, 'text/html;charset=utf-8');
+    toastStore.show(`全量审计报告已生成（${all.length} 模块记录 / ${totalFindings} 发现）`, 'success');
+  }
+
   // —— 清空 ——
 
   async function clearAll() {
@@ -166,8 +188,10 @@
         <button class="btn btn-sm flex-1" onclick={exportCsv}>CSV</button>
         <button class="btn btn-sm flex-1" onclick={exportJsonReport}>JSON</button>
         <button class="btn btn-sm flex-1" onclick={exportMarkdownReport}>Markdown</button>
+        <button class="btn btn-sm flex-1 btn-primary" onclick={exportHtmlReport}>HTML</button>
         <button class="btn btn-sm btn-ghost text-red-500 ml-auto" onclick={clearAll}>清空</button>
       </div>
+      <button class="btn btn-sm btn-primary w-full" onclick={fullAuditReport}>📊 一键全量审计报告（HTML）</button>
     </div>
   {/if}
 

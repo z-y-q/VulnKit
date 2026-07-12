@@ -24,6 +24,109 @@ export function buildZoomEyeUrl(
   return `${endpoint}?${params.toString()}`;
 }
 
+// ===== 多平台查询 URL 构建器（浏览器直开，无需 API Key） =====
+
+/** UTF-8 字符串 → Base64（FOFA qbase64 需要） */
+function b64Utf8(s: string): string {
+  return btoa(unescape(encodeURIComponent(s)));
+}
+
+/** FOFA web 搜索 URL（qbase64 编码） */
+export function buildFofaWebUrl(query: string): string {
+  return `https://fofa.info/result?qbase64=${b64Utf8(query)}`;
+}
+
+/** Shodan web 搜索 URL */
+export function buildShodanWebUrl(query: string): string {
+  return `https://www.shodan.io/search?query=${encodeURIComponent(query)}`;
+}
+
+/** Hunter (奇安信) web 搜索 URL（qbase64） */
+export function buildHunterWebUrl(query: string): string {
+  return `https://hunter.qianxin.com/vip/list?search=${encodeURIComponent(b64Utf8(query))}`;
+}
+
+/** Quake (360) web 搜索 URL */
+export function buildQuakeWebUrl(query: string): string {
+  return `https://quake.360.net/quake/#/searchResult?query=${encodeURIComponent(query)}`;
+}
+
+export interface AssetEngineMeta { id: string; label: string; build: (q: string) => string }
+
+/** 多平台测绘入口（除 ZoomEye API 外，其余为浏览器直开） */
+export const ASSET_ENGINES: AssetEngineMeta[] = [
+  { id: 'fofa', label: 'FOFA', build: buildFofaWebUrl },
+  { id: 'shodan', label: 'Shodan', build: buildShodanWebUrl },
+  { id: 'hunter', label: 'Hunter', build: buildHunterWebUrl },
+  { id: 'quake', label: 'Quake', build: buildQuakeWebUrl },
+];
+
+// ===== FOFA 面板内 API 查询 =====
+
+/** 构建 FOFA API 请求 URL（需 email + key） */
+export function buildFofaApiUrl(query: string, email: string, key: string, size = 100): string {
+  const params = new URLSearchParams({
+    email,
+    key,
+    qbase64: b64Utf8(query),
+    size: String(Math.min(Math.max(size, 1), 100)),
+  });
+  return `https://fofa.info/api/v1/search/all?${params.toString()}`;
+}
+
+/** Shodan host 搜索 API（需 key） */
+export function buildShodanApiUrl(query: string, key: string, page = 1): string {
+  const params = new URLSearchParams({ key, query, page: String(page) });
+  return `https://api.shodan.io/shodan/host/search?${params.toString()}`;
+}
+
+/** Shodan 单主机详情 API（IP → 端口/漏洞/服务） */
+export function buildShodanHostApiUrl(ip: string, key: string): string {
+  return `https://api.shodan.io/shodan/host/${encodeURIComponent(ip)}?key=${encodeURIComponent(key)}`;
+}
+
+/** FOFA 原始结果标准化（默认字段 host,ip,port） */
+export function normalizeFofaResults(raw: unknown): ZoomEyeResult[] {
+  if (!raw || typeof raw !== 'object') return [];
+  const obj = raw as any;
+  if (obj.error) throw new Error('FOFA: ' + (obj.errmsg || obj.error));
+  const results = obj.results;
+  if (!Array.isArray(results)) return [];
+  return results.map((r: any) => {
+    // FOFA 默认返回 [host, ip, port] 数组；若用户带 fields 则可能是对象
+    if (Array.isArray(r)) {
+      return {
+        ip: String(r[1] || '-'), port: Number(r[2]) || 0, service: '-',
+        hostname: String(r[0] || '-'), country: '-', region: '-', banner: '-', title: String(r[0] || '-'),
+      };
+    }
+    return {
+      ip: String(r.ip || '-'), port: Number(r.port) || 0, service: '-',
+      hostname: String(r.host || r.hostname || '-'), country: '-', region: '-', banner: '-', title: String(r.host || r.title || '-'),
+    };
+  });
+}
+
+/** Shodan 搜索结果标准化 */
+export function normalizeShodanResults(raw: unknown): ZoomEyeResult[] {
+  if (!raw || typeof raw !== 'object') return [];
+  const obj = raw as any;
+  if (obj.error) throw new Error('Shodan: ' + (obj.error || 'API 错误'));
+  const matches = obj.matches;
+  if (!Array.isArray(matches)) return [];
+  return matches.map((m: any) => ({
+    ip: m.ip_str || m.ip || '-',
+    port: Number(m.port) || 0,
+    service: m._shodan?.module || m.transport || m.product || '-',
+    hostname: (Array.isArray(m.hostnames) && m.hostnames[0]) || m.host || '-',
+    country: m.location?.country_name || '-',
+    region: m.location?.city || '-',
+    banner: m.product ? `${m.product}${m.version ? '/' + m.version : ''}` : (m.os || '-'),
+    title: m.http?.title || m.product || '-',
+  }));
+}
+
+
 // ===== ZoomEye 结果标准化 =====
 
 export interface ZoomEyeResult {

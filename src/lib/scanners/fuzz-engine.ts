@@ -35,6 +35,10 @@ export interface FuzzResult {
   time: number;
   method: string;
   analysis?: AnalyzedContent | null;
+  /** 严重级别：high(敏感文件200)/medium(可疑状态)/low/info */
+  severity?: 'high' | 'medium' | 'low' | 'info';
+  /** 与其他结果重复（相同 status+size，通常是软 404） */
+  dup?: boolean;
 }
 
 /** 内容识别模式（20 条） */
@@ -123,3 +127,39 @@ export const FUZZ_SORT_FNS: Record<string, (a: FuzzResult, b: FuzzResult) => num
   size: (a, b) => b.size - a.size,
   time: (a, b) => a.time - b.time,
 };
+
+/** 高危敏感文件名模式（命中 + 200 → high） */
+const HIGH_SENSITIVE_RE = /\.(env|bak|backup|old|swp|sql|db|sqlite|pem|key|p12|pfx|keystore|jscfg)(\.|$)/i;
+const HIGH_PATH_RE = /(secret|credential|password|private|admin|config|\.git\/|\.svn\/|\.aws\/|credentials|id_rsa)/i;
+
+/** 评估单条结果严重级别 */
+export function gradeSeverity(r: FuzzResult): FuzzResult['severity'] {
+  if (r.status >= 200 && r.status < 300) {
+    if (HIGH_SENSITIVE_RE.test(r.path) || HIGH_PATH_RE.test(r.path)) return 'high';
+    const ana = r.analysis?.title + ' ' + (r.analysis?.tags || []).join(' ');
+    if (/backup|sql|config|database|secret/i.test(ana)) return 'high';
+    return 'medium';
+  }
+  if (r.status === 401 || r.status === 403) return 'medium'; // 存在但需认证
+  if (r.status >= 300 && r.status < 400) return 'low'; // 重定向
+  if (r.status === 405) return 'low';
+  return 'info';
+}
+
+/**
+ * 标记重复结果（相同 status+size 出现多次 → 软 404 / 通配响应）。
+ * 出现次数 >= 3 的 status:size 组合视为重复模板。
+ */
+export function markDuplicates(results: FuzzResult[]): void {
+  const counter = new Map<string, number>();
+  for (const r of results) {
+    if (r.status === 0) continue;
+    const key = `${r.status}:${r.size}`;
+    counter.set(key, (counter.get(key) || 0) + 1);
+  }
+  for (const r of results) {
+    const key = `${r.status}:${r.size}`;
+    r.dup = (counter.get(key) || 0) >= 3 && r.status !== 200;
+    if (r.dup) r.severity = 'info'; // 软 404 降级
+  }
+}

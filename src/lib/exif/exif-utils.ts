@@ -63,6 +63,25 @@ export function formatExifValue(value: unknown, format?: string): string | null 
       return `${value} px`;
     case 'altitude':
       return `${value} m`;
+    case 'metering': {
+      const map: Record<number, string> = { 0: '未知', 1: '平均测光', 2: '中央重点', 3: '点测光', 4: '多点测光', 5: '矩阵测光', 6: '局部测光' };
+      return map[Number(value)] || String(value);
+    }
+    case 'whitebalance':
+      return Number(value) === 0 ? '手动' : Number(value) === 1 ? '自动' : String(value);
+    case 'flash': {
+      const v = Number(value);
+      if (v === 0) return '未闪光';
+      if (v === 1) return '已闪光';
+      if (v === 16) return '关闭闪光';
+      if (v === 24 || v === 25) return '自动未闪光';
+      if (v === 28 || v === 29) return '自动已闪光';
+      return String(value);
+    }
+    case 'exposureprogram': {
+      const map: Record<number, string> = { 0: '未定义', 1: '手动', 2: '程序自动', 3: '光圈优先', 4: '快门优先', 5: '景深优先', 6: '运动模式', 7: '人像模式', 8: '风景模式' };
+      return map[Number(value)] || String(value);
+    }
     default:
       return String(value);
   }
@@ -88,10 +107,10 @@ const EXIF_SECTIONS: { title: string; icon: string; fields: FieldDef[] }[] = [
       { key: 'ExposureCompensation', label: '曝光补偿', format: 'ev' },
       { key: 'FocalLength', label: '焦距', format: 'focal' },
       { key: 'FocalLengthIn35mmFormat', label: '等效焦距', format: 'focal' },
-      { key: 'MeteringMode', label: '测光模式' },
-      { key: 'WhiteBalance', label: '白平衡' },
-      { key: 'Flash', label: '闪光灯' },
-      { key: 'ExposureProgram', label: '曝光程序' },
+      { key: 'MeteringMode', label: '测光模式', format: 'metering' },
+      { key: 'WhiteBalance', label: '白平衡', format: 'whitebalance' },
+      { key: 'Flash', label: '闪光灯', format: 'flash' },
+      { key: 'ExposureProgram', label: '曝光程序', format: 'exposureprogram' },
     ],
   },
   {
@@ -126,10 +145,35 @@ export function parseExif(buffer: ArrayBuffer): ExifData {
   const view = new DataView(buffer);
   const result: ExifData = {};
 
-  // 检查 JPEG SOI marker
-  if (view.byteLength < 4) return result;
-  const soi = view.getUint16(0);
-  if (soi !== 0xffd8) return result; // not JPEG
+  if (view.byteLength < 8) return result;
+
+  // PNG：签名 89 50 4E 47 0D 0A 1A 0A，查找 eXIf chunk（PNG 1.5+）
+  if (view.getUint32(0) === 0x89504e47 && view.getUint32(4) === 0x0d0a1a0a) {
+    let offset = 8;
+    while (offset + 8 < view.byteLength) {
+      const len = view.getUint32(offset);
+      const type = view.getUint32(offset + 4);
+      // 'eXIf' = 0x65584966
+      if (type === 0x65584966) {
+        // eXIf chunk 数据起始于 offset+8，直接是 TIFF 数据（无 "Exif\0\0" 头）
+        parseTiffDirect(view, offset + 8, result);
+        break;
+      }
+      offset += 12 + len; // len + type(4) + data(len) + crc(4)
+      if (type === 0x49454e44) break; // IEND
+    }
+    return result;
+  }
+
+  // TIFF 直接格式（魔数 II*\0 或 MM\0*）
+  const bo16 = view.getUint16(0);
+  if (bo16 === 0x4949 || bo16 === 0x4d4d) {
+    parseTiffDirect(view, 0, result);
+    return result;
+  }
+
+  // JPEG：检查 SOI marker 0xFFD8
+  if (bo16 !== 0xffd8) return result; // 不支持的格式
 
   // 查找 APP1 marker (0xFFE1)
   let offset = 2;
@@ -146,6 +190,26 @@ export function parseExif(buffer: ArrayBuffer): ExifData {
   }
 
   return result;
+}
+
+/** 直接从 TIFF 头偏移解析（用于 PNG eXIf chunk 和裸 TIFF） */
+function parseTiffDirect(view: DataView, tiffOffset: number, result: ExifData): void {
+  if (tiffOffset + 8 > view.byteLength) return;
+  const bo = view.getUint16(tiffOffset);
+  if (bo !== 0x4949 && bo !== 0x4d4d) return;
+  const isLittle = bo === 0x4949;
+  if (view.getUint16(tiffOffset + 2, isLittle) !== 42) return;
+  const ifd0Offset = view.getUint32(tiffOffset + 4, isLittle);
+  parseIfd(view, tiffOffset, tiffOffset + ifd0Offset, isLittle, result, 'ifd0');
+  const exifIfdPtr = result['ExifIFDPointer'] as number | undefined;
+  if (typeof exifIfdPtr === 'number' && exifIfdPtr > 0) {
+    parseIfd(view, tiffOffset, tiffOffset + exifIfdPtr, isLittle, result, 'exif');
+  }
+  const gpsIfdPtr = result['GPSInfoIFDPointer'] as number | undefined;
+  if (typeof gpsIfdPtr === 'number' && gpsIfdPtr > 0) {
+    parseIfd(view, tiffOffset, tiffOffset + gpsIfdPtr, isLittle, result, 'gps');
+  }
+  resolveGps(result, isLittle);
 }
 
 function parseApp1(view: DataView, dataOffset: number, dataLen: number, result: ExifData): void {
@@ -421,14 +485,14 @@ const EXIF_TAGS: Record<number, string> = {
   0x9004: 'DateTimeDigitized',
   0x9201: 'ShutterSpeedValue',
   0x9202: 'ApertureValue',
-  0x9204: 'ExposureBiasValue',
+  0x9204: 'ExposureCompensation',
   0x9205: 'MaxApertureValue',
   0x9207: 'MeteringMode',
   0x9209: 'Flash',
   0x920a: 'FocalLength',
   0xa001: 'ColorSpace',
-  0xa002: 'PixelXDimension',
-  0xa003: 'PixelYDimension',
+  0xa002: 'ImageWidth',
+  0xa003: 'ImageHeight',
   0xa405: 'FocalLengthIn35mmFormat',
   0xa431: 'BodySerialNumber',
   0xa432: 'LensSpecification',

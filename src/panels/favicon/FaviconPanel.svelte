@@ -8,6 +8,9 @@
   import { toastStore } from '@/stores/ui';
   import {
     computeFaviconHash,
+    computeMd5Hex,
+    computeSha256Hex,
+    discoverFaviconUrl,
     buildShodanQuery,
     buildFofaQuery,
     KNOWN_FAVICONS,
@@ -21,6 +24,8 @@
   let faviconDataUri = $state('');
   let faviconUrl = $state('');
   let hashValue = $state<number | null>(null);
+  let md5Hex = $state('');
+  let sha256Hex = $state('');
   let matchedProduct = $state<string | null>(null);
   let shodanQuery = $state('');
   let fofaQuery = $state('');
@@ -51,6 +56,8 @@
     faviconDataUri = '';
     faviconUrl = '';
     hashValue = null;
+    md5Hex = '';
+    sha256Hex = '';
     matchedProduct = null;
     shodanQuery = '';
     fofaQuery = '';
@@ -58,9 +65,17 @@
 
     try {
       const origin = validated.parsed.origin;
+      const baseUrl = validated.parsed.href;
 
-      // Try fetching /favicon.ico first
-      const resolvedUrl = `${origin}/favicon.ico`;
+      // 优先从页面 HTML 的 <link rel="icon"> 发现 favicon URL，回退 /favicon.ico
+      let resolvedUrl = `${origin}/favicon.ico`;
+      try {
+        const htmlRes = await sendMessage({ type: 'FETCH_URL', url: baseUrl }) as { success: boolean; data?: string };
+        if (htmlRes.success && htmlRes.data) {
+          const discovered = discoverFaviconUrl(htmlRes.data, baseUrl);
+          if (discovered) resolvedUrl = discovered;
+        }
+      } catch { /* ignore，用默认 /favicon.ico */ }
       faviconUrl = resolvedUrl;
 
       const response = await sendMessage({ type: 'FETCH_IMAGE', url: resolvedUrl });
@@ -81,9 +96,11 @@
         faviconDataUri = `data:image/x-icon;base64,${base64Data}`;
       }
 
-      // Compute mmh3 hash
+      // Compute hashes: mmh3（Shodan/FOFA）+ MD5 + SHA256
       const hash = computeFaviconHash(base64Data);
       hashValue = hash;
+      md5Hex = computeMd5Hex(base64Data);
+      sha256Hex = await computeSha256Hex(base64Data);
 
       // Build query strings
       shodanQuery = buildShodanQuery(hash);
@@ -152,6 +169,21 @@
     if (!fofaQuery) return;
     window.open(`https://fofa.info/result?qbase64=${btoa(fofaQuery)}`, '_blank');
   }
+
+  function copyFaviconUrl() {
+    if (!faviconUrl) {
+      toastStore.show('请先提取图标', 'warning');
+      return;
+    }
+    navigator.clipboard.writeText(faviconUrl).then(() => {
+      toastStore.show('已复制 Favicon URL', 'success');
+    });
+  }
+
+  function openZoomEye() {
+    if (!md5Hex) return;
+    window.open(`https://www.zoomeye.org/searchResult?q=icon_hash:${md5Hex}`, '_blank');
+  }
 </script>
 
 <div class="space-y-3">
@@ -207,16 +239,31 @@
           </div>
         {/if}
         <div class="text-xs font-mono text-gray-500 break-all">{faviconUrl}</div>
+        <button class="btn btn-xs shrink-0" onclick={copyFaviconUrl} title="复制 URL">复制 URL</button>
       </div>
     </div>
 
     <!-- Hash 结果 -->
     <div class="card p-3 space-y-2">
-      <div class="text-xs font-medium">MMH3 Hash</div>
+      <div class="text-xs font-medium">MMH3 Hash <span class="text-gray-400 font-normal">(Shodan/FOFA)</span></div>
       <div class="flex items-center gap-2">
         <code class="text-sm font-mono flex-1 break-all">{hashValue}</code>
         <button class="btn btn-sm text-xs" onclick={copyHash}>复制</button>
       </div>
+      {#if md5Hex}
+        <div class="text-xs font-medium mt-2">MD5</div>
+        <div class="flex items-center gap-2">
+          <code class="text-xs font-mono flex-1 break-all text-gray-600 dark:text-gray-300">{md5Hex}</code>
+          <button class="btn btn-sm text-xs" onclick={() => { navigator.clipboard.writeText(md5Hex); toastStore.show('已复制 MD5', 'success'); }}>复制</button>
+        </div>
+      {/if}
+      {#if sha256Hex}
+        <div class="text-xs font-medium mt-2">SHA-256</div>
+        <div class="flex items-center gap-2">
+          <code class="text-xs font-mono flex-1 break-all text-gray-600 dark:text-gray-300">{sha256Hex}</code>
+          <button class="btn btn-sm text-xs" onclick={() => { navigator.clipboard.writeText(sha256Hex); toastStore.show('已复制 SHA-256', 'success'); }}>复制</button>
+        </div>
+      {/if}
     </div>
 
     <!-- 产品匹配 -->
@@ -254,6 +301,18 @@
           <button class="btn btn-sm btn-ghost text-xs" onclick={openFofa}>打开</button>
         </div>
       </div>
+
+      <!-- ZoomEye -->
+      {#if md5Hex}
+        <div class="space-y-1">
+          <div class="text-xs text-gray-400">ZoomEye</div>
+          <div class="flex items-center gap-2">
+            <code class="text-xs font-mono flex-1 break-all">icon_hash:{md5Hex}</code>
+            <button class="btn btn-sm text-xs" onclick={() => { navigator.clipboard.writeText(`icon_hash:${md5Hex}`); toastStore.show('已复制 ZoomEye 查询', 'success'); }}>复制</button>
+            <button class="btn btn-sm btn-ghost text-xs" onclick={openZoomEye}>打开</button>
+          </div>
+        </div>
+      {/if}
     </div>
   {/if}
 

@@ -11,6 +11,8 @@ export interface ConcurrentOptions {
   concurrency: number;
   /** 可选取消信号：返回 true 时停止派发新任务（在飞任务自然完成） */
   cancelled?: () => boolean;
+  /** 可选暂停信号：返回 true 时 worker 等待（不派发新任务），恢复后继续 */
+  paused?: () => boolean;
 }
 
 /**
@@ -28,6 +30,10 @@ export async function runConcurrent<T>(
   async function worker() {
     while (idx < items.length) {
       if (opts.cancelled?.()) return;
+      while (opts.paused?.()) {
+        if (opts.cancelled?.()) return;
+        await new Promise<void>(r => setTimeout(r, 200));
+      }
       const cur = idx++;
       await fn(items[cur], cur);
     }

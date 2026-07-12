@@ -1,7 +1,7 @@
 <script lang="ts">
   // 网站嗅探面板 — 灵眸 v6.0
   // 流程：自动填充 URL → FETCH_URL 获取 HTML + FETCH_PROBE 获取 headers → 解析 meta/scriptSrc → scan() 匹配 → 分类标签展示
-  import { sendMessage } from '@/lib/core/messaging';
+  import { sendMessage, sendToContent } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
@@ -11,12 +11,26 @@
     CATEGORY_LABELS,
     CATEGORY_ORDER,
     SOURCE_LABELS,
+    CONFIDENCE_LABELS,
+    CONFIDENCE_COLORS,
     type SniffInput,
     type SniffMatch,
     type SniffEvidence,
   } from '@/lib/scanners/sniff-engine';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
+  import { activePanelStore } from '@/stores/ui';
+  import { sniffBadgeStore } from '@/stores/sniff-badge';
+
+  /** 框架名 → 对应分析面板 id（用于一键跳转）*/
+  const FRAMEWORK_PANEL: Record<string, string> = {
+    'Vue.js': 'vue', 'React': 'react', 'Angular': 'angular', 'Svelte': 'svelte',
+    'Next.js': 'vue', 'Nuxt.js': 'vue', '若依框架': 'ruoyi',
+  };
+  function jumpToFramework(name: string) {
+    const id = FRAMEWORK_PANEL[name];
+    if (id) activePanelStore.set(id);
+  }
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
 
@@ -39,9 +53,9 @@
     const groups: { category: string; label: string; items: SniffMatch[] }[] = [];
 
     for (const cat of CATEGORY_ORDER) {
-      const items = filter === 'all'
-        ? results.filter(r => r.category === cat)
-        : results.filter(r => r.category === cat);
+      // filter 为分类筛选：'all' 显示全部，否则只显示该分类
+      if (filter !== 'all' && filter !== cat) continue;
+      const items = results.filter(r => r.category === cat);
       if (items.length > 0) {
         groups.push({ category: cat, label: CATEGORY_LABELS[cat] || cat, items });
       }
@@ -69,9 +83,9 @@
   // 映射 SniffMatch[] → ScanFinding[]
   function mapSniffToFindings(matches: SniffMatch[]): ScanFinding[] {
     return matches.map((m) => ({
-      title: `${m.name} (${m.category})`,
-      severity: 'info' as const,
-      detail: m.evidences.map((e) => `[${e.source}] ${e.evidence}`).join('\n'),
+      title: `${m.name}${m.version ? ` v${m.version}` : ''} (${m.category})`,
+      severity: (m.confidenceLevel === 'strong' ? 'medium' : 'info') as ScanFinding['severity'],
+      detail: `置信度 ${m.confidence}/100 (${CONFIDENCE_LABELS[m.confidenceLevel]})\n${m.evidences.map((e) => `[${e.source}] ${e.evidence}`).join('\n')}`,
       url: targetUrl,
     }));
   }
@@ -145,13 +159,44 @@
       // 解析 HTML 中的 script src 和 meta
       const { scriptSrcs, meta } = parseHtml(html);
 
+      // 通过 MAIN world 注入采集页面运行时信号：全局变量/类名/id/cookies/版本
+      // 这让 sniff 引擎中 40% 的 globals/classNames/cookies 匹配器得以生效
+      let globals: string[] = [];
+      let classNames: string[] = [];
+      let ids: string[] = [];
+      let versions: Record<string, string> = {};
+      const cookieMap: Record<string, string> = {};
+      try {
+        const fp = await sendToContent({ type: 'VK_PAGE_INSPECT', action: 'fingerprint' }) as any;
+        if (fp && typeof fp === 'object') {
+          if (Array.isArray(fp.globals)) globals = fp.globals;
+          if (Array.isArray(fp.classNames)) classNames = fp.classNames;
+          if (Array.isArray(fp.cookies)) {
+            for (const c of fp.cookies) {
+              const eq = c.indexOf('=');
+              if (eq > 0) cookieMap[c.slice(0, eq).trim()] = c.slice(eq + 1).trim();
+            }
+          }
+          if (fp.versions && typeof fp.versions === 'object' && !Array.isArray(fp.versions)) {
+            versions = fp.versions;
+          }
+          // ids 可能是逗号分隔字符串或数组
+          if (Array.isArray(fp.ids)) ids = fp.ids;
+          else if (typeof fp.ids === 'string' && fp.ids) ids = fp.ids.split(',').map((s: string) => s.trim()).filter(Boolean);
+        }
+      } catch { /* 非当前标签页或注入失败，降级为纯静态分析 */ }
+
       // 构建 SniffInput 并扫描
       const input: SniffInput = {
         html,
         headers,
         scriptSrcs,
-        cookies: {},  // cookies 需要从页面上下文获取，此处暂留空
+        cookies: cookieMap,
         meta,
+        globals,
+        classNames,
+        ids,
+        versions,
       };
 
       results = scan(input);
@@ -161,6 +206,15 @@
       } else {
         toastStore.show('未检测到任何技术特征', 'info');
       }
+
+      // 写入侧栏徽标：取置信度最高的若干项（带版本优先），供侧栏按钮显示
+      try {
+        const badgeItems = [...results]
+          .sort((a, b) => b.confidence - a.confidence)
+          .slice(0, 5)
+          .map(r => ({ name: r.name, version: r.version || undefined }));
+        sniffBadgeStore.set(badgeItems);
+      } catch { /* 徽标失败不影响扫描 */ }
 
       try {
         await scanHistoryStore.addScan({
@@ -187,9 +241,25 @@
       toastStore.show('没有可复制的结果', 'warning');
       return;
     }
-    const lines = results.map(r => `${r.name} [${r.category}] (${r.matchedCount} matches)`);
+    const lines = results.map(r => `${r.name}${r.version ? ' v' + r.version : ''} [${r.category}] 置信${r.confidence}(${CONFIDENCE_LABELS[r.confidenceLevel]}) (${r.matchedCount} 匹配)`);
     navigator.clipboard.writeText(lines.join('\n'));
     toastStore.show(`已复制 ${lines.length} 项技术指纹`, 'success');
+  }
+
+  function copyMarkdown() {
+    if (results.length === 0) {
+      toastStore.show('没有可复制的结果', 'warning');
+      return;
+    }
+    const lines = [`# 网站技术指纹嗅探`, ``, `**目标:** ${targetUrl}`, ``, `## 识别技术 (${results.length})`];
+    for (const g of groupedResults) {
+      lines.push(``, `### ${g.label} (${g.items.length})`);
+      for (const r of g.items) {
+        lines.push(`- **${r.name}**${r.version ? ` v${r.version}` : ''} — 置信 ${r.confidence}/100 (${CONFIDENCE_LABELS[r.confidenceLevel]})`);
+      }
+    }
+    navigator.clipboard.writeText(lines.join('\n'));
+    toastStore.show('Markdown 已复制', 'success');
   }
 
   function exportResults() {
@@ -200,6 +270,9 @@
     const exportData = results.map(r => ({
       name: r.name,
       category: r.category,
+      version: r.version || null,
+      confidence: r.confidence,
+      confidenceLevel: r.confidenceLevel,
       matchCount: r.matchedCount,
       evidences: r.evidences.map(e => ({
         source: e.source,
@@ -240,6 +313,7 @@
         <span>涵盖 <strong class="text-primary">{catCount}</strong> 个分类</span>
         <div class="ml-auto flex gap-1">
           <button class="btn btn-sm" onclick={copyResults}>复制</button>
+          <button class="btn btn-sm" onclick={copyMarkdown}>MD</button>
           <button class="btn btn-sm" onclick={exportResults}>导出</button>
         </div>
       </div>
@@ -275,10 +349,16 @@
             {#each group.items as item (item.name)}
               <button
                 class="badge text-xs cursor-pointer {expandedName === item.name ? 'bg-primary text-white ring-2 ring-primary/30' : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'}"
-                onclick={() => toggleExpand(item.name)}>
+                onclick={() => toggleExpand(item.name)}
+                title="置信度 {item.confidence}/100 ({CONFIDENCE_LABELS[item.confidenceLevel]})"
+              >
                 {item.name}
-                {#if item.matchedCount > 1}
-                  <span class="opacity-60">({item.matchedCount})</span>
+                {#if item.version}
+                  <span class="opacity-70 font-mono">v{item.version}</span>
+                {/if}
+                <span class="ml-0.5 px-1 rounded {CONFIDENCE_COLORS[item.confidenceLevel]}">{CONFIDENCE_LABELS[item.confidenceLevel]}</span>
+                {#if FRAMEWORK_PANEL[item.name]}
+                  <span class="ml-0.5 opacity-70 hover:opacity-100" title="跳转到 {FRAMEWORK_PANEL[item.name]} 分析面板" onclick={(e) => { e.stopPropagation(); jumpToFramework(item.name); }}>→</span>
                 {/if}
               </button>
             {/each}

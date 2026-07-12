@@ -20,3 +20,6 @@ pnpm-debug.log*
 # env
 .env
 .env.local
+
+# playwright mcp session artifacts
+.playwright-mcp/

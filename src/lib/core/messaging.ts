@@ -42,6 +42,7 @@ export interface ContentResponseMap {
   VK_REACT_STORE_EXPLORE: unknown;
   VK_ANGULAR_STORE_EXPLORE: unknown;
   VK_PAGE_INSPECT: unknown;
+  VK_VUE_ATTACK: { success: boolean; error?: string; guards?: Record<string, number>; disabledMeta?: number; path?: string };
   CONTEXT_EXTRACT_LINKS: { count: number };
   VK_FINGERPRINT_DOM: DomFingerprint;
 }
@@ -58,7 +59,15 @@ export function sendMessage<T extends BackgroundMessage['type']>(
 
 /**
  * 向当前 tab 的 content script 发送消息。
+ *
+ * 容错：content script 是声明式注入（document_start），只在新导航时自动注入。
+ * 若用户在「已打开但早于扩展加载」的 tab 上调用（典型如首次打开 side-panel），
+ * 该 tab 上没有 content script，sendMessage 会抛 "Receiving end does not exist"。
+ * 此时主动用 scripting.executeScript 注入 bridge.js（bridge 内有 __VK_CONTENT_BRIDGE__
+ * 守卫，幂等），短暂等待监听器注册后重试一次。
  */
+const BRIDGE_CONTENT_FILE = '/content-scripts/bridge.js';
+
 export async function sendToContent<T extends ContentMessage['type']>(
   msg: Extract<ContentMessage, { type: T }>,
 ): Promise<ContentResponseMap[T] | null> {
@@ -67,6 +76,17 @@ export async function sendToContent<T extends ContentMessage['type']>(
   try {
     return (await browser.tabs.sendMessage(tab.id, msg)) as ContentResponseMap[T];
   } catch {
-    return null;
+    // content script 未就绪 —— 主动注入后重试一次
+    try {
+      await browser.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: [BRIDGE_CONTENT_FILE],
+      });
+      // 等待 bridge 的 onMessage 监听器注册
+      await new Promise((r) => setTimeout(r, 60));
+      return (await browser.tabs.sendMessage(tab.id, msg)) as ContentResponseMap[T];
+    } catch {
+      return null;
+    }
   }
 }

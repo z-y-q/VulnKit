@@ -15,12 +15,29 @@
   let showLineNumbers = $state(true);
   let scriptSrcs = $state<string[]>([]);
   let linkHrefs = $state<string[]>([]);
+  // 来自其他面板（如信息收集）发送的待加载 URL 队列
+  let pendingUrls = $state<string[]>([]);
 
   // 自动填充当前页 URL
   $effect(() => {
     getActiveTabUrl().then(u => {
       if (u) url = u;
     });
+  });
+
+  // 消费其他面板发送的 URL 队列
+  $effect(() => {
+    browser.storage.local.get('lingmou:source-pending').then((res) => {
+      const pending = res?.['lingmou:source-pending'] as string | undefined;
+      if (pending) {
+        pendingUrls = pending.split('\n').map(s => s.trim()).filter(Boolean);
+        browser.storage.local.remove('lingmou:source-pending');
+        if (pendingUrls.length) {
+          url = pendingUrls[0];
+          toastStore.show(`已载入 ${pendingUrls.length} 个待加载 URL，点击加载`, 'info');
+        }
+      }
+    }).catch(() => { /* ignore */ });
   });
 
   // 解析外部资源
@@ -160,6 +177,23 @@
       <div class="text-xs text-gray-500">{statusText}</div>
     {/if}
   </div>
+
+  <!-- 待加载 URL 队列（来自信息收集等面板） -->
+  {#if pendingUrls.length > 0}
+    <div class="card p-2 space-y-1">
+      <div class="text-xs text-gray-400">待加载队列 ({pendingUrls.length})</div>
+      <div class="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+        {#each pendingUrls as u2 (u2)}
+          <button
+            class="badge text-xs cursor-pointer font-mono truncate max-w-[16rem] {u2 === url ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}"
+            title={u2}
+            onclick={() => { url = u2; fetchSource(); }}
+          >{u2.replace(/^https?:\/\//, '')}</button>
+        {/each}
+        <button class="badge text-xs bg-gray-100 dark:bg-gray-800 text-gray-400" onclick={() => pendingUrls = []}>清除</button>
+      </div>
+    </div>
+  {/if}
 
   <!-- 搜索 + 工具栏 -->
   {#if source}

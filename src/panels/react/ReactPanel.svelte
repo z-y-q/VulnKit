@@ -9,6 +9,7 @@
     flattenStoreTree,
     isSensitiveEntry,
   } from '@/lib/analyzers/vue-analyzer';
+  import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
 
   // ===== 类型（与 inject/react-detect.ts 返回值对齐）=====
   interface ReactDetectResult {
@@ -50,6 +51,31 @@
   let storeFilter = $state('');
   let expandedStores = $state<Set<string>>(new Set());
   let currentUrl = $state('');
+  // 子标签：检测 / Store / 路由
+  let activeTab = $state<'detect' | 'store' | 'routes'>('detect');
+
+  /** 聚合所有来源的路由（detect 阶段 + store 探索阶段） */
+  let allRoutes = $derived.by(() => {
+    const out: { path: string; source: string; hasElement?: boolean }[] = [];
+    const seen = new Set<string>();
+    if (detectResult?.routes) {
+      for (const r of detectResult.routes) {
+        const key = r;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ path: r, source: 'detect' });
+      }
+    }
+    if (storeResult?.routes) {
+      for (const r of storeResult.routes) {
+        const key = r.path;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ path: r.path, source: r.source || 'store', hasElement: r.hasElement });
+      }
+    }
+    return out;
+  });
 
   // 自动填充当前 URL
   $effect(() => {
@@ -77,6 +103,7 @@
     detectResult = data as ReactDetectResult;
     detecting = false;
     toastStore.show(`检测到 React ${(data as ReactDetectResult).version || ''}`, 'success');
+    await saveFindings();
   }
 
   // ===== 探索 Store =====
@@ -105,6 +132,7 @@
       types.add(t);
     });
     toastStore.show(`${Array.from(types).join(', ')} | ${storeKeys.length} 个 Store`, 'success');
+    await saveFindings();
   }
 
   // ===== Store 展开/收起 =====
@@ -157,7 +185,7 @@
   }
 
   // ===== 衍生状态 =====
-  let groupedRoutes = $derived(() => {
+  let groupedRoutes = $derived.by(() => {
     if (!storeResult?.routes) return {};
     const g: Record<string, RouteEntry[]> = {};
     for (const r of storeResult.routes) {
@@ -167,6 +195,35 @@
     }
     return g;
   });
+
+  // ===== Findings 导出 =====
+  /** 基于当前扫描结果生成安全发现（对齐 v5 vk-react getFindings） */
+  function getFindings(): ScanFinding[] {
+    const findings: ScanFinding[] = [];
+    if (!detectResult || !detectResult.detected) return findings;
+    if (detectResult.version) {
+      findings.push({ severity: 'info', title: 'React 版本泄露', detail: 'React ' + detectResult.version, url: currentUrl });
+    }
+    if (detectResult.mode === 'development') {
+      findings.push({ severity: 'high', title: 'React 开发模式运行', detail: '生产环境使用开发模式构建，泄露组件树和内部结构', url: currentUrl });
+    }
+    if (detectResult.metaframework) {
+      findings.push({ severity: 'info', title: '元框架检测', detail: detectResult.metaframework, url: currentUrl });
+    }
+    const routeCount = (detectResult.routes?.length || 0) + (storeResult?.routes?.length || 0);
+    if (routeCount > 0) {
+      findings.push({ severity: 'medium', title: '客户端路由发现', detail: routeCount + ' 个路由', url: currentUrl });
+    }
+    return findings;
+  }
+
+  /** 将 findings 保存到扫描历史 */
+  async function saveFindings() {
+    const findings = getFindings();
+    if (findings.length > 0 && currentUrl) {
+      await scanHistoryStore.addScan({ url: currentUrl, module: 'react', findings });
+    }
+  }
 
   // ===== 辅助 =====
   function modeColor(mode: string): string {
@@ -190,6 +247,44 @@
     <b>目标:</b> <span class="font-mono break-all">{currentUrl || '未获取'}</span>
   </div>
 
+  <!-- 子标签 -->
+  <div class="flex gap-1">
+    {#each [{ id: 'detect', label: '检测' }, { id: 'store', label: 'Store' }, { id: 'routes', label: `路由${allRoutes.length ? ' (' + allRoutes.length + ')' : ''}` }] as t}
+      <button
+        class="btn btn-sm {activeTab === t.id ? 'bg-primary text-white' : 'btn-ghost'}"
+        onclick={() => (activeTab = t.id as typeof activeTab)}
+      >{t.label}</button>
+    {/each}
+  </div>
+
+  {#if activeTab === 'routes'}
+    <!-- 路由聚合 -->
+    <div class="card p-3 space-y-2">
+      <div class="flex items-center justify-between">
+        <div class="text-sm font-medium">客户端路由</div>
+        <button class="btn btn-sm" disabled={allRoutes.length === 0}
+          onclick={() => copyText(allRoutes.map(r => r.path).join('\n'), `${allRoutes.length} 条路由`)}>
+          复制全部
+        </button>
+      </div>
+      {#if allRoutes.length === 0}
+        <div class="text-xs text-gray-400">暂无路由。请先「检测 React」或「探索 State」。</div>
+      {:else}
+        <div class="space-y-0.5 max-h-96 overflow-y-auto">
+          {#each allRoutes as r (r.path + r.source)}
+            <div class="flex items-center gap-1 text-xs">
+              <span class="badge text-[10px] shrink-0 bg-gray-200 dark:bg-gray-700">{r.source}</span>
+              <code class="font-mono break-all flex-1">{r.path}</code>
+              {#if r.hasElement}<span class="badge text-[10px]">component</span>{/if}
+              <button class="btn btn-sm text-[10px] shrink-0" onclick={() => copyText(r.path)}>复制</button>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  {#if activeTab === 'detect'}
   <!-- React 检测 -->
   <div class="card p-3 space-y-2">
     <div class="flex items-center justify-between">
@@ -263,21 +358,6 @@
         </div>
       {/if}
 
-      <!-- 路由（detect 阶段） -->
-      {#if detectResult.routes && detectResult.routes.length > 0}
-        <div class="space-y-1 text-xs mt-2">
-          <div class="flex items-center gap-2">
-            <span class="text-gray-500">路由</span>
-            <span class="text-gray-400">({detectResult.routes.length})</span>
-          </div>
-          <div class="space-y-0.5 max-h-40 overflow-y-auto">
-            {#each detectResult.routes as r}
-              <div class="font-mono text-gray-600 dark:text-gray-400">{r}</div>
-            {/each}
-          </div>
-        </div>
-      {/if}
-
       <!-- 操作按钮 -->
       <div class="flex gap-1 mt-2">
         <button class="btn btn-sm flex-1" onclick={copyDetectJson}>复制 JSON</button>
@@ -285,7 +365,9 @@
       </div>
     {/if}
   </div>
+  {/if}
 
+  {#if activeTab === 'store'}
   <!-- Store 探索 -->
   <div class="card p-3 space-y-2">
     <div class="flex items-center justify-between">
@@ -353,45 +435,6 @@
         </div>
       {/each}
 
-      <!-- 路由（explore 阶段） -->
-      {#if storeResult.routes && storeResult.routes.length > 0}
-        <div class="space-y-1 text-xs mt-2">
-          <div class="flex items-center gap-2">
-            <span class="font-medium">路由</span>
-            <span class="text-gray-400">({storeResult.routes.length})</span>
-          </div>
-          <!-- 按来源分组 -->
-          <div class="space-y-1">
-            {#each Object.entries(groupedRoutes) as [src, routes]}
-              <div>
-                <div class="text-gray-500 font-medium">{src} ({routes.length})</div>
-                <div class="space-y-0.5 max-h-60 overflow-y-auto">
-                  {#each routes as r}
-                    <div class="flex items-center gap-1">
-                      <code class="font-mono text-xs break-all flex-1">{r.path}</code>
-                      {#if r.hasElement}
-                        <span class="badge text-[10px]">component</span>
-                      {/if}
-                    </div>
-                  {/each}
-                </div>
-              </div>
-            {/each}
-          </div>
-          <div class="flex gap-1">
-            <button
-              class="btn btn-sm flex-1"
-              onclick={() => copyText(
-                storeResult!.routes.map(r => r.path).join('\n'),
-                `${storeResult!.routes.length} 条路由`,
-              )}
-            >
-              复制路由
-            </button>
-          </div>
-        </div>
-      {/if}
-
       <!-- API 端点 -->
       {#if storeResult.apiEndpoints && storeResult.apiEndpoints.length > 0}
         <div class="space-y-1 text-xs mt-2">
@@ -429,4 +472,5 @@
       {/if}
     {/if}
   </div>
+  {/if}
 </div>

@@ -273,6 +273,22 @@
     URL.revokeObjectURL(a.href);
     toastStore.show(`已导出 ${filtered.length} 条记录`, 'success');
   }
+
+  async function sendToMultiUrl() {
+    if (filtered.length === 0) {
+      toastStore.show('没有可发送的链接', 'warning');
+      return;
+    }
+    const urls = filtered
+      .map(l => l.href)
+      .filter(u => u.startsWith('http://') || u.startsWith('https://'));
+    if (urls.length === 0) {
+      toastStore.show('没有有效的 HTTP(S) 链接', 'warning');
+      return;
+    }
+    await browser.storage.local.set({ 'lingmou:multiurl-pending': urls.join('\n') });
+    toastStore.show(`已发送 ${urls.length} 个 URL 到 MultiUrl 面板`, 'success');
+  }
 </script>
 
 <div class="space-y-3">
@@ -320,6 +336,7 @@
         <div class="flex gap-1 ml-auto">
           <button class="btn btn-sm" onclick={copyAll}>复制全部</button>
           <button class="btn btn-sm" onclick={exportCsv}>导出 CSV</button>
+          <button class="btn btn-sm" onclick={sendToMultiUrl}>发送到 MultiUrl</button>
         </div>
       </div>
     {/if}

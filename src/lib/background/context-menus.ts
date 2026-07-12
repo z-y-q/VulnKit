@@ -79,11 +79,19 @@ async function showToast(tabId: number, message: string, ok: boolean): Promise<v
 }
 
 async function copyAndToast(tabId: number, text: string, message: string): Promise<void> {
+  // Service Worker 无 navigator.clipboard，需注入到页面上下文复制
   try {
-    await navigator.clipboard.writeText(text);
+    await browser.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: (t: string) => navigator.clipboard?.writeText(t).catch(() => {}),
+      args: [text],
+    });
     await showToast(tabId, message, true);
   } catch {
-    /* 剪贴板不可用 */
+    // 页面上下文复制失败 → 回退到 storage，让 popup/side-panel 复制
+    await browser.storage.local.set({ __pendingCopy: text });
+    await showToast(tabId, '灵眸: 剪贴板受限，已暂存（见侧栏）', true);
   }
 }
 
@@ -118,13 +126,22 @@ export async function handleMenuClick(
 
   // 提取链接
   if (id === 'vulnkit-extract-links') {
-    browser.tabs.sendMessage(tab.id, { type: 'CONTEXT_EXTRACT_LINKS' }).catch(() => {});
-    // TODO(Phase 5): 提取链接结果页将迁移为 side panel 内的面板
-    setTimeout(() => {
-      browser.tabs.create({
-        url: browser.runtime.getURL('src/extracted-links/extracted-links.html' as any),
-      });
-    }, 500);
+    try {
+      await browser.tabs.sendMessage(tab.id, { type: 'CONTEXT_EXTRACT_LINKS' });
+    } catch {
+      /* ignore */
+    }
+    // content script 异步写入 contextExtractedLinks，留一点时间
+    await new Promise((r) => setTimeout(r, 300));
+    const stored = await browser.storage.local.get(['contextExtractedLinks', 'contextExtractedUrl']);
+    await browser.storage.local.set({
+      __extractedLinks: {
+        url: stored.contextExtractedUrl || tab.url,
+        fetchedAt: Date.now(),
+        links: Array.isArray(stored.contextExtractedLinks) ? stored.contextExtractedLinks : [],
+      },
+    });
+    browser.tabs.create({ url: browser.runtime.getURL('/extracted-links.html') });
     return;
   }
 

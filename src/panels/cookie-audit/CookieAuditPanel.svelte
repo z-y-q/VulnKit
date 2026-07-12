@@ -313,6 +313,129 @@
     }
   }
 
+  // ===== Cookie 编辑/新增/批量导入（v5 spoof 能力）=====
+
+  let editorOpen = $state(false);
+  let editing = $state<AuditedCookie | null>(null);
+  let form = $state({ name: '', value: '', domain: '', path: '/', secure: false, httpOnly: false, sameSite: 'unspecified' });
+  let importText = $state('');
+  let importOpen = $state(false);
+
+  /** 获取当前活动标签页 URL（Cookie 操作上下文） */
+  async function currentPageUrl(): Promise<string> {
+    const tab = await getActiveTab();
+    return tab?.url || '';
+  }
+
+  async function openAdd() {
+    editing = null;
+    const pageUrl = await currentPageUrl();
+    let domain = '';
+    try { domain = new URL(pageUrl).hostname; } catch { /* ignore */ }
+    form = { name: '', value: '', domain, path: '/', secure: pageUrl.startsWith('https'), httpOnly: false, sameSite: 'lax' };
+    editorOpen = true;
+  }
+
+  function openEdit(c: AuditedCookie) {
+    editing = c;
+    form = {
+      name: c.name,
+      value: c.value,
+      domain: c.domain.replace(/^\./, ''),
+      path: c.path || '/',
+      secure: c.secure,
+      httpOnly: c.httpOnly,
+      sameSite: c.sameSite || 'lax',
+    };
+    editorOpen = true;
+  }
+
+  async function saveCookie() {
+    if (!form.name || !form.domain) {
+      toastStore.show('Cookie 名称和域名必填', 'warning');
+      return;
+    }
+    try {
+      const url = `${form.secure ? 'https' : 'http'}://${form.domain}${form.path || '/'}`;
+      await browser.cookies.set({
+        url,
+        name: form.name,
+        value: form.value,
+        domain: form.domain.startsWith('.') ? form.domain : '.' + form.domain,
+        path: form.path || '/',
+        secure: form.secure,
+        httpOnly: form.httpOnly,
+        sameSite: form.sameSite as any,
+      });
+      toastStore.show(`${editing ? '已修改' : '已新增'} ${form.name}`, 'success');
+      editorOpen = false;
+      await loadCookies();
+    } catch (e: any) {
+      toastStore.show(`保存失败: ${e.message || e}`, 'error');
+    }
+  }
+
+  /** 批量导入：解析 "name=value; name2=value2" 或每行一个 */
+  async function importCookies() {
+    const raw = importText.trim();
+    if (!raw) {
+      toastStore.show('请输入 Cookie 字符串', 'warning');
+      return;
+    }
+    let domain = '';
+    const pageUrl = await currentPageUrl();
+    try { domain = new URL(pageUrl).hostname; } catch { /* ignore */ }
+    const isHttps = pageUrl.startsWith('https');
+    // 兼容分号分隔和换行分隔
+    const pairs = raw.split(/[;\n]/).map(s => s.trim()).filter(Boolean);
+    let ok = 0;
+    for (const pair of pairs) {
+      const eq = pair.indexOf('=');
+      if (eq <= 0) continue;
+      const name = pair.slice(0, eq).trim();
+      const value = pair.slice(eq + 1).trim();
+      try {
+        await browser.cookies.set({
+          url: `${isHttps ? 'https' : 'http'}://${domain}/`,
+          name,
+          value,
+          domain: '.' + domain,
+          path: '/',
+          secure: isHttps,
+          httpOnly: false,
+          sameSite: 'lax' as any,
+        });
+        ok++;
+      } catch { /* ignore single failure */ }
+    }
+    toastStore.show(`已导入 ${ok}/${pairs.length} 个 Cookie`, ok > 0 ? 'success' : 'error');
+    importOpen = false;
+    importText = '';
+    if (ok > 0) await loadCookies();
+  }
+
+  /** 批量清除当前域名所有 Cookie */
+  async function clearAll() {
+    const pageUrl = await currentPageUrl();
+    if (!confirm(`确认删除 ${pageUrl} 域名下所有 Cookie？此操作不可撤销。`)) return;
+    try {
+      let domain = '';
+      try { domain = new URL(pageUrl).hostname; } catch { /* ignore */ }
+      const all = await browser.cookies.getAll({ domain });
+      let n = 0;
+      for (const c of all) {
+        try {
+          await browser.cookies.remove({ url: `${c.secure ? 'https' : 'http'}://${domain}${c.path}`, name: c.name });
+          n++;
+        } catch { /* ignore */ }
+      }
+      toastStore.show(`已清除 ${n} 个 Cookie`, 'success');
+      await loadCookies();
+    } catch (e: any) {
+      toastStore.show(`清除失败: ${e.message || e}`, 'error');
+    }
+  }
+
   function copyAuditReport() {
     if (results.length === 0) {
       toastStore.show('没有审计结果', 'warning');
@@ -478,6 +601,9 @@
       </div>
 
       <div class="flex gap-1 flex-wrap">
+        <button class="btn btn-xs btn-soft" onclick={openAdd}>+ 新增</button>
+        <button class="btn btn-xs btn-soft" onclick={() => (importOpen = true)}>批量导入</button>
+        <button class="btn btn-xs text-red-500" onclick={clearAll}>清除全部</button>
         <button class="btn btn-xs" onclick={copyAuditReport}>复制报告</button>
         <button class="btn btn-xs" onclick={copyMarkdownReport}>复制 MD</button>
         <button class="btn btn-xs btn-primary" onclick={exportJson}>导出 JSON</button>
@@ -503,6 +629,7 @@
             </div>
             <div class="flex gap-1 shrink-0">
               <button class="btn btn-xs" title="复制值" onclick={() => copyValue(r.cookie.value)}>复制</button>
+              <button class="btn btn-xs text-blue-500" title="编辑" onclick={() => openEdit(r.cookie)}>编辑</button>
               <button class="btn btn-xs text-red-500" title="删除" onclick={() => deleteCookie(r.cookie)}>删除</button>
             </div>
           </div>
@@ -553,3 +680,71 @@
     </div>
   {/if}
 </div>
+
+<!-- Cookie 编辑/新增弹窗 -->
+{#if editorOpen}
+  <div class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-4 space-y-3" onclick={(e) => e.stopPropagation()}>
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-bold">{editing ? '编辑 Cookie' : '新增 Cookie'}</span>
+        <button class="text-gray-400 hover:text-gray-600" onclick={() => (editorOpen = false)}>✕</button>
+      </div>
+      <div class="space-y-2">
+        <div>
+          <label class="text-xs text-gray-500">名称</label>
+          <input class="input text-xs" bind:value={form.name} placeholder="session_id" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">值</label>
+          <input class="input text-xs font-mono" bind:value={form.value} placeholder="value" />
+        </div>
+        <div class="flex gap-2">
+          <div class="flex-1">
+            <label class="text-xs text-gray-500">域名</label>
+            <input class="input text-xs" bind:value={form.domain} placeholder="example.com" />
+          </div>
+          <div class="flex-1">
+            <label class="text-xs text-gray-500">路径</label>
+            <input class="input text-xs" bind:value={form.path} placeholder="/" />
+          </div>
+        </div>
+        <div class="flex gap-2 flex-wrap text-xs">
+          <label class="flex items-center gap-1"><input type="checkbox" bind:checked={form.secure} class="accent-blue-500" /> Secure</label>
+          <label class="flex items-center gap-1"><input type="checkbox" bind:checked={form.httpOnly} class="accent-blue-500" /> HttpOnly</label>
+          <label class="flex items-center gap-1">SameSite:
+            <select class="input text-xs w-24" bind:value={form.sameSite}>
+              <option value="unspecified">默认</option>
+              <option value="lax">Lax</option>
+              <option value="strict">Strict</option>
+              <option value="no_restriction">None</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button class="btn btn-sm btn-ghost" onclick={() => (editorOpen = false)}>取消</button>
+        <button class="btn btn-sm btn-primary" onclick={saveCookie}>保存</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- 批量导入弹窗 -->
+{#if importOpen}
+  <div class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-4 space-y-3" onclick={(e) => e.stopPropagation()}>
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-bold">批量导入 Cookie</span>
+        <button class="text-gray-400 hover:text-gray-600" onclick={() => (importOpen = false)}>✕</button>
+      </div>
+      <p class="text-xs text-gray-400">支持 <code class="font-mono">name=value; name2=value2</code> 格式，或每行一个。导入到当前域名。</p>
+      <textarea class="input text-xs font-mono" rows="6" placeholder="session_id=abc123; token=eyJhbGc..." bind:value={importText}></textarea>
+      <div class="flex justify-end gap-2">
+        <button class="btn btn-sm btn-ghost" onclick={() => (importOpen = false)}>取消</button>
+        <button class="btn btn-sm btn-primary" onclick={importCookies}>导入</button>
+      </div>
+    </div>
+  </div>
+{/if}

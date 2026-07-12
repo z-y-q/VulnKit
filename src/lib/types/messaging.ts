@@ -45,6 +45,7 @@ export type ContentMessage =
   | { type: 'VK_REACT_STORE_EXPLORE' }
   | { type: 'VK_ANGULAR_STORE_EXPLORE' }
   | { type: 'VK_PAGE_INSPECT'; action: string; timeout?: number }
+  | { type: 'VK_VUE_ATTACK'; action: 'bypass' | 'disableAuth' | 'navigate' | 'jump' | 'restore'; target?: string; timeout?: number }
   | { type: 'CONTEXT_EXTRACT_LINKS' }
   | { type: 'VK_FINGERPRINT_DOM' };
 

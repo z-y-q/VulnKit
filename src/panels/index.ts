@@ -20,6 +20,8 @@ import SveltePanel from './svelte/SveltePanel.svelte';
 import RuoYiPanel from './ruoyi/RuoYiPanel.svelte';
 import SourcemapPanel from './sourcemap/SourcemapPanel.svelte';
 import SniffPanel from './sniff/SniffPanel.svelte';
+import LeakscanPanel from './leakscan/LeakscanPanel.svelte';
+import HaePanel from './hae/HaePanel.svelte';
 import ReportPanel from './report/ReportPanel.svelte';
 import FaviconPanel from './favicon/FaviconPanel.svelte';
 import AssetPanel from './asset/AssetPanel.svelte';
@@ -28,6 +30,8 @@ import ExifPanel from './exif/ExifPanel.svelte';
 import StorageCheckPanel from './storage-check/StorageCheckPanel.svelte';
 import MultiurlPanel from './multiurl/MultiurlPanel.svelte';
 import HistoryPanel from './history/HistoryPanel.svelte';
+import HistoryArchivePanel from './history-archive/HistoryArchivePanel.svelte';
+import TabsavePanel from './tabsave/TabsavePanel.svelte';
 import SourceLoaderPanel from './source-loader/SourceLoaderPanel.svelte';
 
 export interface PanelConfig {
@@ -163,6 +167,24 @@ export const panels: PanelConfig[] = [
     catColor: '#e74c3c',
     component: SniffPanel,
   },
+  {
+    id: 'leakscan',
+    label: '泄露扫描',
+    icon: '🔓',
+    category: 'scan',
+    categoryLabel: '扫描',
+    catColor: '#e74c3c',
+    component: LeakscanPanel,
+  },
+  {
+    id: 'hae',
+    label: 'HAE规则',
+    icon: '🎨',
+    category: 'scan',
+    categoryLabel: '扫描',
+    catColor: '#e74c3c',
+    component: HaePanel,
+  },
 
   // ===== 利用 (Exploit) =====
   {
@@ -285,6 +307,24 @@ export const panels: PanelConfig[] = [
     categoryLabel: '工具',
     catColor: '#9b59b6',
     component: HistoryPanel,
+  },
+  {
+    id: 'history-archive',
+    label: 'Wayback',
+    icon: '🗂️',
+    category: 'tools',
+    categoryLabel: '工具',
+    catColor: '#9b59b6',
+    component: HistoryArchivePanel,
+  },
+  {
+    id: 'tabsave',
+    label: '标签保存',
+    icon: '📑',
+    category: 'tools',
+    categoryLabel: '工具',
+    catColor: '#9b59b6',
+    component: TabsavePanel,
   },
   {
     id: 'exif',

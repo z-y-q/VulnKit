@@ -5,6 +5,7 @@
   import { sendToContent } from '@/lib/core/messaging';
   import { toastStore } from '@/stores/ui';
   import { flattenStoreTree } from '@/lib/analyzers/vue-analyzer';
+  import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
 
   // ===== 类型（与 inject/angular-detect.ts / inject/angular-store-explorer.ts 返回值一致）=====
   interface AngularDetectResult {
@@ -52,9 +53,15 @@
   let storeLoading = $state(false);
   let storeResult = $state<AngularStoreExploreResult | null>(null);
   let storeStatus = $state('');
-
+  let storeSearch = $state('');
   // 子标签页: 'store' | 'routes' | 'api'
   let activeSubTab = $state<'store' | 'routes' | 'api'>('store');
+  let filteredStoreKeys = $derived(() => {
+    const keys = Object.keys(storeResult?.stores || {});
+    if (!storeSearch) return keys;
+    const q = storeSearch.toLowerCase();
+    return keys.filter(k => k.toLowerCase().includes(q));
+  });
   let lastDetectResult = $state<AngularDetectResult | null>(null);
 
   // ===== 检测 Angular =====
@@ -83,6 +90,7 @@
       detectStatus = '未检测到 Angular';
       toastStore.show('未检测到 Angular 框架', 'info');
     }
+    await saveFindings();
   }
 
   // ===== 探索 Store =====
@@ -118,6 +126,7 @@
       storeKeys.length > 0 ? `发现 ${storeKeys.length} 个 Store` : '未发现 NgRx Store / Signal',
       storeKeys.length > 0 ? 'success' : 'info',
     );
+    await saveFindings();
   }
 
   // state 树扁平化复用 vue-analyzer 的 flattenStoreTree（含敏感字段检测）
@@ -166,10 +175,9 @@
       toastStore.show('没有路由数据', 'warning');
       return;
     }
-    const routes = storeResult.routes;
-    const text = routes.map((r) => r.path).join('\n');
+    const text = JSON.stringify(storeResult.routes, null, 2);
     navigator.clipboard.writeText(text).then(() => {
-      toastStore.show(`已复制 ${routes.length} 个路由`, 'success');
+      toastStore.show(`已复制 ${storeResult.routes.length} 个路由（JSON）`, 'success');
     });
   }
 
@@ -202,6 +210,36 @@
     return mode === 'development'
       ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
       : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
+  }
+
+  // ===== Findings 导出 =====
+  /** 基于当前扫描结果生成安全发现（对齐 v5 vk-angular getFindings） */
+  function getFindings(): ScanFinding[] {
+    const findings: ScanFinding[] = [];
+    if (!lastDetectResult || !lastDetectResult.detected) return findings;
+    if (lastDetectResult.version) {
+      findings.push({ severity: 'info', title: 'Angular 版本泄露', detail: '检测到 Angular 版本: ' + lastDetectResult.version });
+    }
+    if (lastDetectResult.mode === 'development') {
+      findings.push({ severity: 'medium', title: 'Angular 开发模式运行', detail: '应用以开发模式运行，可能泄露调试信息和源码映射' });
+    }
+    if (storeResult?.routes?.length) {
+      findings.push({ severity: 'low', title: '客户端路由发现', detail: storeResult.routes.length + ' 个路由' });
+    }
+    if (storeResult?.apiEndpoints?.length) {
+      findings.push({ severity: 'low', title: 'API 端点发现', detail: storeResult.apiEndpoints.length + ' 个端点' });
+    }
+    return findings;
+  }
+
+  /** 将 findings 保存到扫描历史 */
+  async function saveFindings() {
+    const findings = getFindings();
+    if (findings.length > 0) {
+      // Angular panel doesn't have its own URL; use tab URL via a simple trick
+      const url = typeof location !== 'undefined' ? location.href : '';
+      await scanHistoryStore.addScan({ url, module: 'angular', findings });
+    }
   }
 </script>
 
@@ -329,6 +367,9 @@
     {#if storeStatus}
       <div class="text-xs text-gray-500">{storeStatus}</div>
     {/if}
+    {#if storeResult && Object.keys(storeResult.stores || {}).length > 0}
+      <input class="input text-xs" placeholder="搜索 Store..." bind:value={storeSearch} />
+    {/if}
   </div>
 
   <!-- Store 探索结果 -->
@@ -357,12 +398,11 @@
 
     <!-- Store 标签页 -->
     {#if activeSubTab === 'store'}
-      {@const storeKeys = Object.keys(storeResult.stores || {})}
-      {#if storeKeys.length === 0 && (!storeResult.signals || storeResult.signals.length === 0)}
+      {#if filteredStoreKeys.length === 0 && (!storeResult.signals || storeResult.signals.length === 0)}
         <div class="card p-3 text-center text-xs text-gray-400">未发现 NgRx Store / Signal</div>
       {:else}
         <!-- Store 列表 -->
-        {#each storeKeys as storeId}
+        {#each filteredStoreKeys as storeId}
           {@const storeData = storeResult.stores[storeId] || { state: {}, type: 'unknown' }}
           {@const state = storeData.state || {}}
           {@const rows = flattenStoreTree(state)}

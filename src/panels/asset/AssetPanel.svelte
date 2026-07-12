@@ -2,48 +2,77 @@
   // 资产测绘面板 — 灵眸 v6.0
   // ZoomEye API 集成：搜索主机/服务，结果分页，导出 CSV/JSON，复制 IP 列表
   import { sendMessage } from '@/lib/core/messaging';
+  import { getActiveTabUrl } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
   import {
     buildZoomEyeUrl,
     normalizeResults,
+    normalizeFofaResults,
+    normalizeShodanResults,
+    buildFofaApiUrl,
+    buildShodanApiUrl,
     buildCsv,
+    ASSET_ENGINES,
     type ZoomEyeResult,
     type ZoomEyeMode,
   } from '@/lib/scanners/asset-engine';
 
   // ===== 常量 =====
   const STORAGE_KEY_API = 'lingmou_zoomeye_key';
+  const STORAGE_KEY_FOFA = 'lingmou_fofa'; // {email, key}
+  const STORAGE_KEY_SHODAN = 'lingmou_shodan_key';
+
+  type Engine = 'zoomeye' | 'fofa' | 'shodan';
 
   // ===== 状态 =====
+  let engine = $state<Engine>('zoomeye');
   let apiKey = $state('');
+  let fofaEmail = $state('');
+  let fofaKey = $state('');
+  let shodanKey = $state('');
   let query = $state('');
   let mode = $state<ZoomEyeMode>('host');
   let searching = $state(false);
   let statusText = $state('');
   let results = $state<ZoomEyeResult[]>([]);
   let currentPage = $state(1);
+
+  // 自动填充当前域名到查询（如 site:example.com）
+  $effect(() => {
+    getActiveTabUrl().then(u => {
+      if (u && !query) {
+        try { const h = new URL(u).hostname; query = `site:"${h}"`; } catch { /* */ }
+      }
+    });
+  });
+
   let totalPages = $state(1);
   let searchFilter = $state('');
 
   // ===== 挂载时读取持久化 API Key =====
   $effect(() => {
-    browser.storage.local.get(STORAGE_KEY_API).then((stored) => {
-      if (stored?.[STORAGE_KEY_API]) {
-        apiKey = stored[STORAGE_KEY_API] as string;
-      }
+    browser.storage.local.get([STORAGE_KEY_API, STORAGE_KEY_FOFA, STORAGE_KEY_SHODAN]).then((stored) => {
+      if (stored?.[STORAGE_KEY_API]) apiKey = stored[STORAGE_KEY_API] as string;
+      const fofa = stored?.[STORAGE_KEY_FOFA];
+      if (fofa && typeof fofa === 'object') { fofaEmail = fofa.email || ''; fofaKey = fofa.key || ''; }
+      if (stored?.[STORAGE_KEY_SHODAN]) shodanKey = stored[STORAGE_KEY_SHODAN] as string;
     });
   });
 
   // ===== 持久化 API Key =====
   function saveApiKey() {
-    browser.storage.local.set({ [STORAGE_KEY_API]: apiKey.trim() }).then(() => {
-      toastStore.show('API Key 已保存', 'success');
-    });
+    if (engine === 'zoomeye') {
+      browser.storage.local.set({ [STORAGE_KEY_API]: apiKey.trim() }).then(() => toastStore.show('ZoomEye Key 已保存', 'success'));
+    } else if (engine === 'fofa') {
+      browser.storage.local.set({ [STORAGE_KEY_FOFA]: { email: fofaEmail.trim(), key: fofaKey.trim() } }).then(() => toastStore.show('FOFA 凭证已保存', 'success'));
+    } else {
+      browser.storage.local.set({ [STORAGE_KEY_SHODAN]: shodanKey.trim() }).then(() => toastStore.show('Shodan Key 已保存', 'success'));
+    }
   }
 
   // ===== 派生 =====
-  let filtered = $derived(() => {
+  let filtered = $derived.by(() => {
     if (!searchFilter) return results;
     const q = searchFilter.toLowerCase();
     return results.filter(
@@ -56,65 +85,74 @@
     );
   });
 
-  // ===== 核心搜索 =====
+  // ===== 凭证校验 =====
+  function ensureCredentials(): boolean {
+    if (engine === 'zoomeye') {
+      if (!apiKey.trim()) { toastStore.show('请先输入 ZoomEye API Key', 'warning'); return false; }
+    } else if (engine === 'fofa') {
+      if (!fofaEmail.trim() || !fofaKey.trim()) { toastStore.show('请先输入 FOFA Email + Key', 'warning'); return false; }
+    } else {
+      if (!shodanKey.trim()) { toastStore.show('请先输入 Shodan API Key', 'warning'); return false; }
+    }
+    return true;
+  }
+
+  const ENGINE_LABEL: Record<Engine, string> = { zoomeye: 'ZoomEye', fofa: 'FOFA', shodan: 'Shodan' };
+
+  /** 解析 background 响应 → JSON 对象；失败抛错 */
+  async function parseResponse(resp: any, label: string): Promise<any> {
+    if (!resp || !resp.success) throw new Error(resp?.error || '请求失败');
+    try { return JSON.parse(resp.data); }
+    catch { throw new Error(`${label} 响应解析失败（格式异常）`); }
+  }
+
+  // ===== 核心搜索（按引擎分发）=====
   async function search(page = 1) {
-    if (!apiKey.trim()) {
-      toastStore.show('请先输入 ZoomEye API Key', 'warning');
-      return;
-    }
-    if (!query.trim()) {
-      toastStore.show('请输入搜索语句', 'warning');
-      return;
-    }
+    if (!ensureCredentials()) return;
+    if (!query.trim()) { toastStore.show('请输入搜索语句', 'warning'); return; }
 
     searching = true;
-    statusText = '正在查询 ZoomEye...';
     results = [];
-
-    const url = buildZoomEyeUrl(query.trim(), page, mode);
+    const label = ENGINE_LABEL[engine];
+    statusText = `正在查询 ${label}...`;
 
     try {
-      const resp = await sendMessage({
-        type: 'FETCH_URL_AUTH',
-        url,
-        provider: 'zoomeye',
-        key: apiKey.trim(),
-      });
+      let rawJson: any;
+      let total = 0;
+      let pageSize = 10;
 
-      // 响应格式：{ success: true, data: string } | { success: false, error: string }
-      if (!resp || !(resp as any).success) {
-        const errMsg = (resp as any)?.error || '请求失败';
-        handleApiError(errMsg);
-        return;
+      if (engine === 'zoomeye') {
+        const url = buildZoomEyeUrl(query.trim(), page, mode);
+        const resp = await sendMessage({
+          type: 'FETCH_URL_AUTH', url, provider: 'zoomeye', key: apiKey.trim(),
+        });
+        rawJson = await parseResponse(resp, label);
+        if (rawJson.error) throw new Error(rawJson.message || rawJson.error);
+        const list = rawJson.matches || rawJson.data || [];
+        total = rawJson.total ?? list.length;
+        pageSize = list.length || 10;
+        results = normalizeResults(rawJson, mode);
+      } else if (engine === 'fofa') {
+        const url = buildFofaApiUrl(query.trim(), fofaEmail.trim(), fofaKey.trim());
+        const resp = await sendMessage({ type: 'FETCH_URL', url });
+        rawJson = await parseResponse(resp, label);
+        results = normalizeFofaResults(rawJson);
+        total = Number(rawJson.size) || results.length;
+        pageSize = results.length || 100;
+      } else {
+        const url = buildShodanApiUrl(query.trim(), shodanKey.trim(), page);
+        const resp = await sendMessage({ type: 'FETCH_URL', url });
+        rawJson = await parseResponse(resp, label);
+        results = normalizeShodanResults(rawJson);
+        total = Number(rawJson.total) || results.length;
+        pageSize = 100;
       }
 
-      // 解析 JSON
-      let json: any;
-      try {
-        json = JSON.parse((resp as any).data);
-      } catch {
-        toastStore.show('响应解析失败', 'error');
-        statusText = '查询失败：响应格式异常';
-        return;
-      }
-
-      if (json.error) {
-        toastStore.show(`API 错误: ${json.message || json.error}`, 'error');
-        statusText = `API 错误: ${json.message || json.error}`;
-        return;
-      }
-
-      const list = json.matches || json.data || [];
-      const total = json.total ?? list.length;
-
-      results = normalizeResults(json, mode);
       currentPage = page;
-      totalPages = Math.max(1, Math.ceil(total / (list.length || 10)));
-
-      statusText = `ZoomEye: 查询完成 (第 ${page} 页，共 ${total} 条${list.length > 0 ? '，本页 ' + list.length + ' 条' : ''})`;
+      totalPages = Math.max(1, Math.ceil(total / pageSize));
+      statusText = `${label}: 查询完成 (第 ${page} 页，共 ${total} 条${results.length > 0 ? '，本页 ' + results.length + ' 条' : ''})`;
     } catch (e: any) {
-      toastStore.show(`查询失败: ${e.message}`, 'error');
-      statusText = `查询失败: ${e.message}`;
+      handleApiError(e.message || String(e));
     } finally {
       searching = false;
     }
@@ -145,30 +183,22 @@
 
   // ===== 导出 =====
   function exportCsv() {
-    const data = searchFilter
-      ? results.filter(
-          (r) =>
-            r.ip.toLowerCase().includes(searchFilter.toLowerCase()) ||
-            r.hostname.toLowerCase().includes(searchFilter.toLowerCase()) ||
-            r.service.toLowerCase().includes(searchFilter.toLowerCase()),
-        )
-      : results;
-    if (data.length === 0) {
+    if (filtered.length === 0) {
       toastStore.show('没有可导出的结果', 'warning');
       return;
     }
-    const csv = buildCsv(data);
+    const csv = buildCsv(filtered);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     downloadBlob(blob, `lingmou-asset-zoomeye-${Date.now()}.csv`);
     toastStore.show('CSV 已导出', 'success');
   }
 
   function exportJson() {
-    if (results.length === 0) {
+    if (filtered.length === 0) {
       toastStore.show('没有可导出的结果', 'warning');
       return;
     }
-    const json = JSON.stringify(results, null, 2);
+    const json = JSON.stringify(filtered, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     downloadBlob(blob, `lingmou-asset-zoomeye-${Date.now()}.json`);
     toastStore.show('JSON 已导出', 'success');
@@ -196,45 +226,107 @@
 </script>
 
 <div class="space-y-3">
-  <!-- API Key 配置 -->
+  <!-- 引擎选择 + API Key 配置 -->
   <div class="card p-3 space-y-2">
-    <div class="flex gap-2">
-      <input
-        class="input flex-1 text-xs font-mono"
-        type="password"
-        placeholder="ZoomEye API Key"
-        bind:value={apiKey}
-      />
-      <button class="btn btn-sm btn-primary" onclick={saveApiKey}>保存</button>
+    <!-- 引擎切换 -->
+    <div class="flex gap-0.5">
+      {#each (['zoomeye', 'fofa', 'shodan'] as Engine[]) as eng}
+        <button
+          class="btn btn-sm flex-1 {engine === eng ? 'bg-primary text-white' : 'btn-ghost'}"
+          onclick={() => { engine = eng; results = []; statusText = ''; }}
+        >
+          {ENGINE_LABEL[eng]}
+        </button>
+      {/each}
     </div>
+
+    <!-- ZoomEye：单 Key -->
+    {#if engine === 'zoomeye'}
+      <div class="flex gap-2">
+        <input
+          class="input flex-1 text-xs font-mono"
+          type="password"
+          placeholder="ZoomEye API Key"
+          bind:value={apiKey}
+        />
+        <button class="btn btn-sm btn-primary" onclick={saveApiKey}>保存</button>
+      </div>
+    {:else if engine === 'fofa'}
+      <!-- FOFA：Email + Key -->
+      <div class="flex gap-2">
+        <input
+          class="input flex-1 text-xs font-mono"
+          placeholder="FOFA Email"
+          bind:value={fofaEmail}
+        />
+        <input
+          class="input flex-1 text-xs font-mono"
+          type="password"
+          placeholder="FOFA API Key"
+          bind:value={fofaKey}
+        />
+        <button class="btn btn-sm btn-primary" onclick={saveApiKey}>保存</button>
+      </div>
+    {:else}
+      <!-- Shodan：单 Key -->
+      <div class="flex gap-2">
+        <input
+          class="input flex-1 text-xs font-mono"
+          type="password"
+          placeholder="Shodan API Key"
+          bind:value={shodanKey}
+        />
+        <button class="btn btn-sm btn-primary" onclick={saveApiKey}>保存</button>
+      </div>
+    {/if}
   </div>
 
   <!-- 搜索栏 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <!-- 模式切换 -->
-      <div class="flex gap-0.5">
-        <button
-          class="btn btn-sm {mode === 'host' ? 'bg-primary text-white' : 'btn-ghost'}"
-          onclick={() => { mode = 'host'; }}
-        >
-          Host
-        </button>
-        <button
-          class="btn btn-sm {mode === 'web' ? 'bg-primary text-white' : 'btn-ghost'}"
-          onclick={() => { mode = 'web'; }}
-        >
-          Web
-        </button>
-      </div>
+      <!-- 模式切换（仅 ZoomEye） -->
+      {#if engine === 'zoomeye'}
+        <div class="flex gap-0.5">
+          <button
+            class="btn btn-sm {mode === 'host' ? 'bg-primary text-white' : 'btn-ghost'}"
+            onclick={() => { mode = 'host'; }}
+          >
+            Host
+          </button>
+          <button
+            class="btn btn-sm {mode === 'web' ? 'bg-primary text-white' : 'btn-ghost'}"
+            onclick={() => { mode = 'web'; }}
+          >
+            Web
+          </button>
+        </div>
+      {/if}
       <input
         class="input flex-1 text-xs font-mono"
-        placeholder='查询语句，如 country:"CN" +service:"http"'
+        placeholder={engine === 'fofa'
+          ? 'FOFA 语法，如 title="后台" && country="CN"'
+          : engine === 'shodan'
+            ? 'Shodan 语法，如 apache country:CN'
+            : '查询语句，如 country:"CN" +service:"http"'}
         bind:value={query}
       />
-      <button class="btn btn-sm btn-primary" disabled={searching || !query.trim() || !apiKey.trim()} onclick={() => search(1)}>
+      <button class="btn btn-sm btn-primary" disabled={searching || !query.trim()} onclick={() => search(1)}>
         {searching ? '查询中...' : '搜索'}
       </button>
+    </div>
+    <!-- 多平台测绘入口（无需 API Key，浏览器直开；ZoomEye 语法可能需调整） -->
+    <div class="flex items-center gap-1 text-xs flex-wrap">
+      <span class="text-gray-400">其他平台:</span>
+      {#each ASSET_ENGINES as eng}
+        <a
+          href={eng.build(query)}
+          target="_blank"
+          class="btn btn-xs {query.trim() ? '' : 'pointer-events-none opacity-50'}"
+          onclick={() => !query.trim() && toastStore.show('请先输入查询语句', 'warning')}
+        >
+          {eng.label}
+        </a>
+      {/each}
     </div>
   </div>
 
@@ -251,7 +343,7 @@
         placeholder="过滤结果..."
         bind:value={searchFilter}
       />
-      <span class="text-gray-400 shrink-0">{filtered().length} 条</span>
+      <span class="text-gray-400 shrink-0">{filtered.length} 条</span>
       <button class="btn btn-sm shrink-0" onclick={copyIpList}>复制 IP</button>
       <button class="btn btn-sm shrink-0" onclick={exportCsv}>导出 CSV</button>
       <button class="btn btn-sm shrink-0" onclick={exportJson}>导出 JSON</button>
@@ -259,7 +351,7 @@
   {/if}
 
   <!-- 结果表格 -->
-  {#if filtered().length > 0}
+  {#if filtered.length > 0}
     <div class="card overflow-hidden">
       <div class="overflow-x-auto max-h-72 overflow-y-auto">
         <table class="w-full text-xs">
@@ -275,7 +367,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each filtered() as r}
+            {#each filtered as r}
               <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                 <td class="px-3 py-1.5 font-mono">{r.ip}</td>
                 <td class="px-3 py-1.5 font-mono">{r.port || '-'}</td>

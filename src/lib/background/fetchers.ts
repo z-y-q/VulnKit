@@ -26,28 +26,50 @@ function collectHeaders(resp: Response): Record<string, string> {
   return hdrs;
 }
 
-/** 抓取文本，可选 Range 尾部。tailOnly 传数字则取最后 N 字节，true 默认 500 字节。 */
+/** 抓取文本，可选 Range 尾部。tailOnly 传数字则取最后 N 字节，true 默认 500 字节。
+ *  服务器不支持后缀 Range（返回 416 或忽略 Range 返回 200）时自动降级为全文抓取，
+ *  确保 sourceMappingURL 提取不会因 Range 兼容性问题整体失败。
+ */
 export async function fetchUrl(
   url: string,
   tailOnly?: boolean | number,
   timeoutMs?: number,
 ): Promise<FetchResult> {
-  const opts: RequestInit = {};
-  if (tailOnly) {
-    const bytes = typeof tailOnly === 'number' ? tailOnly : 500;
-    opts.headers = { Range: `bytes=-${bytes}` };
-  }
   const tc = createTimeoutController(timeoutMs || 10000);
-  opts.signal = tc.controller.signal;
   const release = await acquire(hostnameOf(url));
   try {
-    const resp = await fetch(url, opts);
-    if (!resp.ok && resp.status !== 206) {
-      const body = await resp.text().catch(() => '');
-      throw new Error('HTTP ' + resp.status + (body ? ': ' + body.slice(0, 200) : ''));
+    // 第一次尝试：带 Range（如启用 tailOnly）
+    if (tailOnly) {
+      const bytes = typeof tailOnly === 'number' ? tailOnly : 500;
+      try {
+        const resp = await fetch(url, {
+          headers: { Range: `bytes=-${bytes}` },
+          signal: tc.controller.signal,
+        });
+        if (resp.status === 206) {
+          // 服务器接受了后缀 Range，返回的就是尾部
+          const data = await resp.text();
+          return { success: true, data };
+        }
+        if (resp.ok) {
+          // 服务器忽略 Range，返回全文 —— 截取尾部即可
+          const full = await resp.text();
+          return { success: true, data: full.slice(-bytes) };
+        }
+        // 416 / 其他：落到下方全文重试
+      } catch (e) {
+        // 网络/超时错误直接返回（重试也大概率失败）
+        return { success: false, error: (e as Error).message || '请求超时' };
+      }
     }
-    const data = await resp.text();
-    return { success: true, data };
+    // 全文抓取（无 tailOnly，或 Range 不被支持后的降级）
+    const resp2 = await fetch(url, { signal: tc.controller.signal });
+    if (!resp2.ok) {
+      const body = await resp2.text().catch(() => '');
+      throw new Error('HTTP ' + resp2.status + (body ? ': ' + body.slice(0, 200) : ''));
+    }
+    const data2 = await resp2.text();
+    return { success: true, data: data2 };
   } catch (e) {
     return { success: false, error: (e as Error).message || '请求超时' };
   } finally {
@@ -87,47 +109,60 @@ let zoomEyeTokenCache: { token: string | null; expiresAt: number } = {
   expiresAt: 0,
 };
 
-/** 通过 ZoomEye API key 鉴权后抓取。 */
+/** 通过 ZoomEye API key 鉴权后抓取。token 缓存 1 小时；401 自动重新登录重试一次。 */
 export async function fetchZoomEyeAuth(
   url: string,
   apiKey: string,
 ): Promise<FetchResult> {
-  const now = Date.now();
   const release = await acquire(hostnameOf(url));
   try {
-    if (zoomEyeTokenCache.token && zoomEyeTokenCache.expiresAt > now) {
+    const doRequest = async (token: string) => {
       const resp = await fetch(url, {
-        headers: { Authorization: 'JWT ' + zoomEyeTokenCache.token },
+        headers: { Authorization: 'JWT ' + token },
         signal: AbortSignal.timeout(15000),
       });
       if (!resp.ok) {
         const body = await resp.text().catch(() => '');
-        if (resp.status === 401) zoomEyeTokenCache = { token: null, expiresAt: 0 };
-        throw new Error('HTTP ' + resp.status + (body ? ': ' + body.slice(0, 200) : ''));
+        return { ok: false, status: resp.status, body };
       }
-      return { success: true, data: await resp.text() };
+      return { ok: true as const, text: await resp.text() };
+    };
+
+    const login = async (): Promise<string> => {
+      const loginResp = await fetch('https://api.zoomeye.org/user/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!loginResp.ok) throw new Error('ZoomEye login failed: HTTP ' + loginResp.status);
+      const loginData = await loginResp.json();
+      if (!loginData.access_token) throw new Error('ZoomEye login failed: no access_token');
+      zoomEyeTokenCache = { token: loginData.access_token, expiresAt: Date.now() + 3600000 };
+      return loginData.access_token;
+    };
+
+    const now = Date.now();
+    // 1) 命中缓存
+    if (zoomEyeTokenCache.token && zoomEyeTokenCache.expiresAt > now) {
+      const r = await doRequest(zoomEyeTokenCache.token);
+      if (r.ok) return { success: true, data: r.text };
+      // 401 → 清缓存，重新登录后重试一次
+      if (r.status === 401) {
+        zoomEyeTokenCache = { token: null, expiresAt: 0 };
+        const fresh = await login();
+        const r2 = await doRequest(fresh);
+        if (r2.ok) return { success: true, data: r2.text };
+        throw new Error('HTTP ' + r2.status + (r2.body ? ': ' + r2.body.slice(0, 200) : ''));
+      }
+      throw new Error('HTTP ' + r.status + (r.body ? ': ' + r.body.slice(0, 200) : ''));
     }
 
-    const loginResp = await fetch('https://api.zoomeye.org/user/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: apiKey }),
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!loginResp.ok) throw new Error('ZoomEye login failed: HTTP ' + loginResp.status);
-    const loginData = await loginResp.json();
-    if (!loginData.access_token) throw new Error('ZoomEye login failed: no access_token');
-    zoomEyeTokenCache = { token: loginData.access_token, expiresAt: now + 3600000 };
-
-    const apiResp = await fetch(url, {
-      headers: { Authorization: 'JWT ' + loginData.access_token },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!apiResp.ok) {
-      const apiBody = await apiResp.text().catch(() => '');
-      throw new Error('HTTP ' + apiResp.status + (apiBody ? ': ' + apiBody.slice(0, 200) : ''));
-    }
-    return { success: true, data: await apiResp.text() };
+    // 2) 无缓存 → 登录后请求
+    const token = await login();
+    const r = await doRequest(token);
+    if (r.ok) return { success: true, data: r.text };
+    throw new Error('HTTP ' + r.status + (r.body ? ': ' + r.body.slice(0, 200) : ''));
   } catch (e) {
     return { success: false, error: (e as Error).message || '请求超时' };
   } finally {

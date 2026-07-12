@@ -17,7 +17,9 @@
   // 启动时查询当前 JS 阻断状态
   $effect(() => {
     sendMessage({ type: 'QUERY_JS_BLOCK' }).then(r => {
-      jsBlocked = r.blocked;
+      jsBlocked = !!r?.blocked;
+    }).catch(() => {
+      /* background 未就绪，忽略 */
     });
   });
 
@@ -26,6 +28,17 @@
     if (r.success) {
       jsBlocked = !enable;
       toastStore.show(`${enable ? '已启用' : '已禁用'} JavaScript，请刷新页面`, 'success');
+    } else {
+      toastStore.show(`操作失败: ${r.error || '未知错误'}`, 'error');
+    }
+  }
+
+  async function resetAllRules() {
+    if (!confirm('确定一键清除所有 JS 阻断规则？')) return;
+    const r = await sendMessage({ type: 'TOGGLE_JS', enable: true });
+    if (r.success) {
+      jsBlocked = false;
+      toastStore.show('已清除所有 JS 阻断规则，请刷新页面', 'success');
     } else {
       toastStore.show(`操作失败: ${r.error || '未知错误'}`, 'error');
     }
@@ -93,6 +106,7 @@
       { regex: /Firebug|firebug|chrome\.devtools/i, type: 'DevTools检测', desc: '外部 JS 包含 Firebug/DevTools 探测' },
       { regex: /setInterval\s*\(\s*function\s*\([^)]*\)\s*\{[^}]*debugger/, type: 'debugger循环', desc: '外部 JS 包含 setInterval + debugger 循环' },
       { regex: /constructor\s*=\s*function/, type: 'Function劫持', desc: '外部 JS 包含 constructor 重写代码' },
+      { regex: /new\s+Image.*onerror.*devtools/i, type: 'DevTools检测', desc: '外部 JS 通过 Image.onerror 检测开发者工具' },
     ];
     const seenTypes: Record<string, boolean> = {};
     for (const d of allDetections) seenTypes[d.type] = true;
@@ -273,6 +287,7 @@
       <div class="flex gap-1">
         <button class="btn btn-sm" class:bg-gray-400={jsBlocked} disabled={jsBlocked} onclick={() => toggleJs(false)}>禁用 JS</button>
         <button class="btn btn-sm btn-primary" disabled={!jsBlocked} onclick={() => toggleJs(true)}>启用 JS</button>
+        <button class="btn btn-sm text-red-500" onclick={resetAllRules}>一键清除</button>
       </div>
     </div>
   </div>

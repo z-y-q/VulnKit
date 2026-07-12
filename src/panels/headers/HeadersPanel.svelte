@@ -213,6 +213,23 @@
     navigator.clipboard.writeText(md);
     toastStore.show('已复制 Markdown', 'success');
   }
+
+  function exportCsv() {
+    if (!result) {
+      toastStore.show('没有检测结果', 'warning');
+      return;
+    }
+    const rows = ['Header,Status,Value,Recommendation', ...result.results.map(r =>
+      `"${r.name}","${r.status}","${(r.detail || '').replace(/"/g, '""')}","${(r.recommendation || '').replace(/"/g, '""')}"`)];
+    const blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `headers-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toastStore.show('CSV 已导出', 'success');
+  }
 </script>
 
 <div class="space-y-3">
@@ -451,6 +468,7 @@
     <div class="flex gap-1">
       <button class="btn btn-sm flex-1" onclick={copyText}>复制文本</button>
       <button class="btn btn-sm flex-1" onclick={copyMarkdown}>复制 Markdown</button>
+      <button class="btn btn-sm flex-1" onclick={exportCsv}>导出 CSV</button>
     </div>
   {/if}
 </div>

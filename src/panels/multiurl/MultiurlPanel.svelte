@@ -5,9 +5,20 @@
 
   let rawText = $state('');
   let delay = $state(0);
-  let maxUrls = 20;
+  let maxUrls = 50;
   let opening = $state(false);
   let openedCount = $state(0);
+
+  // 启动时检查是否有从其他面板发送过来的 URL
+  $effect(() => {
+    browser.storage.local.get('lingmou:multiurl-pending').then(result => {
+      const pending = result['lingmou:multiurl-pending'] as string | undefined;
+      if (pending) {
+        rawText = pending;
+        browser.storage.local.remove('lingmou:multiurl-pending');
+      }
+    }).catch(() => { /* ignore */ });
+  });
 
   let urls = $derived.by(() => {
     return rawText
@@ -81,6 +92,35 @@
     rawText = '';
     openedCount = 0;
   }
+
+  /** 抓取当前标签页及右侧所有标签页的 URL，填入文本框 */
+  async function grabCurrentTab() {
+    try {
+      const [active] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!active?.url) { toastStore.show('当前标签页无可抓取的 URL', 'warning'); return; }
+      const all = await browser.tabs.query({ currentWindow: true });
+      const urls = all.map(t => t.url).filter((u): u is string => !!u && /^https?:\/\//i.test(u));
+      const merged = rawText.trim() ? `${rawText.trim()}\n${urls.join('\n')}` : urls.join('\n');
+      rawText = merged;
+      toastStore.show(`已抓取 ${urls.length} 个标签页 URL`, 'success');
+    } catch (e: any) {
+      toastStore.show('抓取失败: ' + (e?.message || ''), 'warning');
+    }
+  }
+
+  function exportTxt() {
+    if (uniqueUrls.length === 0) {
+      toastStore.show('没有可导出的 URL', 'warning');
+      return;
+    }
+    const blob = new Blob([uniqueUrls.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `urls-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toastStore.show(`已导出 ${uniqueUrls.length} 个 URL`, 'success');
+  }
 </script>
 
 <div class="space-y-3">
@@ -153,6 +193,21 @@
       onclick={copyUrls}
     >
       复制
+    </button>
+    <button
+      class="btn btn-sm"
+      disabled={uniqueUrls.length === 0}
+      onclick={exportTxt}
+      title="导出 TXT"
+    >
+      导出
+    </button>
+    <button
+      class="btn btn-sm"
+      onclick={grabCurrentTab}
+      title="抓取当前窗口所有标签页 URL"
+    >
+      抓取
     </button>
     <button
       class="btn btn-sm"

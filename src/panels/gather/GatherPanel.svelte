@@ -6,7 +6,10 @@
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
   import type { DomFingerprint } from '@/lib/types/messaging';
+  import { matchAllRules, type HaeMatch } from '@/lib/scanners/hae-engine';
+  import { loadMergedGroups, type HaeGroup } from '@/lib/scanners/hae-store';
   import patternsData from '@/lib/data/gather-patterns.json';
+  import { loadPrefs, isDomainExcluded } from '@/lib/core/general-prefs';
 
   // ===== 类型 =====
   interface Finding {
@@ -44,7 +47,7 @@
   }
 
   // ===== 状态 =====
-  type Category = 'tech' | 'resources' | 'leaks';
+  type Category = 'tech' | 'resources' | 'leaks' | 'hae';
   let collecting = $state(false);
   let statusText = $state('');
   let elapsedSec = $state(0);
@@ -53,6 +56,24 @@
   let techFindings = $state<Finding[]>([]);
   let resourceFindings = $state<Finding[]>([]);
   let leakFindings = $state<Finding[]>([]);
+  let haeFindings = $state<HaeMatch[]>([]);
+  // 当前生效的 HaE 规则组（默认 + 自定义合并）
+  let haeGroups = $state<HaeGroup[]>([]);
+  let excludeDomains = $state<string[]>([]);
+  $effect(() => {
+    loadPrefs().then(p => { excludeDomains = p.gatherExcludeDomains; });
+  });
+
+  // 载入 HaE 规则（默认 + 用户自定义），并监听 options 页变更热更新
+  $effect(() => {
+    const reload = () => loadMergedGroups().then(g => { haeGroups = g; }).catch(() => { /* */ });
+    reload();
+    const listener = (changes: any, area: string) => {
+      if (area === 'local' && changes['haeCustomRules']) reload();
+    };
+    browser.storage.onChanged.addListener(listener);
+    return () => browser.storage.onChanged.removeListener(listener);
+  });
   let searchFilter = $state('');
 
   let _timerHandle: ReturnType<typeof setInterval> | null = null;
@@ -68,10 +89,30 @@
   let filteredResources = $derived(applyFilter(resourceFindings));
   let filteredLeaks = $derived(applyFilter(leakFindings));
 
+  // 跨分类搜索：搜索时合并所有分类结果
+  let allFiltered = $derived(() => {
+    if (!searchFilter) return [];
+    return [
+      ...techFindings.map(f => ({ ...f, _cat: 'tech' as const })),
+      ...resourceFindings.map(f => ({ ...f, _cat: 'resources' as const })),
+      ...leakFindings.map(f => ({ ...f, _cat: 'leaks' as const })),
+    ].filter(f => f.name.toLowerCase().includes(searchFilter.toLowerCase()) || f.value.toLowerCase().includes(searchFilter.toLowerCase()));
+  });
+
   function applyFilter(list: Finding[]): Finding[] {
-    if (!searchFilter) return list;
+    let out = list;
+    // 采集域名排除：过滤掉值为排除域名的条目（外链域名/脚本域名/frame 等）
+    if (excludeDomains.length) {
+      out = out.filter(f => {
+        const v = f.value.trim().toLowerCase();
+        // 仅对看起来像主机名的值应用（含点、无空格）
+        if (!v || !v.includes('.') || v.includes(' ')) return true;
+        return !isDomainExcluded(v, excludeDomains);
+      });
+    }
+    if (!searchFilter) return out;
     const q = searchFilter.toLowerCase();
-    return list.filter(
+    return out.filter(
       f => f.name.toLowerCase().includes(q) || f.value.toLowerCase().includes(q),
     );
   }
@@ -81,7 +122,7 @@
   /** 分析 DOM 指纹数据，返回技术栈发现 */
   function analyzeFingerprint(
     fp: DomFingerprint,
-    inspectResult: { globals?: string[]; versions?: string[]; cookies?: string[] } | null,
+    inspectResult: { globals?: string[]; versions?: Record<string, string> | string[]; cookies?: string[] } | null,
     leakResult: { storage?: Record<string, string>; globals?: string[] } | null,
     patterns: typeof patternsData,
   ): { tech: Finding[]; resources: Finding[]; leaks: Finding[] } {
@@ -142,8 +183,14 @@
         }
       }
       if (inspectResult.versions) {
-        for (const v of inspectResult.versions) {
-          add('tech', '版本信息', v, 'blue');
+        const vObj = inspectResult.versions;
+        // inject 返回 Record<string,string>（名→版本），兼容历史数组形式
+        if (Array.isArray(vObj)) {
+          for (const v of vObj) add('tech', '版本信息', v, 'blue');
+        } else {
+          for (const [name, ver] of Object.entries(vObj)) {
+            add('tech', '版本信息', `${name} ${ver}`, 'blue');
+          }
         }
       }
     }
@@ -267,6 +314,7 @@
     techFindings = [];
     resourceFindings = [];
     leakFindings = [];
+    haeFindings = [];
 
     try {
       const url = await getActiveTabUrl();
@@ -296,6 +344,9 @@
       techFindings = result.tech;
       resourceFindings = result.resources;
       leakFindings = result.leaks;
+
+      // 4.5 HaE 规则匹配（默认 + 用户自定义，在页面 HTML + scriptSrcs 上提取指纹/凭证）
+      haeFindings = matchAllRules(fp.bodyHtml + '\n' + fp.scriptSrcs.join('\n'), haeGroups);
 
       // 5. 外部 JS 文件分析
       if (fp.scriptSrcs.length > 0) {
@@ -403,6 +454,34 @@
     URL.revokeObjectURL(url);
     toastStore.show('CSV 已导出', 'success');
   }
+
+  /** 复制全部发现（按分类分组纯文本） */
+  function copyAll() {
+    if (totalCount === 0) { toastStore.show('没有数据可复制', 'warning'); return; }
+    const lines: string[] = [`# 信息收集结果`, ''];
+    const dump = (title: string, list: Finding[]) => {
+      if (!list.length) return;
+      lines.push(`## ${title} (${list.length})`);
+      for (const f of list) lines.push(`- [${f.name}] ${f.value}`);
+      lines.push('');
+    };
+    dump('技术栈', techFindings);
+    dump('资源', resourceFindings);
+    dump('泄露', leakFindings);
+    navigator.clipboard.writeText(lines.join('\n')).then(() =>
+      toastStore.show(`已复制 ${totalCount} 条`, 'success'));
+  }
+
+  /** 将外链 JS/CSS 资源发送到「源码加载」面板 */
+  async function sendToSourceLoader() {
+    const urls = resourceFindings
+      .filter(f => (f.name === 'JS' || f.name === 'CSS') && /^https?:\/\//i.test(f.value))
+      .map(f => f.value);
+    const uniq = [...new Set(urls)];
+    if (uniq.length === 0) { toastStore.show('没有可发送的 JS/CSS 资源', 'warning'); return; }
+    await browser.storage.local.set({ 'lingmou:source-pending': uniq.join('\n') });
+    toastStore.show(`已发送 ${uniq.length} 条到「源码加载」`, 'success');
+  }
 </script>
 
 <div class="space-y-3">
@@ -415,8 +494,11 @@
     >
       {collecting ? `收集中... ${elapsedSec}s` : '收集当前页面'}
     </button>
+    <button class="btn btn-sm" disabled={totalCount === 0} onclick={copyAll}>复制全部</button>
     <button class="btn btn-sm" disabled={totalCount === 0} onclick={exportJson}>导出 JSON</button>
     <button class="btn btn-sm" disabled={totalCount === 0} onclick={exportCsv}>导出 CSV</button>
+    <button class="btn btn-sm" disabled={resourceCount === 0} onclick={sendToSourceLoader} title="发送 JS/CSS 到源码加载">→源码加载</button>
+    <button class="btn btn-sm" onclick={() => browser.runtime.openOptionsPage()} title="管理 HaE 规则（YAML）">HaE 规则</button>
   </div>
 
   {#if statusText}
@@ -435,12 +517,32 @@
       bind:value={searchFilter}
     />
 
+    <!-- 跨分类搜索结果 -->
+    {#if searchFilter && allFiltered.length > 0}
+      <div class="card p-3">
+        <div class="text-xs font-medium mb-2 text-blue-600 dark:text-blue-400">全局搜索（{allFiltered.length} 条匹配）</div>
+        <div class="space-y-1 max-h-64 overflow-y-auto">
+          {#each allFiltered.slice(0, 100) as f}
+            <div class="flex items-center justify-between gap-2 group">
+              <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="badge badge-sm text-white" style="background-color: var(--color-{f.color}, #666)">{f.name}</span>
+                <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{f._cat}</span>
+                <span class="text-xs font-mono truncate" title={f.value}>{f.value}</span>
+              </div>
+              <button class="btn btn-xs opacity-0 group-hover:opacity-100" onclick={() => copyValue(f.value)}>复制</button>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     <!-- 分类标签 -->
     <div class="flex gap-1">
       {#each [
         { id: 'tech' as Category, label: '技术栈', count: filteredTech.length },
         { id: 'resources' as Category, label: '资源', count: filteredResources.length },
         { id: 'leaks' as Category, label: '泄露', count: filteredLeaks.length },
+        { id: 'hae' as Category, label: 'HaE', count: haeFindings.length },
       ] as cat}
         <button
           class="btn btn-sm {activeCategory === cat.id ? 'bg-primary text-white' : 'btn-ghost'}"
@@ -511,6 +613,27 @@
                   <span class="text-xs font-mono truncate text-red-600 dark:text-red-400" title={f.value}>{f.value}</span>
                 </div>
                 <button class="btn btn-xs opacity-0 group-hover:opacity-100" onclick={() => copyValue(f.value)}>复制</button>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {/if}
+
+    <!-- HaE 规则命中 -->
+    {#if activeCategory === 'hae'}
+      <div class="card p-3">
+        <div class="text-xs font-medium mb-2 text-gray-500">HaE 规则命中（{haeFindings.length}）</div>
+        {#if haeFindings.length === 0}
+          <div class="text-xs text-gray-400">未命中 HaE 规则</div>
+        {:else}
+          <div class="space-y-1 max-h-64 overflow-y-auto">
+            {#each haeFindings as m}
+              <div class="flex items-center gap-2 group">
+                <span class="badge badge-sm shrink-0 bg-purple-500 text-white">{m.group}</span>
+                <span class="text-xs font-medium shrink-0">{m.rule}{#if m.sensitive} 🔒{/if}</span>
+                <span class="text-xs font-mono truncate text-gray-600 dark:text-gray-300 flex-1" title={m.value}>{m.value}</span>
+                <button class="btn btn-xs opacity-0 group-hover:opacity-100 shrink-0" onclick={() => copyValue(m.value)}>复制</button>
               </div>
             {/each}
           </div>

@@ -277,6 +277,23 @@
     toastStore.show('已复制全部结果', 'success');
   }
 
+  function copyMarkdown() {
+    if (findings.length === 0) { toastStore.show('没有扫描结果', 'warning'); return; }
+    const lines = [`# GraphQL 安全扫描`, ``, `**目标:** ${targetUrl}`, ``];
+    if (endpoints.length > 0) {
+      lines.push(`## 端点 (${endpoints.length})`, ...endpoints.map(ep => `- \`${ep.path}\` (HTTP ${ep.status}, introspection: ${ep.introspection ? '开启' : '关闭'})`), ``);
+    }
+    if (schemaInfo) {
+      lines.push(`## Schema`, `- 类型: ${schemaInfo.totalTypes}`, `- Query: ${schemaInfo.queries.length}`, `- Mutation: ${schemaInfo.mutations.length}`, ``);
+    }
+    lines.push(`## 发现 (${sortedFindings.length})`);
+    for (const f of sortedFindings) {
+      lines.push(`- **[${f.severity.toUpperCase()}] ${f.test}** — ${f.detail}`);
+    }
+    navigator.clipboard.writeText(lines.join('\n'));
+    toastStore.show('Markdown 已复制', 'success');
+  }
+
   function exportResults() {
     if (findings.length === 0) { toastStore.show('没有扫描结果', 'warning'); return; }
     const data = {
@@ -289,10 +306,11 @@
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    a.href = url;
     a.download = `graphql-scan-${Date.now()}.json`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     toastStore.show('结果已导出', 'success');
   }
 </script>
@@ -392,6 +410,7 @@
         <option value="test">按类型</option>
       </select>
       <button class="btn btn-sm" onclick={copyAll}>复制</button>
+      <button class="btn btn-sm" onclick={copyMarkdown}>MD</button>
       <button class="btn btn-sm" onclick={exportResults}>导出</button>
     </FilterBar>
   {/if}
