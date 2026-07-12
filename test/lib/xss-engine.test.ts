@@ -11,6 +11,7 @@ import {
   XSS_MARKERS,
   REFLECTION_PROBE,
   analyzeSinkLine,
+  getCompiledXssPatterns,
   type XssContext,
 } from '@/lib/scanners/xss-engine';
 
@@ -376,5 +377,43 @@ describe('xss-engine: XSS_SORT_FNS', () => {
     ];
     const sorted = [...findings].sort(XSS_SORT_FNS.context);
     expect(sorted[0].context).toBe('attr');
+  });
+});
+
+describe('xss-engine: 正则预编译', () => {
+  it('编译缓存为模块级单例（多次获取同一引用）', () => {
+    const a = getCompiledXssPatterns();
+    const b = getCompiledXssPatterns();
+    expect(a.sinks).toBe(b.sinks);
+    expect(a.sanitizers).toBe(b.sanitizers);
+  });
+
+  it('sink 与 sanitizer 模式均已预编译', () => {
+    const { sinks, sanitizers } = getCompiledXssPatterns();
+    expect(sinks.length).toBeGreaterThan(0);
+    expect(sanitizers.length).toBeGreaterThan(0);
+    // 绝大多数应成功编译为 RegExp（无效正则才为 null）
+    const validSinks = sinks.filter(s => s.regex instanceof RegExp);
+    const validSanitizers = sanitizers.filter(s => s.regex instanceof RegExp);
+    expect(validSinks.length).toBeGreaterThan(10);
+    expect(validSanitizers.length).toBeGreaterThan(5);
+  });
+
+  it('多次 analyzeSinkLine / isSanitized 复用同一编译缓存（regex 引用不变）', () => {
+    const before = getCompiledXssPatterns();
+    const firstSinkRegex = before.sinks.find(s => s.regex instanceof RegExp)?.regex;
+    const firstSanRegex = before.sanitizers.find(s => s.regex instanceof RegExp)?.regex;
+
+    // 触发若干次扫描调用
+    analyzeSinkLine('document.write("<script>alert(1)</script>")');
+    analyzeSinkLine('element.innerHTML = userInput');
+    isSanitized('some body', '<script>');
+    isSanitized('another body', 'alert');
+
+    const after = getCompiledXssPatterns();
+    expect(after.sinks).toBe(before.sinks);
+    expect(after.sanitizers).toBe(before.sanitizers);
+    expect(after.sinks.find(s => s.regex instanceof RegExp)?.regex).toBe(firstSinkRegex);
+    expect(after.sanitizers.find(s => s.regex instanceof RegExp)?.regex).toBe(firstSanRegex);
   });
 });

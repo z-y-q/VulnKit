@@ -61,6 +61,55 @@ const SANITIZER_PATTERNS = (data.SANITIZER_PATTERNS ?? []) as Array<{
   reduction: number;
 }>;
 
+// ====== 正则预编译 ======
+
+/**
+ * 将 JSON 序列化的 RegexDef 编译为 RegExp，无效正则返回 null（编译期剔除）。
+ * 与 sniff-engine 同款策略：模块加载时一次性预编译，运行时直接复用，
+ * 避免 analyzeSinkLine 逐行热循环里反复 new RegExp。
+ */
+function compileRegex(def: RegexDef): RegExp | null {
+  try {
+    return new RegExp(def.source, def.flags);
+  } catch {
+    return null;
+  }
+}
+
+interface CompiledSinkPattern {
+  context: string;
+  severity: string;
+  regex: RegExp | null;
+}
+
+interface CompiledSanitizerPattern {
+  name: string;
+  reduction: number;
+  regex: RegExp | null;
+}
+
+/** sink 模式预编译缓存（模块级单例） */
+const COMPILED_SINK_PATTERNS: CompiledSinkPattern[] = SINK_PATTERNS.map(sp => ({
+  context: sp.context,
+  severity: sp.severity,
+  regex: compileRegex(sp.regex),
+}));
+
+/** 净化器模式预编译缓存（模块级单例） */
+const COMPILED_SANITIZER_PATTERNS: CompiledSanitizerPattern[] = SANITIZER_PATTERNS.map(sp => ({
+  name: sp.name,
+  reduction: sp.reduction,
+  regex: compileRegex(sp.regex),
+}));
+
+/** 暴露编译缓存（供测试验证预编译单例性，与 sniff-engine.getCompiledSignatures 对齐） */
+export function getCompiledXssPatterns(): {
+  sinks: CompiledSinkPattern[];
+  sanitizers: CompiledSanitizerPattern[];
+} {
+  return { sinks: COMPILED_SINK_PATTERNS, sanitizers: COMPILED_SANITIZER_PATTERNS };
+}
+
 // ====== 上下文检测 ======
 
 /**
@@ -231,22 +280,16 @@ export function findReflection(
 export function isSanitized(body: string, payload: string): boolean {
   if (!body) return false;
 
-  for (const sp of SANITIZER_PATTERNS) {
-    try {
-      const re = new RegExp(sp.regex.source, sp.regex.flags);
-      if (re.test(body)) {
-        // 高 reduction 值的净化器意味着更强的保护
-        if (sp.reduction >= 3) return true;
-        // 低 reduction 净化器也检测，但不一定是完全安全
-        if (sp.reduction >= 1) {
-          // 检查 payload 是否仍被反射（如果净化器存在但 payload 仍反射，可能是绕过）
-          if (!body.includes(payload) && !htmlDecode(body).includes(payload)) {
-            return true;
-          }
-        }
+  for (const sp of COMPILED_SANITIZER_PATTERNS) {
+    if (!sp.regex || !sp.regex.test(body)) continue;
+    // 高 reduction 值的净化器意味着更强的保护
+    if (sp.reduction >= 3) return true;
+    // 低 reduction 净化器也检测，但不一定是完全安全
+    if (sp.reduction >= 1) {
+      // 检查 payload 是否仍被反射（如果净化器存在但 payload 仍反射，可能是绕过）
+      if (!body.includes(payload) && !htmlDecode(body).includes(payload)) {
+        return true;
       }
-    } catch {
-      // ignore invalid regex
     }
   }
 
@@ -321,15 +364,11 @@ export function analyzeSinkLine(
 ): SinkMatch | null {
   const matchedPatterns: Array<{ context: string; severity: string }> = [];
 
-  for (const sp of SINK_PATTERNS) {
-    try {
-      const re = new RegExp(sp.regex.source, sp.regex.flags);
-      const matches = code.match(re);
-      if (matches && matches.length > 0) {
-        matchedPatterns.push({ context: sp.context, severity: sp.severity });
-      }
-    } catch {
-      // ignore invalid regex
+  for (const sp of COMPILED_SINK_PATTERNS) {
+    if (!sp.regex) continue;
+    const matches = code.match(sp.regex);
+    if (matches && matches.length > 0) {
+      matchedPatterns.push({ context: sp.context, severity: sp.severity });
     }
   }
 
@@ -338,15 +377,10 @@ export function analyzeSinkLine(
   // 检测净化器
   const sanitizers: string[] = [];
   let totalReduction = 0;
-  for (const sp of SANITIZER_PATTERNS) {
-    try {
-      const re = new RegExp(sp.regex.source, sp.regex.flags);
-      if (re.test(code)) {
-        sanitizers.push(sp.name);
-        totalReduction += sp.reduction;
-      }
-    } catch {
-      // ignore
+  for (const sp of COMPILED_SANITIZER_PATTERNS) {
+    if (sp.regex && sp.regex.test(code)) {
+      sanitizers.push(sp.name);
+      totalReduction += sp.reduction;
     }
   }
 
