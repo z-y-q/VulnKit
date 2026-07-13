@@ -1,102 +1,300 @@
 <script lang="ts">
+  // Sidebar — 工具导航（对齐 docs/UX-UI优化建议.md §4.1）
+  // 搜索 / 最近 / 收藏 / 分类（折叠持久化）/ iconMode 图标栏。
+  // 行点击区与收藏星标分离（不嵌套 button，§6.2/§8）；当前项 aria-current；
+  // 折叠分类 aria-expanded+aria-controls；icon-only 按钮均带 aria-label。
   import { panels, type PanelConfig } from '@/panels';
   import { sniffBadgeStore } from '@/stores/sniff-badge';
   import { panelLayoutStore, applyLayout } from '@/stores/panel-layout';
-
-  let layout = $derived($panelLayoutStore);
-  // 应用用户排序 + 过滤隐藏面板（与 options 页、popup 共用同一逻辑）
-  let visiblePanels = $derived(applyLayout(panels, layout));
+  import { sidebarStateStore } from '@/stores/sidebar-state';
+  import { recentPanelsStore } from '@/stores/recent-panels';
+  import { favoritePanelsStore } from '@/stores/favorite-panels';
 
   interface Props {
     activePanel: string;
     onselect: (id: string) => void;
+    /** 窄宽图标栏模式（由 side-panel ResizeObserver 驱动 + 用户手动覆盖） */
+    iconMode?: boolean;
+    onToggleIconMode?: () => void;
   }
 
-  let { activePanel, onselect }: Props = $props();
+  let { activePanel, onselect, iconMode = false, onToggleIconMode }: Props = $props();
 
-  // 嗅探徽标（storage.session 持久化）— 仅 sniff 面板按钮显示
+  let layout = $derived($panelLayoutStore);
+  let visiblePanels = $derived(applyLayout(panels, layout));
+  let visibleIds = $derived(new Set(visiblePanels.map((p) => p.id)));
+  let collapsedCats = $derived($sidebarStateStore.collapsedCats);
+  let recent = $derived($recentPanelsStore);
+  let favorites = $derived($favoritePanelsStore);
   let sniffBadge = $derived($sniffBadgeStore);
+
+  // —— 搜索 ——
+  let query = $state('');
+  let q = $derived(query.trim().toLowerCase());
+  let searchInput: HTMLInputElement | undefined = $state();
+
+  let searchResults = $derived(
+    q
+      ? visiblePanels.filter(
+          (p) =>
+            p.label.toLowerCase().includes(q) ||
+            p.categoryLabel.toLowerCase().includes(q) ||
+            p.id.toLowerCase().includes(q),
+        )
+      : [],
+  );
+
+  function isFav(id: string): boolean {
+    return favorites.includes(id);
+  }
+
+  // 最近 / 收藏区：仅显示「当前可见」面板，避免指向已隐藏面板
+  let recentVisible = $derived(recent.filter((id) => visibleIds.has(id)).slice(0, 6));
+  let favoriteVisible = $derived(favorites.filter((id) => visibleIds.has(id)));
+
+  function panelById(id: string): PanelConfig | undefined {
+    return visiblePanels.find((p) => p.id === id);
+  }
 
   // 按分类分组
   let categories = $derived(
-    visiblePanels.reduce((acc, panel) => {
-      if (!acc[panel.category]) {
-        acc[panel.category] = { label: panel.categoryLabel, color: panel.catColor, panels: [] };
-      }
-      acc[panel.category].panels.push(panel);
-      return acc;
-    }, {} as Record<string, { label: string; color: string; panels: PanelConfig[] }>)
+    visiblePanels.reduce(
+      (acc, panel) => {
+        if (!acc[panel.category]) {
+          acc[panel.category] = { label: panel.categoryLabel, color: panel.catColor, panels: [] };
+        }
+        acc[panel.category].panels.push(panel);
+        return acc;
+      },
+      {} as Record<string, { label: string; color: string; panels: PanelConfig[] }>,
+    ),
   );
 
-  // 折叠状态
-  let collapsedCats = $state<Record<string, boolean>>({});
+  // ⌘K / Ctrl+K 聚焦搜索
+  $effect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInput?.focus();
+        searchInput?.select();
+      }
+    };
+      window.addEventListener('keydown', handler);
+      return () => window.removeEventListener('keydown', handler);
+  });
 
-  function toggleCat(cat: string) {
-    collapsedCats[cat] = !collapsedCats[cat];
+  function shortcutIdx(panel: PanelConfig): number {
+    return visiblePanels.findIndex((p) => p.id === panel.id) + 1;
+  }
+
+  async function toggleFav(id: string, e: Event) {
+    e.stopPropagation();
+    await favoritePanelsStore.toggle(id);
   }
 
   function select(id: string) {
     onselect(id);
   }
-
-  function isCatActive(cat: string): boolean {
-    return panels.some(p => p.category === cat && p.id === activePanel);
-  }
 </script>
 
-<aside class="w-44 shrink-0 bg-gray-50/80 dark:bg-slate-900/60 border-r border-gray-200/50 dark:border-gray-700/30 overflow-y-auto vk-glass">
-  {#each Object.entries(categories) as [catId, cat]}
-    <div class="border-b border-gray-200/40 dark:border-gray-700/20">
-      <!-- 分类标题 -->
+<aside
+  class="shrink-0 bg-gray-50/80 dark:bg-slate-900/60 border-r border-gray-200/50 dark:border-gray-700/30 vk-glass flex flex-col {iconMode
+    ? 'w-12'
+    : 'w-44'} transition-[width] duration-200"
+  aria-label="工具导航"
+>
+  {#if iconMode}
+    <!-- ====== 图标栏模式（窄宽） ====== -->
+    <div class="overflow-y-auto flex-1 py-1.5 px-1 space-y-0.5">
+      {#each visiblePanels as panel (panel.id)}
+        <button
+          type="button"
+          class="w-full h-9 flex items-center justify-center rounded-lg text-base transition-all duration-200 {activePanel ===
+          panel.id
+            ? 'bg-white dark:bg-gray-800/80 shadow-sm'
+            : 'hover:bg-white/60 dark:hover:bg-gray-800/40'}"
+          aria-label={panel.label}
+          aria-current={activePanel === panel.id ? 'page' : undefined}
+          title={panel.label}
+          onclick={() => select(panel.id)}
+        >
+          <span class="grayscale-0">{panel.icon}</span>
+          {#if isFav(panel.id)}
+            <span class="absolute text-[7px] text-amber-400 ml-3 -mt-3">●</span>
+          {/if}
+        </button>
+      {/each}
+    </div>
+    {#if onToggleIconMode}
       <button
-        class="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
-        onclick={() => toggleCat(catId)}
+        type="button"
+        class="shrink-0 h-9 flex items-center justify-center border-t border-gray-200/50 dark:border-gray-700/30 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/60 dark:hover:bg-gray-800/40"
+        aria-label="展开侧栏"
+        title="展开侧栏"
+        onclick={onToggleIconMode}
       >
-        <span class="flex items-center gap-1.5">
-          <span class="w-1.5 h-1.5 rounded-full shadow-sm" style="background: {cat.color}; box-shadow: 0 0 6px {cat.color}40"></span>
-          {cat.label}
-        </span>
-        <svg class="w-3 h-3 transition-transform duration-200 {collapsedCats[catId] ? '' : 'rotate-90'}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
-        </svg>
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
       </button>
+    {/if}
+  {:else}
+    <!-- ====== 完整模式 ====== -->
+    <!-- 搜索框 -->
+    <div class="shrink-0 p-2 border-b border-gray-200/40 dark:border-gray-700/20">
+      <label for="sb-search" class="sr-only">搜索工具</label>
+      <div class="relative">
+        <svg class="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+        <input
+          id="sb-search"
+          bind:this={searchInput}
+          bind:value={query}
+          type="search"
+          placeholder="搜索工具 ⌘K"
+          role="combobox"
+          aria-expanded="true"
+          aria-controls="sb-results"
+          aria-autocomplete="list"
+          autocomplete="off"
+          spellcheck="false"
+          class="w-full pl-7 pr-2 py-1.5 text-xs rounded-lg bg-white/80 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/50 text-gray-700 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+        />
+      </div>
+    </div>
 
-      <!-- 面板列表 -->
-      {#if !collapsedCats[catId]}
-        <div class="pb-1 px-1.5 space-y-0.5">
-          {#each cat.panels as panel, i}
-            {@const shortcutIdx = visiblePanels.findIndex(p => p.id === panel.id) + 1}
+    <div id="sb-results" class="overflow-y-auto flex-1">
+      {#if q}
+        <!-- 搜索结果（扁平） -->
+        {#if searchResults.length}
+          <div class="p-1.5 space-y-0.5">
+            <div class="px-2 py-1 text-[10px] text-gray-400 dark:text-gray-500">匹配 {searchResults.length} 个工具</div>
+            {#each searchResults as panel (panel.id)}
+              {@render panelRow(panel, false)}
+            {/each}
+          </div>
+        {:else}
+          <div class="px-4 py-8 text-center text-xs text-gray-400 dark:text-gray-500">
+            <div class="text-2xl mb-2" aria-hidden="true">🔍</div>
+            未找到匹配「{query}」的工具
+          </div>
+        {/if}
+      {:else}
+        <!-- 最近使用 -->
+        {#if recentVisible.length}
+          <div class="border-b border-gray-200/40 dark:border-gray-700/20">
+            <div class="px-3 pt-2 pb-1 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">最近</div>
+            <div class="pb-1 px-1.5 space-y-0.5">
+              {#each recentVisible as id (id)}
+                {@const panel = panelById(id)}
+                {#if panel}{@render panelRow(panel, false)}{/if}
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <!-- 收藏 -->
+        {#if favoriteVisible.length}
+          <div class="border-b border-gray-200/40 dark:border-gray-700/20">
+            <div class="px-3 pt-2 pb-1 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-1">
+              <svg class="w-2.5 h-2.5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
+              收藏
+            </div>
+            <div class="pb-1 px-1.5 space-y-0.5">
+              {#each favoriteVisible as id (id)}
+                {@const panel = panelById(id)}
+                {#if panel}{@render panelRow(panel, false)}{/if}
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <!-- 分类列表 -->
+        {#each Object.entries(categories) as [catId, cat] (catId)}
+          <div class="border-b border-gray-200/40 dark:border-gray-700/20">
             <button
-              class="group w-full text-left pl-3 pr-2 py-1.5 text-[13px] flex items-center gap-2 rounded-lg transition-all duration-200 relative {activePanel === panel.id
-                ? 'bg-white dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 font-semibold shadow-sm vk-glass'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/40 hover:text-gray-700 dark:hover:text-gray-300'}"
-              onclick={() => select(panel.id)}
-              title={shortcutIdx >= 1 && shortcutIdx <= 8 ? `${panel.label} (Alt+${shortcutIdx})` : panel.label}
+              type="button"
+              class="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
+              aria-expanded={!collapsedCats[catId]}
+              aria-controls="sb-cat-{catId}"
+              onclick={() => sidebarStateStore.toggleCat(catId)}
             >
-              <!-- 激活指示条 -->
-              {#if activePanel === panel.id}
-                <span class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full" style="background: {cat.color}; box-shadow: 0 0 8px {cat.color}60"></span>
-              {/if}
-              <span class="text-[15px] w-6 text-center transition-transform duration-200 {activePanel === panel.id ? 'scale-110' : 'group-hover:scale-110'}">{panel.icon}</span>
-              <span class="truncate flex-1">
-                {#if shortcutIdx >= 1 && shortcutIdx <= 8}
-                  <span class="text-[9px] font-mono mr-1 px-0.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-gray-400 dark:text-gray-500 group-hover:bg-gray-300 dark:group-hover:bg-gray-600">{shortcutIdx}</span>
-                {/if}
-                {panel.label}
+              <span class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full shadow-sm" style="background: {cat.color}; box-shadow: 0 0 6px {cat.color}40"></span>
+                {cat.label}
+                <span class="font-normal opacity-60">({cat.panels.length})</span>
               </span>
-              {#if panel.id === 'sniff' && sniffBadge.items.length > 0}
-                <span class="flex gap-0.5 shrink-0" title="最近嗅探: {sniffBadge.items.map(i => i.name + (i.version ? ' v' + i.version : '')).join(', ')}">
-                  {#each sniffBadge.items.slice(0, 2) as item}
-                    <span class="text-[9px] font-mono px-1 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300 leading-tight">
-                      {item.name}{#if item.version}{item.version}{/if}
-                    </span>
-                  {/each}
-                </span>
-              {/if}
+              <svg class="w-3 h-3 transition-transform duration-200 {collapsedCats[catId] ? '' : 'rotate-90'}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg>
             </button>
-          {/each}
-        </div>
+            {#if !collapsedCats[catId]}
+              <div id="sb-cat-{catId}" class="pb-1 px-1.5 space-y-0.5">
+                {#each cat.panels as panel (panel.id)}
+                  {@render panelRow(panel, true)}
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/each}
       {/if}
     </div>
-  {/each}
+
+    {#if onToggleIconMode}
+      <button
+        type="button"
+        class="shrink-0 flex items-center justify-center gap-1.5 py-1.5 border-t border-gray-200/50 dark:border-gray-700/30 text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/60 dark:hover:bg-gray-800/40 transition-colors"
+        aria-label="折叠侧栏为图标栏"
+        title="折叠侧栏"
+        onclick={onToggleIconMode}
+      >
+        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" /></svg>
+        折叠
+      </button>
+    {/if}
+  {/if}
 </aside>
+
+{#snippet panelRow(panel: PanelConfig, withShortcut: boolean)}
+  {@const idx = withShortcut ? shortcutIdx(panel) : 0}
+  <div class="group relative flex items-center rounded-lg transition-all duration-200 {activePanel === panel.id
+    ? 'bg-white dark:bg-gray-800/80 shadow-sm vk-glass'
+    : 'hover:bg-white/60 dark:hover:bg-gray-800/40'}">
+    {#if activePanel === panel.id}
+      <span class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full" style="background: {panel.catColor}; box-shadow: 0 0 8px {panel.catColor}60"></span>
+    {/if}
+    <!-- 主点击区（切换面板） -->
+    <button
+      type="button"
+      class="flex-1 min-w-0 flex items-center gap-2 pl-3 pr-1 py-1.5 text-[13px] text-left {activePanel === panel.id
+        ? 'text-gray-900 dark:text-gray-100 font-semibold'
+        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}"
+      aria-current={activePanel === panel.id ? 'page' : undefined}
+      title={idx >= 1 && idx <= 8 ? `{panel.label} (Alt+${idx})` : panel.label}
+      onclick={() => select(panel.id)}
+    >
+      <span class="text-[15px] w-5 text-center transition-transform duration-200 {activePanel === panel.id ? 'scale-110' : 'group-hover:scale-110'}">{panel.icon}</span>
+      <span class="truncate flex-1">
+        {#if idx >= 1 && idx <= 8}
+          <span class="text-[9px] font-mono mr-1 px-0.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-gray-400 dark:text-gray-500 group-hover:bg-gray-300 dark:group-hover:bg-gray-600">{idx}</span>
+        {/if}
+        {panel.label}
+      </span>
+    </button>
+    <!-- 右侧操作区（与主点击区分离，避免嵌套交互） -->
+    <div class="flex items-center pr-1 shrink-0">
+      {#if panel.id === 'sniff' && sniffBadge.items.length > 0}
+        <span class="flex gap-0.5 mr-0.5" title="最近嗅探: {sniffBadge.items.map((i) => i.name + (i.version ? ' v' + i.version : '')).join(', ')}">
+          {#each sniffBadge.items.slice(0, 2) as item}
+            <span class="text-[9px] font-mono px-1 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300 leading-tight">{item.name}{#if item.version}{item.version}{/if}</span>
+          {/each}
+        </span>
+      {/if}
+      <button
+        type="button"
+        class="p-1 rounded text-xs leading-none transition-colors {isFav(panel.id) ? 'text-amber-400' : 'text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:!text-amber-400 hover:!opacity-100'}"
+        aria-pressed={isFav(panel.id)}
+        aria-label={isFav(panel.id) ? `取消收藏 ${panel.label}` : `收藏 ${panel.label}`}
+        title={isFav(panel.id) ? '取消收藏' : '收藏'}
+        onclick={(e) => toggleFav(panel.id, e)}
+      >
+        {#if isFav(panel.id)}★{:else}☆{/if}
+      </button>
+    </div>
+  </div>
+{/snippet}

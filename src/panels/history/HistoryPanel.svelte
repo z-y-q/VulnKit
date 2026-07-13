@@ -57,16 +57,8 @@
   }
 
   async function deleteEntry(id: string) {
-    // 从 store 中过滤掉该条目（store 没有 deleteEntry，使用 clear + re-add 手段不合适，
-    // 直接操作存储层 — 但按规则不修改 store，所以用 clearDomain 后 refresh）
-    // scanHistoryStore 没有 delete 单条的能力，所以我们直接对 storage 操作
-    const STORAGE_KEY = 'pentest_scan_history';
     try {
-      const data = await browser.storage.local.get(STORAGE_KEY);
-      const all = (data[STORAGE_KEY] as ScanHistoryEntry[]) || [];
-      const next = all.filter(e => e.id !== id);
-      await browser.storage.local.set({ [STORAGE_KEY]: next });
-      await scanHistoryStore.refresh();
+      await scanHistoryStore.deleteEntry(id);
       toastStore.show('已删除该条记录', 'success');
     } catch {
       toastStore.show('删除失败', 'error');
@@ -119,53 +111,64 @@
       {#each filtered as entry (entry.id)}
         {@const isExpanded = expandedId === entry.id}
         <div class="card p-2 space-y-1">
-          <!-- 标题行 -->
-          <div class="flex items-center gap-2 cursor-pointer" role="button" tabindex="0" onclick={() => toggleExpand(entry.id)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(entry.id); } }}>
-            <span class="badge text-xs">{entry.moduleName || MODULE_LABELS[entry.module] || entry.module}</span>
-            <span class="text-xs text-gray-600 dark:text-gray-300 truncate flex-1">{entry.domain}</span>
-            <span class="text-xs text-gray-400 shrink-0">{formatTime(entry.timestamp)}</span>
-
-            <!-- 严重程度徽标 -->
-            <span class="flex items-center gap-1 shrink-0 text-xs">
-              {#if entry.summary.critical > 0}
-                <span class="text-red-600 dark:text-red-400 font-bold">C{entry.summary.critical}</span>
-              {/if}
-              {#if entry.summary.high > 0}
-                <span class="text-orange-500 dark:text-orange-400 font-bold">H{entry.summary.high}</span>
-              {/if}
-              {#if entry.summary.medium > 0}
-                <span class="text-yellow-500 dark:text-yellow-400 font-bold">M{entry.summary.medium}</span>
-              {/if}
-              {#if entry.summary.low > 0}
-                <span class="text-blue-500 dark:text-blue-400 font-bold">L{entry.summary.low}</span>
-              {/if}
-              {#if entry.summary.info > 0}
-                <span class="text-gray-400 font-bold">I{entry.summary.info}</span>
-              {/if}
-              {#if entry.summary.total === 0}
-                <span class="text-green-500 dark:text-green-400">无风险</span>
-              {/if}
-            </span>
-
-            <span class="text-xs text-gray-400 shrink-0">{entry.summary.total}条</span>
-
-            <!-- 操作按钮 -->
+          <!-- 标题行：展开按钮（含信息）与右侧操作按钮分离，避免嵌套交互 -->
+          <div class="flex items-center gap-1.5">
             <button
+              type="button"
+              class="flex items-center gap-2 flex-1 min-w-0 text-left rounded-md px-1 py-0.5 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+              onclick={() => toggleExpand(entry.id)}
+              aria-expanded={isExpanded}
+              aria-label={`${entry.moduleName || MODULE_LABELS[entry.module] || entry.module} · ${entry.domain} · ${entry.summary.total} 条发现`}
+            >
+              <span class="badge text-xs shrink-0">{entry.moduleName || MODULE_LABELS[entry.module] || entry.module}</span>
+              <span class="text-xs text-gray-600 dark:text-gray-300 truncate flex-1">{entry.domain}</span>
+              <span class="text-xs text-gray-400 shrink-0">{formatTime(entry.timestamp)}</span>
+
+              <!-- 严重程度徽标 -->
+              <span class="flex items-center gap-1 shrink-0 text-xs">
+                {#if entry.summary.critical > 0}
+                  <span class="text-red-600 dark:text-red-400 font-bold">C{entry.summary.critical}</span>
+                {/if}
+                {#if entry.summary.high > 0}
+                  <span class="text-orange-500 dark:text-orange-400 font-bold">H{entry.summary.high}</span>
+                {/if}
+                {#if entry.summary.medium > 0}
+                  <span class="text-yellow-500 dark:text-yellow-400 font-bold">M{entry.summary.medium}</span>
+                {/if}
+                {#if entry.summary.low > 0}
+                  <span class="text-blue-500 dark:text-blue-400 font-bold">L{entry.summary.low}</span>
+                {/if}
+                {#if entry.summary.info > 0}
+                  <span class="text-gray-400 font-bold">I{entry.summary.info}</span>
+                {/if}
+                {#if entry.summary.total === 0}
+                  <span class="text-green-500 dark:text-green-400">无风险</span>
+                {/if}
+              </span>
+
+              <span class="text-xs text-gray-400 shrink-0">{entry.summary.total}条</span>
+              <span class="text-gray-400 text-xs shrink-0" aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
+            </button>
+
+            <!-- 操作区：与展开按钮分离的兄弟按钮 -->
+            <button
+              type="button"
               class="btn btn-sm text-xs text-red-500 dark:text-red-400 shrink-0 px-1"
-              onclick={(e) => { e.stopPropagation(); clearDomain(entry.domain); }}
+              onclick={() => clearDomain(entry.domain)}
               title="清空该域名历史"
+              aria-label={`清空 ${entry.domain} 的所有历史`}
             >
               域名清空
             </button>
             <button
+              type="button"
               class="btn btn-sm text-xs text-red-500 dark:text-red-400 shrink-0 px-1"
-              onclick={(e) => { e.stopPropagation(); deleteEntry(entry.id); }}
+              onclick={() => deleteEntry(entry.id)}
               title="删除该条"
+              aria-label="删除该条记录"
             >
               ✕
             </button>
-
-            <span class="text-gray-400 text-xs shrink-0">{isExpanded ? '▾' : '▸'}</span>
           </div>
 
           <!-- 展开详情 -->

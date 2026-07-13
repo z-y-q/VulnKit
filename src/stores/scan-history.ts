@@ -125,6 +125,8 @@ interface ScanHistoryStore extends Readable<ScanHistoryEntry[]> {
   }) => Promise<void>;
   clear: () => Promise<void>;
   clearDomain: (domain: string) => Promise<void>;
+  /** 删除单条记录的唯一入口（UI 不应直接操作 storage）。 */
+  deleteEntry: (id: string) => Promise<void>;
 }
 
 function createScanHistoryStore(): ScanHistoryStore {
@@ -215,10 +217,16 @@ function createScanHistoryStore(): ScanHistoryStore {
     store.set(next);
   }
 
+  async function deleteEntry(id: string) {
+    const next = (await readRaw()).filter(e => e.id !== id);
+    await writeRaw(next);
+    store.set(next);
+  }
+
   // 初始化加载
   refresh();
 
-  return { subscribe: store.subscribe, refresh, addScan, clear, clearDomain };
+  return { subscribe: store.subscribe, refresh, addScan, clear, clearDomain, deleteEntry };
 }
 
 export const scanHistoryStore = createScanHistoryStore();

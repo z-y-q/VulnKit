@@ -5,6 +5,7 @@
  */
 import type { ScanHistoryEntry, ScanFinding, ScanSeverity } from '@/stores/scan-history';
 import { SEV_ORDER, MODULE_LABELS } from '@/stores/scan-history';
+import { getAppVersion } from '@/lib/core/app-version';
 
 // ===== 严重程度显示映射 =====
 
@@ -164,8 +165,8 @@ export function buildCsv(entries: ScanHistoryEntry[]): string {
   return rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
 }
 
-/** 导出为 JSON */
-export function buildJson(entries: ScanHistoryEntry[]): string {
+/** 导出为 JSON。appVersion 缺省取 manifest 版本（扩展上下文可用）。 */
+export function buildJson(entries: ScanHistoryEntry[], appVersion: string = getAppVersion()): string {
   const allFindings = entries.flatMap(entry =>
     entry.findings.map(f => ({
       module: entry.module,
@@ -178,7 +179,7 @@ export function buildJson(entries: ScanHistoryEntry[]): string {
   );
   const report = {
     tool: '灵眸 VulnKit',
-    version: '6.0.0',
+    version: appVersion,
     timestamp: new Date().toISOString(),
     totalEntries: entries.length,
     totalFindings: allFindings.length,

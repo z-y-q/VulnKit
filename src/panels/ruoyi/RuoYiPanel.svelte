@@ -5,6 +5,7 @@
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
   import { scanSettingsStore } from '@/stores/settings';
+  import { getAppVersion } from '@/lib/core/app-version';
   import type { ProbeResult, FetchResult } from '@/lib/types/messaging';
   import { runConcurrent } from '@/lib/core/concurrency';
   import {
@@ -624,7 +625,7 @@ ${sensitiveRoutes.length > 0 ? `<h2>🛣️ 敏感路由（${sensitiveRoutes.len
 ${marAlive.length > 0 ? `<h2>🔍 MaR 字典扫描存活（${marAlive.length}）</h2><table><thead><tr><th>状态</th><th>路径</th><th>标题</th><th>来源</th></tr></thead><tbody>${marRows}</tbody></table>` : ''}
 ${gatewayRoutes.length > 0 ? `<h2>🌐 Gateway 路由（${gatewayRoutes.length}）</h2><table><thead><tr><th>URI</th><th>谓词</th></tr></thead><tbody>${gwRows}</tbody></table>` : ''}
 ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}）</h2><div>${nacosServices.map(s => `<span style="display:inline-block;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:4px;margin:2px;font-size:12px">${esc(s)}</span>`).join('')}</div>` : ''}
-<hr><p style="color:#9ca3af;font-size:12px;text-align:center">灵眸 v6.0 RuoYi 分析报告</p>
+<hr><p style="color:#9ca3af;font-size:12px;text-align:center">灵眸 v${getAppVersion()} RuoYi 分析报告</p>
 </body></html>`;
 
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });

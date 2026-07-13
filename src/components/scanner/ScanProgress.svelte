@@ -1,23 +1,62 @@
 <script lang="ts">
-  // 扫描进度条 — 统一所有扫描面板的进度展示
+  // 扫描进度条 — 统一所有扫描面板的进度展示。
+  // 增强（对齐 docs/UX-UI优化建议.md §3.4 / §8.3）：
+  // - total 未知/为 0 时显示 indeterminate（脉动条），不再显示误导性的 0/0 · 0%；
+  // - role="progressbar" + aria-value*，读屏可感知；
+  // - 可选阶段(phase)、耗时(elapsedMs)、失败数(failed)。
   let {
     scanned = 0,
     total = 0,
     scanning = false,
     label,
-  }: { scanned?: number; total?: number; scanning?: boolean; label?: string } = $props();
+    phase,
+    elapsedMs,
+    failed = 0,
+  }: {
+    scanned?: number;
+    total?: number;
+    scanning?: boolean;
+    label?: string;
+    phase?: string;
+    elapsedMs?: number;
+    failed?: number;
+  } = $props();
 
-  let pct = $derived(total > 0 ? Math.round((scanned / total) * 100) : 0);
+  let determinate = $derived(total > 0);
+  let pct = $derived(determinate ? Math.min(100, Math.round((scanned / total) * 100)) : 0);
+
+  function fmtMs(ms: number): string {
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    const m = Math.floor(ms / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    return `${m}m${s}s`;
+  }
 </script>
 
 {#if scanning}
-  <div class="space-y-1">
+  <div
+    class="space-y-1"
+    role="progressbar"
+    aria-valuemin={0}
+    aria-valuemax={determinate ? total : undefined}
+    aria-valuenow={determinate ? scanned : undefined}
+    aria-label={phase ?? label ?? '扫描进度'}
+  >
     <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-      <div class="bg-primary h-full transition-all duration-150" style="width:{pct}%"></div>
+      {#if determinate}
+        <div class="bg-primary h-full transition-all duration-150" style="width:{pct}%"></div>
+      {:else}
+        <div class="bg-primary/60 h-full w-full animate-pulse rounded-full"></div>
+      {/if}
     </div>
-    <div class="text-xs text-gray-400 flex justify-between">
-      <span>{label ?? '进度'}</span>
-      <span>{scanned} / {total}{#if total > 0} · {pct}%{/if}</span>
+    <div class="text-xs text-gray-400 flex justify-between gap-2">
+      <span class="truncate">{phase ?? label ?? '进度'}</span>
+      <span class="shrink-0 tabular-nums">
+        {#if determinate}{scanned} / {total} · {pct}%{:else}{scanned} 项{/if}
+        {#if failed > 0}<span class="text-red-400 dark:text-red-500 ml-1">· 失败 {failed}</span>{/if}
+        {#if elapsedMs != null}<span class="ml-1">· {fmtMs(elapsedMs)}</span>{/if}
+      </span>
     </div>
   </div>
 {/if}

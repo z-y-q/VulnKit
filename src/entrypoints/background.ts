@@ -24,6 +24,7 @@ import {
   restoreSpoofState,
 } from '@/lib/background/dnr';
 import { createContextMenus, handleMenuClick } from '@/lib/background/context-menus';
+import { clearPendingActionForTab } from '@/lib/navigation/pending-actions';
 import {
   registerRuoYiHook,
   unregisterRuoYiHook,
@@ -204,5 +205,8 @@ export default defineBackground(() => {
   });
 
   // ====== tab 关闭清理 ======
-  browser.tabs.onRemoved.addListener(tabId => cleanupRuoYiTabOnClose(tabId));
+  browser.tabs.onRemoved.addListener(tabId => {
+    cleanupRuoYiTabOnClose(tabId);
+    clearPendingActionForTab(tabId); // 清理该 tab 的 pending action（§3.1）
+  });
 });

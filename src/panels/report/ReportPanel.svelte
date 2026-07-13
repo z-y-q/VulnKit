@@ -5,7 +5,6 @@
   import { toastStore } from '@/stores/ui';
   import {
     aggregateByModule,
-    aggregateByDomain,
     extractDomains,
     countSeverities,
     sortFindings,
@@ -33,30 +32,22 @@
 
   // —— 派生数据 ——
 
-  let filteredEntries = $derived.by(() => {
+  // 单一 query：domain + severity 同时作用；展示 / 统计 / 导出全部消费同一结果（对齐 §3.5）
+  let queryEntries = $derived.by(() => {
     let list = entries;
-    if (domainFilter) {
-      list = list.filter(e => e.domain === domainFilter);
-    }
-    return list;
+    if (domainFilter) list = list.filter(e => e.domain === domainFilter);
+    if (!sevFilter) return list;
+    // severity 在 finding 层：过滤每个 entry 的 findings，丢弃无匹配 finding 的 entry
+    return list
+      .map(e => ({ ...e, findings: e.findings.filter(f => f.severity === sevFilter) }))
+      .filter(e => e.findings.length > 0);
   });
 
-  let allFindings = $derived(
-    filteredEntries.flatMap(e => e.findings),
-  );
+  let queryFindings = $derived(queryEntries.flatMap(e => e.findings));
 
-  let severityFiltered = $derived.by(() => {
-    let list = allFindings;
-    if (sevFilter) {
-      list = list.filter(f => f.severity === sevFilter);
-    }
-    return list;
-  });
-
-  let moduleGroups = $derived(aggregateByModule(filteredEntries));
-  let domainGroups = $derived(aggregateByDomain(filteredEntries));
-  let domains = $derived(extractDomains(entries));
-  let globalSummary = $derived(countSeverities(allFindings));
+  let moduleGroups = $derived(aggregateByModule(queryEntries));
+  let domains = $derived(extractDomains(entries)); // 域名下拉用全量，避免筛选后选项消失
+  let globalSummary = $derived(countSeverities(queryFindings));
 
   // —— 导出 ——
 
@@ -71,39 +62,39 @@
   }
 
   function exportCsv() {
-    if (filteredEntries.length === 0) {
-      toastStore.show('没有可导出的数据', 'warning');
+    if (queryFindings.length === 0) {
+      toastStore.show('当前筛选下没有可导出的数据', 'warning');
       return;
     }
-    downloadBlob(buildCsv(filteredEntries), 'lingmou-report.csv', 'text/csv;charset=utf-8');
-    toastStore.show('CSV 报告已导出', 'success');
+    downloadBlob(buildCsv(queryEntries), 'lingmou-report.csv', 'text/csv;charset=utf-8');
+    toastStore.show(`CSV 已导出（当前筛选 ${queryFindings.length} 项）`, 'success');
   }
 
   function exportJsonReport() {
-    if (filteredEntries.length === 0) {
-      toastStore.show('没有可导出的数据', 'warning');
+    if (queryFindings.length === 0) {
+      toastStore.show('当前筛选下没有可导出的数据', 'warning');
       return;
     }
-    downloadBlob(buildJson(filteredEntries), 'lingmou-report.json', 'application/json;charset=utf-8');
-    toastStore.show('JSON 报告已导出', 'success');
+    downloadBlob(buildJson(queryEntries), 'lingmou-report.json', 'application/json;charset=utf-8');
+    toastStore.show(`JSON 已导出（当前筛选 ${queryFindings.length} 项）`, 'success');
   }
 
   function exportMarkdownReport() {
-    if (filteredEntries.length === 0) {
-      toastStore.show('没有可导出的数据', 'warning');
+    if (queryFindings.length === 0) {
+      toastStore.show('当前筛选下没有可导出的数据', 'warning');
       return;
     }
-    downloadBlob(buildMarkdown(filteredEntries), 'lingmou-report.md', 'text/markdown;charset=utf-8');
-    toastStore.show('Markdown 报告已导出', 'success');
+    downloadBlob(buildMarkdown(queryEntries), 'lingmou-report.md', 'text/markdown;charset=utf-8');
+    toastStore.show(`Markdown 已导出（当前筛选 ${queryFindings.length} 项）`, 'success');
   }
 
   function exportHtmlReport() {
-    if (filteredEntries.length === 0) {
-      toastStore.show('没有可导出的数据', 'warning');
+    if (queryFindings.length === 0) {
+      toastStore.show('当前筛选下没有可导出的数据', 'warning');
       return;
     }
-    downloadBlob(buildHtml(filteredEntries), 'lingmou-report.html', 'text/html;charset=utf-8');
-    toastStore.show('HTML 报告已导出（含严重度分布 + 模块覆盖）', 'success');
+    downloadBlob(buildHtml(queryEntries), 'lingmou-report.html', 'text/html;charset=utf-8');
+    toastStore.show(`HTML 已导出（当前筛选 ${queryFindings.length} 项，含严重度分布 + 模块覆盖）`, 'success');
   }
 
   /** 一键全量审计：聚合所有扫描记录生成 HTML 报告（忽略当前过滤） */
@@ -135,12 +126,12 @@
 
 <div class="space-y-3">
   <!-- 总览统计 -->
-  {#if filteredEntries.length > 0}
+  {#if queryEntries.length > 0}
     <div class="card p-3 space-y-2">
       <div class="flex items-center gap-2 flex-wrap">
         <span class="text-sm font-medium">总览</span>
         <span class="text-xs text-gray-400">
-          {filteredEntries.length} 次扫描 / {allFindings.length} 项发现
+          {queryEntries.length} 次扫描 / {queryFindings.length} 项发现
         </span>
       </div>
 
@@ -191,7 +182,7 @@
         <button class="btn btn-sm flex-1 btn-primary" onclick={exportHtmlReport}>HTML</button>
         <button class="btn btn-sm btn-ghost text-red-500 ml-auto" onclick={clearAll}>清空</button>
       </div>
-      <button class="btn btn-sm btn-primary w-full" onclick={fullAuditReport}>📊 一键全量审计报告（HTML）</button>
+      <button class="btn btn-sm btn-primary w-full" onclick={fullAuditReport} title="聚合全部扫描记录，忽略当前筛选条件">📊 一键全量审计报告（忽略当前筛选）</button>
     </div>
   {/if}
 
@@ -221,7 +212,7 @@
         </div>
       </div>
     {/each}
-  {:else if !loading && entries.length > 0 && filteredEntries.length === 0}
+  {:else if !loading && entries.length > 0 && queryEntries.length === 0}
     <div class="card p-4 text-center text-sm text-gray-400">
       当前筛选条件下无结果
     </div>

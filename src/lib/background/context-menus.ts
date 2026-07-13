@@ -2,6 +2,7 @@
 // 页面/选区/链接三类上下文菜单，选区支持编解码与哈希（结果复制到剪贴板并 toast）。
 
 import { md5String } from '@/lib/core/md5';
+import { setPendingAction } from '@/lib/navigation/pending-actions';
 import type { Browser } from 'wxt/browser';
 
 interface MenuSpec {
@@ -209,23 +210,23 @@ export async function handleMenuClick(
 }
 
 /**
- * 打开侧栏到指定面板，并写入 pendingAutoRun 让面板自动触发扫描。
+ * 打开侧栏到指定面板，并写入带 tabId 的 pending action 让面板自动触发扫描（§3.1）。
  * 信号带 nonce（时间戳），即使切到同一面板也会重新触发。
  */
 async function openSidePanelWithAction(panel: string, url: string, tab: Browser.tabs.Tab): Promise<void> {
-  await browser.storage.local.set({
-    pendingPanel: panel,
-    pendingAutoRun: { panel, url, nonce: Date.now() },
-  });
+  const tabId = typeof tab.id === 'number' ? tab.id : undefined;
+  if (tabId !== undefined) {
+    await setPendingAction({ panel, tabId, url, mode: 'autorun', nonce: Date.now() });
+  }
   try {
-    // OpenOptions 要求 tabId 或 windowId 至少一个为具体 number（不可 undefined）
-    if (typeof tab.id === 'number') {
-      await browser.sidePanel.open({ tabId: tab.id });
+    // open 要求 tabId 或 windowId 至少一个为具体 number（不可 undefined）
+    if (tabId !== undefined) {
+      await browser.sidePanel.open({ tabId });
     } else if (typeof tab.windowId === 'number') {
       await browser.sidePanel.open({ windowId: tab.windowId });
     }
   } catch {
-    // sidePanel.open 在个别场景不可用 → 回退徽标提示用户手动打开
+    // sidePanel.open 在个别场景不可用 → 徽标提示用户手动打开；pending 已写入，手动打开后会消费
     browser.action.setBadgeText({ text: '▶' });
     browser.action.setBadgeBackgroundColor({ color: '#2196F3' });
   }

@@ -1,6 +1,7 @@
 import App from './App.svelte';
 import { mount, unmount } from 'svelte';
 import 'virtual:uno.css';
+import '../../styles/shared.css';
 import './app.css';
 
 const app = mount(App, {

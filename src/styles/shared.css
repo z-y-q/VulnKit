@@ -1,0 +1,75 @@
+/* shared.css — 三入口共享基础样式（对齐 docs/UX-UI优化建议.md §7.5）
+ *
+ * 不依赖 UnoCSS 是否自动注入；由各入口 main.ts 显式 import 确定生效。
+ * 提供：reset / 字体栈 / 全局 focus-visible / reduced-motion / 语义 CSS 变量（亮/暗）。
+ * Side Panel 的高度、overflow、动画等专属样式仍留在各自 app.css。
+ * 完整 token 迁移（btn/card/input 改用变量）留阶段 5。
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  /* 语义 token（亮色默认） */
+  --vk-bg: #ffffff;
+  --vk-bg-soft: #f8fafc;
+  --vk-bg-sunken: #f1f5f9;
+  --vk-text: #1f2937;
+  --vk-text-muted: #6b7280;
+  --vk-border: #e5e7eb;
+  --vk-primary: #4a90e2;
+  --vk-primary-strong: #357abd;
+  --vk-danger: #ef4444;
+  --vk-success: #10b981;
+  --vk-warning: #f59e0b;
+  --vk-ring: rgba(74, 144, 226, 0.4);
+  color-scheme: light;
+}
+
+.dark {
+  --vk-bg: #1e293b;
+  --vk-bg-soft: #0f172a;
+  --vk-bg-sunken: #020617;
+  --vk-text: #e2e8f0;
+  --vk-text-muted: #94a3b8;
+  --vk-border: #334155;
+  --vk-primary: #4a90e2;
+  --vk-primary-strong: #357abd;
+  --vk-danger: #ef4444;
+  --vk-success: #10b981;
+  --vk-warning: #f59e0b;
+  --vk-ring: rgba(74, 144, 226, 0.5);
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 全局焦点环（§8.2.4）：键盘可见，鼠标点击不抢焦 */
+:focus-visible {
+  outline: 2px solid var(--vk-primary);
+  outline-offset: 2px;
+}
+
+/* 尊重动效偏好（§7.3）：覆盖所有过渡/动画，不只 .vk-* */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

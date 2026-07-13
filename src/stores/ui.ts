@@ -64,7 +64,7 @@ let _toastId = 0;
 function createToastStore() {
   const toasts = writable<ToastItem[]>([]);
 
-  function show(message: string, type: ToastItem['type'] = 'info', duration = 2000) {
+  function show(message: string, type: ToastItem['type'] = 'info', duration?: number) {
     // 去重：相同 message+type 在窗口期内只弹一次，避免并发扫描刷屏
     let dup = false;
     toasts.update(t => {
@@ -73,11 +73,13 @@ function createToastStore() {
     });
     if (dup) return;
 
+    // 错误/警告停留更久，给用户读完和操作的时间（对齐 §8.4）
+    const auto = duration ?? (type === 'error' ? 7000 : type === 'warning' ? 5000 : 3000);
     const id = _toastId++;
-    toasts.update(t => [...t, { id, message, type, duration }]);
+    toasts.update(t => [...t, { id, message, type, duration: auto }]);
     setTimeout(() => {
       toasts.update(t => t.filter(item => item.id !== id));
-    }, duration);
+    }, auto);
   }
 
   function dismiss(id: number) {

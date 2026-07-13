@@ -1,8 +1,59 @@
 <script lang="ts">
-  // Popup — 灵眸 v6.0
-  // 纯 scoped CSS，不依赖 UnoCSS，确保 Chrome 扩展 popup 渲染正确
+  // Popup — 灵眸 v6.0（阶段2重构：当前页状态 + 搜索 + 最近，对齐 §4.2）
+  // 纯 scoped CSS，不依赖 UnoCSS，确保 Chrome 扩展 popup 渲染正确。
+  // 暗色 class 钩子已留，批次 2c 接入 shared.css 变量后即跟随主题。
   import { panelMeta } from '@/panels/registry';
   import { panelLayoutStore, applyLayout } from '@/stores/panel-layout';
+  import { recentPanelsStore } from '@/stores/recent-panels';
+  import { getAppVersion } from '@/lib/core/app-version';
+  import { setPendingAction } from '@/lib/navigation/pending-actions';
+  import { themeStore } from '@/stores/ui';
+
+  let version = $derived(getAppVersion());
+
+  // 跟随全局主题（与 side-panel/options 共用 themeStore，§7.5）
+  $effect(() => {
+    document.documentElement.classList.toggle('dark', $themeStore);
+  });
+
+  // 失败反馈：URL 不支持 / sidePanel.open 失败时留 Popup 展示原因（§3.1）
+  let errorMsg = $state('');
+
+  // —— 当前页状态（§4.2.4）：展示域名与可执行状态 ——
+  let pageStatus = $state<{ domain: string; ok: boolean; reason?: string } | null>(null);
+
+  async function resolveTarget(): Promise<{ tabId: number; url: string } | { error: string }> {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (!tab || typeof tab.id !== 'number') return { error: '未找到当前标签页' };
+    const url = tab.url || '';
+    if (!url) return { error: '当前页面不可用，请切换到普通网页' };
+    try {
+      const u = new URL(url);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        return { error: `不支持 ${u.protocol} 页面，请切换到普通网页` };
+      }
+    } catch {
+      return { error: '当前页面 URL 无效' };
+    }
+    return { tabId: tab.id, url };
+  }
+
+  // 初始化：解析当前页状态
+  $effect(() => {
+    resolveTarget().then((r) => {
+      if ('error' in r) {
+        pageStatus = { domain: '', ok: false, reason: r.error };
+      } else {
+        try {
+          pageStatus = { domain: new URL(r.url).hostname, ok: true };
+        } catch {
+          pageStatus = { domain: '', ok: false };
+        }
+      }
+    });
+  });
+
+  let pageReady = $derived(pageStatus?.ok === true);
 
   let layout = $derived($panelLayoutStore);
 
@@ -22,58 +73,78 @@
   // 当前分类下显示的面板（应用布局：排序 + 过滤隐藏）
   let filteredPanels = $derived(
     applyLayout(
-      activeCat === 'all'
-        ? panelMeta
-        : panelMeta.filter((p) => p.category === activeCat),
+      activeCat === 'all' ? panelMeta : panelMeta.filter((p) => p.category === activeCat),
       layout,
-    )
+    ),
   );
 
-  // 标签页分页（每页 16 个）
-  const PAGE_SIZE = 16;
-  let page = $state(0);
-  let totalPages = $derived(Math.max(1, Math.ceil(filteredPanels.length / PAGE_SIZE)));
-
-  // 分页后当前页的面板
-  let pagedPanels = $derived(
-    filteredPanels.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  // —— 搜索（§4.2.2：替代分页的主要发现方式） ——
+  let query = $state('');
+  let q = $derived(query.trim().toLowerCase());
+  let searchResults = $derived(
+    q
+      ? applyLayout(panelMeta, layout).filter(
+          (p) =>
+            p.label.toLowerCase().includes(q) ||
+            p.categoryLabel.toLowerCase().includes(q) ||
+            p.id.toLowerCase().includes(q),
+        )
+      : [],
   );
 
-  // 切换分类时重置分页
-  $effect(() => {
-    filteredPanels;
-    page = 0;
-  });
+  // —— 最近使用（§4.2.1） ——
+  let recent = $derived($recentPanelsStore);
+  let recentVisible = $derived(
+    recent
+      .filter((id) => !layout.hidden.includes(id))
+      .slice(0, 4)
+      .map((id) => panelMeta.find((p) => p.id === id))
+      .filter((p): p is (typeof panelMeta)[number] => !!p),
+  );
 
   async function openSidePanel() {
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id) {
-      await browser.sidePanel.open({ tabId: tab.id });
+    if (typeof tab?.id === 'number') {
+      try {
+        await browser.sidePanel.open({ tabId: tab.id });
+      } catch (e) {
+        errorMsg = `无法打开侧栏：${(e as Error).message}`;
+        return;
+      }
     }
     window.close();
   }
 
   async function openSidePanelToPanel(panelId: string) {
-    await browser.storage.local.set({ pendingPanel: panelId });
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id) {
-      await browser.sidePanel.open({ tabId: tab.id });
+    const r = await resolveTarget();
+    if ('error' in r) {
+      errorMsg = r.error;
+      return;
     }
-    window.close();
+    errorMsg = '';
+    await setPendingAction({ panel: panelId, tabId: r.tabId, url: r.url, mode: 'open', nonce: Date.now() });
+    try {
+      await browser.sidePanel.open({ tabId: r.tabId });
+      window.close();
+    } catch (e) {
+      errorMsg = `任务已就绪，但无法自动打开侧栏：${(e as Error).message}。请点击下方「打开面板」。`;
+    }
   }
 
-  // 一键操作：开侧栏到目标面板并自动跑（对当前标签页）
   async function quickAction(panelId: string) {
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    const url = tab?.url || '';
-    await browser.storage.local.set({
-      pendingPanel: panelId,
-      pendingAutoRun: { panel: panelId, url, nonce: Date.now() },
-    });
-    if (tab?.id) {
-      try { await browser.sidePanel.open({ tabId: tab.id }); } catch { /* ignore */ }
+    const r = await resolveTarget();
+    if ('error' in r) {
+      errorMsg = r.error;
+      return;
     }
-    window.close();
+    errorMsg = '';
+    await setPendingAction({ panel: panelId, tabId: r.tabId, url: r.url, mode: 'autorun', nonce: Date.now() });
+    try {
+      await browser.sidePanel.open({ tabId: r.tabId });
+      window.close();
+    } catch (e) {
+      errorMsg = `任务已就绪，但无法自动打开侧栏：${(e as Error).message}。请点击下方「打开面板」。`;
+    }
   }
 
   // 一键操作清单（高频，对当前页面即点即跑）
@@ -90,23 +161,20 @@
     activeCat = id;
   }
 
+  // 搜索框 Enter：打开首个匹配
+  function onSearchKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter' && searchResults.length) {
+      e.preventDefault();
+      openSidePanelToPanel(searchResults[0].id);
+    }
+  }
+
   // 面板角标：扫描类=S，编码=^（对齐 v5 Badge）
   function badgeFor(panel: (typeof panelMeta)[number]): string {
     if (panel.id === 'encoding') return '^';
     if (panel.category === 'scan') return 'S';
     return '';
   }
-
-  // Alt+Left/Right 翻页（对齐 v5）
-  $effect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-      if (e.key === 'ArrowLeft' && page > 0) { e.preventDefault(); page--; }
-      else if (e.key === 'ArrowRight' && page < totalPages - 1) { e.preventDefault(); page++; }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  });
 </script>
 
 <div class="popup-root">
@@ -115,13 +183,24 @@
     <div class="popup-brand">
       <div class="popup-logo">灵</div>
       <span class="popup-title">灵眸</span>
-      <span class="popup-version">v7.0</span>
+      <span class="popup-version">v{version}</span>
+    </div>
+
+    <!-- 当前页状态（§4.2.4） -->
+    <div class="page-status {pageReady ? 'ok' : 'bad'}" title={pageStatus?.reason || ''}>
+      <span class="status-dot"></span>
+      {#if pageStatus?.ok}
+        <span class="status-domain" title={pageStatus.domain}>{pageStatus.domain || '当前页面'}</span>
+      {:else}
+        <span class="status-domain">{pageStatus?.reason || '当前页面不可用'}</span>
+      {/if}
     </div>
 
     <!-- Category Chips -->
     <div class="category-row">
-      {#each categories as cat}
+      {#each categories as cat (cat.id)}
         <button
+          type="button"
           class="category-chip {activeCat === cat.id ? 'active' : ''}"
           style={activeCat === cat.id ? `background:${cat.color};border-color:${cat.color}` : ''}
           onclick={() => setCat(cat.id)}
@@ -133,12 +212,40 @@
     </div>
   </header>
 
+  {#if errorMsg}
+    <div class="popup-error" role="alert">
+      <span class="popup-error-icon" aria-hidden="true">⚠️</span>
+      <span class="popup-error-text">{errorMsg}</span>
+    </div>
+  {/if}
+
+  <!-- 搜索框（§4.2.2） -->
+  <div class="search-bar">
+    <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+    <label for="popup-search" class="sr-only">搜索工具</label>
+    <input
+      id="popup-search"
+      type="search"
+      placeholder="搜索工具…"
+      autocomplete="off"
+      spellcheck="false"
+      bind:value={query}
+      onkeydown={onSearchKeydown}
+    />
+  </div>
+
   <!-- 一键操作（对当前页面即点即跑） -->
   <div class="quick-bar">
     <div class="quick-title">⚡ 一键操作 · 当前页</div>
     <div class="quick-grid">
       {#each QUICK_ACTIONS as qa (qa.id)}
-        <button class="quick-btn" onclick={() => quickAction(qa.id)} title={`对当前页面运行 ${qa.label}`}>
+        <button
+          type="button"
+          class="quick-btn"
+          disabled={!pageReady}
+          onclick={() => quickAction(qa.id)}
+          title={pageReady ? `对当前页面运行 ${qa.label}` : '请先切换到普通网页'}
+        >
           <span class="quick-icon" style="color:{qa.color}">{qa.icon}</span>
           <span class="quick-label">{qa.label}</span>
         </button>
@@ -146,34 +253,63 @@
     </div>
   </div>
 
-  <!-- Tool Grid -->
-  <div class="popup-grid">
-    {#each pagedPanels as panel (panel.id)}
-      <button
-        class="tool-btn"
-        onclick={() => openSidePanelToPanel(panel.id)}
-        title={panel.label}
-      >
-        {#if badgeFor(panel)}<span class="tool-badge">{badgeFor(panel)}</span>{/if}
-        <span class="tool-icon">{panel.icon}</span>
-        <span class="tool-label">{panel.label}</span>
-      </button>
-    {/each}
-  </div>
-
-  <!-- Pagination -->
-  {#if totalPages > 1}
-    <div class="pagination">
-      <button class="page-btn" disabled={page === 0} onclick={() => page--}>◀</button>
-      <span class="page-info">{page + 1}/{totalPages}</span>
-      <button class="page-btn" disabled={page >= totalPages - 1} onclick={() => page++}>▶</button>
+  <!-- 最近使用（非搜索态） -->
+  {#if !q && recentVisible.length}
+    <div class="recent-bar">
+      <div class="quick-title">🕐 最近使用</div>
+      <div class="recent-grid">
+        {#each recentVisible as panel (panel.id)}
+          <button type="button" class="recent-btn" onclick={() => openSidePanelToPanel(panel.id)} title={panel.label}>
+            <span class="recent-icon">{panel.icon}</span>
+            <span class="recent-label">{panel.label}</span>
+          </button>
+        {/each}
+      </div>
     </div>
   {/if}
+
+  <!-- 工具区：搜索结果 / 分类网格 -->
+  <div class="popup-grid">
+    {#if q}
+      {#if searchResults.length}
+        {#each searchResults as panel (panel.id)}
+          <button
+            type="button"
+            class="tool-btn"
+            onclick={() => openSidePanelToPanel(panel.id)}
+            title={panel.label}
+          >
+            {#if badgeFor(panel)}<span class="tool-badge">{badgeFor(panel)}</span>{/if}
+            <span class="tool-icon">{panel.icon}</span>
+            <span class="tool-label">{panel.label}</span>
+          </button>
+        {/each}
+      {:else}
+        <div class="search-empty">
+          <div class="search-empty-icon" aria-hidden="true">🔍</div>
+          未找到匹配「{query}」的工具
+        </div>
+      {/if}
+    {:else}
+      {#each filteredPanels as panel (panel.id)}
+        <button
+          type="button"
+          class="tool-btn"
+          onclick={() => openSidePanelToPanel(panel.id)}
+          title={panel.label}
+        >
+          {#if badgeFor(panel)}<span class="tool-badge">{badgeFor(panel)}</span>{/if}
+          <span class="tool-icon">{panel.icon}</span>
+          <span class="tool-label">{panel.label}</span>
+        </button>
+      {/each}
+    {/if}
+  </div>
 
   <!-- Footer -->
   <footer class="popup-footer">
     <span class="footer-count">共 {panelMeta.length} 个工具</span>
-    <button class="open-panel-btn" onclick={openSidePanel}>打开面板 →</button>
+    <button type="button" class="open-panel-btn" onclick={openSidePanel}>打开面板 →</button>
   </footer>
 </div>
 
@@ -202,7 +338,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
 
   .popup-logo {
@@ -235,6 +371,85 @@
     padding: 2px 6px;
     border-radius: 4px;
     background: #f5f5f5;
+    margin-left: auto;
+  }
+
+  /* ===== 当前页状态 ===== */
+  .page-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    background: #f5f7fa;
+  }
+  .page-status .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .page-status.ok { background: #f0f9f0; color: #2e7d32; }
+  .page-status.ok .status-dot { background: #4CAF50; box-shadow: 0 0 6px #4CAF5080; }
+  .page-status.bad { background: #fef2f2; color: #b91c1c; }
+  .page-status.bad .status-dot { background: #ef4444; }
+  .status-domain {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ===== 错误提示条 ===== */
+  .popup-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 8px 12px 0;
+    padding: 8px 10px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    font-size: 11px;
+    color: #b91c1c;
+    line-height: 1.4;
+    flex-shrink: 0;
+  }
+  .popup-error-icon { flex-shrink: 0; }
+  .popup-error-text { flex: 1; }
+
+  /* ===== 搜索框 ===== */
+  .search-bar {
+    position: relative;
+    padding: 8px 12px 6px;
+    flex-shrink: 0;
+  }
+  .search-icon {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    color: #999;
+    pointer-events: none;
+  }
+  .search-bar input {
+    width: 100%;
+    padding: 6px 10px 6px 30px;
+    font-size: 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #f9f9f9;
+    color: #333;
+    outline: none;
+    transition: all 0.15s ease;
+  }
+  .search-bar input:focus {
+    border-color: #4A90E2;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
   }
 
   /* ===== Category Chips ===== */
@@ -243,7 +458,6 @@
     gap: 5px;
     flex-wrap: wrap;
   }
-
   .category-chip {
     display: inline-flex;
     align-items: center;
@@ -258,34 +472,26 @@
     cursor: pointer;
     transition: all 0.15s ease;
   }
-
-  .category-chip:hover {
-    border-color: #bbb;
-    background: #fafafa;
-  }
-
+  .category-chip:hover { border-color: #bbb; background: #fafafa; }
   .category-chip.active {
     color: #fff;
     border-color: transparent;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
   }
-
   .cat-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
-    transition: background 0.15s ease;
   }
 
   /* ===== Quick Action Bar ===== */
   .quick-bar {
-    padding: 8px 10px 6px;
+    padding: 6px 12px 6px;
     border-bottom: 1px solid #f0f0f0;
     flex-shrink: 0;
     background: linear-gradient(180deg, #f8fbff 0%, #fff 100%);
   }
-
   .quick-title {
     font-size: 10px;
     font-weight: 700;
@@ -293,13 +499,11 @@
     letter-spacing: 0.3px;
     margin-bottom: 6px;
   }
-
   .quick-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 5px;
   }
-
   .quick-btn {
     display: flex;
     align-items: center;
@@ -312,32 +516,49 @@
     transition: all 0.15s ease;
     text-align: left;
   }
-
-  .quick-btn:hover {
+  .quick-btn:hover:not(:disabled) {
     border-color: #4A90E2;
     background: #eef4fc;
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(74, 144, 226, 0.18);
   }
+  .quick-btn:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+  .quick-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .quick-icon { font-size: 14px; line-height: 1; flex-shrink: 0; }
+  .quick-label { font-size: 11px; font-weight: 600; color: #444; }
 
-  .quick-btn:active {
-    transform: translateY(0) scale(0.98);
-  }
-
-  .quick-icon {
-    font-size: 14px;
-    line-height: 1;
+  /* ===== 最近使用 ===== */
+  .recent-bar {
+    padding: 6px 12px;
+    border-bottom: 1px solid #f0f0f0;
     flex-shrink: 0;
   }
-
-  .quick-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #444;
+  .recent-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
   }
-
-  .quick-btn:hover .quick-label {
-    color: #4A90E2;
+  .recent-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 8px;
+    border: 1px solid #f0f0f0;
+    border-radius: 8px;
+    background: #fafafa;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+    overflow: hidden;
+  }
+  .recent-btn:hover { border-color: #4A90E2; background: #eef4fc; }
+  .recent-icon { font-size: 13px; flex-shrink: 0; }
+  .recent-label {
+    font-size: 11px;
+    color: #555;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* ===== Tool Grid ===== */
@@ -346,11 +567,12 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 3px;
-    padding: 10px 10px;
+    padding: 8px 10px;
     overflow-y: auto;
+    align-content: start;
   }
-
   .tool-btn {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -362,26 +584,10 @@
     cursor: pointer;
     transition: all 0.15s ease;
   }
-
-  .tool-btn:hover {
-    background: #eef4fc;
-    transform: scale(1.04);
-  }
-
-  .tool-btn:active {
-    transform: scale(0.96);
-  }
-
-  .tool-icon {
-    font-size: 18px;
-    line-height: 1;
-    transition: transform 0.15s ease;
-  }
-
-  .tool-btn:hover .tool-icon {
-    transform: scale(1.12);
-  }
-
+  .tool-btn:hover { background: #eef4fc; transform: scale(1.04); }
+  .tool-btn:active { transform: scale(0.96); }
+  .tool-icon { font-size: 18px; line-height: 1; transition: transform 0.15s ease; }
+  .tool-btn:hover .tool-icon { transform: scale(1.12); }
   .tool-label {
     font-size: 10px;
     color: #666;
@@ -392,11 +598,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-
-  .tool-btn:hover .tool-label {
-    color: #4A90E2;
-  }
-
+  .tool-btn:hover .tool-label { color: #4A90E2; }
   .tool-badge {
     position: absolute;
     top: 2px;
@@ -414,46 +616,14 @@
     line-height: 1;
   }
 
-  .tool-btn {
-    position: relative;
-  }
-
-  /* ===== Pagination ===== */
-  .pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 6px 0;
-    border-top: 1px solid #f5f5f5;
-  }
-
-  .page-btn {
-    border: none;
-    background: none;
+  .search-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-size: 11px;
     color: #999;
-    font-size: 10px;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 4px;
-    transition: all 0.15s;
+    padding: 24px 12px;
   }
-
-  .page-btn:hover:not(:disabled) {
-    background: #f0f0f0;
-    color: #4A90E2;
-  }
-
-  .page-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
-  }
-
-  .page-info {
-    font-size: 10px;
-    color: #999;
-    font-family: 'SF Mono', Monaco, monospace;
-  }
+  .search-empty-icon { font-size: 22px; margin-bottom: 6px; }
 
   /* ===== Footer ===== */
   .popup-footer {
@@ -465,12 +635,7 @@
     background: #fafafa;
     flex-shrink: 0;
   }
-
-  .footer-count {
-    font-size: 10px;
-    color: #999;
-  }
-
+  .footer-count { font-size: 10px; color: #999; }
   .open-panel-btn {
     padding: 5px 12px;
     border: none;
@@ -483,25 +648,51 @@
     transition: all 0.15s ease;
     box-shadow: 0 1px 4px rgba(74, 144, 226, 0.3);
   }
+  .open-panel-btn:hover { background: #357ABD; box-shadow: 0 2px 8px rgba(74, 144, 226, 0.4); }
+  .open-panel-btn:active { transform: scale(0.97); }
 
-  .open-panel-btn:hover {
-    background: #357ABD;
-    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.4);
-  }
-
-  .open-panel-btn:active {
-    transform: scale(0.97);
+  /* ===== 无障碍辅助 ===== */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   /* ===== Scrollbar ===== */
-  .popup-grid::-webkit-scrollbar {
-    width: 4px;
-  }
-  .popup-grid::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .popup-grid::-webkit-scrollbar-thumb {
-    background: #d0d0d0;
-    border-radius: 2px;
-  }
+  .popup-grid::-webkit-scrollbar { width: 4px; }
+  .popup-grid::-webkit-scrollbar-track { background: transparent; }
+  .popup-grid::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 2px; }
+
+  /* ===== 暗色主题（最小覆盖，§7.5；完整 token 迁移留阶段 5） ===== */
+  :global(.dark) .popup-root { background: var(--vk-bg); color: var(--vk-text); }
+  :global(.dark) .popup-header { border-color: var(--vk-border); }
+  :global(.dark) .popup-version { background: var(--vk-bg-sunken); color: var(--vk-text-muted); }
+  :global(.dark) .page-status { background: var(--vk-bg-sunken); }
+  :global(.dark) .page-status.ok { background: rgba(16, 185, 129, 0.12); color: #6ee7b7; }
+  :global(.dark) .page-status.bad { background: rgba(239, 68, 68, 0.12); color: #fca5a5; }
+  :global(.dark) .popup-error { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #fca5a5; }
+  :global(.dark) .search-bar input { background: var(--vk-bg-soft); color: var(--vk-text); border-color: var(--vk-border); }
+  :global(.dark) .search-icon { color: var(--vk-text-muted); }
+  :global(.dark) .category-chip { background: var(--vk-bg); color: var(--vk-text-muted); border-color: var(--vk-border); }
+  :global(.dark) .category-chip:hover { background: var(--vk-bg-sunken); }
+  :global(.dark) .quick-bar { background: var(--vk-bg); border-color: var(--vk-border); }
+  :global(.dark) .quick-title { color: var(--vk-text-muted); }
+  :global(.dark) .quick-btn { background: var(--vk-bg); border-color: var(--vk-border); }
+  :global(.dark) .quick-btn:hover:not(:disabled) { background: var(--vk-bg-sunken); }
+  :global(.dark) .quick-label { color: var(--vk-text); }
+  :global(.dark) .recent-bar { border-color: var(--vk-border); }
+  :global(.dark) .recent-btn { background: var(--vk-bg-soft); border-color: var(--vk-border); }
+  :global(.dark) .recent-btn:hover { background: var(--vk-bg-sunken); }
+  :global(.dark) .recent-label { color: var(--vk-text); }
+  :global(.dark) .tool-label { color: var(--vk-text-muted); }
+  :global(.dark) .tool-btn:hover { background: var(--vk-bg-sunken); }
+  :global(.dark) .popup-footer { background: var(--vk-bg-soft); border-color: var(--vk-border); }
+  :global(.dark) .footer-count { color: var(--vk-text-muted); }
+  :global(.dark) .popup-grid::-webkit-scrollbar-thumb { background: #475569; }
 </style>
