@@ -2,7 +2,7 @@
   "name": "lingmou-v6",
   "description": "灵眸 - 编码解码、图标识别、资产测绘、信息收集、权限分析",
   "private": true,
-  "version": "7.1.0",
+  "version": "7.2.0",
   "type": "module",
   "scripts": {
     "build:inject": "tsc -p tsconfig.inject.json",
@@ -40,6 +40,7 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "crypto-js": "^4.2.0",
+    "fflate": "^0.8.3",
     "js-yaml": "^5.2.1",
     "sm-crypto": "^0.4.0"
   }

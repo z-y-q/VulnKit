@@ -7,6 +7,15 @@
   import type { FetchResult } from '@/lib/types/messaging';
   import { extractScriptSrcs, extractLinkHrefs, formatSize } from '@/lib/source/source-utils';
 
+  // —— 大文件保护 ——
+  // 抓取上限：交给 background 夹紧；超过返回 TOO_LARGE，避免一次性拉超大源码。
+  const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
+  // 渲染行数上限：只渲染前 N 行，防止超大 HTML 一次性创建海量 DOM 节点卡死面板。
+  // 完整内容仍可复制/下载，搜索在全文上进行。
+  const MAX_RENDER_LINES = 5000;
+  // 搜索防抖：连续输入时只在前一次输入停顿 200ms 后扫一次全文。
+  const SEARCH_DEBOUNCE_MS = 200;
+
   let url = $state('');
   let loading = $state(false);
   let source = $state('');
@@ -53,16 +62,30 @@
 
   let sourceSize = $derived(source ? new Blob([source]).size : 0);
 
-  // 按行分割
-  let lines = $derived(source ? source.split('\n') : []);
+  // 全文按行分割（仅在 source 变化时重算一次）
+  let allLines = $derived(source ? source.split('\n') : []);
+  // 仅渲染前 N 行，避免超大 HTML 创建海量 DOM；完整内容可复制/下载
+  let renderLines = $derived(allLines.slice(0, MAX_RENDER_LINES));
+  let truncated = $derived(allLines.length > MAX_RENDER_LINES);
+  let lineCount = $derived(allLines.length);
 
-  // 搜索匹配行
+  // 搜索防抖：searchText 变化后延迟触发全文扫描
+  let debouncedSearch = $state('');
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => {
+    const v = searchText;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { debouncedSearch = v; }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(searchTimer);
+  });
+
+  // 搜索匹配行（在全文 allLines 上扫描，结果索引与原始行号对齐）
   let matchLineSet = $derived.by(() => {
-    if (!searchText.trim()) return null;
-    const s = searchText.trim().toLowerCase();
+    const s = debouncedSearch.trim().toLowerCase();
+    if (!s) return null;
     const set = new Set<number>();
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].toLowerCase().includes(s)) set.add(i);
+    for (let i = 0; i < allLines.length; i++) {
+      if (allLines[i].toLowerCase().includes(s)) set.add(i);
     }
     return set;
   });
@@ -80,22 +103,28 @@
     source = '';
     statusText = '加载中...';
     searchText = '';
+    debouncedSearch = '';
 
     try {
       const res = await sendMessage({
         type: 'FETCH_URL',
         url: u,
         timeout: 15000,
+        maxBytes: MAX_SOURCE_BYTES,
       }) as FetchResult<string>;
 
-      if ('error' in res) {
+      if (!res.success) {
         source = '';
-        statusText = `加载失败: ${res.error}`;
-        toastStore.show(`加载失败: ${res.error}`, 'error');
+        // 区分超限与其他错误，给更明确提示
+        const msg = res.code === 'TOO_LARGE'
+          ? `源码过大（超过 ${Math.round(MAX_SOURCE_BYTES / 1024 / 1024)}MB），已中止`
+          : res.error;
+        statusText = `加载失败: ${msg}`;
+        toastStore.show(`加载失败: ${msg}`, 'error');
       } else {
         source = res.data;
-        statusText = `加载完成 — ${formatSize(sourceSize)}`;
-        toastStore.show(`源码加载完成，共 ${lines.length} 行`, 'success');
+        statusText = `加载完成 — ${formatSize(sourceSize)}${truncated ? `（仅渲染前 ${MAX_RENDER_LINES} 行）` : ''}`;
+        toastStore.show(`源码加载完成，共 ${lineCount} 行`, 'success');
       }
     } catch (err: any) {
       source = '';
@@ -221,9 +250,14 @@
 
   <!-- 源码展示 -->
   {#if source}
+    {#if truncated}
+      <div class="text-xs text-amber-600 dark:text-amber-400">
+        ⚠ 源码共 {lineCount} 行，为避免卡顿仅渲染前 {MAX_RENDER_LINES} 行（完整内容可复制/下载，搜索仍覆盖全文）
+      </div>
+    {/if}
     <div class="card overflow-hidden">
       <div class="overflow-auto max-h-96 text-xs font-mono bg-gray-50 dark:bg-gray-900">
-        <pre class="p-2 leading-5 whitespace-pre-wrap break-all">{#each lines as line, i (i)}
+        <pre class="p-2 leading-5 whitespace-pre-wrap break-all">{#each renderLines as line, i (i)}
           {#if highlightMatch(line, i)}
             <mark class="bg-yellow-200 dark:bg-yellow-900 rounded px-0.5">{#if showLineNumbers}<span class="text-gray-400 select-none mr-2 inline-block w-8 text-right">{i + 1}</span>{/if}{line}</mark>
           {:else}

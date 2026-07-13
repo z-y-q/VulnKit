@@ -56,6 +56,7 @@ export const panelMeta: PanelMeta[] = [
   { id: 'exif', label: 'EXIF查看', icon: '📷', category: 'tools', categoryLabel: '工具', catColor: '#9b59b6' },
   { id: 'storage-check', label: '存储检查', icon: '🗄️', category: 'tools', categoryLabel: '工具', catColor: '#9b59b6' },
   { id: 'source-loader', label: '源码加载', icon: '📦', category: 'tools', categoryLabel: '工具', catColor: '#9b59b6' },
+  { id: 'jsarchive', label: 'JS归档', icon: '🗜️', category: 'tools', categoryLabel: '工具', catColor: '#9b59b6' },
 
   // ===== 报告 (Report) =====
   { id: 'report', label: '统一报告', icon: '📊', category: 'report', categoryLabel: '报告', catColor: '#999' },

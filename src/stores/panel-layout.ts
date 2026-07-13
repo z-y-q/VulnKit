@@ -36,28 +36,39 @@ function create(): Writable<PanelLayout> & {
   async function reload() {
     try {
       const r = await browser.storage.local.get(STORAGE_KEY);
-      store.set(normalize(r?.[STORAGE_KEY]));
+      const next = normalize(r?.[STORAGE_KEY]);
+      store.set(next);
+      writeQueue = Promise.resolve(next); // 用磁盘状态重置写队列基线
     } catch { /* ignore */ }
   }
 
-  async function persist(layout: PanelLayout) {
-    store.set(layout);
-    try { await browser.storage.local.set({ [STORAGE_KEY]: layout }); } catch { /* */ }
+  // 串行写队列：所有变更依次「读最新结果 → 计算 → store.set + 落盘」，
+  // 杜绝并发 toggle/order 时的 stale-read 与 last-write-wins。
+  let writeQueue: Promise<PanelLayout> = Promise.resolve({ ...EMPTY });
+
+  function enqueue(fn: (cur: PanelLayout) => PanelLayout): Promise<PanelLayout> {
+    writeQueue = writeQueue.then((cur) => {
+      const next = fn(cur);
+      store.set(next);
+      browser.storage.local.set({ [STORAGE_KEY]: next }).catch(() => {});
+      return next;
+    });
+    return writeQueue;
   }
 
   async function setOrder(order: string[]) {
-    const cur = await new Promise<PanelLayout>(res => store.subscribe(v => res(v))());
-    persist({ order, hidden: cur.hidden });
+    await enqueue(cur => ({ order, hidden: cur.hidden }));
   }
 
   async function toggleHidden(id: string) {
-    const cur = await new Promise<PanelLayout>(res => store.subscribe(v => res(v))());
-    const hidden = cur.hidden.includes(id) ? cur.hidden.filter(x => x !== id) : [...cur.hidden, id];
-    persist({ order: cur.order, hidden });
+    await enqueue(cur => {
+      const hidden = cur.hidden.includes(id) ? cur.hidden.filter(x => x !== id) : [...cur.hidden, id];
+      return { order: cur.order, hidden };
+    });
   }
 
   async function reset() {
-    persist({ ...EMPTY });
+    await enqueue(() => ({ ...EMPTY }));
   }
 
   // 初始化 + 监听变更（options 页修改后 popup/sidebar 热更新）
@@ -65,7 +76,9 @@ function create(): Writable<PanelLayout> & {
     reload();
     browser.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes[STORAGE_KEY]) {
-        store.set(normalize(changes[STORAGE_KEY].newValue));
+        const next = normalize(changes[STORAGE_KEY].newValue);
+        store.set(next);
+        writeQueue = Promise.resolve(next); // 外部写入后重置基线，避免本地队列回滚
       }
     });
   }
@@ -76,16 +89,24 @@ function create(): Writable<PanelLayout> & {
 export const panelLayoutStore = create();
 
 /**
- * 对面板元数据列表应用布局：按 order 重排，过滤 hidden。
- * @param list 原始面板元数据（含 id）
+ * 按 layout.order 对列表重排（不过滤 hidden）。
+ * order 中未列出的项保持原相对顺序追加在后。供 options 编辑页（需保留隐藏项）使用。
  */
-export function applyLayout<T extends { id: string }>(list: T[], layout: PanelLayout): T[] {
-  const visible = list.filter(p => !layout.hidden.includes(p.id));
-  if (!layout.order.length) return visible;
+export function sortByLayout<T extends { id: string }>(list: T[], layout: PanelLayout): T[] {
+  if (!layout.order.length) return [...list];
   const idx = new Map(layout.order.map((id, i) => [id, i]));
-  return [...visible].sort((a, b) => {
+  return [...list].sort((a, b) => {
     const ia = idx.has(a.id) ? idx.get(a.id)! : 1e9;
     const ib = idx.has(b.id) ? idx.get(b.id)! : 1e9;
     return ia - ib;
   });
+}
+
+/**
+ * 对面板元数据列表应用布局：先按 order 重排，再过滤 hidden。
+ * sidebar / popup 等只读消费方统一用这个，保证顺序与可见性与 options 编辑一致。
+ */
+export function applyLayout<T extends { id: string }>(list: T[], layout: PanelLayout): T[] {
+  const visible = list.filter(p => !layout.hidden.includes(p.id));
+  return sortByLayout(visible, layout);
 }

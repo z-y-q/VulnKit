@@ -29,29 +29,29 @@ export default defineContentScript({
     const GEN_TOKEN = (): string =>
       Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-    // dataKey → { resolve, token }
-    interface Channel {
-      resolve: ((result: unknown) => void) | null;
-      token: string | null;
+    // token → pending：每次注入独立条目，支持同 dataKey 并发调用互不覆盖。
+    interface Pending {
+      dataKey: string;
+      timer: ReturnType<typeof setTimeout>;
+      resolve: (result: unknown) => void;
     }
-    const channels: Record<string, Channel> = {};
-    const DATA_KEYS = [
-      '__vk_detect',
-      '__vk_react_detect',
-      '__vk_angular_detect',
-      '__vk_sourcemap_detect',
-      '__vk_vue_store',
-      '__vk_page_inspect',
-      '__vk_react_store',
-      '__vk_angular_store',
-      '__vk_svelte_detect',
-      '__vk_vue_attack',
-    ];
-    for (const k of DATA_KEYS) channels[k] = { resolve: null, token: null };
+    const pending = new Map<string, Pending>();
 
     let vueDetecting = false;
 
+    /** 清理某 token 的待办（成功回执、超时、加载失败共用）。 */
+    function settle(token: string, withResult: (p: Pending) => void) {
+      const p = pending.get(token);
+      if (!p) return;
+      pending.delete(token);
+      clearTimeout(p.timer);
+      if (p.dataKey === '__vk_detect') vueDetecting = false;
+      withResult(p);
+    }
+
     window.addEventListener('message', (e: MessageEvent) => {
+      // 必须来自当前窗口且同源：防止其它 frame/页面伪造回执
+      if (e.source !== window) return;
       if (e.origin !== location.origin) return;
       const data = e.data as any;
       if (!data || typeof data !== 'object') return;
@@ -69,55 +69,51 @@ export default defineContentScript({
         return;
       }
 
-      for (const key in channels) {
-        if (!data[key]) continue;
-        const ch = channels[key];
-        if (ch.resolve && ch.token && data.__vk_token === ch.token) {
-          ch.resolve(data.result);
-          ch.resolve = null;
-          ch.token = null;
-          if (key === '__vk_detect') vueDetecting = false;
-        }
-        return;
-      }
+      // token 必须是字符串且存在于 pending；再用 dataKey 二次校验防碰撞
+      const token = data.__vk_token;
+      if (typeof token !== 'string') return;
+      const p = pending.get(token);
+      if (!p) return;
+      if (!data[p.dataKey]) return;
+
+      // 成功回执：resolve 后立即移除，避免重复结算
+      settle(token, (entry) => entry.resolve(data.result));
     });
 
-    // ====== 通用脚本注入 ======
-    function injectScript(
-      url: string,
-      dataKey: string,
-      timeoutMs: number,
-    ): Promise<unknown> {
-      const ch = channels[dataKey];
-      if (!ch) return Promise.resolve(null);
+    // ====== 通用脚本注入（统一 detect / store / inspect / attack） ======
+    function injectTracked(opts: {
+      url: string;
+      dataKey: string;
+      timeout: number;
+      /** 超时返回值（detect/store/inspect 为 null，attack 为错误对象） */
+      fallback?: unknown;
+      /** 脚本加载失败返回值（默认同 fallback） */
+      loadError?: unknown;
+      /** 额外 dataset 写入（如 vkAction / vkTarget） */
+      setup?: (script: HTMLScriptElement) => void;
+    }): Promise<unknown> {
+      const { url, dataKey, timeout, fallback = null, loadError = fallback, setup } = opts;
+      // Vue detect 全局单飞：并发探测只跑一次
       if (dataKey === '__vk_detect' && vueDetecting) return Promise.resolve(null);
       if (dataKey === '__vk_detect') vueDetecting = true;
 
       return new Promise((resolve) => {
         const token = GEN_TOKEN();
-        ch.token = token;
-
-        const timer = setTimeout(() => {
-          ch.resolve = null;
-          if (dataKey === '__vk_detect') vueDetecting = false;
-          resolve(null);
-        }, timeoutMs);
-
-        ch.resolve = (result: unknown) => {
-          clearTimeout(timer);
-          resolve(result);
-        };
+        const timer = setTimeout(() => settle(token, () => resolve(fallback)), timeout);
+        pending.set(token, {
+          dataKey,
+          timer,
+          resolve: (result: unknown) => resolve(result),
+        });
 
         const script = document.createElement('script');
         script.src = browser.runtime.getURL(url as any);
         script.dataset.vkToken = token;
+        setup?.(script);
         script.onload = () => script.remove();
         script.onerror = () => {
           script.remove();
-          clearTimeout(timer);
-          ch.resolve = null;
-          if (dataKey === '__vk_detect') vueDetecting = false;
-          resolve(null);
+          settle(token, () => resolve(loadError));
         };
         (document.head || document.documentElement).appendChild(script);
       });
@@ -137,66 +133,26 @@ export default defineContentScript({
 
     // ====== page-inspect（带额外 action dataset） ======
     function injectPageInspect(action: string, timeout: number): Promise<unknown> {
-      return new Promise((resolve) => {
-        const ch = channels['__vk_page_inspect'];
-        const token = GEN_TOKEN();
-        ch.token = token;
-        const timer = setTimeout(() => {
-          ch.resolve = null;
-          resolve(null);
-        }, timeout);
-
-        ch.resolve = (result: unknown) => {
-          clearTimeout(timer);
-          ch.resolve = null;
-          resolve(result);
-        };
-
-        const script = document.createElement('script');
-        script.src = browser.runtime.getURL(pageInspectUrl as any);
-        script.dataset.vkToken = token;
-        script.dataset.vkAction = action;
-        script.onload = () => script.remove();
-        script.onerror = () => {
-          script.remove();
-          clearTimeout(timer);
-          ch.resolve = null;
-          resolve(null);
-        };
-        (document.head || document.documentElement).appendChild(script);
+      return injectTracked({
+        url: pageInspectUrl,
+        dataKey: '__vk_page_inspect',
+        timeout,
+        setup: (s) => { s.dataset.vkAction = action; },
       });
     }
 
     // ====== Vue 攻击层（bypass/navigate/restore，带 action+target dataset） ======
     function injectVueAttack(action: string, target: string, timeout: number): Promise<unknown> {
-      return new Promise((resolve) => {
-        const ch = channels['__vk_vue_attack'];
-        const token = GEN_TOKEN();
-        ch.token = token;
-        const timer = setTimeout(() => {
-          ch.resolve = null;
-          resolve({ success: false, error: '注入超时（页面可能无 Vue Router）' });
-        }, timeout);
-
-        ch.resolve = (result: unknown) => {
-          clearTimeout(timer);
-          ch.resolve = null;
-          resolve(result);
-        };
-
-        const script = document.createElement('script');
-        script.src = browser.runtime.getURL(vueAttackUrl as any);
-        script.dataset.vkToken = token;
-        script.dataset.vkAction = action;
-        script.dataset.vkTarget = target || '';
-        script.onload = () => script.remove();
-        script.onerror = () => {
-          script.remove();
-          clearTimeout(timer);
-          ch.resolve = null;
-          resolve({ success: false, error: '脚本加载失败' });
-        };
-        (document.head || document.documentElement).appendChild(script);
+      return injectTracked({
+        url: vueAttackUrl,
+        dataKey: '__vk_vue_attack',
+        timeout,
+        fallback: { success: false, error: '注入超时（页面可能无 Vue Router）' },
+        loadError: { success: false, error: '脚本加载失败' },
+        setup: (s) => {
+          s.dataset.vkAction = action;
+          s.dataset.vkTarget = target || '';
+        },
       });
     }
 
@@ -269,7 +225,7 @@ export default defineContentScript({
 
       const handler = INJECT_HANDLERS[type];
       if (handler) {
-        injectScript(handler.url, handler.dataKey, handler.timeout).then(sendResponse);
+        injectTracked({ url: handler.url, dataKey: handler.dataKey, timeout: handler.timeout }).then(sendResponse);
         return true;
       }
 

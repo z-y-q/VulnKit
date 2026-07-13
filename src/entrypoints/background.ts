@@ -1,8 +1,9 @@
 // 灵眸 v6.0 — Background Service Worker
 // 编排：消息分发 → fetchers / dnr / context-menus / ruoyi-hook
-// SSRF 防护统一在分发层用 url-guard 校验。
+// SSRF 防护统一在分发层用 url-guard 校验；消息来源统一由 sender-guard 校验。
 
 import { isAllowedUrl, validateProbeUrl } from '@/lib/core/url-guard';
+import { isAuthorized } from '@/lib/background/sender-guard';
 import {
   fetchUrl,
   fetchImage,
@@ -34,8 +35,13 @@ import type { BackgroundMessage } from '@/lib/types/messaging';
 
 export default defineBackground(() => {
   // ====== 消息分发 ======
-  browser.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (!msg || !msg.type) return false;
+  // 统一门控：sender 必须满足该消息类型的来源策略（见 sender-guard.ts）。
+  // 不合法来源立即拒绝，不进入 handle，避免外部上下文调用高权限操作。
+  browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!isAuthorized(msg as { type?: string } | null, sender)) {
+      sendResponse({ error: 'Unauthorized sender' });
+      return false; // 同步响应，无需异步
+    }
     const message = msg as BackgroundMessage;
     handle(message).then(
       (resp) => sendResponse(resp),
@@ -48,12 +54,18 @@ export default defineBackground(() => {
     switch (message.type) {
       // —— 抓取代理 ——
       case 'FETCH_URL': {
+        if (typeof message.url !== 'string' || !message.url) {
+          return { success: false, error: 'Invalid url' };
+        }
         if (!isAllowedUrl(message.url)) {
           return { success: false, error: 'URL not allowed (must be http/https, no private IPs)' };
         }
-        return fetchUrl(message.url, message.tailOnly, message.timeout);
+        return fetchUrl(message.url, message.tailOnly, message.timeout, message.maxBytes);
       }
       case 'FETCH_URL_AUTH': {
+        if (typeof message.url !== 'string' || !message.url) {
+          return { success: false, error: 'Invalid url' };
+        }
         if (!isAllowedUrl(message.url)) {
           return { success: false, error: 'URL not allowed (must be http/https, no private IPs)' };
         }
@@ -65,17 +77,20 @@ export default defineBackground(() => {
 
       // —— 探测类 ——
       case 'FETCH_PROBE': {
+        if (typeof message.url !== 'string' || !message.url) return { error: 'Invalid url' };
         const v = validateProbeUrl(message.url);
         if ('error' in v) return { error: v.error };
         return fetchProbe(v.parsed.href, message);
       }
       case 'FETCH_CORS_PROBE': {
+        if (typeof message.url !== 'string' || !message.url) return { error: 'Invalid url' };
         const v = validateProbeUrl(message.url);
         if ('error' in v) return { error: v.error };
         if (!isAllowedUrl(v.parsed.href)) return { error: 'URL not allowed (no private IPs)' };
         return fetchCorsProbe(v.parsed.href, message);
       }
       case 'FETCH_HEADER_PROBE': {
+        if (typeof message.url !== 'string' || !message.url) return { error: 'Invalid url' };
         const v = validateProbeUrl(message.url);
         if ('error' in v) return { error: v.error };
         if (!isAllowedUrl(v.parsed.href)) return { error: 'URL not allowed (no private IPs)' };
@@ -88,12 +103,16 @@ export default defineBackground(() => {
         return fetchDnsResolve(message.hostname, message.recordType);
       }
       case 'FETCH_WAF_PROBE': {
+        if (typeof message.url !== 'string' || !message.url) return { error: 'Invalid url' };
         const v = validateProbeUrl(message.url);
         if ('error' in v) return { error: v.error };
         if (!isAllowedUrl(v.parsed.href)) return { error: 'URL not allowed (no private IPs)' };
         return fetchWafProbe(v.parsed.href, message);
       }
       case 'FETCH_IMAGE': {
+        if (typeof message.url !== 'string' || !message.url) {
+          return { success: false, error: 'Invalid url' };
+        }
         if (!isAllowedUrl(message.url)) {
           return { success: false, error: 'URL not allowed (must be http/https, no private IPs)' };
         }
@@ -114,6 +133,9 @@ export default defineBackground(() => {
       // —— 请求伪造 ——
       case 'SPOOF_UA':
         try {
+          if (typeof message.url !== 'string' || typeof message.userAgent !== 'string') {
+            return { success: false, error: 'Invalid url or userAgent' };
+          }
           await spoofUa(message.url, message.userAgent);
           return { success: true };
         } catch (e) {
@@ -128,6 +150,9 @@ export default defineBackground(() => {
         }
       case 'SPOOF_HEADERS':
         try {
+          if (typeof message.url !== 'string' || typeof message.headers !== 'object' || !message.headers) {
+            return { success: false, error: 'Invalid url or headers' };
+          }
           await spoofHeaders(message.url, message.headers);
           return { success: true };
         } catch (e) {
@@ -143,7 +168,9 @@ export default defineBackground(() => {
 
       // —— 若依 Hook ——
       case 'REGISTER_RUOYI_HOOK':
-        if (!message.origin) return { success: false, error: 'Missing origin' };
+        if (typeof message.origin !== 'string' || !message.origin) {
+          return { success: false, error: 'Missing origin' };
+        }
         await registerRuoYiHook(message.origin);
         return { success: true };
       case 'UNREGISTER_RUOYI_HOOK':

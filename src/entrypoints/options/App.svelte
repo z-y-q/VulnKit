@@ -261,18 +261,10 @@
 
   // ===== 面板排序 / 显示隐藏 =====
   import { panelMeta } from '@/panels/registry';
-  import { panelLayoutStore } from '@/stores/panel-layout';
+  import { panelLayoutStore, sortByLayout } from '@/stores/panel-layout';
   let layout = $derived($panelLayoutStore);
-  // 当前编辑顺序（基于 layout.order 重排 panelMeta）
-  let orderedPanels = $derived.by(() => {
-    const idx = new Map(layout.order.map((id, i) => [id, i]));
-    return [...panelMeta].sort((a, b) => {
-      const ia = idx.has(a.id) ? idx.get(a.id)! : 1e9;
-      const ib = idx.has(b.id) ? idx.get(b.id)! : 1e9;
-      if (ia !== ib) return ia - ib;
-      return panelMeta.indexOf(a) - panelMeta.indexOf(b);
-    });
-  });
+  // 当前编辑顺序（复用统一排序逻辑；这里需保留隐藏项以供勾选，故用 sortByLayout 而非 applyLayout）
+  let orderedPanels = $derived(sortByLayout(panelMeta, layout));
   async function movePanel(index: number, delta: number) {
     const newList = orderedPanels.map(p => p.id);
     const j = index + delta;
@@ -392,11 +384,11 @@
         <button class="btn btn-xs text-red-500" onclick={clearHae}>清空自定义</button>
       </div>
     </div>
-    <p class="text-xs text-gray-400">YAML 格式，自定义规则追加到内置默认规则之后，供「信息收集」面板使用。字段：group / rules[]{name, f_regex, s_regex, format, color, sensitive}。保存时自动校验正则合法性。</p>
+    <p class="text-xs text-gray-400">YAML 格式，自定义规则追加到内置默认规则之后，供「信息收集」面板使用。字段：group / rules[]（每条含 name, f_regex, s_regex, format, color, sensitive）。保存时自动校验正则合法性。</p>
     <textarea
       class="input font-mono text-xs w-full"
       rows="12"
-      placeholder="# 示例：&#10;- group: 自定义规则&#10;  rules:&#10;    - name: 内网IP&#10;      f_regex: '(?:10\\.|172\\.(?:1[6-9]|2\\d|3[01])\\.|192\\.168\\.)\\d{1,3}'&#10;      format: '{0}'&#10;      color: orange&#10;      sensitive: false"
+      placeholder="# 示例：&#10;- group: 自定义规则&#10;  rules:&#10;    - name: 内网IP&#10;      f_regex: '(?:10\\.|172\\.(?:1[6-9]|2\\d|3[01])\\.|192\\.168\\.)\\d&#123;1,3&#125;'&#10;      format: '&#123;0&#125;'&#10;      color: orange&#10;      sensitive: false"
       bind:value={haeText}
       oninput={() => (haeDirty = true)}
     ></textarea>

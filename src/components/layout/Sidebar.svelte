@@ -1,11 +1,11 @@
 <script lang="ts">
   import { panels, type PanelConfig } from '@/panels';
   import { sniffBadgeStore } from '@/stores/sniff-badge';
-  import { panelLayoutStore } from '@/stores/panel-layout';
+  import { panelLayoutStore, applyLayout } from '@/stores/panel-layout';
 
   let layout = $derived($panelLayoutStore);
-  // 过滤被用户隐藏的面板
-  let visiblePanels = $derived(panels.filter(p => !layout.hidden.includes(p.id)));
+  // 应用用户排序 + 过滤隐藏面板（与 options 页、popup 共用同一逻辑）
+  let visiblePanels = $derived(applyLayout(panels, layout));
 
   interface Props {
     activePanel: string;
@@ -65,7 +65,7 @@
       {#if !collapsedCats[catId]}
         <div class="pb-1 px-1.5 space-y-0.5">
           {#each cat.panels as panel, i}
-            {@const shortcutIdx = panels.findIndex(p => p.id === panel.id) + 1}
+            {@const shortcutIdx = visiblePanels.findIndex(p => p.id === panel.id) + 1}
             <button
               class="group w-full text-left pl-3 pr-2 py-1.5 text-[13px] flex items-center gap-2 rounded-lg transition-all duration-200 relative {activePanel === panel.id
                 ? 'bg-white dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 font-semibold shadow-sm vk-glass'

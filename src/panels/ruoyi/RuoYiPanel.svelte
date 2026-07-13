@@ -82,15 +82,20 @@
   });
 
   // 路由按前缀分组树（/system/user → system > user）
+  interface RouteTreeNode {
+    name: string;
+    children?: RouteTreeNode[];
+    leaf?: string;
+  }
   let routeTree = $derived.by(() => {
-    const root: { name: string; children?: any[]; leaf?: string } = { name: '', children: [] as any[] };
-    const getNode = (parts: string[], create: boolean) => {
-      let node: any = root;
+    const root: RouteTreeNode = { name: '', children: [] };
+    const getNode = (parts: string[], create: boolean): RouteTreeNode | null => {
+      let node: RouteTreeNode = root;
       for (const p of parts) {
         node.children = node.children || [];
-        let next = node.children.find((c: any) => c.name === p);
+        let next = node.children.find(c => c.name === p);
         if (!next && create) {
-          next = { name: p, children: [] as any[] };
+          next = { name: p, children: [] };
           node.children.push(next);
         }
         if (!next) return null;
@@ -471,7 +476,7 @@
     for (const sr of sensitiveRoutes) {
       if (!seen.has(sr.path)) {
         seen.add(sr.path);
-        routes.push({ path: sr.path, title: sr.title, status: null, source: 'Hook捕获' });
+        routes.push({ path: sr.path, title: sr.title || '', status: null, source: 'Hook捕获' });
       }
     }
 
@@ -917,7 +922,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
       {#if routeTreeMode}
         <!-- 树视图：按路径前缀分组 -->
         <div class="card p-2 space-y-0.5 max-h-96 overflow-y-auto text-xs font-mono">
-          {#snippet renderNode(node, depth)}
+          {#snippet renderNode(node: RouteTreeNode, depth: number)}
             {#if node.children && node.children.length > 0}
               <details open style="margin-left: {depth * 12}px;">
                 <summary class="cursor-pointer text-gray-700 dark:text-gray-300 select-none">

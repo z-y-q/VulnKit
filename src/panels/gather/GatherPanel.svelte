@@ -90,7 +90,7 @@
   let filteredLeaks = $derived(applyFilter(leakFindings));
 
   // 跨分类搜索：搜索时合并所有分类结果
-  let allFiltered = $derived(() => {
+  let allFiltered = $derived.by(() => {
     if (!searchFilter) return [];
     return [
       ...techFindings.map(f => ({ ...f, _cat: 'tech' as const })),

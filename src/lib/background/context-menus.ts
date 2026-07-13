@@ -218,7 +218,12 @@ async function openSidePanelWithAction(panel: string, url: string, tab: Browser.
     pendingAutoRun: { panel, url, nonce: Date.now() },
   });
   try {
-    await browser.sidePanel.open({ tabId: tab.id });
+    // OpenOptions 要求 tabId 或 windowId 至少一个为具体 number（不可 undefined）
+    if (typeof tab.id === 'number') {
+      await browser.sidePanel.open({ tabId: tab.id });
+    } else if (typeof tab.windowId === 'number') {
+      await browser.sidePanel.open({ windowId: tab.windowId });
+    }
   } catch {
     // sidePanel.open 在个别场景不可用 → 回退徽标提示用户手动打开
     browser.action.setBadgeText({ text: '▶' });

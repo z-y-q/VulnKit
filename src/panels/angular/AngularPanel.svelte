@@ -56,7 +56,7 @@
   let storeSearch = $state('');
   // 子标签页: 'store' | 'routes' | 'api'
   let activeSubTab = $state<'store' | 'routes' | 'api'>('store');
-  let filteredStoreKeys = $derived(() => {
+  let filteredStoreKeys = $derived.by(() => {
     const keys = Object.keys(storeResult?.stores || {});
     if (!storeSearch) return keys;
     const q = storeSearch.toLowerCase();
@@ -171,13 +171,14 @@
   }
 
   function copyRoutesText() {
-    if (!storeResult?.routes?.length) {
+    const sr = storeResult;
+    if (!sr?.routes?.length) {
       toastStore.show('没有路由数据', 'warning');
       return;
     }
-    const text = JSON.stringify(storeResult.routes, null, 2);
+    const text = JSON.stringify(sr.routes, null, 2);
     navigator.clipboard.writeText(text).then(() => {
-      toastStore.show(`已复制 ${storeResult.routes.length} 个路由（JSON）`, 'success');
+      toastStore.show(`已复制 ${sr.routes.length} 个路由（JSON）`, 'success');
     });
   }
 

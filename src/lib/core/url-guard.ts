@@ -14,7 +14,9 @@ export function isAllowedUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
-    const hostname = parsed.hostname.toLowerCase();
+    // WHATWG URL 的 hostname 对 IPv6 保留方括号（如 [::1]），统一去掉再匹配，
+    // 否则 loopback [::1] 会绕过 '::1' 相等判断与 IPV6_PRIVATE_RE。
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|]$/g, '');
     if (
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||

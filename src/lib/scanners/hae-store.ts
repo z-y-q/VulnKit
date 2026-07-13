@@ -7,6 +7,9 @@
 import * as yaml from 'js-yaml';
 import { DEFAULT_HAE_GROUPS, type HaeGroup, type HaeRule } from './hae-engine';
 
+// 透传类型，便于 UI 层只从单一入口（hae-store）导入规则与类型。
+export type { HaeGroup, HaeRule };
+
 const STORAGE_KEY = 'haeCustomRules';
 
 /** 默认规则的 YAML 文本（选项页初始化 / 恢复默认用） */

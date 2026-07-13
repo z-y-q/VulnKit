@@ -5,9 +5,16 @@
   import StatusBar from '@/components/layout/StatusBar.svelte';
   import Toast from '@/components/ui/Toast.svelte';
   import { panels } from '@/panels';
+  import { panelLayoutStore, applyLayout } from '@/stores/panel-layout';
 
   // 当前活跃面板（$store 自动订阅/取消）
   let activePanel = $derived($activePanelStore);
+
+  // 版本号取自 manifest，避免硬编码与 package.json 脱节
+  let version = $derived(browser.runtime.getManifest().version);
+
+  // 快捷键序列与侧栏可见顺序一致（应用用户排序 + 隐藏过滤）
+  let orderedPanels = $derived(applyLayout(panels, $panelLayoutStore));
 
   // 查找当前面板配置
   let currentPanel = $derived(panels.find(p => p.id === activePanel));
@@ -55,14 +62,14 @@
     browser.runtime.openOptionsPage();
   }
 
-  // 键盘快捷键：Alt+1~8 切换到前 8 个面板（按侧栏顺序）
+  // 键盘快捷键：Alt+1~8 切换到前 8 个面板（按侧栏可见顺序）
   $effect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       // 仅处理 Alt+1..8
       const n = parseInt(e.key, 10);
       if (!n || n < 1 || n > 8) return;
-      const target = panels[n - 1];
+      const target = orderedPanels[n - 1];
       if (target) {
         e.preventDefault();
         activePanelStore.set(target.id);
@@ -79,7 +86,7 @@
     <div class="flex items-center gap-2.5">
       <div class="w-7 h-7 rounded-lg vk-brand-bg flex items-center justify-center text-white text-xs font-bold shadow-md shadow-blue-500/30">灵</div>
       <span class="text-base font-bold vk-brand-gradient tracking-tight">灵眸</span>
-      <span class="text-[10px] text-gray-400 font-mono px-1.5 py-0.5 rounded-md bg-gray-100/80 dark:bg-gray-700/50 font-medium">v7.0</span>
+      <span class="text-[10px] text-gray-400 font-mono px-1.5 py-0.5 rounded-md bg-gray-100/80 dark:bg-gray-700/50 font-medium">v{version}</span>
     </div>
     <div class="flex items-center gap-1">
       <button onclick={toggleTheme} class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-500 dark:text-gray-400 transition-all duration-200 hover:text-gray-700 dark:hover:text-gray-200" title="切换主题">
@@ -113,9 +120,15 @@
         <div class="flex-1 overflow-y-auto p-3.5">
           {#key activePanel}
             <div class="vk-fade-in">
-              {#if currentPanel.component}
-                {@const Panel = currentPanel.component}
-                <Panel />
+              {#if currentPanel}
+                {#await currentPanel.load()}
+                  <div class="text-xs text-gray-400 animate-pulse">加载中…</div>
+                {:then module}
+                  {@const Panel = module.default}
+                  <Panel />
+                {:catch}
+                  <div class="text-xs text-red-500">面板加载失败，请重试</div>
+                {/await}
               {/if}
             </div>
           {/key}

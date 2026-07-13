@@ -4,7 +4,8 @@
 // ====== Background 消息（UI/content → background）======
 export type BackgroundMessage =
   // —— 抓取代理（绕过 CORS）——
-  | { type: 'FETCH_URL'; url: string; tailOnly?: boolean | number; timeout?: number }
+  // maxBytes 由 background 强制夹紧到安全上限，调用方不可突破硬顶。
+  | { type: 'FETCH_URL'; url: string; tailOnly?: boolean | number; timeout?: number; maxBytes?: number }
   | { type: 'FETCH_URL_AUTH'; url: string; provider: 'zoomeye'; key: string }
   // —— 探测类（保留响应头/状态/耗时）——
   | { type: 'FETCH_PROBE'; url: string; method?: string; headers?: Record<string, string>; body?: string; timeout?: number; followRedirect?: boolean; includeBody?: boolean }
@@ -57,7 +58,11 @@ export interface FetchOk<T = string> {
 export interface FetchErr {
   success: false;
   error: string;
+  /** 结构化错误码，便于 UI 区分处理（超限、HTTP、超时、中止） */
+  code?: FetchErrorCode;
 }
+
+export type FetchErrorCode = 'HTTP_ERROR' | 'TOO_LARGE' | 'TIMEOUT' | 'ABORTED' | 'NETWORK';
 export type FetchResult<T = string> = FetchOk<T> | FetchErr;
 
 export interface ProbeResult {

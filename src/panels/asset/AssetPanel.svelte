@@ -54,7 +54,7 @@
   $effect(() => {
     browser.storage.local.get([STORAGE_KEY_API, STORAGE_KEY_FOFA, STORAGE_KEY_SHODAN]).then((stored) => {
       if (stored?.[STORAGE_KEY_API]) apiKey = stored[STORAGE_KEY_API] as string;
-      const fofa = stored?.[STORAGE_KEY_FOFA];
+      const fofa = stored?.[STORAGE_KEY_FOFA] as { email?: string; key?: string } | undefined;
       if (fofa && typeof fofa === 'object') { fofaEmail = fofa.email || ''; fofaKey = fofa.key || ''; }
       if (stored?.[STORAGE_KEY_SHODAN]) shodanKey = stored[STORAGE_KEY_SHODAN] as string;
     });
