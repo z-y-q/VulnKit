@@ -222,6 +222,7 @@
       <div
         class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 transition-colors"
         onclick={() => document.getElementById('exif-file-input')?.click()}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('exif-file-input')?.click(); } }}
         ondrop={onDrop}
         ondragover={onDragOver}
         role="button"

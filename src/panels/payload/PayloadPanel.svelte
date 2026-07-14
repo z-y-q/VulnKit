@@ -213,8 +213,9 @@
       <div class="text-xs text-gray-500 mb-2">SQLi 动态参数（调整后自动重新生成）</div>
       <div class="flex gap-2 items-end">
         <div>
-          <label class="block text-xs text-gray-500 mb-1">列数 (N)</label>
+          <label for="payload-sqli-cols" class="block text-xs text-gray-500 mb-1">列数 (N)</label>
           <input
+            id="payload-sqli-cols"
             class="input text-xs w-16 text-center font-mono"
             type="number"
             min="1"
@@ -223,8 +224,8 @@
           />
         </div>
         <div class="flex-1">
-          <label class="block text-xs text-gray-500 mb-1">目标表名</label>
-          <input class="input text-xs font-mono" placeholder="users" bind:value={sqliTable} />
+          <label for="payload-sqli-table" class="block text-xs text-gray-500 mb-1">目标表名</label>
+          <input id="payload-sqli-table" class="input text-xs font-mono" placeholder="users" bind:value={sqliTable} />
         </div>
       </div>
     </div>
@@ -236,12 +237,12 @@
       <div class="text-xs text-gray-500 mb-2">反弹 Shell 参数（复制时自动替换）</div>
       <div class="flex gap-2 items-end">
         <div class="flex-1">
-          <label class="block text-xs text-gray-500 mb-1">监听 IP</label>
-          <input class="input text-xs font-mono" placeholder="10.0.0.1" bind:value={revIp} />
+          <label for="payload-rev-ip" class="block text-xs text-gray-500 mb-1">监听 IP</label>
+          <input id="payload-rev-ip" class="input text-xs font-mono" placeholder="10.0.0.1" bind:value={revIp} />
         </div>
         <div class="w-24">
-          <label class="block text-xs text-gray-500 mb-1">端口</label>
-          <input class="input text-xs font-mono text-center" placeholder="4444" bind:value={revPort} />
+          <label for="payload-rev-port" class="block text-xs text-gray-500 mb-1">端口</label>
+          <input id="payload-rev-port" class="input text-xs font-mono text-center" placeholder="4444" bind:value={revPort} />
         </div>
       </div>
     </div>
@@ -273,7 +274,14 @@
           {#each items as item, i (i)}
             <div class="p-2 border-b border-gray-50 dark:border-gray-800/50 last:border-b-0 hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
               <div class="flex items-start justify-between gap-2">
-                <div class="flex-1 min-w-0 cursor-pointer" onclick={() => copyPayload(item.payload)} title="点击复制">
+                <div
+                  class="flex-1 min-w-0 cursor-pointer"
+                  role="button"
+                  tabindex="0"
+                  onclick={() => copyPayload(item.payload)}
+                  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); copyPayload(item.payload); } }}
+                  title="点击复制"
+                >
                   {#if item.name}
                     <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-0.5">
                       {item.name}

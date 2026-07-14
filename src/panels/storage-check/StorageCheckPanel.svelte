@@ -630,7 +630,10 @@
               <div
                 class="text-gray-500 mt-0.5 break-all cursor-pointer select-all"
                 class:line-clamp-2={!expandedKeys.has(item.key)}
+                role="button"
+                tabindex="0"
                 onclick={() => toggleExpand(item.key)}
+                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(item.key); } }}
                 title="点击展开/收起"
               >
                 {expandedKeys.has(item.key) ? escapeHtml(item.value) : escapeHtml(truncate(item.value, 120))}

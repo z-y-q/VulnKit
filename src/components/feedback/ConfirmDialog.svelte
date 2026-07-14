@@ -54,12 +54,26 @@
   function onOverlayClick(e: MouseEvent) {
     if (e.target === e.currentTarget) confirmStore.respond(false);
   }
+
+  function onOverlayKeydown(e: KeyboardEvent) {
+    // Enter/Space 触发关闭；Escape 已由 window 级 keydown 处理
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      confirmStore.respond(false);
+    }
+  }
 </script>
 
 {#if req}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <!-- 遮罩点击关闭是 pointer 辅助；键盘用户通过 Escape / 取消按钮关闭，故 overlay 不作为交互元素 -->
-  <div class="vk-confirm-overlay" onclick={onOverlayClick}>
+  <!-- 遮罩点击/激活关闭；键盘用户亦可通过 Escape（window 监听）或取消按钮关闭 -->
+  <div
+    class="vk-confirm-overlay"
+    role="button"
+    tabindex="-1"
+    aria-label="点击遮罩关闭对话框"
+    onclick={onOverlayClick}
+    onkeydown={onOverlayKeydown}
+  >
     <div
       bind:this={dialogRef}
       class="vk-confirm-dialog"

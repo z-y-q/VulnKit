@@ -241,8 +241,8 @@
     </div>
 
     <div>
-      <label class="block text-xs text-gray-500 mb-1">输入</label>
-      <textarea class="input font-mono text-xs" rows="3" placeholder="输入需要编码/解码的内容..." bind:value={input}></textarea>
+      <label for="enc-input" class="block text-xs text-gray-500 mb-1">输入</label>
+      <textarea id="enc-input" class="input font-mono text-xs" rows="3" placeholder="输入需要编码/解码的内容..." bind:value={input}></textarea>
     </div>
 
     <div>
@@ -257,8 +257,8 @@
 
   {:else if view === 'jwt'}
     <div>
-      <label class="block text-xs text-gray-500 mb-1">JWT Token</label>
-      <textarea class="input font-mono text-xs" rows="3" placeholder="粘贴 JWT（eyJ...）" bind:value={jwtInput}></textarea>
+      <label for="enc-jwt" class="block text-xs text-gray-500 mb-1">JWT Token</label>
+      <textarea id="enc-jwt" class="input font-mono text-xs" rows="3" placeholder="粘贴 JWT（eyJ...）" bind:value={jwtInput}></textarea>
     </div>
 
     {#if jwtError}
@@ -491,8 +491,8 @@
 
     <!-- 输入 -->
     <div>
-      <label class="block text-xs text-gray-500 mb-1">输入</label>
-      <textarea class="input font-mono text-xs" rows="3" placeholder={cryptoAlgo === 'hash' ? '输入待哈希内容' : '输入明文/密文'} bind:value={cryptoInput}></textarea>
+      <label for="enc-crypto-input" class="block text-xs text-gray-500 mb-1">输入</label>
+      <textarea id="enc-crypto-input" class="input font-mono text-xs" rows="3" placeholder={cryptoAlgo === 'hash' ? '输入待哈希内容' : '输入明文/密文'} bind:value={cryptoInput}></textarea>
     </div>
 
     <!-- 操作按钮 -->

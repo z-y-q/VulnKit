@@ -271,8 +271,8 @@
     {/if}
 
     <div>
-      <label class="block text-xs text-gray-500 mb-1">User-Agent</label>
-      <textarea class="input font-mono text-xs" rows="2" placeholder="选择预设或输入自定义 UA" bind:value={customUa}></textarea>
+      <label for="spoof-ua" class="block text-xs text-gray-500 mb-1">User-Agent</label>
+      <textarea id="spoof-ua" class="input font-mono text-xs" rows="2" placeholder="选择预设或输入自定义 UA" bind:value={customUa}></textarea>
     </div>
 
     <div class="flex gap-1">
@@ -287,16 +287,16 @@
 
     <div class="card p-2 space-y-2">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">X-Forwarded-For</label>
-        <input class="input text-xs font-mono" placeholder="1.2.3.4" bind:value={xff} />
+        <label for="spoof-xff" class="block text-xs text-gray-500 mb-1">X-Forwarded-For</label>
+        <input id="spoof-xff" class="input text-xs font-mono" placeholder="1.2.3.4" bind:value={xff} />
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Referer</label>
-        <input class="input text-xs font-mono" placeholder="https://internal.target.local/" bind:value={referer} />
+        <label for="spoof-referer" class="block text-xs text-gray-500 mb-1">Referer</label>
+        <input id="spoof-referer" class="input text-xs font-mono" placeholder="https://internal.target.local/" bind:value={referer} />
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Client-IP / X-Real-IP</label>
-        <input class="input text-xs font-mono" placeholder="10.0.0.1" bind:value={clientIp} />
+        <label for="spoof-clientip" class="block text-xs text-gray-500 mb-1">Client-IP / X-Real-IP</label>
+        <input id="spoof-clientip" class="input text-xs font-mono" placeholder="10.0.0.1" bind:value={clientIp} />
       </div>
     </div>
 

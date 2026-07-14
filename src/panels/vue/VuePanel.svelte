@@ -996,7 +996,13 @@
         {#each Object.entries(storeResult.store.stores || {}) as [storeId, storeData]}
           {@const isExpanded = expandedStores.has(storeId)}
           <div class="card p-2 space-y-1 text-xs">
-            <div class="flex items-center gap-2 cursor-pointer" onclick={() => toggleStore(storeId)}>
+            <div
+              class="flex items-center gap-2 cursor-pointer"
+              role="button"
+              tabindex="0"
+              onclick={() => toggleStore(storeId)}
+              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleStore(storeId); } }}
+            >
               <span class="text-gray-500">{isExpanded ? '▼' : '▶'}</span>
               <span class="font-semibold">{storeId}</span>
               <span class="badge">{storeData.type || 'unknown'}</span>

@@ -684,29 +684,28 @@
 <!-- Cookie 编辑/新增弹窗 -->
 {#if editorOpen}
   <div class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-4 space-y-3" onclick={(e) => e.stopPropagation()}>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-4 space-y-3">
       <div class="flex items-center justify-between">
         <span class="text-sm font-bold">{editing ? '编辑 Cookie' : '新增 Cookie'}</span>
         <button class="text-gray-400 hover:text-gray-600" onclick={() => (editorOpen = false)}>✕</button>
       </div>
       <div class="space-y-2">
         <div>
-          <label class="text-xs text-gray-500">名称</label>
-          <input class="input text-xs" bind:value={form.name} placeholder="session_id" />
+          <label for="cookie-edit-name" class="text-xs text-gray-500">名称</label>
+          <input id="cookie-edit-name" class="input text-xs" bind:value={form.name} placeholder="session_id" />
         </div>
         <div>
-          <label class="text-xs text-gray-500">值</label>
-          <input class="input text-xs font-mono" bind:value={form.value} placeholder="value" />
+          <label for="cookie-edit-value" class="text-xs text-gray-500">值</label>
+          <input id="cookie-edit-value" class="input text-xs font-mono" bind:value={form.value} placeholder="value" />
         </div>
         <div class="flex gap-2">
           <div class="flex-1">
-            <label class="text-xs text-gray-500">域名</label>
-            <input class="input text-xs" bind:value={form.domain} placeholder="example.com" />
+            <label for="cookie-edit-domain" class="text-xs text-gray-500">域名</label>
+            <input id="cookie-edit-domain" class="input text-xs" bind:value={form.domain} placeholder="example.com" />
           </div>
           <div class="flex-1">
-            <label class="text-xs text-gray-500">路径</label>
-            <input class="input text-xs" bind:value={form.path} placeholder="/" />
+            <label for="cookie-edit-path" class="text-xs text-gray-500">路径</label>
+            <input id="cookie-edit-path" class="input text-xs" bind:value={form.path} placeholder="/" />
           </div>
         </div>
         <div class="flex gap-2 flex-wrap text-xs">
@@ -733,8 +732,7 @@
 <!-- 批量导入弹窗 -->
 {#if importOpen}
   <div class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-4 space-y-3" onclick={(e) => e.stopPropagation()}>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-4 space-y-3">
       <div class="flex items-center justify-between">
         <span class="text-sm font-bold">批量导入 Cookie</span>
         <button class="text-gray-400 hover:text-gray-600" onclick={() => (importOpen = false)}>✕</button>

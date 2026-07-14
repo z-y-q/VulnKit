@@ -368,7 +368,14 @@
                 {/if}
                 <span class="ml-0.5 px-1 rounded {CONFIDENCE_COLORS[item.confidenceLevel]}">{CONFIDENCE_LABELS[item.confidenceLevel]}</span>
                 {#if FRAMEWORK_PANEL[item.name]}
-                  <span class="ml-0.5 opacity-70 hover:opacity-100" title="跳转到 {FRAMEWORK_PANEL[item.name]} 分析面板" onclick={(e) => { e.stopPropagation(); jumpToFramework(item.name); }}>→</span>
+                  <span
+                    class="ml-0.5 opacity-70 hover:opacity-100"
+                    role="button"
+                    tabindex="0"
+                    title="跳转到 {FRAMEWORK_PANEL[item.name]} 分析面板"
+                    onclick={(e) => { e.stopPropagation(); jumpToFramework(item.name); }}
+                    onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); jumpToFramework(item.name); } }}
+                  >→</span>
                 {/if}
               </button>
             {/each}

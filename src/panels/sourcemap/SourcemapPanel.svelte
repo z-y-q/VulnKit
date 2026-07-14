@@ -897,8 +897,7 @@
 <!-- 源码查看器弹窗 -->
 {#if viewerOpen && viewerBundle?.info}
   <div class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden" onclick={(e) => e.stopPropagation()}>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden">
       <!-- 弹窗头 -->
       <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 dark:border-gray-700 shrink-0">
         <div class="flex items-center gap-2 min-w-0">
@@ -926,7 +925,7 @@
           </div>
           <div class="flex-1 overflow-y-auto p-2 space-y-0.5">
             {#each viewerFiles as f (f.path)}
-              <div class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer group" onclick={() => viewFile(f)} role="button" tabindex="0">
+              <div class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer group" onclick={() => viewFile(f)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); viewFile(f); } }} role="button" tabindex="0">
                 <span class="text-gray-400 text-xs">📄</span>
                 <span class="text-xs font-mono text-gray-700 dark:text-gray-300 truncate flex-1">{f.path}</span>
                 <span class="text-[10px] text-gray-400 shrink-0">{(f.content.length / 1024).toFixed(1)}KB</span>
@@ -940,7 +939,6 @@
         </div>
       {/if}
     </div>
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="absolute inset-0 -z-10" onclick={() => (viewerOpen = false)}></div>
+    <button type="button" class="absolute inset-0 -z-10 cursor-default" aria-label="关闭源码查看器" onclick={() => (viewerOpen = false)}></button>
   </div>
 {/if}
