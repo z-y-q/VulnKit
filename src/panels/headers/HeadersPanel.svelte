@@ -9,6 +9,8 @@
   import EmptyState from '@/components/scanner/EmptyState.svelte';
   import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
   import FilterBar from '@/components/scanner/FilterBar.svelte';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { toCsv, toMarkdownTable } from '@/lib/actions/serializers';
   import type { ProbeResult } from '@/lib/types/messaging';
   import {
     analyzeHeaders,
@@ -185,60 +187,41 @@
 
   function cancel() { cancelled = true; }
 
-  function copyText() {
-    if (!result) return;
+  // —— 导出/复制序列化器（作用于 result.results，统一走 ExportMenu；修原 navigator.clipboard 未 await）——
+  function headersCsv(items: HeaderCheckResult[]): string {
+    return toCsv([
+      ['Header', 'Status', 'Value', 'Recommendation'],
+      ...items.map((r) => [r.name, r.status, r.detail || '', r.recommendation || '']),
+    ]);
+  }
+  function headersMd(items: HeaderCheckResult[]): string {
+    let md = '# Security Headers Report\n\n';
+    md += `**Target:** ${targetUrl}\n`;
+    md += `**Score:** ${result?.score} (${result?.grade})\n\n`;
+    md += toMarkdownTable(
+      ['Header', 'Status', 'Value', 'Description'],
+      items.map((r) => [r.name, r.status, r.detail || '-', r.recommendation || '-']),
+    );
+    return md;
+  }
+  function headersText(items: HeaderCheckResult[]): string {
     const lines = [
       '安全头分析报告',
       '==================',
       `目标: ${targetUrl}`,
-      `评分: ${result.score} (${result.grade})`,
+      `评分: ${result?.score} (${result?.grade})`,
       '',
       '结果:',
     ];
-    for (const r of result.results) {
+    for (const r of items) {
       const statusText = r.status === 'pass' ? '[通过]' : r.status === 'warn' ? '[警告]' : '[缺失]';
       lines.push(`${statusText} ${r.name}: ${r.detail || '-'}`);
       if (r.recommendation) lines.push(`  建议: ${r.recommendation}`);
     }
-    for (const l of result.infoLeaks) {
+    for (const l of result?.infoLeaks ?? []) {
       lines.push(`[泄露] ${l.name}: ${l.detail} (${l.message})`);
     }
-    navigator.clipboard.writeText(lines.join('\n'));
-    toastStore.show('已复制报告文本', 'success');
-  }
-
-  function copyMarkdown() {
-    if (!result) {
-      toastStore.show('没有检测结果', 'warning');
-      return;
-    }
-    let md = '# Security Headers Report\n\n';
-    md += `**Target:** ${targetUrl}\n`;
-    md += `**Score:** ${result.score} (${result.grade})\n\n`;
-    md += '| Header | Status | Value | Description |\n';
-    md += '|--------|--------|-------|-------------|\n';
-    for (const r of result.results) {
-      md += `| ${r.name} | ${r.status} | ${r.detail || '-'} | ${r.recommendation || '-'} |\n`;
-    }
-    navigator.clipboard.writeText(md);
-    toastStore.show('已复制 Markdown', 'success');
-  }
-
-  function exportCsv() {
-    if (!result) {
-      toastStore.show('没有检测结果', 'warning');
-      return;
-    }
-    const rows = ['Header,Status,Value,Recommendation', ...result.results.map(r =>
-      `"${r.name}","${r.status}","${(r.detail || '').replace(/"/g, '""')}","${(r.recommendation || '').replace(/"/g, '""')}"`)];
-    const blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `headers-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toastStore.show('CSV 已导出', 'success');
+    return lines.join('\n');
   }
 </script>
 
@@ -473,12 +456,12 @@
     </div>
   {/if}
 
-  <!-- 操作按钮 -->
+  <!-- 导出菜单（复制文本/MD + 导出 CSV，统一走 copyText/downloadText） -->
   {#if result}
-    <div class="flex gap-1">
-      <button class="btn btn-sm flex-1" onclick={copyText}>复制文本</button>
-      <button class="btn btn-sm flex-1" onclick={copyMarkdown}>复制 Markdown</button>
-      <button class="btn btn-sm flex-1" onclick={exportCsv}>导出 CSV</button>
-    </div>
+    <ExportMenu
+      items={result.results}
+      module="headers"
+      serializers={{ csv: headersCsv, markdown: headersMd, text: headersText }}
+    />
   {/if}
 </div>

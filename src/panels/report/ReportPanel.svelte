@@ -3,6 +3,8 @@
   // 从 scan-history store 读取扫描记录，聚合展示 + 多格式导出
   import { scanHistoryStore, type ScanHistoryEntry, type ScanSeverity } from '@/stores/scan-history';
   import { toastStore } from '@/stores/ui';
+  import { confirmStore } from '@/stores/confirm';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
   import {
     aggregateByModule,
     extractDomains,
@@ -61,32 +63,8 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  function exportCsv() {
-    if (queryFindings.length === 0) {
-      toastStore.show('当前筛选下没有可导出的数据', 'warning');
-      return;
-    }
-    downloadBlob(buildCsv(queryEntries), 'lingmou-report.csv', 'text/csv;charset=utf-8');
-    toastStore.show(`CSV 已导出（当前筛选 ${queryFindings.length} 项）`, 'success');
-  }
-
-  function exportJsonReport() {
-    if (queryFindings.length === 0) {
-      toastStore.show('当前筛选下没有可导出的数据', 'warning');
-      return;
-    }
-    downloadBlob(buildJson(queryEntries), 'lingmou-report.json', 'application/json;charset=utf-8');
-    toastStore.show(`JSON 已导出（当前筛选 ${queryFindings.length} 项）`, 'success');
-  }
-
-  function exportMarkdownReport() {
-    if (queryFindings.length === 0) {
-      toastStore.show('当前筛选下没有可导出的数据', 'warning');
-      return;
-    }
-    downloadBlob(buildMarkdown(queryEntries), 'lingmou-report.md', 'text/markdown;charset=utf-8');
-    toastStore.show(`Markdown 已导出（当前筛选 ${queryFindings.length} 项）`, 'success');
-  }
+  // CSV / JSON / Markdown 导出统一交给 ExportMenu（serializers 直接复用 report-builder 的 buildCsv/buildJson/buildMarkdown）。
+  // HTML 因体量大、含统计图表，保留独立按钮（exportHtmlReport）。
 
   function exportHtmlReport() {
     if (queryFindings.length === 0) {
@@ -112,7 +90,13 @@
   // —— 清空 ——
 
   async function clearAll() {
-    if (!confirm('确定清空所有扫描历史？此操作不可恢复。')) return;
+    const ok = await confirmStore.ask({
+      title: '清空扫描历史',
+      message: '确定清空所有扫描历史？此操作不可恢复。',
+      confirmLabel: '清空',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await scanHistoryStore.clear();
     domainFilter = '';
     sevFilter = '';
@@ -176,10 +160,12 @@
       </div>
 
       <div class="flex items-center gap-1 text-xs">
-        <button class="btn btn-sm flex-1" onclick={exportCsv}>CSV</button>
-        <button class="btn btn-sm flex-1" onclick={exportJsonReport}>JSON</button>
-        <button class="btn btn-sm flex-1" onclick={exportMarkdownReport}>Markdown</button>
-        <button class="btn btn-sm flex-1 btn-primary" onclick={exportHtmlReport}>HTML</button>
+        <ExportMenu
+          items={queryEntries}
+          module="report"
+          serializers={{ csv: buildCsv, json: buildJson, markdown: buildMarkdown }}
+        />
+        <button class="btn btn-sm flex-1 btn-primary" onclick={exportHtmlReport} disabled={queryFindings.length === 0}>HTML</button>
         <button class="btn btn-sm btn-ghost text-red-500 ml-auto" onclick={clearAll}>清空</button>
       </div>
       <button class="btn btn-sm btn-primary w-full" onclick={fullAuditReport} title="聚合全部扫描记录，忽略当前筛选条件">📊 一键全量审计报告（忽略当前筛选）</button>
