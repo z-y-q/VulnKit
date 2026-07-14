@@ -39,8 +39,9 @@
     type WebpackSnapshot,
   } from '@/lib/analyzers/sourcemap-analyzer';
   import { PHASE1_MAIN_WORLD_FN } from '@/lib/analyzers/sourcemap-phase1';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
 
-  type Phase = 'idle' | 'detecting' | 'detected' | 'scanning' | 'done';
+  type Phase = 'idle' | 'detecting' | 'detected';
 
   let targetUrl = $state('');
   let phase = $state<Phase>('idle');
@@ -48,10 +49,7 @@
   let wpSnapshot = $state<WebpackSnapshot | null>(null);
   let bundleUrls = $state<string[]>([]);
   let results = $state<SourceMapResult[]>([]);
-  let scanned = $state(0);
-  let total = $state(0);
   let filter = $state<'all' | 'vuln'>('all');
-  let cancelled = $state(false);
 
   // 聚合的源码内容扫描结果
   let allEndpoints = $state<EndpointFinding[]>([]);
@@ -260,53 +258,61 @@
     }
   }
 
-  /** Phase 2: 并发抓取 Bundle → 提取 Source Map → 分析 */
-  async function scan() {
+  // ===== TaskController 接管 Bundle 扫描状态机（取消/进度/task-center 上报，对齐 §3.4/§10.4）=====
+  const controller = createTaskController<{ bundleUrls: string[] }, SourceMapResult[]>(
+    {
+      run: async (input, ctx) => {
+        const urlsToScan = input.bundleUrls.slice(0, MAX_SCRIPTS);
+        ctx.reportProgress({ phase: '扫描 Bundle', total: urlsToScan.length, completed: 0 });
+        const collected: SourceMapResult[] = [];
+        const tasks = urlsToScan.map((url) => (): Promise<SourceMapResult> => scanBundle(url));
+        await runConcurrent(tasks, async (task) => {
+          if (ctx.signal.aborted) return;
+          collected.push(await task());
+          ctx.reportProgress({ completed: collected.length });
+        }, { concurrency: CONCURRENCY, cancelled: () => ctx.signal.aborted });
+
+        results = collected;
+        if (ctx.signal.aborted) return collected; // 取消：保留部分，跳过后续聚合
+        await scanAllSourceContent();
+        await saveFindings();
+        return collected;
+      },
+    },
+    { centerPanel: 'sourcemap', centerLabel: 'Source Map 检测' },
+  );
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let scanning2 = $derived(cs.status === 'running' || cs.status === 'validating' || cs.status === 'paused');
+  let scanDone = $derived(cs.status === 'succeeded' || cs.status === 'cancelled');
+
+  async function handleScan() {
     if (bundleUrls.length === 0) {
       toastStore.show('未检测到 JS Bundle，请先点击「检测」', 'error');
       return;
     }
-
-    phase = 'scanning';
-    cancelled = false;
     results = [];
     allEndpoints = [];
     allSecrets = [];
-    scanned = 0;
-
-    const urlsToScan = bundleUrls.slice(0, MAX_SCRIPTS);
-    total = urlsToScan.length;
-    const collected: SourceMapResult[] = [];
-
-    const tasks = urlsToScan.map((url) => (): Promise<SourceMapResult> => scanBundle(url));
-
-    await runConcurrent(tasks, async (task) => {
-      collected.push(await task());
-      scanned++;
-    }, { concurrency: CONCURRENCY, cancelled: () => cancelled });
-
-    results = collected;
-
-    // 聚合扫描所有泄露的源码内容
-    await scanAllSourceContent();
-
-    // 保存 findings 到扫描历史
-    await saveFindings();
-
-    phase = 'done';
-    if (cancelled) {
-      toastStore.show('扫描已取消', 'info');
-      return;
-    }
-    if (vulnCount > 0) {
-      toastStore.show(
-        `发现 ${mapCount} 个 Source Map，${vulnCount} 个风险项，${allSecrets.length} 个密钥，${allEndpoints.length} 个端点`,
-        'warning',
-      );
-    } else if (mapCount > 0) {
-      toastStore.show(`发现 ${mapCount} 个 Source Map`, 'info');
-    } else {
-      toastStore.show('未发现 Source Map 文件', 'success');
+    try {
+      const r = await controller.start({ bundleUrls });
+      if (r.status === 'succeeded') {
+        if (vulnCount > 0) {
+          toastStore.show(
+            `发现 ${mapCount} 个 Source Map，${vulnCount} 个风险项，${allSecrets.length} 个密钥，${allEndpoints.length} 个端点`,
+            'warning',
+          );
+        } else if (mapCount > 0) {
+          toastStore.show(`发现 ${mapCount} 个 Source Map`, 'info');
+        } else {
+          toastStore.show('未发现 Source Map 文件', 'success');
+        }
+      } else if (r.status === 'cancelled') {
+        toastStore.show('扫描已取消', 'info');
+      }
+    } catch (e) {
+      toastStore.show(e instanceof Error ? e.message : '扫描失败', 'error');
     }
   }
 
@@ -437,8 +443,6 @@
     allEndpoints = [...endpoints.values()];
     allSecrets = [...secrets.values()];
   }
-
-  function cancel() { cancelled = true; }
 
   // ===== Findings 导出 =====
   /** 基于当前扫描结果生成安全发现（对齐 v5 vk-sourcemap getFindings） */
@@ -739,7 +743,7 @@
 <div class="space-y-3">
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
-    <UrlInput bind:value={targetUrl} scanning={phase === 'detecting' || phase === 'scanning'} buttonText="检测" scanningText="检测中..." onscan={detect} />
+    <UrlInput bind:value={targetUrl} scanning={phase === 'detecting' || scanning2} buttonText="检测" scanningText="检测中..." onscan={detect} />
 
     {#if detectResult}
       <div class="text-xs text-gray-400 flex flex-wrap items-center gap-1">
@@ -764,18 +768,18 @@
       </div>
     {/if}
 
-    {#if phase === 'detected' || phase === 'scanning' || phase === 'done'}
+    {#if phase === 'detected' || scanning2 || scanDone}
       <div class="flex gap-1">
-        <button class="btn btn-sm btn-primary flex-1" disabled={phase === 'scanning'} onclick={scan}>
-          {phase === 'scanning' ? '扫描中...' : `扫描 ${bundleUrls.length} 个 Bundle`}
+        <button class="btn btn-sm btn-primary flex-1" disabled={scanning2} onclick={handleScan}>
+          {scanning2 ? '扫描中...' : `扫描 ${bundleUrls.length} 个 Bundle`}
         </button>
-        {#if phase === 'scanning'}
-          <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+        {#if scanning2}
+          <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
         {/if}
       </div>
     {/if}
 
-    <ScanProgress {scanned} {total} scanning={phase === 'detecting' || phase === 'scanning'} label="Bundle 扫描" />
+    <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={phase === 'detecting' || scanning2} phase={cs.phase} label="Bundle 扫描" />
   </div>
 
   <!-- 统计栏 -->
@@ -800,7 +804,7 @@
   {/if}
 
   <!-- 内容安全扫描结果：端点 + 密钥 -->
-  {#if phase === 'done' && (allEndpoints.length > 0 || allSecrets.length > 0)}
+  {#if scanDone && (allEndpoints.length > 0 || allSecrets.length > 0)}
     <div class="space-y-2">
       {#if allSecrets.length > 0}
         <div class="card p-2.5 space-y-1.5 border-red-200 dark:border-red-900/40">
@@ -887,7 +891,7 @@
         </div>
       {/each}
     </div>
-  {:else if phase === 'done' && results.length === 0}
+  {:else if scanDone && results.length === 0}
     <EmptyState message="未发现 Source Map 文件" icon="✅" />
   {:else if phase === 'idle'}
     <EmptyState message="输入目标 URL，检测 JS Bundle 和 Source Map，还原并扫描源码" icon="🗺️" />
