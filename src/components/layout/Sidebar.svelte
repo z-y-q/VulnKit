@@ -4,6 +4,7 @@
   // 行点击区与收藏星标分离（不嵌套 button，§6.2/§8）；当前项 aria-current；
   // 折叠分类 aria-expanded+aria-controls；icon-only 按钮均带 aria-label。
   import { panels, type PanelConfig } from '@/panels';
+  import { panelMatches } from '@/panels/registry';
   import { sniffBadgeStore } from '@/stores/sniff-badge';
   import { panelLayoutStore, applyLayout } from '@/stores/panel-layout';
   import { sidebarStateStore } from '@/stores/sidebar-state';
@@ -34,14 +35,7 @@
   let searchInput: HTMLInputElement | undefined = $state();
 
   let searchResults = $derived(
-    q
-      ? visiblePanels.filter(
-          (p) =>
-            p.label.toLowerCase().includes(q) ||
-            p.categoryLabel.toLowerCase().includes(q) ||
-            p.id.toLowerCase().includes(q),
-        )
-      : [],
+    q ? visiblePanels.filter((p) => panelMatches(p, q)) : [],
   );
 
   function isFav(id: string): boolean {

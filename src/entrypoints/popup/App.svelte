@@ -2,7 +2,7 @@
   // Popup — 灵眸 v6.0（阶段2重构：当前页状态 + 搜索 + 最近，对齐 §4.2）
   // 纯 scoped CSS，不依赖 UnoCSS，确保 Chrome 扩展 popup 渲染正确。
   // 暗色 class 钩子已留，批次 2c 接入 shared.css 变量后即跟随主题。
-  import { panelMeta } from '@/panels/registry';
+  import { panelMeta, panelMatches } from '@/panels/registry';
   import { panelLayoutStore, applyLayout } from '@/stores/panel-layout';
   import { recentPanelsStore } from '@/stores/recent-panels';
   import { getAppVersion } from '@/lib/core/app-version';
@@ -82,14 +82,7 @@
   let query = $state('');
   let q = $derived(query.trim().toLowerCase());
   let searchResults = $derived(
-    q
-      ? applyLayout(panelMeta, layout).filter(
-          (p) =>
-            p.label.toLowerCase().includes(q) ||
-            p.categoryLabel.toLowerCase().includes(q) ||
-            p.id.toLowerCase().includes(q),
-        )
-      : [],
+    q ? applyLayout(panelMeta, layout).filter((p) => panelMatches(p, q)) : [],
   );
 
   // —— 最近使用（§4.2.1） ——
