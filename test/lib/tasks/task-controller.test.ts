@@ -129,4 +129,22 @@ describe('task-controller（§3.4 / §10.2）', () => {
     expect(get(ctrl.state).status).toBe('running');
     await p;
   });
+
+  it('retry 无参：用上次 input 重跑（retry all）', async () => {
+    const seen: string[] = [];
+    const ctrl = createTaskController<string, string>({ run: async (input) => { seen.push(input); return 'done'; } });
+    await ctrl.start('first');
+    const r = await ctrl.retry();
+    expect(r.status).toBe('succeeded');
+    expect(seen).toEqual(['first', 'first']);
+  });
+
+  it('retry 传参：用新 input 重跑（retry failed 复用）', async () => {
+    const seen: string[] = [];
+    const ctrl = createTaskController<string, string>({ run: async (input) => { seen.push(input); return 'done'; } });
+    await ctrl.start('all');
+    const r = await ctrl.retry('only-failed');
+    expect(r.status).toBe('succeeded');
+    expect(seen).toEqual(['all', 'only-failed']);
+  });
 });

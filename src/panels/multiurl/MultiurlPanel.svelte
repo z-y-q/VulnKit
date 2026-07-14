@@ -30,7 +30,7 @@
   let duplicateCount = $derived(urls.length - uniqueUrls.length);
 
   // —— TaskController 接管批量打开（逐项成败 + 可取消）——
-  const controller = createTaskController<{ urls: string[]; delay: number }, { ok: number; fail: number }>({
+  const controller = createTaskController<{ urls: string[]; delay: number }, { ok: number; fail: number; failedUrls: string[] }>({
     validate: (input) => {
       if (input.urls.length === 0) throw new Error('请输入 URL');
       if (input.urls.length > maxUrls) throw new Error(`一次最多打开 ${maxUrls} 个标签页`);
@@ -39,6 +39,7 @@
       ctx.reportProgress({ total: input.urls.length, completed: 0, succeeded: 0, failed: 0, phase: '批量打开' });
       let ok = 0;
       let fail = 0;
+      const failedUrls: string[] = [];
       for (const url of input.urls) {
         if (ctx.signal.aborted) break;
         try {
@@ -46,6 +47,7 @@
           ok++;
         } catch {
           fail++;
+          failedUrls.push(url);
         }
         ctx.reportProgress({
           completed: ok + fail,
@@ -55,7 +57,7 @@
         });
         if (input.delay > 0 && !ctx.signal.aborted) await sleep(input.delay, ctx.signal);
       }
-      return { ok, fail };
+      return { ok, fail, failedUrls };
     },
   },
   { centerPanel: 'multiurl', centerLabel: 'URL 多开' });
@@ -63,6 +65,7 @@
   let cs = $state<TaskState>({ ...IDLE });
   $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
   let opening = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+  let lastFailedUrls = $state<string[]>([]);
 
   /** 可取消的 sleep：每 100ms 检查 signal，避免取消后仍等满 delay */
   async function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -92,9 +95,10 @@
     try {
       const r = await controller.start({ urls: uniqueUrls, delay });
       if (r.status === 'succeeded' && r.result) {
-        const { ok, fail } = r.result;
+        const { ok, fail, failedUrls } = r.result;
+        lastFailedUrls = failedUrls;
         toastStore.show(
-          fail > 0 ? `已打开 ${ok} 个，失败 ${fail} 个` : `已打开 ${ok} 个标签页`,
+          fail > 0 ? `已打开 ${ok} 个，失败 ${fail} 个（可重试失败）` : `已打开 ${ok} 个标签页`,
           fail > 0 ? 'warning' : 'success',
         );
       } else if (r.status === 'cancelled') {
@@ -103,6 +107,24 @@
     } catch {
       // failed：toast 已由 controller? 否；这里补一条
       toastStore.show('打开失败', 'error');
+    }
+  }
+
+  /** 重试上次失败的 URL（retry 'failed'，复用 controller.retry 传参） */
+  async function retryFailed() {
+    if (lastFailedUrls.length === 0) return;
+    try {
+      const r = await controller.retry({ urls: lastFailedUrls, delay });
+      if (r.status === 'succeeded' && r.result) {
+        const { ok, fail, failedUrls } = r.result;
+        lastFailedUrls = failedUrls;
+        toastStore.show(
+          fail > 0 ? `重试完成：再打开 ${ok} 个，仍失败 ${fail} 个` : `重试成功：已打开 ${ok} 个`,
+          fail > 0 ? 'warning' : 'success',
+        );
+      }
+    } catch {
+      toastStore.show('重试失败', 'error');
     }
   }
 
@@ -122,6 +144,7 @@
 
   function clearAll() {
     rawText = '';
+    lastFailedUrls = [];
     controller.reset();
   }
 
@@ -215,6 +238,11 @@
       >
         全部打开
       </button>
+      {#if lastFailedUrls.length > 0}
+        <button class="btn btn-sm flex-1" onclick={retryFailed} title="只重试上次失败的 URL">
+          重试失败 {lastFailedUrls.length}
+        </button>
+      {/if}
     {/if}
     <button class="btn btn-sm flex-1" disabled={opening || uniqueUrls.length === 0 || duplicateCount === 0} onclick={dedup}>
       去重

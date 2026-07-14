@@ -65,6 +65,8 @@ export interface TaskController<TInput, TResult> {
   cancel(): void;
   /** 回到 idle 并清空进度/错误 */
   reset(): void;
+  /** 重跑：无参用上次 input（retry 'all'）；传参换 input（retry 'failed' 复用）。仅终态后可调 */
+  retry(input?: TInput): Promise<StartResult<TResult>>;
 }
 
 export interface CreateTaskOptions {
@@ -101,6 +103,7 @@ export function createTaskController<TInput, TResult>(
   let paused = false;
   let startedAt = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
+  let lastInput: TInput | undefined;
 
   function patch(p: Partial<TaskState>) {
     store.update((s) => ({ ...s, ...p }));
@@ -170,6 +173,7 @@ export function createTaskController<TInput, TResult>(
       return { status: 'cancelled' };
     }
 
+    lastInput = input;
     patch({ status: 'running', phase: '运行中', canCancel: true, canPause: canPauseEnabled });
     startTimer();
 
@@ -235,5 +239,9 @@ export function createTaskController<TInput, TResult>(
     patch({ ...IDLE });
   }
 
-  return { state: store, start, pause, resume, cancel, reset };
+  function retry(input?: TInput): Promise<StartResult<TResult>> {
+    return start(input ?? lastInput!);
+  }
+
+  return { state: store, start, pause, resume, cancel, reset, retry };
 }
