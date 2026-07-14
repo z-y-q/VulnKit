@@ -16,6 +16,7 @@
   import ResultToolbar from '@/components/results/ResultToolbar.svelte';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
   import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
   import DetailDrawer from '@/components/results/DetailDrawer.svelte';
   import type { DetailField, DetailHandoffAction } from '@/components/results/detail-drawer-utils';
   import { downloadText, buildFilename } from '@/lib/actions/download';
@@ -61,9 +62,6 @@
 
   // ===== 状态 =====
   let targetUrl = $state('');
-  let scanning = $state(false);
-  let scanned = $state(0);
-  let total = $state(0);
   let findings = $state<XssFinding[]>([]);
   let query = $state<ResultQuery>({ search: '', filters: {}, sort: { key: 'severity', direction: 'asc' } });
   let customPayload = $state('');
@@ -71,7 +69,6 @@
   let useHarvest = $state(true);
   let usePost = $state(false);
   let encoding = $state<'none' | 'url' | 'html' | 'base64'>('none');
-  let cancelled = $state(false);
 
   // 注入点管理
   let points = $state<InjectPoint[]>([]);
@@ -485,104 +482,129 @@
   }
 
   // ===== 主扫描 =====
-  async function scan() {
-    const v = validateProbeUrl(targetUrl);
-    if ('error' in v) {
-      toastStore.show('请输入合法的 http(s) URL', 'error');
+  // ===== TaskController 接管扫描状态机（取消/进度/task-center 上报，对齐 §3.4/§10.4）=====
+  type XssInput = { targetUrl: string; useCustom: boolean; customPayload: string };
+  const controller = createTaskController<XssInput, XssFinding[]>(
+    {
+      validate: (input) => {
+        const v = validateProbeUrl(input.targetUrl);
+        if ('error' in v) throw new Error('请输入合法的 http(s) URL');
+      },
+      run: async (input, ctx) => {
+        // 注入点：列表选中 或 现场采集
+        let activePoints: InjectPoint[];
+        if (points.length > 0) {
+          activePoints = points.filter((p) => p.selected);
+        } else {
+          activePoints = await collectPoints();
+          points = activePoints; // 回填列表
+        }
+        if (ctx.signal.aborted) return [];
+        if (activePoints.length === 0) {
+          findings = [];
+          toastStore.show('未发现注入点（可点击「采集注入点」或开启 DOM 收割）', 'warning');
+          return [];
+        }
+
+        // payloads
+        let payloads: string[];
+        if (input.useCustom && input.customPayload.trim()) {
+          payloads = input.customPayload.split('\n').map((s) => s.trim()).filter(Boolean);
+        } else {
+          const allPayloads = new Set<string>();
+          for (const c of ['html', 'attr', 'script', 'url', 'style'] as XssContext[]) {
+            for (const p of buildPayloadsForContext(c)) allPayloads.add(p);
+          }
+          payloads = [...allPayloads];
+        }
+
+        // Phase 1: 反射快速过滤
+        let reflectedPoints: InjectPoint[] = [];
+        if (!input.useCustom) {
+          const probeResults = new Set<string>();
+          ctx.reportProgress({ phase: '反射过滤', total: activePoints.length, completed: 0 });
+          let p1 = 0;
+          await runConcurrent(activePoints, async (pt) => {
+            if (ctx.signal.aborted) return;
+            const r = await probeReflection(pt);
+            if (r.reflected) probeResults.add(pt.id);
+            p1++;
+            ctx.reportProgress({ completed: p1 });
+          }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => ctx.signal.aborted });
+          if (ctx.signal.aborted) {
+            findings = [];
+            return [];
+          }
+          reflectedPoints = activePoints.filter((p) => probeResults.has(p.id));
+          if (reflectedPoints.length === 0) {
+            findings = [];
+            toastStore.show(`${activePoints.length} 个注入点均无反射`, 'success');
+            return [];
+          }
+        } else {
+          reflectedPoints = activePoints;
+        }
+
+        // Phase 2: 反射点 × payload
+        const tasks: (() => Promise<XssFinding | null>)[] = [];
+        for (const pt of reflectedPoints) {
+          for (const payload of payloads) {
+            tasks.push(() => probeSingle(pt, payload));
+          }
+        }
+        ctx.reportProgress({ phase: 'Payload 探测', total: tasks.length, completed: 0 });
+        const collected: XssFinding[] = [];
+        let p2 = 0;
+        await runConcurrent(tasks, async (task) => {
+          if (ctx.signal.aborted) return;
+          const r = await task();
+          if (r) collected.push(r);
+          p2++;
+          ctx.reportProgress({ completed: p2 });
+        }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => ctx.signal.aborted });
+
+        findings = collected.sort(XSS_SORT_FNS.severity);
+        return findings;
+      },
+    },
+    { centerPanel: 'xss', centerLabel: 'XSS 检测' },
+  );
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let archiving = $derived(cs.status === 'running' || cs.status === 'validating' || cs.status === 'paused');
+
+  async function handleScan() {
+    if (points.length > 0 && points.filter((p) => p.selected).length === 0) {
+      toastStore.show('请至少勾选一个注入点', 'warning');
       return;
     }
-
-    // 注入点：优先使用列表中选中的；列表为空则现场采集
-    let activePoints: InjectPoint[];
-    if (points.length > 0) {
-      activePoints = points.filter(p => p.selected);
-      if (activePoints.length === 0) {
-        toastStore.show('请至少勾选一个注入点', 'warning');
-        return;
-      }
-    } else {
-      activePoints = await collectPoints();
-      // 同步回填列表
-      points = activePoints;
-    }
-
-    if (activePoints.length === 0) {
-      toastStore.show('未发现注入点（可点击「采集注入点」或开启 DOM 收割）', 'warning');
-      return;
-    }
-
-    scanning = true;
     findings = [];
-    scanned = 0;
-    cancelled = false;
-
-    let payloads: string[];
-    if (useCustom && customPayload.trim()) {
-      payloads = customPayload.split('\n').map(s => s.trim()).filter(Boolean);
-    } else {
-      const allPayloads = new Set<string>();
-      for (const ctx of ['html', 'attr', 'script', 'url', 'style'] as XssContext[]) {
-        for (const p of buildPayloadsForContext(ctx)) allPayloads.add(p);
-      }
-      payloads = [...allPayloads];
-    }
-
-    // Phase 1: 反射快速过滤
-    let reflectedPoints: InjectPoint[] = [];
-    if (!useCustom) {
-      const probeResults = new Set<string>();
-      await runConcurrent(activePoints, async (pt) => {
-        const r = await probeReflection(pt);
-        if (r.reflected) probeResults.add(pt.id);
-        scanned++;
-      }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
-
-      reflectedPoints = activePoints.filter(p => probeResults.has(p.id));
-      if (reflectedPoints.length === 0) {
-        scanning = false;
-        toastStore.show(`${activePoints.length} 个注入点均无反射`, 'success');
-        return;
-      }
-    } else {
-      reflectedPoints = activePoints;
-    }
-
-    // Phase 2: 反射点 × payload
-    const tasks: (() => Promise<XssFinding | null>)[] = [];
-    for (const pt of reflectedPoints) {
-      for (const payload of payloads) {
-        tasks.push(() => probeSingle(pt, payload));
-      }
-    }
-
-    total = tasks.length;
-    scanned = 0;
-    const collected: XssFinding[] = [];
-    await runConcurrent(tasks, async (task) => {
-      const r = await task();
-      if (r) collected.push(r);
-      scanned++;
-    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
-
-    findings = collected.sort(XSS_SORT_FNS.severity);
-    scanning = false;
-
-    if (cancelled) { toastStore.show('扫描已取消', 'info'); return; }
-
     try {
-      await scanHistoryStore.addScan({ url: targetUrl, module: 'xssscan', findings: mapToFindings(findings) });
-    } catch { /* store failure must not break scan */ }
-
-    if (vulnCount > 0) {
-      toastStore.show(`发现 ${vulnCount} 个潜在 XSS 点（${reflectedCount} 个反射）`, 'warning');
-    } else if (reflectedCount > 0) {
-      toastStore.show(`${reflectedCount} 个参数存在反射，但已被净化`, 'success');
-    } else {
-      toastStore.show(`XSS 检测完成，未发现漏洞（${total} 个测试）`, 'success');
+      const r = await controller.start({ targetUrl, useCustom, customPayload });
+      if (r.status === 'succeeded') {
+        const list = r.result ?? [];
+        if (list.length > 0) {
+          try {
+            await scanHistoryStore.addScan({ url: targetUrl, module: 'xssscan', findings: mapToFindings(list) });
+          } catch { /* store failure must not break scan */ }
+          if (vulnCount > 0) {
+            toastStore.show(`发现 ${vulnCount} 个潜在 XSS 点（${reflectedCount} 个反射）`, 'warning');
+          } else if (reflectedCount > 0) {
+            toastStore.show(`${reflectedCount} 个参数存在反射，但已被净化`, 'success');
+          } else {
+            toastStore.show(`XSS 检测完成（${list.length} 项）`, 'success');
+          }
+        }
+        // list 为空：run 内已 toast（无反射 / 未发现注入点）
+      } else if (r.status === 'cancelled') {
+        const n = findings.length;
+        toastStore.show(n > 0 ? `扫描已取消（已采集 ${n} 项）` : '扫描已取消', 'info');
+      }
+    } catch (e) {
+      toastStore.show(e instanceof Error ? e.message : '扫描失败', 'error');
     }
   }
-
-  function cancel() { cancelled = true; }
 
   // ===== DOM Sink 静态分析 =====
   async function analyzeSinks() {
@@ -861,28 +883,28 @@ ${cards}
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} recordTarget />
-      {#if scanning}
-        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="检测" onscan={handleScan} recordTarget />
+      {#if archiving}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
 
     <div class="flex items-center gap-3 text-xs flex-wrap">
       <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useHarvest} disabled={scanning} class="accent-blue-500" />
+        <input type="checkbox" bind:checked={useHarvest} disabled={archiving} class="accent-blue-500" />
         <span>DOM 收割</span>
       </label>
       <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={usePost} disabled={scanning} class="accent-blue-500" />
+        <input type="checkbox" bind:checked={usePost} disabled={archiving} class="accent-blue-500" />
         <span>测试 POST</span>
       </label>
       <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useCustom} disabled={scanning} class="accent-blue-500" />
+        <input type="checkbox" bind:checked={useCustom} disabled={archiving} class="accent-blue-500" />
         <span>自定义 Payload</span>
       </label>
       <label class="flex items-center gap-1 cursor-pointer">
         <span class="text-gray-500">编码</span>
-        <select class="input text-xs w-24 py-0.5" bind:value={encoding} disabled={scanning}>
+        <select class="input text-xs w-24 py-0.5" bind:value={encoding} disabled={archiving}>
           <option value="none">无</option>
           <option value="url">URL 编码</option>
           <option value="html">HTML 编码</option>
@@ -923,7 +945,7 @@ ${cards}
       <div class="text-xs text-gray-400">自动提取注入点，使用反射探针 + 上下文 payload 并发检测</div>
     {/if}
 
-    <ScanProgress {scanned} {total} {scanning} label="XSS 检测" />
+    <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="XSS 检测" />
   </div>
 
   <!-- 注入点管理 -->
@@ -931,7 +953,7 @@ ${cards}
     <div class="flex items-center justify-between">
       <div class="text-sm font-medium">注入点管理 <span class="text-xs text-gray-400">({points.length > 0 ? points.filter(p => p.selected).length + '/' + points.length : '未采集'})</span></div>
       <div class="flex gap-1">
-        <button class="btn btn-sm btn-primary" onclick={harvestPoints} disabled={scanning}>采集注入点</button>
+        <button class="btn btn-sm btn-primary" onclick={harvestPoints} disabled={archiving}>采集注入点</button>
         <button class="btn btn-sm" onclick={copyAllUrls} disabled={points.length === 0}>复制 URL</button>
         <button class="btn btn-sm" onclick={batchOpen} disabled={points.length === 0}>批量打开</button>
         <button class="btn btn-sm" onclick={batchVerify} disabled={points.length === 0 || verifying}>{verifying ? '验证中...' : '批量验证'}</button>
@@ -1059,7 +1081,7 @@ ${cards}
         </div>
       {/each}
     </div>
-  {:else if !scanning && findings.length === 0 && scanned > 0}
+  {:else if !archiving && findings.length === 0 && cs.completed > 0}
     <div class="text-center text-gray-400 text-sm py-8">未发现 XSS 漏洞</div>
   {/if}
 
@@ -1128,7 +1150,7 @@ ${cards}
     actions={xssDetailActions}
   />
 
-  {#if !scanning && findings.length === 0 && scanned === 0 && sinks.length === 0}
+  {#if !archiving && findings.length === 0 && cs.completed === 0 && sinks.length === 0}
     <div class="text-center text-gray-400 text-sm py-4">
       输入目标 URL → 采集注入点 → 检测反射；或直接「分析 DOM 汇点」
     </div>
