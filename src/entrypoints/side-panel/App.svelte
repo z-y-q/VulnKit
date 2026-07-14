@@ -5,6 +5,7 @@
   import ContextBanner from '@/components/layout/ContextBanner.svelte';
   import StatusBar from '@/components/layout/StatusBar.svelte';
   import Toast from '@/components/ui/Toast.svelte';
+  import ConfirmDialog from '@/components/feedback/ConfirmDialog.svelte';
   import PanelLoadState from '@/components/feedback/PanelLoadState.svelte';
   import PanelErrorState from '@/components/feedback/PanelErrorState.svelte';
   import { panels } from '@/panels';
@@ -211,3 +212,6 @@
 
 <!-- Toast Container -->
 <Toast />
+
+<!-- 确认对话框（confirmStore.ask 的渲染端，必须在入口挂载，否则 ask 返回的 Promise 永挂） -->
+<ConfirmDialog />
