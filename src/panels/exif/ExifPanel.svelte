@@ -13,6 +13,9 @@
     type ExifData,
     type ExifSection,
   } from '@/lib/exif/exif-utils';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
+  import { toMarkdownTable } from '@/lib/actions/serializers';
 
   // ---------- 状态 ----------
 
@@ -172,8 +175,22 @@
       toastStore.show('请先解析 EXIF 数据', 'warning');
       return;
     }
-    navigator.clipboard.writeText(JSON.stringify(exifData, null, 2));
-    toastStore.show('已复制 EXIF JSON', 'success');
+    copyText(JSON.stringify(exifData, null, 2), '已复制 EXIF JSON');
+  }
+
+  // —— 导出序列化器（作用于 sections 扁平字段）——
+  type ExifFlatField = { section: string; label: string; value: string };
+  let flatFields = $derived(
+    sections.flatMap(s => s.fields.map(f => ({ section: s.title, label: f.label, value: f.value }))),
+  );
+  function exifJson(items: ExifFlatField[]): string {
+    return JSON.stringify(exifData, null, 2);
+  }
+  function exifMd(items: ExifFlatField[]): string {
+    return toMarkdownTable(['分组', '字段', '值'], items.map(f => [f.section, f.label, f.value]));
+  }
+  function exifText(items: ExifFlatField[]): string {
+    return items.map(f => `[${f.section}] ${f.label}: ${f.value}`).join('\n');
   }
 
   function clearExif() {
@@ -212,6 +229,7 @@
     <div class="flex-1"></div>
     {#if exifData}
       <button class="btn btn-sm" onclick={copyExifData}>复制 JSON</button>
+      <ExportMenu items={flatFields} module="exif" serializers={{ json: exifJson, markdown: exifMd, text: exifText }} />
       <button class="btn btn-sm" onclick={clearExif}>清空</button>
     {/if}
   </div>

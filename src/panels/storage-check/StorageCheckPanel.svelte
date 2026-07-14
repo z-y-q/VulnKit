@@ -4,6 +4,11 @@
   import { getActiveTab, getActiveTabUrl, execInTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
+  import { toCsv } from '@/lib/actions/serializers';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
   import {
     classifyStorageValue,
     truncate,
@@ -25,7 +30,6 @@
   // ---------- 状态 ----------
 
   let scanning = $state(false);
-  let scanned = $state(false);
   let localItems = $state<StorageItem[]>([]);
   let sessionItems = $state<StorageItem[]>([]);
   let cookies = $state<StorageItem[]>([]);
@@ -109,59 +113,71 @@
 
   // ---------- 扫描逻辑 ----------
 
+  // —— TaskController 接管扫描状态机 ——
+  const controller = createTaskController<void, void>({
+    run: async (_input, ctx) => {
+      ctx.reportProgress({ phase: '读取页面存储' });
+      localItems = [];
+      sessionItems = [];
+      cookies = [];
+      windowVars = [];
+      idbInfo = null;
+
+      const tab = await getActiveTab();
+      if (!tab?.id) throw new Error('无法获取当前标签页');
+
+      const [localResult, sessionResult, cookieResult, windowResult, idbResult] = await Promise.all([
+        readWebStorage(tab.id, 'local'),
+        readWebStorage(tab.id, 'session'),
+        readCookies(tab.id),
+        readWindowVars(tab.id),
+        readIndexedDB(tab.id),
+      ]);
+
+      if (ctx.signal.aborted) return;
+
+      localItems = localResult;
+      sessionItems = sessionResult;
+      cookies = cookieResult;
+      windowVars = windowResult;
+      idbInfo = idbResult;
+
+      try {
+        const pageUrl = await getActiveTabUrl();
+        if (pageUrl) {
+          const allItems = [...localItems, ...sessionItems, ...cookies, ...windowVars];
+          await scanHistoryStore.addScan({
+            url: pageUrl,
+            module: 'storage-check',
+            findings: mapStorageToFindings(allItems),
+          });
+        }
+      } catch { /* store failure must not break scan */ }
+    },
+  }, { centerPanel: 'storage-check', centerLabel: '存储检查' });
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  // scanning 复用控制器运行态；scanned = 有任何终态结果
+  $effect(() => { scanning = cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating'; });
+  let scanned = $derived(
+    cs.status === 'succeeded' || cs.status === 'cancelled' ||
+    localItems.length > 0 || sessionItems.length > 0 || cookies.length > 0 || windowVars.length > 0,
+  );
+
   async function startScan() {
-    scanning = true;
-    scanned = false;
-    localItems = [];
-    sessionItems = [];
-    cookies = [];
-    windowVars = [];
-    idbInfo = null;
-
-    const tab = await getActiveTab();
-    if (!tab?.id) {
-      scanning = false;
-      toastStore.show('无法获取当前标签页', 'error');
-      return;
-    }
-
-    // 并行读取 localStorage / sessionStorage / cookies / window vars
-    const [localResult, sessionResult, cookieResult, windowResult, idbResult] = await Promise.all([
-      readWebStorage(tab.id, 'local'),
-      readWebStorage(tab.id, 'session'),
-      readCookies(tab.id),
-      readWindowVars(tab.id),
-      readIndexedDB(tab.id),
-    ]);
-
-    localItems = localResult;
-    sessionItems = sessionResult;
-    cookies = cookieResult;
-    windowVars = windowResult;
-    idbInfo = idbResult;
-    scanning = false;
-    scanned = true;
-
-    const totalSensitive = localSensitive + sessionSensitive + cookieSensitive + windowSensitive;
-    const total = localItems.length + sessionItems.length + cookies.length + windowVars.length;
-    if (totalSensitive > 0) {
-      toastStore.show(`扫描完成：${total} 条存储中发现 ${totalSensitive} 条敏感数据`, 'warning');
-    } else {
-      toastStore.show(`扫描完成：${total} 条存储，无敏感数据`, 'success');
-    }
-
-    // 发布到扫描历史
-    try {
-      const pageUrl = await getActiveTabUrl();
-      if (pageUrl) {
-        const allItems = [...localItems, ...sessionItems, ...cookies, ...windowVars];
-        await scanHistoryStore.addScan({
-          url: pageUrl,
-          module: 'storage-check',
-          findings: mapStorageToFindings(allItems),
-        });
+    const r = await controller.start();
+    if (r.status === 'succeeded') {
+      const totalSensitive = localSensitive + sessionSensitive + cookieSensitive + windowSensitive;
+      const total = localItems.length + sessionItems.length + cookies.length + windowVars.length;
+      if (totalSensitive > 0) {
+        toastStore.show(`扫描完成：${total} 条存储中发现 ${totalSensitive} 条敏感数据`, 'warning');
+      } else {
+        toastStore.show(`扫描完成：${total} 条存储，无敏感数据`, 'success');
       }
-    } catch { /* store failure must not break scan */ }
+    } else if (r.status === 'cancelled') {
+      toastStore.show('扫描已取消', 'info');
+    }
   }
 
   function readWebStorage(tabId: number, type: 'local' | 'session'): Promise<StorageItem[]> {
@@ -364,56 +380,45 @@
     });
   }
 
-  function copyAllData() {
-    let items: StorageItem[] = [];
-    if (activeTab === 'local') items = localItems;
-    else if (activeTab === 'session') items = sessionItems;
-    else if (activeTab === 'cookie') items = cookies;
-    else if (activeTab === 'window') items = windowVars;
+  function activeTabItems(): StorageItem[] {
+    if (activeTab === 'local') return localItems;
+    if (activeTab === 'session') return sessionItems;
+    if (activeTab === 'cookie') return cookies;
+    if (activeTab === 'window') return windowVars;
+    return [];
+  }
 
-    if (items.length === 0) {
-      toastStore.show('无数据可复制', 'warning');
-      return;
-    }
+  function copyAllData() {
+    const items = activeTabItems();
+    if (items.length === 0) { toastStore.show('无数据可复制', 'warning'); return; }
     const obj: Record<string, string> = {};
     for (const item of items) obj[item.key] = item.value;
-    navigator.clipboard.writeText(JSON.stringify(obj, null, 2));
-    toastStore.show('已复制全部数据', 'success');
+    copyText(JSON.stringify(obj, null, 2), '已复制全部数据');
   }
 
   function copyIdbData() {
-    if (!idbInfo?.databases?.length) {
-      toastStore.show('无 IndexedDB 数据', 'warning');
-      return;
-    }
-    navigator.clipboard.writeText(JSON.stringify(idbInfo, null, 2));
-    toastStore.show('已复制 IndexedDB 数据', 'success');
+    if (!idbInfo?.databases?.length) { toastStore.show('无 IndexedDB 数据', 'warning'); return; }
+    copyText(JSON.stringify(idbInfo, null, 2), '已复制 IndexedDB 数据');
   }
 
   function copyValue(value: string) {
-    navigator.clipboard.writeText(value);
-    toastStore.show('已复制值', 'success');
+    copyText(value, '已复制值');
   }
 
-  /** 导出当前分类全部数据为 JSON 文件 */
-  function exportJson() {
-    const dump: Record<string, any> = { _category: activeTab };
-    if (activeTab === 'local') dump.data = Object.fromEntries(localItems.map(i => [i.key, i.value]));
-    else if (activeTab === 'session') dump.data = Object.fromEntries(sessionItems.map(i => [i.key, i.value]));
-    else if (activeTab === 'cookie') dump.data = Object.fromEntries(cookies.map(i => [i.key, i.value]));
-    else if (activeTab === 'window') dump.data = Object.fromEntries(windowVars.map(i => [i.key, i.value]));
-    else if (activeTab === 'idb') dump.data = idbInfo;
-    if (!dump.data || (dump.data instanceof Object && Object.keys(dump.data).length === 0)) {
-      toastStore.show('无数据可导出', 'warning');
-      return;
-    }
-    const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `storage-${activeTab}-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    toastStore.show('已导出 JSON', 'success');
+  // —— 导出序列化器（作用于当前 activeTab 的 items）——
+  function storageJson(items: StorageItem[]): string {
+    const obj: Record<string, string> = {};
+    for (const item of items) obj[item.key] = item.value;
+    return JSON.stringify({ category: activeTab, data: obj }, null, 2);
+  }
+  function storageCsv(items: StorageItem[]): string {
+    return toCsv([
+      ['key', 'value', 'sensitive', 'severity', 'storageType'],
+      ...items.map(i => [i.key, i.value, String(i.isSensitive), i.severity, i.storageType]),
+    ]);
+  }
+  function storageText(items: StorageItem[]): string {
+    return items.map(i => `[${i.storageType}${i.isSensitive ? '/敏感' : ''}] ${i.key} = ${i.value}`).join('\n');
   }
 
   function clearAllStorage() {
@@ -482,18 +487,24 @@
   <!-- 操作栏 -->
   <div class="card p-3">
     <div class="flex items-center gap-2">
-      <button class="btn btn-sm btn-primary" disabled={scanning} onclick={startScan}>
-        {scanning ? '检查中...' : '检查存储'}
-      </button>
+      {#if scanning}
+        <button class="btn btn-sm btn-danger" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
+      {:else}
+        <button class="btn btn-sm btn-primary" onclick={startScan}>检查存储</button>
+      {/if}
       {#if scanned}
         <button class="btn btn-sm" onclick={copyAllData}>复制全部</button>
-        <button class="btn btn-sm" onclick={exportJson}>导出</button>
         {#if activeTab !== 'idb'}
+          <ExportMenu items={activeTabItems()} module="storage-check" serializers={{ json: storageJson, csv: storageCsv, text: storageText }} />
           <button class="btn btn-sm text-red-500" onclick={clearAllStorage}>清空全部</button>
         {/if}
       {/if}
     </div>
   </div>
+
+  {#if cs.status === 'failed'}
+    <ErrorState error={cs.error!} onRetry={startScan} />
+  {/if}
 
   <!-- 未扫描提示 -->
   {#if !scanned && !scanning}
@@ -575,7 +586,6 @@
         {#if idbInfo?.databases && idbInfo.databases.length > 0}
           <div class="flex justify-end">
             <button class="btn btn-xs" onclick={copyIdbData}>复制全部</button>
-            <button class="btn btn-xs" onclick={exportJson}>导出</button>
           </div>
           {#each idbInfo.databases as db}
             <div class="space-y-1">

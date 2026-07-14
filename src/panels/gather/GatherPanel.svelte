@@ -11,6 +11,11 @@
   import { loadMergedGroups, type HaeGroup } from '@/lib/scanners/hae-store';
   import patternsData from '@/lib/data/gather-patterns.json';
   import { loadPrefs, isDomainExcluded } from '@/lib/core/general-prefs';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
+  import { toCsv, toMarkdownTable } from '@/lib/actions/serializers';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
 
   // ===== 类型 =====
   interface Finding {
@@ -49,9 +54,6 @@
 
   // ===== 状态 =====
   type Category = 'tech' | 'resources' | 'leaks' | 'hae';
-  let collecting = $state(false);
-  let statusText = $state('');
-  let elapsedSec = $state(0);
   let activeCategory = $state<Category>('tech');
 
   let techFindings = $state<Finding[]>([]);
@@ -76,9 +78,6 @@
     return () => browser.storage.onChanged.removeListener(listener);
   });
   let searchFilter = $state('');
-
-  let _timerHandle: ReturnType<typeof setInterval> | null = null;
-  let _startTime = 0;
 
   // ===== 派生状态 =====
   let totalCount = $derived(techFindings.length + resourceFindings.length + leakFindings.length);
@@ -302,67 +301,42 @@
     return value.substring(0, max) + '...';
   }
 
-  // ===== 收集逻辑 =====
-  async function startGather() {
-    collecting = true;
-    statusText = '正在收集页面信息...';
-    elapsedSec = 0;
-    _startTime = Date.now();
-    _timerHandle = setInterval(() => {
-      elapsedSec = Math.floor((Date.now() - _startTime) / 1000);
-    }, 1000);
+  // ===== 收集逻辑（TaskController 接管）=====
+  const controller = createTaskController<void, void>({
+    run: async (_input, ctx) => {
+      techFindings = [];
+      resourceFindings = [];
+      leakFindings = [];
+      haeFindings = [];
 
-    techFindings = [];
-    resourceFindings = [];
-    leakFindings = [];
-    haeFindings = [];
-
-    try {
       const url = await getActiveTabUrl();
-      if (!url) {
-        toastStore.show('无法获取当前页面（需 http/https）', 'error');
-        return;
-      }
+      if (!url) throw new Error('无法获取当前页面（需 http/https）');
 
-      // 1. DOM 指纹
-      statusText = '提取 DOM 指纹...';
+      ctx.reportProgress({ phase: '提取 DOM 指纹' });
       const fp = await sendToContent({ type: 'VK_FINGERPRINT_DOM' });
-      if (!fp) {
-        toastStore.show('无法连接 content script，请刷新页面后重试', 'error');
-        return;
-      }
+      if (!fp) throw new Error('无法连接 content script，请刷新页面后重试');
 
-      // 2. Fingerprint inspect（全局变量、版本、cookies）
-      statusText = '分析指纹信息...';
+      ctx.reportProgress({ phase: '分析指纹信息' });
       const inspectResult = await sendToContent({ type: 'VK_PAGE_INSPECT', action: 'fingerprint' }) as any;
 
-      // 3. 泄露扫描（storage、敏感全局变量）
-      statusText = '敏感信息泄露扫描...';
+      ctx.reportProgress({ phase: '敏感信息泄露扫描' });
       const leakResult = await sendToContent({ type: 'VK_PAGE_INSPECT', action: 'leak-scan' }) as any;
 
-      // 4. 模式分析
       const result = analyzeFingerprint(fp, inspectResult, leakResult, patternsData);
       techFindings = result.tech;
       resourceFindings = result.resources;
       leakFindings = result.leaks;
 
-      // 4.5 HaE 规则匹配（默认 + 用户自定义，在页面 HTML + scriptSrcs 上提取指纹/凭证）
       haeFindings = matchAllRules(fp.bodyHtml + '\n' + fp.scriptSrcs.join('\n'), haeGroups);
 
-      // 5. 外部 JS 文件分析
       if (fp.scriptSrcs.length > 0) {
-        statusText = `分析 ${fp.scriptSrcs.length} 个 JS 文件...`;
+        ctx.reportProgress({ phase: `分析 ${fp.scriptSrcs.length} 个 JS 文件` });
         const jsResult = await extractFromJsFiles(fp.scriptSrcs, url, patternsData);
-        if (jsResult.resources.length > 0) {
-          resourceFindings = [...resourceFindings, ...jsResult.resources];
-        }
-        if (jsResult.leaks.length > 0) {
-          leakFindings = [...leakFindings, ...jsResult.leaks];
-        }
+        if (jsResult.resources.length > 0) resourceFindings = [...resourceFindings, ...jsResult.resources];
+        if (jsResult.leaks.length > 0) leakFindings = [...leakFindings, ...jsResult.leaks];
       }
 
-      // 6. 扫描 forms / iframes（通过 execInTab 注入）
-      statusText = '扫描表单和内联框架...';
+      ctx.reportProgress({ phase: '扫描表单和内联框架' });
       const tab = await getActiveTab();
       if (tab?.id) {
         const domExtra = await execInTab(tab.id, function () {
@@ -380,7 +354,6 @@
             try { items.push({ name: 'frame', value: new URL((el as HTMLIFrameElement).src, pageUrl).hostname, color: 'purple' }); }
             catch (e) { /* ignore */ }
           });
-          // 外部域名
           const domains = new Set<string>();
           document.querySelectorAll('[href]').forEach(function (el) {
             try { const u = new URL((el as HTMLAnchorElement).href, pageUrl); if (u.hostname !== location.hostname) domains.add(u.hostname); }
@@ -399,78 +372,63 @@
           }
         }
       }
+    },
+  }, { centerPanel: 'gather', centerLabel: '信息收集' });
 
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let collecting = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+
+  async function startGather() {
+    const r = await controller.start();
+    if (r.status === 'succeeded') {
       const total = techFindings.length + resourceFindings.length + leakFindings.length;
-      statusText = `收集完成，共 ${total} 条（${elapsedSec}s）`;
       toastStore.show(`收集完成，发现 ${total} 条信息`, 'success');
-    } catch (e: any) {
-      statusText = `收集失败: ${e.message}`;
-      toastStore.show(`收集失败: ${e.message}`, 'error');
-    } finally {
-      collecting = false;
-      if (_timerHandle) { clearInterval(_timerHandle); _timerHandle = null; }
+    } else if (r.status === 'cancelled') {
+      toastStore.show('收集已取消', 'info');
     }
   }
 
   // ===== 导出 / 复制 =====
   function copyValue(value: string) {
-    navigator.clipboard.writeText(value).then(() => {
-      toastStore.show('已复制', 'success');
-    });
+    copyText(value, '已复制');
   }
 
-  function exportJson() {
+  // 扁平化所有发现供 ExportMenu 消费
+  type FlatFinding = { category: string; name: string; value: string };
+  let flatFindings = $derived.by<FlatFinding[]>(() => [
+    ...techFindings.map(f => ({ category: '技术栈', name: f.name, value: f.value })),
+    ...resourceFindings.map(f => ({ category: '资源', name: f.name, value: f.value })),
+    ...leakFindings.map(f => ({ category: '泄露', name: f.name, value: f.value })),
+  ]);
+
+  function gatherJson(items: FlatFinding[]): string {
     const output: Record<string, { name: string; value: string }[]> = {};
-    if (techFindings.length > 0) output['技术栈'] = techFindings.map(f => ({ name: f.name, value: f.value }));
-    if (resourceFindings.length > 0) output['资源'] = resourceFindings.map(f => ({ name: f.name, value: f.value }));
-    if (leakFindings.length > 0) output['泄露'] = leakFindings.map(f => ({ name: f.name, value: f.value }));
-    if (Object.keys(output).length === 0) {
-      toastStore.show('没有数据可导出', 'warning');
-      return;
+    for (const it of items) {
+      if (!output[it.category]) output[it.category] = [];
+      output[it.category].push({ name: it.name, value: it.value });
     }
-    const json = JSON.stringify(output, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lingmou-gather-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toastStore.show('JSON 已导出', 'success');
+    return JSON.stringify(output, null, 2);
   }
-
-  function exportCsv() {
-    const rows: string[][] = [];
-    for (const f of techFindings) rows.push(['技术栈', f.name, f.value]);
-    for (const f of resourceFindings) rows.push(['资源', f.name, f.value]);
-    for (const f of leakFindings) rows.push(['泄露', f.name, f.value]);
-    if (rows.length === 0) { toastStore.show('没有数据可导出', 'warning'); return; }
-    const csv = '﻿' + 'Category,Type,Value\n' + rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lingmou-gather-${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toastStore.show('CSV 已导出', 'success');
+  function gatherCsv(items: FlatFinding[]): string {
+    return toCsv([['Category', 'Type', 'Value'], ...items.map(i => [i.category, i.name, i.value])]);
+  }
+  function gatherText(items: FlatFinding[]): string {
+    const lines: string[] = [`# 信息收集结果`, ''];
+    const byCat: Record<string, FlatFinding[]> = {};
+    for (const it of items) (byCat[it.category] ??= []).push(it);
+    for (const [cat, list] of Object.entries(byCat)) {
+      lines.push(`## ${cat} (${list.length})`);
+      for (const f of list) lines.push(`- [${f.name}] ${f.value}`);
+      lines.push('');
+    }
+    return lines.join('\n');
   }
 
   /** 复制全部发现（按分类分组纯文本） */
   function copyAll() {
     if (totalCount === 0) { toastStore.show('没有数据可复制', 'warning'); return; }
-    const lines: string[] = [`# 信息收集结果`, ''];
-    const dump = (title: string, list: Finding[]) => {
-      if (!list.length) return;
-      lines.push(`## ${title} (${list.length})`);
-      for (const f of list) lines.push(`- [${f.name}] ${f.value}`);
-      lines.push('');
-    };
-    dump('技术栈', techFindings);
-    dump('资源', resourceFindings);
-    dump('泄露', leakFindings);
-    navigator.clipboard.writeText(lines.join('\n')).then(() =>
-      toastStore.show(`已复制 ${totalCount} 条`, 'success'));
+    copyText(gatherText(flatFindings), `已复制 ${totalCount} 条`);
   }
 
   /** 将外链 JS/CSS 资源发送到「源码加载」面板 */
@@ -490,22 +448,23 @@
 <div class="space-y-3">
   <!-- 顶部操作栏 -->
   <div class="flex items-center gap-2">
-    <button
-      class="btn btn-sm btn-primary"
-      disabled={collecting}
-      onclick={startGather}
-    >
-      {collecting ? `收集中... ${elapsedSec}s` : '收集当前页面'}
-    </button>
+    {#if collecting}
+      <button class="btn btn-sm btn-danger" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
+    {:else}
+      <button class="btn btn-sm btn-primary" onclick={startGather}>收集当前页面</button>
+    {/if}
     <button class="btn btn-sm" disabled={totalCount === 0} onclick={copyAll}>复制全部</button>
-    <button class="btn btn-sm" disabled={totalCount === 0} onclick={exportJson}>导出 JSON</button>
-    <button class="btn btn-sm" disabled={totalCount === 0} onclick={exportCsv}>导出 CSV</button>
+    <ExportMenu items={flatFindings} module="gather" serializers={{ json: gatherJson, csv: gatherCsv, text: gatherText }} disabled={collecting} />
     <button class="btn btn-sm" disabled={resourceCount === 0} onclick={sendToSourceLoader} title="发送 JS/CSS 到源码加载">→源码加载</button>
     <button class="btn btn-sm" onclick={() => browser.runtime.openOptionsPage()} title="管理 HaE 规则（YAML）">HaE 规则</button>
   </div>
 
-  {#if statusText}
-    <div class="text-xs text-gray-500">{statusText}</div>
+  {#if collecting}
+    <div class="text-xs text-gray-500">{cs.phase || '收集中...'} · {(cs.elapsedMs / 1000).toFixed(1)}s</div>
+  {/if}
+
+  {#if cs.status === 'failed'}
+    <ErrorState error={cs.error!} onRetry={startGather} />
   {/if}
 
   {#if totalCount === 0 && !collecting}

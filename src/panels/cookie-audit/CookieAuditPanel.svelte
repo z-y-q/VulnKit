@@ -3,6 +3,11 @@
   import { getActiveTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
+  import { toCsv, toMarkdownTable } from '@/lib/actions/serializers';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
 
   // ---------- 类型 ----------
 
@@ -175,9 +180,7 @@
 
   // ---------- 状态 ----------
 
-  let loading = $state(true);
   let results = $state<AuditResult[]>([]);
-  let statusText = $state('');
   let filter = $state<'all' | SevLevel>('all');
   let searchText = $state('');
 
@@ -224,60 +227,40 @@
     return findings;
   }
 
-  // ---------- 加载 ----------
+  // ---------- 加载（TaskController 接管）----------
 
-  $effect(() => {
-    loadCookies();
-  });
-
-  async function loadCookies() {
-    loading = true;
-    statusText = '正在审计 Cookie...';
-
-    try {
+  const controller = createTaskController<void, void>({
+    run: async (_input, ctx) => {
+      ctx.reportProgress({ phase: '审计 Cookie' });
       const tab = await getActiveTab();
-      if (!tab?.url) {
-        statusText = '无法获取当前页面';
-        loading = false;
-        return;
-      }
+      if (!tab?.url) throw new Error('无法获取当前页面');
 
       const url = new URL(tab.url);
       const hostname = url.hostname;
       const isHttpsSite = url.protocol === 'https:';
       const domain = hostname;
 
-      // 获取 cookie
       const cookies = await browser.cookies.getAll({ domain });
-
       let targetCookies = cookies;
 
-      // 如果精确域名无 cookie，尝试父域名
       if (!targetCookies || targetCookies.length === 0) {
         const parts = domain.split('.');
         if (parts.length > 2) {
           const baseDomain = parts.slice(-2).join('.');
           const parentCookies = await browser.cookies.getAll({ domain: baseDomain });
-          if (parentCookies && parentCookies.length > 0) {
-            targetCookies = parentCookies;
-          }
+          if (parentCookies && parentCookies.length > 0) targetCookies = parentCookies;
         }
       }
 
       if (!targetCookies || targetCookies.length === 0) {
-        statusText = '当前域名没有 Cookie';
-        loading = false;
-        return;
+        results = [];
+        throw new Error('当前域名没有 Cookie');
       }
 
-      // 审计
       const audited: AuditResult[] = targetCookies.map(c => auditCookie(c, isHttpsSite));
       audited.sort((a, b) => b.sevScore - a.sevScore);
-
       results = audited;
-      statusText = `审计完成: ${audited.length} 个 Cookie`;
 
-      // 发布到扫描历史
       try {
         await scanHistoryStore.addScan({
           url: tab.url,
@@ -285,19 +268,31 @@
           findings: mapCookieAuditToFindings(audited, tab.url),
         });
       } catch { /* store failure must not break scan */ }
-    } catch (e: any) {
-      statusText = `查询失败: ${e.message || e}`;
-    } finally {
-      loading = false;
+    },
+  }, { centerPanel: 'cookie-audit', centerLabel: 'Cookie 审计' });
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let loading = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating' || cs.status === 'idle');
+  let statusText = $derived(cs.status === 'failed' ? (cs.error?.message ?? '查询失败') : (loading ? (cs.phase || '审计中...') : (results.length > 0 ? `审计完成: ${results.length} 个 Cookie` : '就绪')));
+
+  $effect(() => {
+    loadCookies();
+  });
+
+  async function loadCookies() {
+    try {
+      const r = await controller.start();
+      if (r.status === 'cancelled') toastStore.show('已取消', 'info');
+    } catch {
+      // failed：statusText 已由 cs.error 驱动，ErrorState 展示
     }
   }
 
   // ---------- 操作 ----------
 
   function copyValue(value: string) {
-    navigator.clipboard.writeText(value).then(() => {
-      toastStore.show('已复制 Cookie 值', 'success');
-    });
+    copyText(value, '已复制 Cookie 值');
   }
 
   async function deleteCookie(c: AuditedCookie) {
@@ -436,78 +431,36 @@
     }
   }
 
-  function copyAuditReport() {
-    if (results.length === 0) {
-      toastStore.show('没有审计结果', 'warning');
-      return;
-    }
-    const lines = results.map(r => {
-      const c = r.cookie;
-      let line = `${c.name}=[已隐藏]`;
-      line += ` | Secure:${c.secure ? 'Y' : 'N'}`;
-      line += ` HttpOnly:${c.httpOnly ? 'Y' : 'N'}`;
-      line += ` SameSite:${c.sameSite || 'none'}`;
-      if (r.issues.length > 0) {
-        line += ` | Issues: ${r.issues.map(i => `[${i.severity.toUpperCase()}] ${i.text}`).join('; ')}`;
-      }
-      return line;
-    });
-    navigator.clipboard.writeText(lines.join('\n')).then(() => {
-      toastStore.show(`已复制 ${results.length} 条审计结果`, 'success');
-    });
-  }
-
-  function copyMarkdownReport() {
-    if (results.length === 0) {
-      toastStore.show('没有审计结果', 'warning');
-      return;
-    }
-    const headers = ['Cookie', 'Secure', 'HttpOnly', 'SameSite', 'Issues'];
-    const rows = results.map(r => {
-      const c = r.cookie;
-      const issuesText = r.issues.length > 0
-        ? r.issues.map(i => `[${i.severity.toUpperCase()}] ${i.text}`).join('; ')
-        : '-';
-      return [c.name, c.secure ? 'Yes' : 'No', c.httpOnly ? 'Yes' : 'No', c.sameSite || 'none', issuesText];
-    });
-    const colWidths = headers.map((h, i) =>
-      Math.max(h.length, ...rows.map(r => r[i].length)),
-    );
-    const pad = (s: string, w: number) => s.padEnd(w);
-    const sep = colWidths.map(w => '-'.repeat(w)).join(' | ');
-    const headerLine = headers.map((h, i) => pad(h, colWidths[i])).join(' | ');
-    const dataLines = rows.map(r => r.map((cell, i) => pad(cell, colWidths[i])).join(' | '));
-    const md = `${headerLine}\n${sep}\n${dataLines.join('\n')}`;
-    navigator.clipboard.writeText(md).then(() => {
-      toastStore.show('已复制 Markdown 表格', 'success');
-    });
-  }
-
-  function exportJson() {
-    if (results.length === 0) {
-      toastStore.show('没有可导出的结果', 'warning');
-      return;
-    }
-    const report = {
-      timestamp: new Date().toISOString(),
-      cookies: results.map(r => ({
-        name: r.cookie.name,
-        domain: r.cookie.domain,
-        path: r.cookie.path,
-        secure: r.cookie.secure,
-        httpOnly: r.cookie.httpOnly,
-        sameSite: r.cookie.sameSite,
+  // —— 导出序列化器（作用于 results）——
+  function cookieJson(items: AuditResult[]): string {
+    return JSON.stringify({
+      cookies: items.map(r => ({
+        name: r.cookie.name, domain: r.cookie.domain, path: r.cookie.path,
+        secure: r.cookie.secure, httpOnly: r.cookie.httpOnly, sameSite: r.cookie.sameSite,
         issues: r.issues,
       })),
-    };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `cookie-audit-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toastStore.show('已导出 JSON', 'success');
+    }, null, 2);
+  }
+  function cookieCsv(items: AuditResult[]): string {
+    return toCsv([
+      ['name', 'domain', 'secure', 'httpOnly', 'sameSite', 'severity', 'issues'],
+      ...items.map(r => [
+        r.cookie.name, r.cookie.domain, String(r.cookie.secure), String(r.cookie.httpOnly),
+        r.cookie.sameSite, r.maxSev, r.issues.map(i => i.text).join('; '),
+      ]),
+    ]);
+  }
+  function cookieMd(items: AuditResult[]): string {
+    return toMarkdownTable(
+      ['Cookie', 'Secure', 'HttpOnly', 'SameSite', 'Issues'],
+      items.map(r => [
+        r.cookie.name,
+        r.cookie.secure ? 'Yes' : 'No',
+        r.cookie.httpOnly ? 'Yes' : 'No',
+        r.cookie.sameSite || 'none',
+        r.issues.length > 0 ? r.issues.map(i => `[${i.severity.toUpperCase()}] ${i.text}`).join('; ') : '-',
+      ]),
+    );
   }
 
   // ---------- 工具 ----------
@@ -604,16 +557,18 @@
         <button class="btn btn-xs btn-soft" onclick={openAdd}>+ 新增</button>
         <button class="btn btn-xs btn-soft" onclick={() => (importOpen = true)}>批量导入</button>
         <button class="btn btn-xs text-red-500" onclick={clearAll}>清除全部</button>
-        <button class="btn btn-xs" onclick={copyAuditReport}>复制报告</button>
-        <button class="btn btn-xs" onclick={copyMarkdownReport}>复制 MD</button>
-        <button class="btn btn-xs btn-primary" onclick={exportJson}>导出 JSON</button>
+        <ExportMenu items={results} module="cookie-audit" serializers={{ json: cookieJson, csv: cookieCsv, markdown: cookieMd }} copySerialize={cookieMd} />
       </div>
     {/if}
   </div>
 
+  {#if cs.status === 'failed'}
+    <ErrorState error={cs.error!} onRetry={loadCookies} />
+  {/if}
+
   <!-- 结果列表 -->
-  {#if loading}
-    <div class="text-xs text-gray-400 text-center py-4">正在审计...</div>
+  {#if loading && results.length === 0}
+    <div class="text-xs text-gray-400 text-center py-4">{cs.phase || '正在审计...'}</div>
   {:else if results.length === 0}
     <div class="text-xs text-gray-400 text-center py-4">{statusText || '点击刷新开始审计'}</div>
   {:else}

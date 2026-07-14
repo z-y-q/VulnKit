@@ -5,6 +5,7 @@
   import { decode as decodeJwt, verifySignature, forgeNoneToken, type DecodedJwt, type JwtVerifyResult } from '@/lib/crypto/jwt';
   import { toastStore } from '@/stores/ui';
   import { loadPrefs } from '@/lib/core/general-prefs';
+  import { copyText } from '@/lib/actions/clipboard';
 
   type View = 'classic' | 'jwt' | 'crypto';
   let view = $state<View>('classic');
@@ -45,7 +46,7 @@
       toastStore.show('没有可复制的内容', 'warning');
       return;
     }
-    navigator.clipboard.writeText(output).then(() => toastStore.show('已复制到剪贴板', 'success'));
+    copyText(output, '已复制到剪贴板');
   }
 
   function swap() {
@@ -106,9 +107,7 @@
   function forgeNone() {
     if (!jwtInput.trim()) { toastStore.show('请先粘贴 JWT', 'warning'); return; }
     const forged = forgeNoneToken(jwtInput.trim());
-    navigator.clipboard.writeText(forged).then(() =>
-      toastStore.show('alg=none PoC 已复制（仅用于授权测试）', 'success'),
-    );
+    copyText(forged, 'alg=none PoC 已复制（仅用于授权测试）');
   }
 
   // —— 加密解密 ——
@@ -204,7 +203,7 @@
 
   function copyCryptoOutput() {
     if (!cryptoOutput) return;
-    navigator.clipboard.writeText(cryptoOutput).then(() => toastStore.show('已复制', 'success'));
+    copyText(cryptoOutput, '已复制');
   }
 </script>
 
