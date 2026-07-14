@@ -4,6 +4,8 @@
   import { getActiveTab, execInTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
   import { matchAllRules, HAE_COLOR_CLASS, DEFAULT_HAE_GROUPS, type HaeMatch } from '@/lib/scanners/hae-engine';
+  import { copyText } from '@/lib/actions/clipboard';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
 
   let inputText = $state('');
   let matches = $state<HaeMatch[]>([]);
@@ -45,14 +47,16 @@
     return HAE_COLOR_CLASS[c] || 'bg-gray-500';
   }
 
-  function copyAll() {
-    if (!filtered.length) return;
-    navigator.clipboard.writeText(filtered.map(m => `[${m.rule}] ${m.value}`).join('\n')).then(() =>
-      toastStore.show(`已复制 ${filtered.length} 条`, 'success'));
+  async function copyValue(v: string) {
+    await copyText(v, '已复制');
   }
 
-  function copyValue(v: string) {
-    navigator.clipboard.writeText(v).then(() => toastStore.show('已复制', 'success'));
+  // —— 序列化器（作用于当前筛选 filtered）——
+  function haeText(items: HaeMatch[]): string {
+    return items.map((m) => `[${m.rule}] ${m.value}`).join('\n');
+  }
+  function haeJson(items: HaeMatch[]): string {
+    return JSON.stringify(items, null, 2);
   }
 </script>
 
@@ -81,7 +85,7 @@
         <input type="checkbox" bind:checked={onlySensitive} class="accent-blue-500" />
         <span>仅敏感</span>
       </label>
-      <button class="btn btn-xs" onclick={copyAll}>复制结果</button>
+      <ExportMenu items={filtered} module="hae" serializers={{ json: haeJson, text: haeText }} />
     </div>
 
     <div class="space-y-1 max-h-[28rem] overflow-y-auto">

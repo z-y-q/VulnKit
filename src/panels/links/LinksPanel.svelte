@@ -4,6 +4,10 @@
   import { getActiveTab, execInTab } from '@/lib/core/tabs';
   import { toastStore, autoRunStore } from '@/stores/ui';
   import { analysisContextStore } from '@/stores/analysis-context';
+  import ResultToolbar from '@/components/results/ResultToolbar.svelte';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
+  import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
   import {
     classifyLink,
     dedupeLinks,
@@ -14,9 +18,7 @@
   // --- State ---
   let loading = $state(false);
   let rawLinks = $state<ExtractedLink[]>([]);
-  let filterType = $state<string>('all');
-  let searchText = $state('');
-  let sortBy = $state<'default' | 'type' | 'domain'>('default');
+  let query = $state<ResultQuery>({ search: '', filters: {}, sort: { key: 'default', direction: 'asc' } });
 
   // --- Constants ---
   const TAG_LABELS: Record<string, string> = {
@@ -80,30 +82,37 @@
     return s.size;
   });
 
-  let filtered = $derived.by(() => {
-    let list = rawLinks;
-    // type filter
-    if (filterType !== 'all') {
-      list = list.filter(l => l.type === filterType);
-    }
-    // search text
-    const q = searchText.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        l =>
-          l.href.toLowerCase().includes(q) ||
-          (l.text || '').toLowerCase().includes(q) ||
-          (l.domain || '').toLowerCase().includes(q),
-      );
-    }
-    // sort
-    if (sortBy === 'type') {
-      list = [...list].sort((a, b) => (a.tag || '').localeCompare(b.tag || ''));
-    } else if (sortBy === 'domain') {
-      list = [...list].sort((a, b) => (a.domain || '').localeCompare(b.domain || ''));
-    }
-    return list;
-  });
+  const linksAdapter: ResultAdapter<ExtractedLink> = {
+    apply(items, q) {
+      let list = items;
+      const typeSel = q.filters.type?.[0];
+      if (typeSel && typeSel !== 'all') list = list.filter((l) => l.type === typeSel);
+      const kw = q.search.trim().toLowerCase();
+      if (kw) {
+        list = list.filter(
+          (l) =>
+            l.href.toLowerCase().includes(kw) ||
+            (l.text || '').toLowerCase().includes(kw) ||
+            (l.domain || '').toLowerCase().includes(kw),
+        );
+      }
+      if (q.sort.key === 'type') return [...list].sort((a, b) => (a.tag || '').localeCompare(b.tag || ''));
+      if (q.sort.key === 'domain') return [...list].sort((a, b) => (a.domain || '').localeCompare(b.domain || ''));
+      return list;
+    },
+    getSearchText(l) {
+      return `${l.href} ${l.text || ''} ${l.domain || ''}`;
+    },
+    getId(l) {
+      return l.href;
+    },
+  };
+
+  let filtered = $derived(linksAdapter.apply(rawLinks, query));
+  let filterTypeSel = $derived(query.filters.type?.[0] ?? 'all');
+  function setTypeFilter(v: string) {
+    query.filters = v === 'all' ? {} : { type: [v] };
+  }
 
   // --- DOM extraction function (runs in MAIN world, cannot reference closures) ---
   function extractLinksFromPage() {
@@ -254,34 +263,16 @@
     toastStore.show(`提取完成，共 ${classified.length} 个链接`, 'success');
   }
 
-  async function copyAll() {
-    const urls = filtered.map(l => l.href).join('\n');
-    if (!urls) {
-      toastStore.show('没有可复制的链接', 'warning');
-      return;
-    }
-    await navigator.clipboard.writeText(urls);
-    toastStore.show(`已复制 ${filtered.length} 个 URL`, 'success');
-  }
-
   async function copyOne(href: string) {
-    await navigator.clipboard.writeText(href);
-    toastStore.show('已复制', 'success');
+    await copyText(href, '已复制');
   }
 
-  function exportCsv() {
-    if (filtered.length === 0) {
-      toastStore.show('没有可导出的链接', 'warning');
-      return;
-    }
-    const csv = buildCsv(filtered);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `lingmou-links-${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    toastStore.show(`已导出 ${filtered.length} 条记录`, 'success');
+  // —— 序列化器（作用于当前筛选 filtered，展示/导出同源 §6.1）——
+  function linksCsv(items: ExtractedLink[]): string {
+    return buildCsv(items);
+  }
+  function linksText(items: ExtractedLink[]): string {
+    return items.map((l) => l.href).join('\n');
   }
 
   async function sendToMultiUrl() {
@@ -327,30 +318,31 @@
         {/if}
       </div>
 
-      <!-- 筛选 -->
-      <div class="flex items-center gap-2 text-xs">
-        <select class="input text-xs w-20" bind:value={filterType}>
+      <!-- 工具栏：ResultToolbar 包裹 类型筛选 / 排序 / 发送·导出 -->
+      <ResultToolbar {query} total={totalCount} shown={filtered.length} searchPlaceholder="搜索 URL / 域名 / 文本...">
+        <select
+          class="input text-xs w-20"
+          value={filterTypeSel}
+          onchange={(e) => setTypeFilter((e.currentTarget as HTMLSelectElement).value)}
+          aria-label="类型筛选"
+        >
           {#each TYPE_OPTIONS as opt}
             <option value={opt.value}>{opt.label}</option>
           {/each}
         </select>
-        <input class="input flex-1 text-xs" placeholder="搜索 URL / 域名 / 文本..." bind:value={searchText} />
-        <select class="input text-xs w-20 ml-auto" bind:value={sortBy}>
+        <select
+          class="input text-xs w-20"
+          value={query.sort.key}
+          onchange={(e) => { query.sort.key = (e.currentTarget as HTMLSelectElement).value; }}
+          aria-label="排序"
+        >
           <option value="default">默认</option>
           <option value="type">按标签</option>
           <option value="domain">按域名</option>
         </select>
-      </div>
-
-      <!-- 批量操作 -->
-      <div class="flex items-center gap-2 text-xs">
-        <span class="text-gray-400">{filtered.length} / {totalCount}</span>
-        <div class="flex gap-1 ml-auto">
-          <button class="btn btn-sm" onclick={copyAll}>复制全部</button>
-          <button class="btn btn-sm" onclick={exportCsv}>导出 CSV</button>
-          <button class="btn btn-sm" onclick={sendToMultiUrl}>发送到 MultiUrl</button>
-        </div>
-      </div>
+        <button class="btn btn-sm" onclick={sendToMultiUrl} disabled={filtered.length === 0}>发送到 MultiUrl</button>
+        <ExportMenu items={filtered} module="links" serializers={{ csv: linksCsv, text: linksText }} />
+      </ResultToolbar>
     {/if}
   </div>
 
