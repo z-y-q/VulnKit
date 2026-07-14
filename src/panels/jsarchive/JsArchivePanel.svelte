@@ -184,7 +184,8 @@
       ctx.reportProgress({ phase: `完成：${collected.length} 个文件，zip ${(zipped.length / 1024).toFixed(1)} KB` });
       return { entries: resultList, zipBlob: blob, totalBytes: zipped.length };
     },
-  });
+  },
+  { centerPanel: 'jsarchive', centerLabel: 'JS 归档' });
 
   // 订阅 controller.state 到本地 $state（模板 reactive 使用）
   let cs = $state<TaskState>({ ...IDLE });

@@ -4,6 +4,7 @@
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
+  import { analysisContextStore } from '@/stores/analysis-context';
   import type { FetchResult } from '@/lib/types/messaging';
   import { extractScriptSrcs, extractLinkHrefs, formatSize } from '@/lib/source/source-utils';
 
@@ -34,17 +35,15 @@
     });
   });
 
-  // 消费其他面板发送的 URL 队列
+  // 消费跨面板 handoff（统一 analysisContextStore，替代旧 lingmou:source-pending）
   $effect(() => {
-    browser.storage.local.get('lingmou:source-pending').then((res) => {
-      const pending = res?.['lingmou:source-pending'] as string | undefined;
-      if (pending) {
-        pendingUrls = pending.split('\n').map(s => s.trim()).filter(Boolean);
-        browser.storage.local.remove('lingmou:source-pending');
-        if (pendingUrls.length) {
-          url = pendingUrls[0];
-          toastStore.show(`已载入 ${pendingUrls.length} 个待加载 URL，点击加载`, 'info');
-        }
+    analysisContextStore.consume('source-loader').then((c) => {
+      const text = c?.payload.text;
+      if (!text) return;
+      pendingUrls = text.split('\n').map(s => s.trim()).filter(Boolean);
+      if (pendingUrls.length) {
+        url = pendingUrls[0];
+        toastStore.show(`已载入 ${pendingUrls.length} 个待加载 URL，点击加载`, 'info');
       }
     }).catch(() => { /* ignore */ });
   });

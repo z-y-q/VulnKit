@@ -9,6 +9,7 @@
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
+  import { analysisContextStore } from '@/stores/analysis-context';
   import { runConcurrent } from '@/lib/core/concurrency';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
@@ -81,7 +82,7 @@
         return collected;
       },
     },
-    { canPause: true },
+    { canPause: true, centerPanel: 'fuzz', centerLabel: '目录扫描' },
   );
 
   let cs = $state<TaskState>({ ...IDLE });
@@ -92,14 +93,10 @@
     getActiveTabUrl().then(u => { if (u) targetUrl = u; });
   });
 
-  // 消费来自其他面板（如 Wayback 历史档案）发送的路径
+  // 消费跨面板 handoff（paths 来自 Wayback；targetUrl 由 UrlInput 统一回填）
   $effect(() => {
-    browser.storage.local.get('lingmou:fuzz-pending').then((res) => {
-      const pending = res?.['lingmou:fuzz-pending'] as string | undefined;
-      if (pending) {
-        customPaths = pending;
-        browser.storage.local.remove('lingmou:fuzz-pending');
-      }
+    analysisContextStore.consumePayload('fuzz', 'paths').then((p) => {
+      if (p) customPaths = p;
     }).catch(() => { /* ignore */ });
   });
 
@@ -259,7 +256,7 @@
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="扫描" onscan={handleScan} />
+      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="扫描" onscan={handleScan} recordTarget />
       {#if archiving}
         <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
         {#if cs.status === 'paused'}

@@ -3,6 +3,7 @@
   // 订阅 scanHistoryStore，展示/筛选/删除历史扫描记录
   import { scanHistoryStore, MODULE_LABELS, SEV_ORDER, type ScanHistoryEntry, type ScanSeverity } from '@/stores/scan-history';
   import { toastStore } from '@/stores/ui';
+  import { analysisContextStore } from '@/stores/analysis-context';
 
   let entries = $derived($scanHistoryStore);
   let filterDomain = $state('');
@@ -75,6 +76,17 @@
     if (!confirm(`确定要清空 ${domain} 的所有历史记录吗？`)) return;
     await scanHistoryStore.clearDomain(domain);
     toastStore.show(`已清空 ${domain} 的历史`, 'success');
+  }
+
+  /** 回跳到该扫描记录的源面板，回填 targetUrl 供继续分析（文档 §6.3） */
+  async function backToModule(entry: ScanHistoryEntry) {
+    await analysisContextStore.handoff({
+      sourcePanel: 'history',
+      sourceLabel: '历史档案',
+      targetPanel: entry.module,
+      payload: { targetUrl: entry.url },
+      summary: entry.domain,
+    });
   }
 </script>
 
@@ -151,6 +163,15 @@
             </button>
 
             <!-- 操作区：与展开按钮分离的兄弟按钮 -->
+            <button
+              type="button"
+              class="btn btn-sm text-xs text-blue-500 dark:text-blue-400 shrink-0 px-1"
+              onclick={() => backToModule(entry)}
+              title={`回到「${entry.moduleName || MODULE_LABELS[entry.module] || entry.module}」继续分析`}
+              aria-label={`回到 ${entry.moduleName || MODULE_LABELS[entry.module] || entry.module} 面板`}
+            >
+              ↩ 回到
+            </button>
             <button
               type="button"
               class="btn btn-sm text-xs text-red-500 dark:text-red-400 shrink-0 px-1"

@@ -5,6 +5,7 @@
   //      + ExportMenu/copyText（规范文件名 + 修复未 await）。
   import { confirmStore } from '@/stores/confirm';
   import { toastStore } from '@/stores/ui';
+  import { analysisContextStore } from '@/stores/analysis-context';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
   import { copyText } from '@/lib/actions/clipboard';
   import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
@@ -56,7 +57,8 @@
       }
       return { ok, fail };
     },
-  });
+  },
+  { centerPanel: 'multiurl', centerLabel: 'URL 多开' });
 
   let cs = $state<TaskState>({ ...IDLE });
   $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
@@ -71,14 +73,10 @@
     }
   }
 
-  // 启动时检查是否有从其他面板发送过来的 URL
+  // 消费跨面板 handoff（统一 analysisContextStore，替代旧 lingmou:multiurl-pending）
   $effect(() => {
-    browser.storage.local.get('lingmou:multiurl-pending').then(result => {
-      const pending = result['lingmou:multiurl-pending'] as string | undefined;
-      if (pending) {
-        rawText = pending;
-        browser.storage.local.remove('lingmou:multiurl-pending');
-      }
+    analysisContextStore.consume('multiurl').then((c) => {
+      if (c?.payload.text) rawText = c.payload.text;
     }).catch(() => { /* ignore */ });
   });
 

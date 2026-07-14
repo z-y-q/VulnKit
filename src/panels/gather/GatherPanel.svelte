@@ -5,6 +5,7 @@
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
+  import { analysisContextStore } from '@/stores/analysis-context';
   import type { DomFingerprint } from '@/lib/types/messaging';
   import { matchAllRules, type HaeMatch } from '@/lib/scanners/hae-engine';
   import { loadMergedGroups, type HaeGroup } from '@/lib/scanners/hae-store';
@@ -479,8 +480,10 @@
       .map(f => f.value);
     const uniq = [...new Set(urls)];
     if (uniq.length === 0) { toastStore.show('没有可发送的 JS/CSS 资源', 'warning'); return; }
-    await browser.storage.local.set({ 'lingmou:source-pending': uniq.join('\n') });
-    toastStore.show(`已发送 ${uniq.length} 条到「源码加载」`, 'success');
+    await analysisContextStore.handoff({
+      sourcePanel: 'gather', sourceLabel: '信息收集',
+      targetPanel: 'source-loader', payload: { text: uniq.join('\n') }, summary: `${uniq.length} 个资源`,
+    });
   }
 </script>
 

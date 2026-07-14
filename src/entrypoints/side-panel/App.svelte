@@ -2,6 +2,7 @@
   import { themeStore, activePanelStore, autoRunStore } from '@/stores/ui';
   import Sidebar from '@/components/layout/Sidebar.svelte';
   import PanelHeader from '@/components/layout/PanelHeader.svelte';
+  import ContextBanner from '@/components/layout/ContextBanner.svelte';
   import StatusBar from '@/components/layout/StatusBar.svelte';
   import Toast from '@/components/ui/Toast.svelte';
   import PanelLoadState from '@/components/feedback/PanelLoadState.svelte';
@@ -165,6 +166,7 @@
           categoryLabel={currentPanel.categoryLabel}
           catColor={currentPanel.catColor}
         />
+        <ContextBanner />
         <div class="flex-1 overflow-y-auto p-3.5">
           {#key `${activePanel}-${loadNonce}`}
             <div class="vk-fade-in">

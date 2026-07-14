@@ -6,6 +6,7 @@
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
+  import { analysisContextStore } from '@/stores/analysis-context';
   import type { FetchResult } from '@/lib/types/messaging';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
@@ -115,8 +116,10 @@
   async function sendToMultiUrl() {
     if (!results.length) { toastStore.show('无结果', 'warning'); return; }
     const text = results.map(r => snapshotUrl(r.timestamp, r.url)).join('\n');
-    await browser.storage.local.set({ 'lingmou:multiurl-pending': text });
-    toastStore.show(`已发送 ${results.length} 条到「URL 多开」`, 'success');
+    await analysisContextStore.handoff({
+      sourcePanel: 'history-archive', sourceLabel: 'Wayback',
+      targetPanel: 'multiurl', payload: { text }, summary: `${results.length} 条历史快照`,
+    });
   }
 
   /** 发送到目录扫描：从历史 URL 提取路径作为字典 */
@@ -132,8 +135,10 @@
       } catch { /* ignore */ }
     }
     if (!paths.size) { toastStore.show('未能从历史 URL 提取路径', 'warning'); return; }
-    await browser.storage.local.set({ 'lingmou:fuzz-pending': [...paths].join('\n') });
-    toastStore.show(`已发送 ${paths.size} 条路径到「目录扫描」`, 'success');
+    await analysisContextStore.handoff({
+      sourcePanel: 'history-archive', sourceLabel: 'Wayback',
+      targetPanel: 'fuzz', payload: { paths: [...paths].join('\n') }, summary: `${paths.size} 条路径`,
+    });
   }
 
   function calendarLink(): string {

@@ -3,6 +3,7 @@
   // 提取当前页面所有链接/图片/脚本/资源/框架/表单，分类、去重、筛选、复制、导出
   import { getActiveTab, execInTab } from '@/lib/core/tabs';
   import { toastStore, autoRunStore } from '@/stores/ui';
+  import { analysisContextStore } from '@/stores/analysis-context';
   import {
     classifyLink,
     dedupeLinks,
@@ -295,8 +296,10 @@
       toastStore.show('没有有效的 HTTP(S) 链接', 'warning');
       return;
     }
-    await browser.storage.local.set({ 'lingmou:multiurl-pending': urls.join('\n') });
-    toastStore.show(`已发送 ${urls.length} 个 URL 到 MultiUrl 面板`, 'success');
+    await analysisContextStore.handoff({
+      sourcePanel: 'links', sourceLabel: '链接提取',
+      targetPanel: 'multiurl', payload: { text: urls.join('\n') }, summary: `${urls.length} 个 URL`,
+    });
   }
 </script>
 

@@ -271,7 +271,7 @@
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
+      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} recordTarget />
       {#if scanning}
         <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
       {/if}

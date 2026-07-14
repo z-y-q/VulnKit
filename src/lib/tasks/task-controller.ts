@@ -12,6 +12,7 @@
 
 import { writable, get, type Readable } from 'svelte/store';
 import { toActionableError, type ActionableError } from '@/lib/errors/actionable-error';
+import { taskCenterStore } from '@/stores/task-center';
 
 export type TaskStatus =
   | 'idle' | 'validating' | 'running' | 'paused'
@@ -69,6 +70,10 @@ export interface TaskController<TInput, TResult> {
 export interface CreateTaskOptions {
   /** 是否支持暂停（fuzz 等需要；默认 false） */
   canPause?: boolean;
+  /** 上报到 task-center 的面板 id（不传则不上报，向后兼容） */
+  centerPanel?: string;
+  /** 上报到 task-center 的任务标签（默认用 centerPanel） */
+  centerLabel?: string;
 }
 
 export const IDLE: TaskState = {
@@ -88,6 +93,8 @@ export function createTaskController<TInput, TResult>(
   opts: CreateTaskOptions = {},
 ): TaskController<TInput, TResult> {
   const canPauseEnabled = opts.canPause ?? false;
+  const centerPanel = opts.centerPanel;
+  const centerLabel = opts.centerLabel ?? opts.centerPanel ?? '';
   const store = writable<TaskState>({ ...IDLE });
 
   let ac: AbortController | null = null;
@@ -97,6 +104,18 @@ export function createTaskController<TInput, TResult>(
 
   function patch(p: Partial<TaskState>) {
     store.update((s) => ({ ...s, ...p }));
+  }
+  /** 终态上报到 task-center（仅当配置了 centerPanel，向后兼容） */
+  function reportToCenter(status: TaskStatus): void {
+    if (!centerPanel) return;
+    if (status === 'succeeded' || status === 'partial' || status === 'cancelled' || status === 'failed') {
+      taskCenterStore.report({
+        panel: centerPanel,
+        label: centerLabel,
+        status,
+        summary: get(store).phase || undefined,
+      });
+    }
   }
   function elapsed(): number {
     return startedAt ? Date.now() - startedAt : 0;
@@ -140,12 +159,14 @@ export function createTaskController<TInput, TResult>(
       stopTimer();
       const err = toActionableError(e);
       patch({ status: 'failed', error: err, elapsedMs: elapsed(), canCancel: false, canPause: false });
+      reportToCenter('failed');
       throw err;
     }
 
     if (ac.signal.aborted) {
       stopTimer();
       patch({ status: 'cancelled', elapsedMs: elapsed(), canCancel: false, canPause: false });
+      reportToCenter('cancelled');
       return { status: 'cancelled' };
     }
 
@@ -163,6 +184,7 @@ export function createTaskController<TInput, TResult>(
       stopTimer();
       const err = toActionableError(e);
       patch({ status: 'failed', error: err, elapsedMs: elapsed(), canCancel: false, canPause: false });
+      reportToCenter('failed');
       throw err;
     }
 
@@ -172,10 +194,12 @@ export function createTaskController<TInput, TResult>(
     if (ac.signal.aborted) {
       // 取消：adapter 已停止派发并返回；result 可能含部分结果（面板自行展示/标记 partial）
       patch({ status: 'cancelled', elapsedMs: finalElapsed, canCancel: false, canPause: false });
+      reportToCenter('cancelled');
       return { status: 'cancelled', result };
     }
 
     patch({ status: 'succeeded', elapsedMs: finalElapsed, canCancel: false, canPause: false });
+    reportToCenter('succeeded');
     return { status: 'succeeded', result };
   }
 

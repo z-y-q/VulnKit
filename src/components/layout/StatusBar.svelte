@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getAppVersion } from '@/lib/core/app-version';
+  import TaskCenterPopover from '@/components/layout/TaskCenterPopover.svelte';
 
   let version = $derived(getAppVersion());
   let time = $state('');
@@ -21,5 +22,8 @@
     <div class="w-3 h-3 rounded bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[6px] font-bold shadow-sm">灵</div>
     <span class="font-medium">v{version}</span>
   </div>
-  <span class="font-mono tabular-nums">{time}</span>
+  <div class="flex items-center gap-2">
+    <TaskCenterPopover />
+    <span class="font-mono tabular-nums">{time}</span>
+  </div>
 </footer>
