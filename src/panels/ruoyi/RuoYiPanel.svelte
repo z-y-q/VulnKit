@@ -8,6 +8,9 @@
   import { getAppVersion } from '@/lib/core/app-version';
   import type { ProbeResult, FetchResult } from '@/lib/types/messaging';
   import { runConcurrent } from '@/lib/core/concurrency';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
+  import { toCsv } from '@/lib/actions/serializers';
   import {
     type HookEvent,
     type CapturedRequest,
@@ -542,50 +545,22 @@
       const cmd = `curl -s -X GET '${origin}${p}'`;
       return token ? `${cmd} \\\n  -H 'Authorization: Bearer ${token}'` : cmd;
     });
-    navigator.clipboard.writeText(lines.join('\n\n')).then(() => {
-      toastStore.show(`已复制 ${paths.length} 条 curl 命令${token ? '（含 Admin-Token）' : ''}`, 'success');
-    });
+    copyText(lines.join('\n\n'), `已复制 ${paths.length} 条 curl 命令${token ? '（含 Admin-Token）' : ''}`);
   }
 
-  // —— 复制/导出 ——
-  function copyRoutes() {
-    const paths = sensitiveRoutes.map((r) => r.path);
-    if (paths.length === 0) {
-      toastStore.show('没有可复制的路由', 'warning');
-      return;
-    }
-    navigator.clipboard.writeText(paths.join('\n')).then(() => {
-      toastStore.show(`已复制 ${paths.length} 条路由`, 'success');
-    });
+  // —— 导出序列化器（敏感路由）——
+  function ruoyiCsv(items: ClassifiedRoute[]): string {
+    return toCsv([['path', 'category', 'title'], ...items.map(r => [r.path, r.category, r.title])]);
   }
-
-  function exportJson() {
-    const data = {
-      timestamp: new Date().toISOString(),
-      version: detectedVersion,
-      variant: detectedVariant,
-      events: events.length,
-      capturedRequests: capturedRequests.length,
-      sensitiveRoutes: sensitiveRoutes.map((r) => ({
-        path: r.path,
-        category: r.category,
-        title: r.title,
-      })),
-      matchedCves: matchedCves.map((c) => ({
-        id: c.id,
-        title: c.title,
-        severity: c.severity,
-        affected: c.affected,
-      })),
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ruoyi-report-${Date.now()}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toastStore.show('报告已导出', 'success');
+  function ruoyiJson(items: ClassifiedRoute[]): string {
+    return JSON.stringify({
+      version: detectedVersion, variant: detectedVariant,
+      sensitiveRoutes: items.map(r => ({ path: r.path, category: r.category, title: r.title })),
+      matchedCves: matchedCves.map(c => ({ id: c.id, title: c.title, severity: c.severity, affected: c.affected })),
+    }, null, 2);
+  }
+  function ruoyiText(items: ClassifiedRoute[]): string {
+    return items.map(r => `[${r.category}] ${r.path}${r.title ? ' — ' + r.title : ''}`).join('\n');
   }
 
   /** 导出 HTML 报告（对齐 v5 exportHtmlReport）—— 自包含、可离线查看 */
@@ -963,8 +938,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
       {/if}
 
       <div class="flex gap-1">
-        <button class="btn btn-sm flex-1" onclick={copyRoutes}>复制路由</button>
-        <button class="btn btn-sm flex-1" onclick={exportJson}>JSON</button>
+        <ExportMenu items={sensitiveRoutes} module="ruoyi-routes" serializers={{ json: ruoyiJson, csv: ruoyiCsv, text: ruoyiText }} copySerialize={ruoyiText} />
         <button class="btn btn-sm flex-1" onclick={exportHtml}>HTML 报告</button>
       </div>
     {:else if hookActive}
