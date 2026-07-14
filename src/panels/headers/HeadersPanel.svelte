@@ -10,6 +10,8 @@
   import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
   import FilterBar from '@/components/scanner/FilterBar.svelte';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
   import { toCsv, toMarkdownTable } from '@/lib/actions/serializers';
   import type { ProbeResult } from '@/lib/types/messaging';
   import {
@@ -26,12 +28,10 @@
   import { scanSettingsStore } from '@/stores/settings';
 
   let targetUrl = $state('');
-  let scanning = $state(false);
   let result = $state<HeaderAnalysisResult | null>(null);
   let filter = $state<'all' | 'miss' | 'warn' | 'pass'>('all');
   let searchQuery = $state('');
   let sortBy = $state<'severity' | 'name' | 'category'>('severity');
-  let cancelled = $state(false);
 
   // 自动填充当前页 URL
   $effect(() => {
@@ -40,13 +40,68 @@
     });
   });
 
+  // —— TaskController 接管扫描状态机（替代 scanning/cancelled）——
+  const controller = createTaskController<{ url: string }, HeaderAnalysisResult>({
+    validate: (input) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('请输入合法的 http(s) URL');
+    },
+    run: async (input, ctx) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('无效的目标 URL');
+      ctx.reportProgress({ phase: '获取响应头' });
+      const probe = await sendMessage({
+        type: 'FETCH_HEADER_PROBE',
+        url: v.parsed.href,
+        timeout: $scanSettingsStore.requestTimeoutMs,
+      }) as ProbeResult;
+      if (probe.error || !probe.headers) {
+        throw new Error('获取响应头失败: ' + (probe.error || '无响应'));
+      }
+      // 将 headers 键转为小写（engine 期望全小写）
+      const normalizedHeaders: Record<string, string> = {};
+      for (const [k, val] of Object.entries(probe.headers)) {
+        normalizedHeaders[k.toLowerCase()] = val;
+      }
+      ctx.reportProgress({ phase: '分析中' });
+      const r = analyzeHeaders(normalizedHeaders);
+      result = r;
+      try {
+        await scanHistoryStore.addScan({
+          url: input.url,
+          module: 'headers',
+          findings: mapHeadersToFindings(r),
+        });
+      } catch { /* store failure must not break scan */ }
+      return r;
+    },
+  }, { centerPanel: 'headers', centerLabel: '安全头检测' });
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+
+  async function handleScan() {
+    const r = await controller.start({ url: targetUrl });
+    if (r.status === 'succeeded' && r.result) {
+      const res = r.result;
+      if (res.issues.length > 0) {
+        toastStore.show(`发现 ${res.issues.length} 个安全头问题（评分 ${res.score}）`, 'warning');
+      } else {
+        toastStore.show(`安全头评分 ${res.score}，配置良好`, 'success');
+      }
+    } else if (r.status === 'cancelled') {
+      toastStore.show('扫描已取消', 'info');
+    }
+  }
+
   // 一键操作（右键菜单 / Popup）：命中本面板则自动扫描
   $effect(() => {
     const sig = $autoRunStore;
     if (sig && sig.panel === 'headers') {
       autoRunStore.clear();
       if (sig.url) targetUrl = sig.url;
-      scan();
+      handleScan();
     }
   });
 
@@ -126,67 +181,6 @@
     }));
   }
 
-  // 主扫描
-  async function scan() {
-    const v = validateProbeUrl(targetUrl);
-    if ('error' in v) {
-      toastStore.show('请输入合法的 http(s) URL', 'error');
-      return;
-    }
-
-    scanning = true;
-    cancelled = false;
-    result = null;
-
-    try {
-      const probe = await sendMessage({
-        type: 'FETCH_HEADER_PROBE',
-        url: v.parsed.href,
-        timeout: $scanSettingsStore.requestTimeoutMs,
-      });
-      const r = probe as ProbeResult;
-
-      if (r.error || !r.headers) {
-        toastStore.show('获取响应头失败: ' + (r.error || '无响应'), 'warning');
-        return;
-      }
-
-      // 将 headers 键转为小写（engine 期望全小写）
-      const normalizedHeaders: Record<string, string> = {};
-      for (const [k, val] of Object.entries(r.headers)) {
-        normalizedHeaders[k.toLowerCase()] = val;
-      }
-
-      if (cancelled) {
-        scanning = false;
-        toastStore.show('扫描已取消', 'info');
-        return;
-      }
-
-      result = analyzeHeaders(normalizedHeaders);
-
-      if (result.issues.length > 0) {
-        toastStore.show(`发现 ${result.issues.length} 个安全头问题（评分 ${result.score}）`, 'warning');
-      } else {
-        toastStore.show(`安全头评分 ${result.score}，配置良好`, 'success');
-      }
-
-      try {
-        await scanHistoryStore.addScan({
-          url: targetUrl,
-          module: 'headers',
-          findings: mapHeadersToFindings(result),
-        });
-      } catch { /* store failure must not break scan */ }
-    } catch (err: any) {
-      toastStore.show('扫描出错: ' + (err.message || '未知错误'), 'warning');
-    } finally {
-      scanning = false;
-    }
-  }
-
-  function cancel() { cancelled = true; }
-
   // —— 导出/复制序列化器（作用于 result.results，统一走 ExportMenu；修原 navigator.clipboard 未 await）——
   function headersCsv(items: HeaderCheckResult[]): string {
     return toCsv([
@@ -229,13 +223,13 @@
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
-      {#if scanning}
-        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="检测" onscan={handleScan} />
+      {#if archiving}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
-    {#if scanning}
-      <div class="text-xs text-gray-400">正在获取响应头...</div>
+    {#if archiving}
+      <div class="text-xs text-gray-400">{cs.phase || '扫描中...'}</div>
     {/if}
   </div>
 
@@ -365,9 +359,11 @@
         {/if}
       {/each}
     </div>
-  {:else if !scanning && result && filteredResults.length === 0}
+  {:else if cs.status === 'failed'}
+    <ErrorState error={cs.error!} onRetry={handleScan} />
+  {:else if !archiving && result && filteredResults.length === 0}
     <EmptyState message="无匹配结果" icon="🔍" />
-  {:else if !scanning && !result}
+  {:else if !archiving && !result}
     <EmptyState
       message="输入目标 URL，点击「检测」开始 HTTP 安全头扫描"
       hint="自动分析 20+ 安全头配置并评分"

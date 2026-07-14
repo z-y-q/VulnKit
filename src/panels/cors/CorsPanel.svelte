@@ -17,7 +17,9 @@
   import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
   import ResultToolbar from '@/components/results/ResultToolbar.svelte';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
   import DetailDrawer from '@/components/results/DetailDrawer.svelte';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
   import { toCsv, toMarkdownTable } from '@/lib/actions/serializers';
   import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
   import type { DetailField, DetailHandoffAction } from '@/components/results/detail-drawer-utils';
@@ -35,13 +37,9 @@
   } from '@/lib/scanners/cors-engine';
 
   let targetUrl = $state('');
-  let scanning = $state(false);
-  let scanned = $state(0);
-  let total = $state(0);
   let issues = $state<CorsIssue[]>([]);
   let safeCount = $state(0);
   let useDynamic = $state(true);
-  let cancelled = $state(false);
   // HTTP 方法开关（v5 支持多方法测试）
   let methods = $state({ GET: true, OPTIONS: true, POST: false, PUT: false, DELETE: false });
   // 已验证的 issue（Credential 双探针）key -> 验证结果
@@ -90,13 +88,75 @@
     });
   });
 
+  // —— TaskController 接管扫描状态机 ——
+  const controller = createTaskController<{ url: string }, void>({
+    validate: (input) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('请输入合法的 http(s) URL');
+    },
+    run: async (input, ctx) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('无效的目标 URL');
+      const base = v.parsed;
+      const origins: OriginVariant[] = [...ORIGIN_VARIANTS];
+      if (useDynamic) origins.push(...buildDynamicOrigins(base.hostname));
+      const endpoints = DEFAULT_CORS_ENDPOINTS;
+      const activeMethods = (Object.keys(methods) as (keyof typeof methods)[]).filter((m) => methods[m]);
+      const tasks: (() => Promise<CorsProbeResult | null>)[] = [];
+      for (const ep of endpoints) {
+        const u = new URL(ep.path, base.origin).href;
+        for (const origin of origins) {
+          for (const m of activeMethods) {
+            tasks.push(() => probeOne(u, m, ep, origin));
+          }
+        }
+      }
+      ctx.reportProgress({ total: tasks.length, completed: 0, phase: 'CORS 探测' });
+      const results: CorsProbeResult[] = [];
+      let scanCount = 0;
+      await runConcurrent(
+        tasks,
+        async (task) => {
+          const r = await task();
+          if (r) results.push(r);
+          scanCount++;
+          ctx.reportProgress({ completed: scanCount });
+        },
+        { concurrency: $scanSettingsStore.concurrency, cancelled: () => ctx.signal.aborted },
+      );
+      const analyzed = analyzeResults(results);
+      issues = analyzed.issues;
+      safeCount = analyzed.safeCount;
+      try {
+        await scanHistoryStore.addScan({ url: input.url, module: 'cors', findings: mapToFindings(issues) });
+      } catch { /* store failure must not break scan */ }
+    },
+  }, { centerPanel: 'cors', centerLabel: 'CORS 检测' });
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+
+  async function handleScan() {
+    const r = await controller.start({ url: targetUrl });
+    if (r.status === 'succeeded') {
+      if (vulnCount > 0) {
+        toastStore.show(`发现 ${vulnCount} 个 CORS 风险点`, 'warning');
+      } else {
+        toastStore.show(`CORS 检测完成，未发现风险（${safeCount} 安全）`, 'success');
+      }
+    } else if (r.status === 'cancelled') {
+      toastStore.show('扫描已取消', 'info');
+    }
+  }
+
   // 一键操作（右键菜单 / Popup）：命中本面板则自动扫描
   $effect(() => {
     const sig = $autoRunStore;
     if (sig && sig.panel === 'cors') {
       autoRunStore.clear();
       if (sig.url) targetUrl = sig.url;
-      scan();
+      handleScan();
     }
   });
 
@@ -187,76 +247,6 @@
       }));
   }
 
-  async function scan() {
-    const v = validateProbeUrl(targetUrl);
-    if ('error' in v) {
-      toastStore.show('请输入合法的 http(s) URL', 'error');
-      return;
-    }
-    scanning = true;
-    cancelled = false;
-    issues = [];
-    safeCount = 0;
-    scanned = 0;
-    verifiedMap = {};
-
-    const base = v.parsed;
-    const origins: OriginVariant[] = [...ORIGIN_VARIANTS];
-    if (useDynamic) origins.push(...buildDynamicOrigins(base.hostname));
-
-    const endpoints = DEFAULT_CORS_ENDPOINTS;
-    const activeMethods = (Object.keys(methods) as (keyof typeof methods)[]).filter((m) => methods[m]);
-    // 每个 endpoint × origin × 启用方法 探测
-    const tasks: (() => Promise<CorsProbeResult | null>)[] = [];
-    for (const ep of endpoints) {
-      const u = new URL(ep.path, base.origin).href;
-      for (const origin of origins) {
-        for (const m of activeMethods) {
-          tasks.push(() => probeOne(u, m, ep, origin));
-        }
-      }
-    }
-
-    total = tasks.length;
-    const results: CorsProbeResult[] = [];
-    await runConcurrent(
-      tasks,
-      async (task) => {
-        const r = await task();
-        if (r) results.push(r);
-        scanned++;
-      },
-      { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled },
-    );
-
-    if (cancelled) {
-      scanning = false;
-      toastStore.show('扫描已取消', 'info');
-      return;
-    }
-
-    const analyzed = analyzeResults(results);
-    issues = analyzed.issues;
-    safeCount = analyzed.safeCount;
-    scanning = false;
-
-    try {
-      await scanHistoryStore.addScan({ url: targetUrl, module: 'cors', findings: mapToFindings(issues) });
-    } catch {
-      /* store failure must not break scan */
-    }
-
-    if (vulnCount > 0) {
-      toastStore.show(`发现 ${vulnCount} 个 CORS 风险点`, 'warning');
-    } else {
-      toastStore.show(`CORS 检测完成，未发现风险（${safeCount} 安全）`, 'success');
-    }
-  }
-
-  function cancel() {
-    cancelled = true;
-  }
-
   // —— 导出/复制序列化器（作用于当前筛选 filteredIssues）——
   function corsCsv(items: CorsIssue[]): string {
     return toCsv([
@@ -332,14 +322,14 @@
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} recordTarget />
-      {#if scanning}
-        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="检测" onscan={handleScan} recordTarget />
+      {#if archiving}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
     <div class="flex items-center gap-3 text-xs flex-wrap">
       <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useDynamic} disabled={scanning} class="accent-blue-500" />
+        <input type="checkbox" bind:checked={useDynamic} disabled={archiving} class="accent-blue-500" />
         <span>动态混淆 Origin</span>
       </label>
       <span class="text-gray-400 shrink-0">方法:</span>
@@ -348,7 +338,7 @@
           <input
             type="checkbox"
             bind:checked={methods[m as keyof typeof methods]}
-            disabled={scanning}
+            disabled={archiving}
             class="accent-blue-500"
           />
           <span class="text-gray-600 dark:text-gray-300">{m}</span>
@@ -358,7 +348,7 @@
     <div class="text-xs text-gray-400">
       端点: {DEFAULT_CORS_ENDPOINTS.length} · Origin: {ORIGIN_VARIANTS.length}{useDynamic ? '+动态' : ''}
     </div>
-    <ScanProgress {scanned} {total} {scanning} label="CORS 探测" />
+    <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="CORS 探测" />
   </div>
 
   <!-- 工具栏：ResultToolbar（搜索 + 计数 + 清除）包裹「仅风险」筛选 / 排序 / 导出 -->
@@ -445,9 +435,11 @@
         </div>
       {/each}
     </div>
-  {:else if !scanning && issues.length === 0 && scanned > 0}
+  {:else if cs.status === 'failed'}
+    <ErrorState error={cs.error!} onRetry={handleScan} />
+  {:else if !archiving && issues.length === 0 && cs.completed > 0}
     <EmptyState message="未检测到 CORS 配置" icon="✅" />
-  {:else if !scanning}
+  {:else if !archiving}
     <EmptyState
       message="输入目标 URL，点击「检测」开始 CORS 跨域配置扫描"
       hint="支持 6 端点 × 多 Origin × GET/OPTIONS 组合探测"

@@ -29,17 +29,15 @@
   import EmptyState from '@/components/scanner/EmptyState.svelte';
   import ResultToolbar from '@/components/results/ResultToolbar.svelte';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
   import { copyText } from '@/lib/actions/clipboard';
   import { toCsv } from '@/lib/actions/serializers';
   import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
 
   let targetUrl = $state('');
-  let scanning = $state(false);
-  let scanned = $state(0);
-  let total = $state(0);
   let results = $state<SubdomainResult[]>([]);
   let query = $state<ResultQuery>({ search: '', filters: {}, sort: { key: 'name', direction: 'asc' } });
-  let cancelled = $state(false);
 
   // 枚举方法开关
   let useBrute = $state(true);     // DNS 暴力
@@ -49,7 +47,6 @@
   let useWayback = $state(true);   // Wayback Machine
   let usePage = $state(true);      // 当前页面链接
   let wildcardDetected = $state(false);
-  let phase = $state('');          // 当前阶段提示
 
   $effect(() => {
     getActiveTabUrl().then(u => {
@@ -57,13 +54,198 @@
     });
   });
 
+  // —— TaskController 接管扫描状态机 ——
+  const controller = createTaskController<{ url: string }, void>({
+    validate: (input) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('请输入合法的 http(s) URL');
+      if (!useBrute && !useCT && !useCertspotter && !useDnsRec && !useWayback && !usePage) {
+        throw new Error('请至少选择一种枚举方法');
+      }
+    },
+    run: async (input, ctx) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('无效的目标 URL');
+      const rootDomain = extractRootDomain(v.parsed.hostname);
+      const candidates = buildSubdomainCandidates(rootDomain);
+
+      results = [];
+      wildcardDetected = false;
+      const collected: SubdomainResult[] = [];
+      let scanned = 0;
+
+      // —— 阶段 0：Wildcard 泛解析检测 ——
+      if (useBrute) {
+        ctx.reportProgress({ phase: '检测泛解析...' });
+        wildcardDetected = await detectWildcard(rootDomain, resolvesToIp);
+        if (wildcardDetected) {
+          toastStore.show('检测到 DNS 泛解析，暴力结果将标记为待验证', 'warning');
+        }
+      }
+
+      // —— 阶段 1：被动枚举（零噪声，优先）——
+      const passiveTasks: Promise<void>[] = [];
+
+      if (useCT) {
+        passiveTasks.push((async () => {
+          ctx.reportProgress({ phase: '查询证书透明日志 (crt.sh)...' });
+          try {
+            const res = await sendMessage({ type: 'FETCH_URL', url: `https://crt.sh/?q=%25.${rootDomain}&output=json` }) as FetchResult<string>;
+            if (res.success && res.data) {
+              await verifyAndMerge(parseCrtshResponse(res.data, rootDomain), 'ct', collected, ctx, () => scanned);
+            }
+          } catch { /* crt.sh 可能超时，忽略 */ }
+        })());
+      }
+
+      if (useWayback) {
+        passiveTasks.push((async () => {
+          ctx.reportProgress({ phase: '查询 Wayback Machine...' });
+          try {
+            const res = await sendMessage({ type: 'FETCH_URL', url: `https://web.archive.org/cdx/search/cdx?url=*.${rootDomain}/*&output=text&fl=original&collapse=urlkey` }) as FetchResult<string>;
+            if (res.success && res.data) {
+              await verifyAndMerge(parseWaybackResponse(res.data, rootDomain), 'wayback', collected, ctx, () => scanned);
+            }
+          } catch { /* ignore */ }
+        })());
+      }
+
+      if (useCertspotter) {
+        passiveTasks.push((async () => {
+          ctx.reportProgress({ phase: '查询 CertSpotter...' });
+          try {
+            const res = await sendMessage({ type: 'FETCH_URL', url: `https://api.certspotter.com/v1/issuances?domain=${rootDomain}&include_subdomains=true&expand=dns_names` }) as FetchResult<string>;
+            if (res.success && res.data) {
+              await verifyAndMerge(parseCertspotterResponse(res.data, rootDomain), 'ct', collected, ctx, () => scanned);
+            }
+          } catch { /* ignore */ }
+        })());
+      }
+
+      if (useDnsRec) {
+        passiveTasks.push((async () => {
+          ctx.reportProgress({ phase: '查询 DNS NS/MX 记录...' });
+          try {
+            const dohUrls = [
+              `https://dns.google/resolve?name=${rootDomain}&type=NS`,
+              `https://dns.google/resolve?name=${rootDomain}&type=MX`,
+            ];
+            for (const u of dohUrls) {
+              const res = await sendMessage({ type: 'FETCH_URL', url: u }) as FetchResult<string>;
+              if (res.success && res.data) {
+                try {
+                  const json = JSON.parse(res.data);
+                  const text = (json.Answer || json.Authority || []).map((a: any) => a.data || '').join('\n');
+                  await verifyAndMerge(parseDnsRecords(text, rootDomain), 'ct', collected, ctx, () => scanned);
+                } catch { /* ignore */ }
+              }
+            }
+          } catch { /* ignore */ }
+        })());
+      }
+
+      if (usePage) {
+        passiveTasks.push((async () => {
+          ctx.reportProgress({ phase: '提取页面链接...' });
+          const links = await harvestPageLinks(rootDomain);
+          if (links.length > 0) await verifyAndMerge(links, 'page', collected, ctx, () => scanned);
+        })());
+      }
+
+      await Promise.all(passiveTasks);
+
+      // —— 阶段 2：DNS 暴力枚举 ——
+      if (useBrute && !ctx.signal.aborted) {
+        ctx.reportProgress({ phase: 'DNS 暴力枚举...' });
+        const bruteTodo = candidates.filter(c => !collected.some(r => r.subdomain === c.full));
+        ctx.reportProgress({ total: bruteTodo.length + scanned, completed: scanned });
+        await runConcurrent(bruteTodo, async (c) => {
+          const r = await resolveOne(c.full);
+          r.source = 'brute';
+          collected.push(r);
+          scanned++;
+          ctx.reportProgress({ completed: scanned });
+        }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => ctx.signal.aborted });
+
+        if (wildcardDetected) {
+          for (const r of collected) {
+            if (r.source === 'brute') r.status = 'alive';
+          }
+        }
+      }
+
+      // —— 阶段 3：HTTP 探测验证 ——
+      if (!ctx.signal.aborted) {
+        ctx.reportProgress({ phase: 'HTTP 探测验证中...' });
+        const aliveHosts = collected
+          .filter(r => r.status === 'alive')
+          .map(r => r.subdomain)
+          .filter((v, i, a) => a.indexOf(v) === i);
+        if (aliveHosts.length > 0) {
+          const verified = await httpProbeVerify(aliveHosts, rootDomain, ctx);
+          for (const r of collected) {
+            if (r.status === 'alive' && !verified.has(r.subdomain)) {
+              r.status = 'dead';
+            }
+          }
+        }
+      }
+
+      // 合并去重
+      const merged = new Map<string, SubdomainResult>();
+      for (const r of collected) {
+        const ex = merged.get(r.subdomain);
+        if (!ex || r.ips.length > ex.ips.length) merged.set(r.subdomain, r);
+      }
+      results = [...merged.values()];
+
+      if (ctx.signal.aborted) return;
+
+      try {
+        const alive = results.filter(r => r.status === 'alive');
+        await scanHistoryStore.addScan({
+          url: input.url,
+          module: 'subdomain',
+          findings: mapSubdomainsToFindings(alive),
+        });
+      } catch { /* store failure must not break scan */ }
+    },
+  }, { centerPanel: 'subdomain', centerLabel: '子域名枚举' });
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+
+  async function handleScan() {
+    const r = await controller.start({ url: targetUrl });
+    if (r.status === 'succeeded') {
+      const aliveCount = results.filter(r => r.status === 'alive').length;
+      const srcCount = {
+        ct: results.filter(r => r.source === 'ct' && r.status === 'alive').length,
+        wayback: results.filter(r => r.source === 'wayback' && r.status === 'alive').length,
+        page: results.filter(r => r.source === 'page' && r.status === 'alive').length,
+        brute: results.filter(r => r.source === 'brute' && r.status === 'alive').length,
+      };
+      if (aliveCount > 0) {
+        toastStore.show(
+          `发现 ${aliveCount} 个存活子域名（证书${srcCount.ct}/历史${srcCount.wayback}/页面${srcCount.page}/暴力${srcCount.brute}）`,
+          'warning',
+        );
+      } else {
+        toastStore.show('枚举完成，未发现存活子域名', 'success');
+      }
+    } else if (r.status === 'cancelled') {
+      toastStore.show('扫描已取消', 'info');
+    }
+  }
+
   // 一键操作（右键菜单 / Popup）：命中本面板则自动扫描
   $effect(() => {
     const sig = $autoRunStore;
     if (sig && sig.panel === 'subdomain') {
       autoRunStore.clear();
       if (sig.url) targetUrl = sig.url;
-      scan();
+      handleScan();
     }
   });
 
@@ -89,7 +271,6 @@
   let filteredResults = $derived(subdomainAdapter.apply(results, query));
 
   let stats = $derived(buildStats(results, 0));
-  let elapsed = $state(0);
 
   async function resolveOne(hostname: string): Promise<SubdomainResult> {
     try {
@@ -128,10 +309,11 @@
   async function httpProbeVerify(
     aliveHosts: string[],
     rootDomain: string,
+    ctx: { signal: AbortSignal },
   ): Promise<Set<string>> {
     const verified = new Set<string>();
     await runConcurrent(aliveHosts, async (host) => {
-      if (cancelled) return;
+      if (ctx.signal.aborted) return;
       const res = await httpProbeOne(host);
       // 连接失败 / 无响应 → 泛解析假阳性
       if (!res || res.error || res.status === 0) return;
@@ -145,20 +327,26 @@
         } catch { /* ignore */ }
       }
       verified.add(host);
-    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
+    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => ctx.signal.aborted });
     return verified;
   }
 
-  /** 被动源获取的子域名 → DNS 验证存活并合并 */
-  async function verifyAndMerge(hostnames: string[], source: SubdomainResult['source'], acc: SubdomainResult[]) {
+  /** 被动源获取的子域名 → DNS 验证存活并合并；onScanned 回调上报进度 */
+  async function verifyAndMerge(
+    hostnames: string[],
+    source: SubdomainResult['source'],
+    acc: SubdomainResult[],
+    ctx: { signal: AbortSignal },
+    onScanned: () => void,
+  ) {
     const seen = new Set(acc.map(r => r.subdomain));
     const todo = hostnames.filter(h => !seen.has(h));
     for (const h of todo) {
-      if (cancelled) break;
+      if (ctx.signal.aborted) break;
       const r = await resolveOne(h);
       r.source = source;
       acc.push(r);
-      scanned++;
+      onScanned();
     }
   }
 
@@ -189,195 +377,6 @@
       url: `https://${r.subdomain}`,
     }));
   }
-
-  async function scan() {
-    const v = validateProbeUrl(targetUrl);
-    if ('error' in v) {
-      toastStore.show('请输入合法的 http(s) URL', 'error');
-      return;
-    }
-
-    if (!useBrute && !useCT && !useCertspotter && !useDnsRec && !useWayback && !usePage) {
-      toastStore.show('请至少选择一种枚举方法', 'warning');
-      return;
-    }
-
-    const rootDomain = extractRootDomain(v.parsed.hostname);
-    const candidates = buildSubdomainCandidates(rootDomain);
-
-    scanning = true;
-    results = [];
-    scanned = 0;
-    cancelled = false;
-    wildcardDetected = false;
-    elapsed = 0;
-    const startMs = Date.now();
-    const collected: SubdomainResult[] = [];
-
-    // —— 阶段 0：Wildcard 泛解析检测（决定暴力枚举是否有意义）——
-    if (useBrute) {
-      phase = '检测泛解析...';
-      wildcardDetected = await detectWildcard(rootDomain, resolvesToIp);
-      if (wildcardDetected) {
-        toastStore.show('检测到 DNS 泛解析，暴力结果将标记为待验证', 'warning');
-      }
-    }
-
-    // —— 阶段 1：被动枚举（零噪声，优先）——
-    const passiveTasks: Promise<void>[] = [];
-
-    if (useCT) {
-      passiveTasks.push((async () => {
-        phase = '查询证书透明日志 (crt.sh)...';
-        try {
-          const res = await sendMessage({ type: 'FETCH_URL', url: `https://crt.sh/?q=%25.${rootDomain}&output=json` }) as FetchResult<string>;
-          if (res.success && res.data) {
-            await verifyAndMerge(parseCrtshResponse(res.data, rootDomain), 'ct', collected);
-          }
-        } catch { /* crt.sh 可能超时，忽略 */ }
-      })());
-    }
-
-    if (useWayback) {
-      passiveTasks.push((async () => {
-        phase = '查询 Wayback Machine...';
-        try {
-          const res = await sendMessage({ type: 'FETCH_URL', url: `https://web.archive.org/cdx/search/cdx?url=*.${rootDomain}/*&output=text&fl=original&collapse=urlkey` }) as FetchResult<string>;
-          if (res.success && res.data) {
-            await verifyAndMerge(parseWaybackResponse(res.data, rootDomain), 'wayback', collected);
-          }
-        } catch { /* ignore */ }
-      })());
-    }
-
-    if (useCertspotter) {
-      passiveTasks.push((async () => {
-        phase = '查询 CertSpotter...';
-        try {
-          const res = await sendMessage({ type: 'FETCH_URL', url: `https://api.certspotter.com/v1/issuances?domain=${rootDomain}&include_subdomains=true&expand=dns_names` }) as FetchResult<string>;
-          if (res.success && res.data) {
-            await verifyAndMerge(parseCertspotterResponse(res.data, rootDomain), 'ct', collected);
-          }
-        } catch { /* ignore */ }
-      })());
-    }
-
-    if (useDnsRec) {
-      passiveTasks.push((async () => {
-        phase = '查询 DNS NS/MX 记录...';
-        try {
-          // 用 Google DoH 查 NS + MX 记录（默认返回 JSON），从响应中提取主机名
-          const dohUrls = [
-            `https://dns.google/resolve?name=${rootDomain}&type=NS`,
-            `https://dns.google/resolve?name=${rootDomain}&type=MX`,
-          ];
-          for (const u of dohUrls) {
-            const res = await sendMessage({ type: 'FETCH_URL', url: u }) as FetchResult<string>;
-            if (res.success && res.data) {
-              // DoH JSON: { Answer: [{ data: "ns1.example.com." }] }
-              try {
-                const json = JSON.parse(res.data);
-                const text = (json.Answer || json.Authority || []).map((a: any) => a.data || '').join('\n');
-                await verifyAndMerge(parseDnsRecords(text, rootDomain), 'ct', collected);
-              } catch { /* ignore */ }
-            }
-          }
-        } catch { /* ignore */ }
-      })());
-    }
-
-    if (usePage) {
-      passiveTasks.push((async () => {
-        phase = '提取页面链接...';
-        const links = await harvestPageLinks(rootDomain);
-        if (links.length > 0) await verifyAndMerge(links, 'page', collected);
-      })());
-    }
-
-    await Promise.all(passiveTasks);
-
-    // —— 阶段 2：DNS 暴力枚举 ——
-    if (useBrute && !cancelled) {
-      phase = 'DNS 暴力枚举...';
-      const bruteTodo = candidates.filter(c => !collected.some(r => r.subdomain === c.full));
-      total = bruteTodo.length + scanned;
-      await runConcurrent(bruteTodo, async (c) => {
-        const r = await resolveOne(c.full);
-        r.source = 'brute';
-        collected.push(r);
-        scanned++;
-        elapsed = Date.now() - startMs;
-      }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
-
-      // 泛解析域名：所有 brute 结果都"存活"，需标记可疑
-      if (wildcardDetected) {
-        for (const r of collected) {
-          if (r.source === 'brute') r.status = 'alive'; // 保留，但 UI 会提示
-        }
-      }
-    }
-
-    // —— 阶段 3：HTTP 探测验证（过滤泛解析假阳性）——
-    if (!cancelled) {
-      phase = 'HTTP 探测验证中...';
-      const aliveHosts = collected
-        .filter(r => r.status === 'alive')
-        .map(r => r.subdomain)
-        .filter((v, i, a) => a.indexOf(v) === i);
-      if (aliveHosts.length > 0) {
-        const verified = await httpProbeVerify(aliveHosts, rootDomain);
-        for (const r of collected) {
-          if (r.status === 'alive' && !verified.has(r.subdomain)) {
-            r.status = 'dead';
-          }
-        }
-      }
-    }
-
-    phase = '';
-    // 合并去重：同子域名保留信息最全的（IP 多的优先）
-    const merged = new Map<string, SubdomainResult>();
-    for (const r of collected) {
-      const ex = merged.get(r.subdomain);
-      if (!ex || r.ips.length > ex.ips.length) merged.set(r.subdomain, r);
-    }
-    results = [...merged.values()];
-    elapsed = Date.now() - startMs;
-    scanning = false;
-
-    if (cancelled) {
-      toastStore.show('扫描已取消', 'info');
-      return;
-    }
-
-    const aliveCount = results.filter(r => r.status === 'alive').length;
-    const srcCount = {
-      ct: results.filter(r => r.source === 'ct' && r.status === 'alive').length,
-      wayback: results.filter(r => r.source === 'wayback' && r.status === 'alive').length,
-      page: results.filter(r => r.source === 'page' && r.status === 'alive').length,
-      brute: results.filter(r => r.source === 'brute' && r.status === 'alive').length,
-    };
-    if (aliveCount > 0) {
-      toastStore.show(
-        `发现 ${aliveCount} 个存活子域名（证书${srcCount.ct}/历史${srcCount.wayback}/页面${srcCount.page}/暴力${srcCount.brute}）`,
-        'warning',
-      );
-    } else {
-      toastStore.show('枚举完成，未发现存活子域名', 'success');
-    }
-
-    // 发布到扫描历史
-    try {
-      const alive = results.filter(r => r.status === 'alive');
-      await scanHistoryStore.addScan({
-        url: targetUrl,
-        module: 'subdomain',
-        findings: mapSubdomainsToFindings(alive),
-      });
-    } catch { /* store failure must not break scan */ }
-  }
-
-  function cancel() { cancelled = true; }
 
   // —— 导出/复制序列化器（作用于当前筛选 filteredResults，展示/导出同源 §6.1）——
   function subdomainCsv(items: SubdomainResult[]): string {
@@ -410,9 +409,9 @@
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <UrlInput bind:value={targetUrl} {scanning} buttonText="枚举" scanningText="枚举中..." onscan={scan} />
-      {#if scanning}
-        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="枚举" scanningText="枚举中..." onscan={handleScan} />
+      {#if archiving}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
     <div class="flex items-center gap-2 text-xs text-gray-400">
@@ -424,27 +423,27 @@
     <!-- 枚举方法开关 -->
     <div class="flex flex-wrap items-center gap-1.5 text-xs">
       <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useCT} disabled={scanning} class="accent-blue-500" />
+        <input type="checkbox" bind:checked={useCT} disabled={archiving} class="accent-blue-500" />
         <span class="text-gray-600 dark:text-gray-300">证书透明 (crt.sh)</span>
       </label>
       <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useCertspotter} disabled={scanning} class="accent-blue-500" />
+        <input type="checkbox" bind:checked={useCertspotter} disabled={archiving} class="accent-blue-500" />
         <span class="text-gray-600 dark:text-gray-300">CertSpotter</span>
       </label>
       <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useDnsRec} disabled={scanning} class="accent-blue-500" />
+        <input type="checkbox" bind:checked={useDnsRec} disabled={archiving} class="accent-blue-500" />
         <span class="text-gray-600 dark:text-gray-300">DNS NS/MX</span>
       </label>
       <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useWayback} disabled={scanning} class="accent-blue-500" />
+        <input type="checkbox" bind:checked={useWayback} disabled={archiving} class="accent-blue-500" />
         <span class="text-gray-600 dark:text-gray-300">Wayback 历史</span>
       </label>
       <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={usePage} disabled={scanning} class="accent-blue-500" />
+        <input type="checkbox" bind:checked={usePage} disabled={archiving} class="accent-blue-500" />
         <span class="text-gray-600 dark:text-gray-300">页面链接</span>
       </label>
       <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useBrute} disabled={scanning} class="accent-blue-500" />
+        <input type="checkbox" bind:checked={useBrute} disabled={archiving} class="accent-blue-500" />
         <span class="text-gray-600 dark:text-gray-300">DNS 暴力</span>
       </label>
     </div>
@@ -455,11 +454,7 @@
       </div>
     {/if}
 
-    {#if scanning && phase}
-      <div class="text-xs text-gray-400">{phase}</div>
-    {/if}
-
-    <ScanProgress {scanned} {total} {scanning} label="子域名枚举" />
+    <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="子域名枚举" />
   </div>
 
   <!-- 工具栏：ResultToolbar 包裹 搜索 / 排序 / 导出 -->
@@ -518,9 +513,11 @@
         </div>
       {/each}
     </div>
-  {:else if !scanning && results.length === 0 && scanned > 0}
+  {:else if cs.status === 'failed'}
+    <ErrorState error={cs.error!} onRetry={handleScan} />
+  {:else if !archiving && results.length === 0 && cs.completed > 0}
     <EmptyState message="未发现存活子域名" icon="✅" />
-  {:else if !scanning}
+  {:else if !archiving}
     <EmptyState
       message="输入目标 URL，点击「枚举」开始 DNS 子域名扫描"
       hint="自动提取根域，基于词表并发 DNS 解析"

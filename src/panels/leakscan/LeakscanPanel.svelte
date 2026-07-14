@@ -11,9 +11,10 @@
   import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
   import FilterBar from '@/components/scanner/FilterBar.svelte';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
 
   let targetUrl = $state('');
-  let scanning = $state(false);
   let findings = $state<LeakFinding[]>([]);
   let filter = $state<'all' | LeakSeverity>('all');
   let sources = $state<{ dom: number; storage: number; js: number }>({ dom: 0, storage: 0, js: 0 });
@@ -86,37 +87,40 @@
     return { text: text.slice(0, 4_000_000), dom, storage, js };
   }
 
-  async function startScan() {
-    if (!targetUrl) { toastStore.show('请先在目标页面打开本面板', 'error'); return; }
-    scanning = true;
-    findings = [];
-    try {
+  // —— TaskController 接管扫描状态机 ——
+  const controller = createTaskController<{ url: string }, void>({
+    validate: (input) => {
+      if (!input.url) throw new Error('请先在目标页面打开本面板');
+    },
+    run: async (input, ctx) => {
+      ctx.reportProgress({ phase: '采集页面信号' });
       const { text, dom, storage, js } = await collectPageSignals();
       sources = { dom, storage, js };
       if (!text || text.length < 10) {
-        toastStore.show('未能采集到页面内容（可能无权限）', 'warning');
-        scanning = false;
-        return;
+        throw new Error('未能采集到页面内容（可能无权限）');
       }
-      // 90 条规则扫描
+      ctx.reportProgress({ phase: '匹配规则' });
       const raw = scanLeaks(text, 30);
-      // 截断条数（v5 上限 200）
       findings = raw.slice(0, 200);
-
       try {
-        await scanHistoryStore.addScan({ url: targetUrl, module: 'leakscan', findings: mapToFindings(findings) });
+        await scanHistoryStore.addScan({ url: input.url, module: 'leakscan', findings: mapToFindings(findings) });
       } catch { /* */ }
+    },
+  }, { centerPanel: 'leakscan', centerLabel: '泄露扫描' });
 
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+
+  async function handleScan() {
+    const r = await controller.start({ url: targetUrl });
+    if (r.status === 'succeeded') {
       if (findings.length > 0) {
         const crit = sevCounts.critical + sevCounts.high;
         toastStore.show(`发现 ${findings.length} 处泄露（${crit} 处高危）`, crit > 0 ? 'error' : 'warning');
       } else {
         toastStore.show('深度扫描完成，未发现敏感信息泄露', 'success');
       }
-    } catch (e: any) {
-      toastStore.show('扫描出错: ' + (e.message || ''), 'warning');
-    } finally {
-      scanning = false;
     }
   }
 
@@ -155,13 +159,13 @@
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <UrlInput bind:value={targetUrl} {scanning} buttonText="深度扫描" onscan={startScan} />
+      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="深度扫描" onscan={handleScan} />
     </div>
     <div class="text-xs text-gray-400">
       采集 DOM / localStorage / sessionStorage / 全局变量 / 外部 JS，运行 90 条泄露规则引擎（含熵值/Luhn/占位符校验降误报）。
     </div>
-    {#if scanning}
-      <div class="text-xs text-blue-500">正在采集页面信号并匹配规则...</div>
+    {#if archiving}
+      <div class="text-xs text-blue-500">{cs.phase || '扫描中...'}</div>
     {/if}
   </div>
 
@@ -211,7 +215,9 @@
         </div>
       {/each}
     </div>
-  {:else if !scanning && findings.length === 0}
+  {:else if cs.status === 'failed'}
+    <ErrorState error={cs.error!} onRetry={handleScan} />
+  {:else if !archiving && findings.length === 0}
     <EmptyState
       message="点击「深度扫描」检测页面中的敏感信息泄露"
       hint="90 条规则覆盖云密钥/加密缺陷/PII/基础设施凭证/Webhook 等"

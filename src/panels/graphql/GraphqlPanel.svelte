@@ -29,14 +29,12 @@
   import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
   import ResultToolbar from '@/components/results/ResultToolbar.svelte';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
   import { copyText } from '@/lib/actions/clipboard';
   import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
 
   let targetUrl = $state('');
-  let scanning = $state(false);
-  let scanned = $state(0);
-  let total = $state(0);
-  let phase = $state('');
   let endpoints = $state<GraphqlEndpoint[]>([]);
   let schemaInfo = $state<GraphqlSchemaInfo | null>(null);
   let findings = $state<GraphqlFinding[]>([]);
@@ -45,7 +43,6 @@
   let query = $state<ResultQuery>({ search: '', filters: {}, sort: { key: 'severity', direction: 'asc' } });
   let showSchema = $state(false);
   let customPath = $state('');
-  let cancelled = $state(false);
 
   $effect(() => {
     getActiveTabUrl().then(u => {
@@ -108,158 +105,139 @@
     }
   }
 
-  async function scan() {
-    const v = validateProbeUrl(targetUrl);
-    if ('error' in v) {
-      toastStore.show('请输入合法的 http(s) URL', 'error');
-      return;
-    }
-    scanning = true;
-    cancelled = false;
-    scanned = 0;
-    total = 0;
-    endpoints = [];
-    schemaInfo = null;
-    findings = [];
-    batchSupported = false;
-    suggestionsEnabled = false;
+  // —— TaskController 接管扫描状态机 ——
+  const controller = createTaskController<{ url: string; customPath: string }, void>({
+    validate: (input) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('请输入合法的 http(s) URL');
+    },
+    run: async (input, ctx) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('无效的目标 URL');
+      endpoints = [];
+      schemaInfo = null;
+      findings = [];
+      batchSupported = false;
+      suggestionsEnabled = false;
 
-    const origin = v.parsed.origin;
-    const allPaths = [...COMMON_GRAPHQL_PATHS];
-    if (customPath.trim()) {
-      const cp = customPath.trim();
-      if (!allPaths.includes(cp)) allPaths.push(cp);
-    }
+      const origin = v.parsed.origin;
+      const allPaths = [...COMMON_GRAPHQL_PATHS];
+      if (input.customPath.trim()) {
+        const cp = input.customPath.trim();
+        if (!allPaths.includes(cp)) allPaths.push(cp);
+      }
 
-    // === Phase 1: 端点发现 ===
-    phase = '探测 GraphQL 端点...';
-    let foundEndpointUrl: string | null = null;
+      // === Phase 1: 端点发现 ===
+      ctx.reportProgress({ phase: '探测 GraphQL 端点...' });
+      let foundEndpointUrl: string | null = null;
 
-    for (const path of allPaths) {
-      if (cancelled) {
-        phase = '';
-        scanning = false;
-        toastStore.show('扫描已取消', 'info');
+      for (const path of allPaths) {
+        if (ctx.signal.aborted) return;
+        ctx.reportProgress({ phase: `探测 ${path}...` });
+        const url = origin + path;
+        const resp = await probeEndpoint(url, INTROSPECTION_QUERIES[0]);
+        if (!resp) continue;
+
+        const parsed: any = { status: resp.status, body: resp.body, headers: resp.headers, error: resp.error };
+        if (isGraphqlEndpoint(parsed)) {
+          let introspection = false;
+          let json: any = null;
+          try { json = JSON.parse(resp.body || ''); } catch { /* ignore */ }
+          if (json?.data?.__schema) {
+            introspection = true;
+            schemaInfo = extractSchemaInfo(json);
+            findings.push({
+              test: 'introspection',
+              severity: 'high',
+              detail: 'GraphQL schema 可被完整读取，泄露所有类型、查询和变更定义',
+              evidence: `类型: ${schemaInfo!.totalTypes}, Query: ${schemaInfo!.queries.length}`,
+            });
+          }
+          endpoints.push({ path, status: resp.status, introspection });
+          foundEndpointUrl = url;
+          break;
+        }
+      }
+
+      if (!foundEndpointUrl) {
+        findings.push({
+          test: 'discovery',
+          severity: 'info',
+          detail: '常见路径均未返回 GraphQL 响应，可尝试手动输入自定义端点',
+        });
         return;
       }
-      phase = `探测 ${path}...`;
-      const url = origin + path;
-      const resp = await probeEndpoint(url, INTROSPECTION_QUERIES[0]);
-      if (!resp) continue;
 
-      const parsed: any = { status: resp.status, body: resp.body, headers: resp.headers, error: resp.error };
-      if (isGraphqlEndpoint(parsed)) {
-        let introspection = false;
-        let json: any = null;
-        try { json = JSON.parse(resp.body || ''); } catch { /* ignore */ }
-        if (json?.data?.__schema) {
-          introspection = true;
-          schemaInfo = extractSchemaInfo(json);
-          findings.push({
-            test: 'introspection',
-            severity: 'high',
-            detail: 'GraphQL schema 可被完整读取，泄露所有类型、查询和变更定义',
-            evidence: `类型: ${schemaInfo!.totalTypes}, Query: ${schemaInfo!.queries.length}`,
-          });
-        }
-        endpoints.push({ path, status: resp.status, introspection });
-        foundEndpointUrl = url;
-        break;
+      // === Phase 2: 安全测试 ===
+      ctx.reportProgress({ phase: '执行安全测试...' });
+      const tasks: (() => Promise<void>)[] = [];
+
+      for (const probe of GRAPHQL_PROBES) {
+        tasks.push(async () => {
+          const resp = await probeEndpoint(foundEndpointUrl!, probe.body);
+          if (!resp) { return; }
+          const parsed: any = { status: resp.status, body: resp.body, headers: resp.headers, error: resp.error };
+          const results = analyzeGraphqlResponse(probe, parsed);
+          for (const f of results) {
+            findings.push(f);
+            if (probe.name === 'batch-query' && Array.isArray(results)) batchSupported = true;
+            if (probe.name === 'field-suggestion' && results.length > 0) suggestionsEnabled = true;
+          }
+        });
       }
-    }
 
-    if (!foundEndpointUrl) {
-      phase = '';
-      findings.push({
-        test: 'discovery',
-        severity: 'info',
-        detail: '常见路径均未返回 GraphQL 响应，可尝试手动输入自定义端点',
-      });
-      scanning = false;
-      toastStore.show('未发现 GraphQL 端点', 'info');
-      return;
-    }
+      if (schemaInfo) {
+        tasks.push(async () => {
+          if (schemaInfo!.mutations.length > 0) {
+            findings.push({
+              test: 'schema-mutations',
+              severity: 'info',
+              detail: `发现 ${schemaInfo!.mutations.length} 个 mutation: ${schemaInfo!.mutations.slice(0, 5).join(', ')}${schemaInfo!.mutations.length > 5 ? '...' : ''}`,
+            });
+          }
+          if (schemaInfo!.subscriptions.length > 0) {
+            findings.push({
+              test: 'schema-subscriptions',
+              severity: 'info',
+              detail: `发现 ${schemaInfo!.subscriptions.length} 个 subscription`,
+            });
+          }
+        });
+      }
 
-    // === Phase 2: 安全测试 ===
-    phase = '执行安全测试...';
-    const tasks: (() => Promise<void>)[] = [];
+      ctx.reportProgress({ total: tasks.length, completed: 0, phase: '安全测试' });
+      let scanCount = 0;
+      await runConcurrent(tasks, async (task) => {
+        await task();
+        scanCount++;
+        ctx.reportProgress({ completed: scanCount });
+      }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => ctx.signal.aborted });
 
-    for (const probe of GRAPHQL_PROBES) {
-      tasks.push(async () => {
-        const resp = await probeEndpoint(foundEndpointUrl!, probe.body);
-        if (!resp) { scanned++; return; }
-        const parsed: any = { status: resp.status, body: resp.body, headers: resp.headers, error: resp.error };
-        const results = analyzeGraphqlResponse(probe, parsed);
-        for (const f of results) {
-          findings.push(f);
-          // 同步标记状态
-          if (probe.name === 'batch-query' && Array.isArray(results)) batchSupported = true;
-          if (probe.name === 'field-suggestion' && results.length > 0) suggestionsEnabled = true;
-        }
-        scanned++;
-      });
-    }
+      batchSupported = findings.some(f => f.test === 'batch-query');
+      suggestionsEnabled = findings.some(f => f.test === 'field-suggestion');
 
-    // schema 附加信息
-    if (schemaInfo) {
-      tasks.push(async () => {
-        if (schemaInfo!.mutations.length > 0) {
-          findings.push({
-            test: 'schema-mutations',
-            severity: 'info',
-            detail: `发现 ${schemaInfo!.mutations.length} 个 mutation: ${schemaInfo!.mutations.slice(0, 5).join(', ')}${schemaInfo!.mutations.length > 5 ? '...' : ''}`,
-          });
-        }
-        if (schemaInfo!.subscriptions.length > 0) {
-          findings.push({
-            test: 'schema-subscriptions',
-            severity: 'info',
-            detail: `发现 ${schemaInfo!.subscriptions.length} 个 subscription`,
-          });
-        }
-        scanned++;
-      });
-    }
+      try {
+        await scanHistoryStore.addScan({ url: input.url, module: 'graphql', findings: mapGraphqlToFindings(findings) });
+      } catch { /* store failure must not break scan */ }
+    },
+  }, { centerPanel: 'graphql', centerLabel: 'GraphQL 检测' });
 
-    total = tasks.length;
-    scanned = 0;
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
 
-    // 并发限流
-    await runConcurrent(tasks, async (task) => {
-      await task();
-    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled });
-
-    if (cancelled) {
-      phase = '';
-      scanning = false;
+  async function handleScan() {
+    const r = await controller.start({ url: targetUrl, customPath });
+    if (r.status === 'succeeded') {
+      if (vulnCount > 0) {
+        toastStore.show(`发现 ${vulnCount} 个安全问题`, 'warning');
+      } else {
+        toastStore.show(`GraphQL 检测完成，${endpoints.length} 个端点，${findings.length} 个发现`, 'success');
+      }
+    } else if (r.status === 'cancelled') {
       toastStore.show('扫描已取消', 'info');
-      return;
     }
-
-    // 补充 batch/suggestion 状态
-    batchSupported = findings.some(f => f.test === 'batch-query');
-    suggestionsEnabled = findings.some(f => f.test === 'field-suggestion');
-
-    phase = '';
-    scanning = false;
-
-    if (vulnCount > 0) {
-      toastStore.show(`发现 ${vulnCount} 个安全问题`, 'warning');
-    } else {
-      toastStore.show(`GraphQL 检测完成，${endpoints.length} 个端点，${findings.length} 个发现`, 'success');
-    }
-
-    try {
-      await scanHistoryStore.addScan({
-        url: targetUrl,
-        module: 'graphql',
-        findings: mapGraphqlToFindings(findings),
-      });
-    } catch { /* store failure must not break scan */ }
   }
-
-  function cancel() { cancelled = true; }
-
   async function copyFinding(f: GraphqlFinding) {
     const text = [
       `[${f.severity.toUpperCase()}] ${f.test}`,
@@ -317,16 +295,16 @@
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
-      {#if scanning}
-        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="检测" onscan={handleScan} />
+      {#if archiving}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
     <div class="flex items-center gap-2 text-xs">
       <input class="input text-xs flex-1" placeholder="自定义路径，如 /api/gateway" bind:value={customPath} />
       <span class="text-gray-400 shrink-0">端点: {COMMON_GRAPHQL_PATHS.length}</span>
     </div>
-    <ScanProgress {scanned} {total} {scanning} label={phase || 'GraphQL 安全测试'} />
+    <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="GraphQL 安全测试" />
   </div>
 
   <!-- 端点发现 -->
@@ -433,9 +411,11 @@
         </div>
       {/each}
     </div>
-  {:else if !scanning && findings.length === 0 && scanned > 0}
+  {:else if cs.status === 'failed'}
+    <ErrorState error={cs.error!} onRetry={handleScan} />
+  {:else if !archiving && findings.length === 0 && cs.completed > 0}
     <EmptyState message="未发现安全问题" icon="✅" />
-  {:else if !scanning}
+  {:else if !archiving}
     <EmptyState
       message="输入目标 URL，点击「检测」开始 GraphQL 安全扫描"
       hint="支持常见路径探测 + 多项安全测试"

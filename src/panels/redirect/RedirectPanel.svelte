@@ -13,6 +13,8 @@
   import EmptyState from '@/components/scanner/EmptyState.svelte';
   import ResultToolbar from '@/components/results/ResultToolbar.svelte';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
   import { toCsv, toMarkdownTable } from '@/lib/actions/serializers';
   import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
   import type { ProbeResult } from '@/lib/types/messaging';
@@ -25,10 +27,6 @@
   } from '@/lib/scanners/redirect-engine';
 
   let targetUrl = $state('');
-  let scanning = $state(false);
-  let scanned = $state(0);
-  let total = $state(0);
-  let cancelled = $state(false);
   let results = $state<RedirectResult[]>([]);
   let query = $state<ResultQuery>({ search: '', filters: {}, sort: { key: 'vuln', direction: 'asc' } });
 
@@ -38,13 +36,62 @@
     });
   });
 
+  // —— TaskController 接管扫描状态机 ——
+  const controller = createTaskController<{ url: string }, RedirectResult[]>({
+    validate: (input) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('请输入合法的 http(s) URL');
+    },
+    run: async (input, ctx) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('无效的目标 URL');
+      const tests = buildTestUrls(v.parsed.origin + v.parsed.pathname);
+      ctx.reportProgress({ total: tests.length, completed: 0, phase: '重定向检测' });
+      const collected: RedirectResult[] = [];
+      let scanCount = 0;
+      await runConcurrent(tests, async (t) => {
+        const r = await probe(t.url);
+        if (r) collected.push({ ...r, param: t.param, variant: t.variant });
+        scanCount++;
+        ctx.reportProgress({ completed: scanCount });
+      }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => ctx.signal.aborted });
+      // 漏洞优先排序
+      results = collected.sort((a, b) => {
+        if (a.status !== b.status) return a.status === 'vulnerable' ? -1 : 1;
+        return a.param.localeCompare(b.param);
+      });
+      try {
+        await scanHistoryStore.addScan({ url: input.url, module: 'redirect', findings: mapToFindings(results) });
+      } catch { /* store failure must not break scan */ }
+      return results;
+    },
+  }, { centerPanel: 'redirect', centerLabel: '重定向检测' });
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+
+  async function handleScan() {
+    const r = await controller.start({ url: targetUrl });
+    if (r.status === 'succeeded') {
+      const vuln = results.filter(r => r.status === 'vulnerable').length;
+      if (vuln > 0) {
+        toastStore.show(`发现 ${vuln} 个开放重定向点`, 'warning');
+      } else {
+        toastStore.show(`检测完成，未发现开放重定向（${cs.total} 个测试）`, 'success');
+      }
+    } else if (r.status === 'cancelled') {
+      toastStore.show('扫描已取消', 'info');
+    }
+  }
+
   // 一键操作（右键链接 → 重定向检测）：命中本面板则自动扫描
   $effect(() => {
     const sig = $autoRunStore;
     if (sig && sig.panel === 'redirect') {
       autoRunStore.clear();
       if (sig.url) targetUrl = sig.url;
-      scan();
+      handleScan();
     }
   });
 
@@ -120,54 +167,6 @@
     }
   }
 
-  async function scan() {
-    const v = validateProbeUrl(targetUrl);
-    if ('error' in v) {
-      toastStore.show('请输入合法的 http(s) URL', 'error');
-      return;
-    }
-    scanning = true;
-    cancelled = false;
-    results = [];
-    scanned = 0;
-
-    const tests = buildTestUrls(v.parsed.origin + v.parsed.pathname);
-    total = tests.length;
-    const collected: RedirectResult[] = [];
-
-    const CONCURRENCY = $scanSettingsStore.concurrency;
-    await runConcurrent(tests, async (t) => {
-      const r = await probe(t.url);
-      if (r) collected.push({ ...r, param: t.param, variant: t.variant });
-      scanned++;
-    }, { concurrency: CONCURRENCY, cancelled: () => cancelled });
-
-    if (cancelled) {
-      scanning = false;
-      toastStore.show('扫描已取消', 'info');
-      return;
-    }
-
-    // 漏洞优先
-    results = collected.sort((a, b) => {
-      if (a.status !== b.status) return a.status === 'vulnerable' ? -1 : 1;
-      return a.param.localeCompare(b.param);
-    });
-    scanning = false;
-
-    try {
-      await scanHistoryStore.addScan({ url: targetUrl, module: 'redirect', findings: mapToFindings(results) });
-    } catch { /* store failure must not break scan */ }
-
-    if (vulnCount > 0) {
-      toastStore.show(`发现 ${vulnCount} 个开放重定向点`, 'warning');
-    } else {
-      toastStore.show(`检测完成，未发现开放重定向（${total} 个测试）`, 'success');
-    }
-  }
-
-  function cancel() { cancelled = true; }
-
   // —— 导出/复制序列化器（作用于当前筛选 filtered，展示/导出同源 §6.1）——
   function redirectCsv(items: RedirectResult[]): string {
     return toCsv([
@@ -192,15 +191,15 @@
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={scan} />
-      {#if scanning}
-        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="检测" onscan={handleScan} />
+      {#if archiving}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
     <div class="text-xs text-gray-400">
       {REDIRECT_PAYLOADS.length} 个参数 × {PROTOCOL_VARIANTS.length} 个协议变体 = {REDIRECT_PAYLOADS.length * PROTOCOL_VARIANTS.length} 个测试
     </div>
-    <ScanProgress {scanned} {total} {scanning} label="重定向检测" />
+    <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="重定向检测" />
   </div>
 
   <!-- 工具栏：ResultToolbar 包裹 漏洞筛选 / 导出 -->
@@ -238,9 +237,11 @@
         </div>
       {/each}
     </div>
-  {:else if !scanning && results.length === 0 && scanned > 0}
+  {:else if cs.status === 'failed'}
+    <ErrorState error={cs.error!} onRetry={handleScan} />
+  {:else if !archiving && results.length === 0 && cs.completed > 0}
     <EmptyState message="未发现开放重定向" icon="✅" />
-  {:else if !scanning}
+  {:else if !archiving}
     <EmptyState
       message="输入目标 URL，检测开放重定向漏洞（参数注入测试）"
       hint="{REDIRECT_PAYLOADS.length} 个参数 × {PROTOCOL_VARIANTS.length} 个协议变体"

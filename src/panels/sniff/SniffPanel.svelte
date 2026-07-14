@@ -22,6 +22,8 @@
   import { activePanelStore } from '@/stores/ui';
   import { sniffBadgeStore } from '@/stores/sniff-badge';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
 
   /** 框架名 → 对应分析面板 id（用于一键跳转）*/
   const FRAMEWORK_PANEL: Record<string, string> = {
@@ -36,11 +38,9 @@
   import EmptyState from '@/components/scanner/EmptyState.svelte';
 
   let targetUrl = $state('');
-  let scanning = $state(false);
   let results = $state<SniffMatch[]>([]);
   let filter = $state('all');
   let expandedName = $state<string | null>(null);
-  let cancelled = $state(false);
 
   // 自动填充当前页 URL
   $effect(() => {
@@ -49,13 +49,107 @@
     });
   });
 
+  // —— TaskController 接管扫描状态机 ——
+  const controller = createTaskController<{ url: string }, void>({
+    validate: (input) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('请输入合法的 http(s) URL');
+    },
+    run: async (input, ctx) => {
+      const v = validateProbeUrl(input.url);
+      if ('error' in v) throw new Error('无效的目标 URL');
+      ctx.reportProgress({ phase: '获取页面内容' });
+      results = [];
+      expandedName = null;
+
+      const [fetchRes, probeRes] = await Promise.all([
+        sendMessage({ type: 'FETCH_URL', url: v.parsed.href, timeout: $scanSettingsStore.requestTimeoutMs }) as Promise<FetchResult<string>>,
+        sendMessage({ type: 'FETCH_PROBE', url: v.parsed.href, method: 'GET', timeout: $scanSettingsStore.requestTimeoutMs }) as Promise<ProbeResult>,
+      ]) as [FetchResult<string>, ProbeResult];
+
+      let html = '';
+      if ('success' in fetchRes && fetchRes.success) {
+        html = fetchRes.data;
+      } else {
+        throw new Error('获取页面内容失败');
+      }
+
+      const headers: Record<string, string> = {};
+      if (probeRes && !probeRes.error && probeRes.headers) {
+        for (const [k, val] of Object.entries(probeRes.headers)) {
+          headers[k.toLowerCase()] = val;
+        }
+      }
+
+      ctx.reportProgress({ phase: '解析页面信号' });
+      const { scriptSrcs, meta } = parseHtml(html);
+
+      let globals: string[] = [];
+      let classNames: string[] = [];
+      let ids: string[] = [];
+      let versions: Record<string, string> = {};
+      const cookieMap: Record<string, string> = {};
+      try {
+        const fp = await sendToContent({ type: 'VK_PAGE_INSPECT', action: 'fingerprint' }) as any;
+        if (fp && typeof fp === 'object') {
+          if (Array.isArray(fp.globals)) globals = fp.globals;
+          if (Array.isArray(fp.classNames)) classNames = fp.classNames;
+          if (Array.isArray(fp.cookies)) {
+            for (const c of fp.cookies) {
+              const eq = c.indexOf('=');
+              if (eq > 0) cookieMap[c.slice(0, eq).trim()] = c.slice(eq + 1).trim();
+            }
+          }
+          if (fp.versions && typeof fp.versions === 'object' && !Array.isArray(fp.versions)) {
+            versions = fp.versions;
+          }
+          if (Array.isArray(fp.ids)) ids = fp.ids;
+          else if (typeof fp.ids === 'string' && fp.ids) ids = fp.ids.split(',').map((s: string) => s.trim()).filter(Boolean);
+        }
+      } catch { /* 非当前标签页或注入失败，降级为纯静态分析 */ }
+
+      ctx.reportProgress({ phase: '匹配规则' });
+      const sniffInput: SniffInput = { html, headers, scriptSrcs, cookies: cookieMap, meta, globals, classNames, ids, versions };
+      results = scan(sniffInput);
+
+      try {
+        const badgeItems = [...results]
+          .sort((a, b) => b.confidence - a.confidence)
+          .slice(0, 5)
+          .map(r => ({ name: r.name, version: r.version || undefined }));
+        sniffBadgeStore.set(badgeItems);
+      } catch { /* 徽标失败不影响扫描 */ }
+
+      try {
+        await scanHistoryStore.addScan({ url: input.url, module: 'sniff', findings: mapSniffToFindings(results) });
+      } catch { /* store failure must not break scan */ }
+    },
+  }, { centerPanel: 'sniff', centerLabel: '网站嗅探' });
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+
+  async function handleScan() {
+    const r = await controller.start({ url: targetUrl });
+    if (r.status === 'succeeded') {
+      if (results.length > 0) {
+        toastStore.show(`识别 ${results.length} 项技术，涵盖 ${catCount} 个分类`, 'success');
+      } else {
+        toastStore.show('未检测到任何技术特征', 'info');
+      }
+    } else if (r.status === 'cancelled') {
+      toastStore.show('扫描已取消', 'info');
+    }
+  }
+
   // 一键操作（右键菜单 / Popup）：命中本面板则自动嗅探
   $effect(() => {
     const sig = $autoRunStore;
     if (sig && sig.panel === 'sniff') {
       autoRunStore.clear();
       if (sig.url) targetUrl = sig.url;
-      startScan();
+      handleScan();
     }
   });
 
@@ -124,125 +218,6 @@
     return { scriptSrcs, meta };
   }
 
-  async function startScan() {
-    const v = validateProbeUrl(targetUrl);
-    if ('error' in v) {
-      toastStore.show('请输入合法的 http(s) URL', 'error');
-      return;
-    }
-
-    scanning = true;
-    cancelled = false;
-    results = [];
-    expandedName = null;
-
-    try {
-      // 并发获取 HTML 和 headers
-      const [fetchRes, probeRes] = await Promise.all([
-        sendMessage({ type: 'FETCH_URL', url: v.parsed.href, timeout: $scanSettingsStore.requestTimeoutMs }) as Promise<FetchResult<string>>,
-        sendMessage({ type: 'FETCH_PROBE', url: v.parsed.href, method: 'GET', timeout: $scanSettingsStore.requestTimeoutMs }) as Promise<ProbeResult>,
-      ]);
-
-      if (cancelled) {
-        scanning = false;
-        toastStore.show('扫描已取消', 'info');
-        return;
-      }
-
-      // 检查 HTML 获取
-      let html = '';
-      if ('success' in fetchRes && fetchRes.success) {
-        html = fetchRes.data;
-      } else {
-        toastStore.show('获取页面内容失败', 'warning');
-        scanning = false;
-        return;
-      }
-
-      // 提取 headers
-      const headers: Record<string, string> = {};
-      if (probeRes && !probeRes.error && probeRes.headers) {
-        for (const [k, val] of Object.entries(probeRes.headers)) {
-          headers[k.toLowerCase()] = val;
-        }
-      }
-
-      // 解析 HTML 中的 script src 和 meta
-      const { scriptSrcs, meta } = parseHtml(html);
-
-      // 通过 MAIN world 注入采集页面运行时信号：全局变量/类名/id/cookies/版本
-      // 这让 sniff 引擎中 40% 的 globals/classNames/cookies 匹配器得以生效
-      let globals: string[] = [];
-      let classNames: string[] = [];
-      let ids: string[] = [];
-      let versions: Record<string, string> = {};
-      const cookieMap: Record<string, string> = {};
-      try {
-        const fp = await sendToContent({ type: 'VK_PAGE_INSPECT', action: 'fingerprint' }) as any;
-        if (fp && typeof fp === 'object') {
-          if (Array.isArray(fp.globals)) globals = fp.globals;
-          if (Array.isArray(fp.classNames)) classNames = fp.classNames;
-          if (Array.isArray(fp.cookies)) {
-            for (const c of fp.cookies) {
-              const eq = c.indexOf('=');
-              if (eq > 0) cookieMap[c.slice(0, eq).trim()] = c.slice(eq + 1).trim();
-            }
-          }
-          if (fp.versions && typeof fp.versions === 'object' && !Array.isArray(fp.versions)) {
-            versions = fp.versions;
-          }
-          // ids 可能是逗号分隔字符串或数组
-          if (Array.isArray(fp.ids)) ids = fp.ids;
-          else if (typeof fp.ids === 'string' && fp.ids) ids = fp.ids.split(',').map((s: string) => s.trim()).filter(Boolean);
-        }
-      } catch { /* 非当前标签页或注入失败，降级为纯静态分析 */ }
-
-      // 构建 SniffInput 并扫描
-      const input: SniffInput = {
-        html,
-        headers,
-        scriptSrcs,
-        cookies: cookieMap,
-        meta,
-        globals,
-        classNames,
-        ids,
-        versions,
-      };
-
-      results = scan(input);
-
-      if (results.length > 0) {
-        toastStore.show(`识别 ${results.length} 项技术，涵盖 ${catCount} 个分类`, 'success');
-      } else {
-        toastStore.show('未检测到任何技术特征', 'info');
-      }
-
-      // 写入侧栏徽标：取置信度最高的若干项（带版本优先），供侧栏按钮显示
-      try {
-        const badgeItems = [...results]
-          .sort((a, b) => b.confidence - a.confidence)
-          .slice(0, 5)
-          .map(r => ({ name: r.name, version: r.version || undefined }));
-        sniffBadgeStore.set(badgeItems);
-      } catch { /* 徽标失败不影响扫描 */ }
-
-      try {
-        await scanHistoryStore.addScan({
-          url: targetUrl,
-          module: 'sniff',
-          findings: mapSniffToFindings(results),
-        });
-      } catch { /* store failure must not break scan */ }
-    } catch (err: any) {
-      toastStore.show('扫描出错: ' + (err.message || '未知错误'), 'warning');
-    } finally {
-      scanning = false;
-    }
-  }
-
-  function cancel() { cancelled = true; }
-
   function toggleExpand(name: string) {
     expandedName = expandedName === name ? null : name;
   }
@@ -286,13 +261,13 @@
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <UrlInput bind:value={targetUrl} {scanning} buttonText="检测" onscan={startScan} />
-      {#if scanning}
-        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
+      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="检测" onscan={handleScan} />
+      {#if archiving}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
-    {#if scanning}
-      <div class="text-xs text-gray-400">正在获取页面并分析技术指纹...</div>
+    {#if archiving}
+      <div class="text-xs text-gray-400">{cs.phase || '扫描中...'}</div>
     {/if}
   </div>
 
@@ -379,7 +354,9 @@
         </div>
       {/each}
     </div>
-  {:else if !scanning && results.length === 0 && techCount === 0}
+  {:else if cs.status === 'failed'}
+    <ErrorState error={cs.error!} onRetry={handleScan} />
+  {:else if !archiving && results.length === 0 && techCount === 0}
     <EmptyState
       message="输入目标 URL，点击「检测」开始技术指纹嗅探"
       hint="自动识别 Web 框架、JS 库、CDN、CMS 等技术栈"

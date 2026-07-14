@@ -9,6 +9,8 @@
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { confirmStore } from '@/stores/confirm';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
 
   // —— 类型 ——
   interface WafPattern {
@@ -50,17 +52,105 @@
 
   // —— 状态 ——
   let targetUrl = $state('');
-  let scanning = $state(false);
-  let aborted = $state(false);
-  let statusText = $state('');
   let detections = $state<WafDetection[]>([]);
   let probeHeaders = $state<Record<string, string> | null>(null);
   let probeDomain = $state('');
   let probeCount = $state(0);
-  let elapsed = $state('0.0');
 
   // 严重程度排序
   const SEV_ORDER: Record<string, number> = { high: 3, medium: 2, low: 1 };
+
+  // —— TaskController 接管扫描状态机（替代 scanning/aborted）——
+  const controller = createTaskController<{ url: string }, void>({
+    validate: (input) => {
+      if (!input.url || !/^https?:\/\//i.test(input.url)) {
+        throw new Error('请输入有效的 URL（http/https）');
+      }
+    },
+    run: async (input, ctx) => {
+      const url = input.url.trim();
+      const origin = new URL(url).origin;
+      const domain = new URL(url).hostname;
+      probeDomain = domain;
+      detections = [];
+      probeHeaders = null;
+      probeCount = 0;
+
+      ctx.reportProgress({ total: PROBE_PATHS.length, completed: 0, phase: 'WAF 指纹检测' });
+      const detectedMap = new Map<string, WafDetection>();
+
+      for (let i = 0; i < PROBE_PATHS.length; i++) {
+        if (ctx.signal.aborted) break;
+        const probe = PROBE_PATHS[i];
+        ctx.reportProgress({ completed: i, phase: `探测中 (${i + 1}/${PROBE_PATHS.length})` });
+        const probeUrl = origin + probe.path;
+        const result = await fetchProbe(probeUrl);
+        if (result && result.headers) {
+          probeHeaders = result.headers;
+          const found = analyzeResponse(result.headers, result.body, SIGNATURES);
+          for (const f of found) {
+            const existing = detectedMap.get(f.name);
+            if (existing) {
+              const existingValues = new Set(existing.evidence.map((e) => e.value));
+              const newEvidence = f.evidence.filter((e) => !existingValues.has(e.value));
+              if (newEvidence.length > 0) {
+                existing.evidence = [...existing.evidence, ...newEvidence];
+              }
+              if ((SEV_ORDER[f.severity] || 0) > (SEV_ORDER[existing.severity] || 0)) {
+                existing.severity = f.severity;
+              }
+            } else {
+              detectedMap.set(f.name, { ...f, probe: probe.desc });
+            }
+          }
+        }
+      }
+
+      // 汇总 + 排序 + 重新评估置信度
+      let allDetected = Array.from(detectedMap.values());
+      allDetected.sort((a, b) => (SEV_ORDER[b.severity] || 0) - (SEV_ORDER[a.severity] || 0));
+      for (const d of allDetected) {
+        const evCount = d.evidence.length;
+        d.confidence = evCount >= 3 ? 'high' : evCount >= 2 ? 'medium' : 'low';
+      }
+
+      if (ctx.signal.aborted) return;
+
+      detections = allDetected;
+      probeCount = PROBE_PATHS.length;
+      try {
+        await scanHistoryStore.addScan({ url: input.url, module: 'waf', findings: mapWafToFindings(allDetected) });
+      } catch { /* store failure must not break scan */ }
+    },
+  }, { centerPanel: 'waf', centerLabel: 'WAF 指纹检测' });
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+
+  /** 主扫描入口：先 confirm 再启动 controller */
+  async function handleScan() {
+    if (archiving) {
+      controller.cancel();
+      return;
+    }
+    const confirmed = await confirmStore.ask({
+      title: 'WAF 指纹检测',
+      message: 'WAF 扫描将向目标发送攻击载荷（SQL注入/XSS/路径穿越等），是否继续？',
+      confirmLabel: '开始扫描',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    const r = await controller.start({ url: targetUrl });
+    if (r.status === 'succeeded') {
+      toastStore.show(
+        detections.length > 0 ? `检测到 ${detections.length} 个 WAF` : '未检测到 WAF',
+        detections.length > 0 ? 'warning' : 'success',
+      );
+    } else if (r.status === 'cancelled') {
+      toastStore.show('扫描已取消', 'info');
+    }
+  }
 
   // 一键操作（右键菜单 / Popup）：命中本面板则自动填充并扫描
   $effect(() => {
@@ -68,7 +158,7 @@
     if (sig && sig.panel === 'waf') {
       autoRunStore.clear();
       if (sig.url) targetUrl = sig.url;
-      startScan();
+      handleScan();
     }
   });
 
@@ -183,117 +273,6 @@
     }));
   }
 
-  /** 主扫描逻辑 */
-  async function startScan() {
-    if (scanning) {
-      // 正在扫描时点击 → 停止
-      aborted = true;
-      return;
-    }
-
-    const url = targetUrl.trim();
-    if (!url || !/^https?:\/\//i.test(url)) {
-      toastStore.show('请输入有效的 URL（http/https）', 'warning');
-      return;
-    }
-
-    const confirmed = await confirmStore.ask({
-      title: 'WAF 指纹检测',
-      message: 'WAF 扫描将向目标发送攻击载荷（SQL注入/XSS/路径穿越等），是否继续？',
-      confirmLabel: '开始扫描',
-      variant: 'danger',
-    });
-    if (!confirmed) {
-      return;
-    }
-
-    scanning = true;
-    aborted = false;
-    detections = [];
-    probeHeaders = null;
-    probeCount = 0;
-    elapsed = '0.0';
-    statusText = '扫描中...';
-
-    const origin = new URL(url).origin;
-    const domain = new URL(url).hostname;
-    probeDomain = domain;
-
-    const startTime = Date.now();
-    const detectedMap = new Map<string, WafDetection>();
-
-    try {
-      for (let i = 0; i < PROBE_PATHS.length; i++) {
-        if (aborted) break;
-
-        const probe = PROBE_PATHS[i];
-        elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        statusText = `探测中... (${i + 1}/${PROBE_PATHS.length}) ${elapsed}s`;
-
-        const probeUrl = origin + probe.path;
-        const result = await fetchProbe(probeUrl);
-
-        if (result && result.headers) {
-          probeHeaders = result.headers;
-          const found = analyzeResponse(result.headers, result.body, SIGNATURES);
-
-          for (const f of found) {
-            const existing = detectedMap.get(f.name);
-            if (existing) {
-              // 合并 evidence（去重）
-              const existingValues = new Set(existing.evidence.map((e) => e.value));
-              const newEvidence = f.evidence.filter((e) => !existingValues.has(e.value));
-              if (newEvidence.length > 0) {
-                existing.evidence = [...existing.evidence, ...newEvidence];
-              }
-              // 取更高严重程度
-              if ((SEV_ORDER[f.severity] || 0) > (SEV_ORDER[existing.severity] || 0)) {
-                existing.severity = f.severity;
-              }
-            } else {
-              detectedMap.set(f.name, { ...f, probe: probe.desc });
-            }
-          }
-        }
-      }
-
-      // 汇总 + 排序 + 重新评估置信度
-      let allDetected = Array.from(detectedMap.values());
-      allDetected.sort((a, b) => (SEV_ORDER[b.severity] || 0) - (SEV_ORDER[a.severity] || 0));
-      for (const d of allDetected) {
-        const evCount = d.evidence.length;
-        d.confidence = evCount >= 3 ? 'high' : evCount >= 2 ? 'medium' : 'low';
-      }
-
-      if (aborted) {
-        statusText = '扫描已取消';
-      } else {
-        detections = allDetected;
-        probeCount = PROBE_PATHS.length;
-        statusText =
-          allDetected.length > 0 ? `检测到 ${allDetected.length} 个 WAF` : '未检测到 WAF';
-        toastStore.show(
-          allDetected.length > 0 ? `检测到 ${allDetected.length} 个 WAF` : '未检测到 WAF',
-          allDetected.length > 0 ? 'warning' : 'success',
-        );
-
-        try {
-          await scanHistoryStore.addScan({
-            url: targetUrl,
-            module: 'waf',
-            findings: mapWafToFindings(allDetected),
-          });
-        } catch { /* store failure must not break scan */ }
-      }
-    } catch (err: any) {
-      statusText = `扫描失败: ${err.message || '未知错误'}`;
-      toastStore.show(`扫描失败: ${err.message || '未知错误'}`, 'error');
-    } finally {
-      scanning = false;
-      aborted = false;
-    }
-  }
-
   // —— 复制 / 导出 ——
 
   // —— 导出/复制序列化器（统一走 ExportMenu；修原 navigator.clipboard 未 await）——
@@ -364,21 +343,25 @@
 
     <div class="flex gap-1">
       <button
-        class="btn btn-sm btn-primary flex-1"
-        disabled={scanning || !targetUrl.trim()}
-        onclick={startScan}
+        class="btn btn-sm {archiving ? 'btn-danger' : 'btn-primary'} flex-1"
+        disabled={!archiving && !targetUrl.trim()}
+        onclick={handleScan}
       >
-        {scanning ? '停止扫描' : 'WAF 指纹检测'}
+        {archiving ? '停止扫描' : 'WAF 指纹检测'}
       </button>
     </div>
 
-    {#if statusText}
-      <div class="text-xs text-gray-500">{statusText}</div>
+    {#if archiving}
+      <div class="text-xs text-gray-500">{cs.phase || '扫描中...'} · {(cs.elapsedMs / 1000).toFixed(1)}s</div>
     {/if}
   </div>
 
+  {#if cs.status === 'failed'}
+    <ErrorState error={cs.error!} onRetry={handleScan} />
+  {/if}
+
   <!-- 探测信息 -->
-  {#if probeDomain && detections.length >= 0 && !scanning}
+  {#if probeDomain && detections.length >= 0 && !archiving}
     <div class="card p-2 text-xs text-gray-500 space-y-0.5">
       <div><b>目标:</b> <span class="font-mono">{probeDomain}</span></div>
       <div><b>探测次数:</b> {probeCount}</div>
@@ -389,15 +372,8 @@
     </div>
   {/if}
 
-  <!-- 扫描进度 -->
-  {#if scanning}
-    <div class="card p-3 text-center">
-      <div class="text-xs text-gray-500">正在发送探测请求... ({elapsed}s)</div>
-    </div>
-  {/if}
-
   <!-- 检测结果 -->
-  {#if !scanning && detections.length > 0}
+  {#if !archiving && detections.length > 0}
     <div class="space-y-1">
       {#each detections as d}
         <div class="card p-3 space-y-1.5">
@@ -425,7 +401,7 @@
   {/if}
 
   <!-- 未检测到 WAF -->
-  {#if !scanning && detections.length === 0 && probeCount > 0}
+  {#if !archiving && detections.length === 0 && probeCount > 0}
     <div class="card p-3 text-center space-y-1">
       <div class="text-2xl">&#128274;</div>
       <div class="text-sm">未检测到 WAF</div>
@@ -439,7 +415,7 @@
   {/if}
 
   <!-- 响应头信息 -->
-  {#if !scanning && probeHeaders && Object.keys(probeHeaders).length > 0 && detections.length > 0}
+  {#if !archiving && probeHeaders && Object.keys(probeHeaders).length > 0 && detections.length > 0}
     <div class="card p-3 space-y-1.5">
       <div class="text-xs font-medium">响应头信息</div>
       <div class="overflow-x-auto">
@@ -464,7 +440,7 @@
   {/if}
 
   <!-- 导出菜单（复制文本/MD + 导出 JSON） -->
-  {#if !scanning && detections.length > 0}
+  {#if !archiving && detections.length > 0}
     <ExportMenu items={detections} module="waf" serializers={{ json: wafJson, markdown: wafMd, text: wafText }} />
   {/if}
 </div>
