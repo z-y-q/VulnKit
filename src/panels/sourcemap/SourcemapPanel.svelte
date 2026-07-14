@@ -15,6 +15,8 @@
   import { runConcurrent } from '@/lib/core/concurrency';
   import { copyText } from '@/lib/actions/clipboard';
   import { downloadText, buildFilename } from '@/lib/actions/download';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { toCsv } from '@/lib/actions/serializers';
   import {
     extractScriptUrls,
     extractInlineSourceMapHints,
@@ -600,6 +602,17 @@
     toastStore.show(`已导出 ${allEndpoints.length} 个端点`, 'success');
   }
 
+  // —— 端点 ExportMenu 序列化器 ——
+  function epJson(items: EndpointFinding[]): string {
+    return JSON.stringify(items, null, 2);
+  }
+  function epCsv(items: EndpointFinding[]): string {
+    return toCsv([['type', 'value'], ...items.map(e => [e.type, e.value])]);
+  }
+  function epText(items: EndpointFinding[]): string {
+    return items.map(e => `[${e.type}] ${e.value}`).join('\n');
+  }
+
   /** 将发现的 JS 以 <script src=真实URL> 注入页面 MAIN world，使其出现在 Chrome DevTools
    *  Sources 面板（对齐 v5 loadSourcesToDevTools：DevTools 显示真实 https://... URL）。
    *  去查询串后去重，同步注入并计数，提示与 v5 一致。
@@ -826,7 +839,7 @@
         <div class="card p-2.5 space-y-1.5">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold text-blue-600 dark:text-blue-400">🔌 API 端点（{allEndpoints.length}）</span>
-            <button class="text-xs text-primary hover:underline" onclick={exportEndpoints}>导出 JSON</button>
+            <ExportMenu items={allEndpoints} module="sourcemap-endpoints" serializers={{ json: epJson, csv: epCsv, text: epText }} />
           </div>
           <div class="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
             {#each allEndpoints.slice(0, 80) as e}

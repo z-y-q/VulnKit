@@ -10,6 +10,8 @@
     isSensitiveEntry,
   } from '@/lib/analyzers/vue-analyzer';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
 
   // ===== 类型（与 inject/react-detect.ts 返回值对齐）=====
   interface ReactDetectResult {
@@ -148,41 +150,31 @@
   // ===== 复制/导出 =====
   function copyDetectJson() {
     if (!detectResult) return;
-    navigator.clipboard.writeText(JSON.stringify(detectResult, null, 2)).then(() => {
-      toastStore.show('已复制检测结果', 'success');
-    });
+    copyText(JSON.stringify(detectResult, null, 2), '已复制检测结果');
   }
 
   function copyStoreJson() {
     if (!storeResult) return;
-    navigator.clipboard.writeText(JSON.stringify(storeResult, null, 2)).then(() => {
-      toastStore.show('已复制 Store 数据', 'success');
-    });
+    copyText(JSON.stringify(storeResult, null, 2), '已复制 Store 数据');
   }
 
-  function exportReport() {
-    if (!detectResult) return;
-    const report = {
-      timestamp: new Date().toISOString(),
-      url: currentUrl,
-      detect: detectResult,
-      store: storeResult || undefined,
-    };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `react-analysis-${Date.now()}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toastStore.show('报告已导出', 'success');
+  // —— 导出序列化器（detect + store 合并报告）——
+  type ReactReport = { detect: typeof detectResult; store: typeof storeResult };
+  function reactJson(items: ReactReport[]): string {
+    const r = items[0];
+    return JSON.stringify({ url: currentUrl, detect: r.detect, store: r.store || undefined }, null, 2);
   }
-
-  function copyText(text: string, label?: string) {
-    navigator.clipboard.writeText(text).then(() => {
-      toastStore.show(label ? `已复制: ${label}` : '已复制', 'success');
-    });
+  function reactText(items: ReactReport[]): string {
+    const r = items[0];
+    const lines: string[] = [];
+    if (r.detect?.detected) {
+      lines.push(`React ${r.detect.version || ''} (${r.detect.mode})`);
+      if (r.detect.metaframework) lines.push('Meta: ' + r.detect.metaframework);
+    }
+    if (r.store?.routes?.length) lines.push(`Routes: ${r.store.routes.length}`);
+    return lines.join('\n') || '无数据';
   }
+  let exportItems = $derived<ReactReport[]>([{ detect: detectResult, store: storeResult }]);
 
   // ===== 衍生状态 =====
   let groupedRoutes = $derived.by(() => {
@@ -361,7 +353,7 @@
       <!-- 操作按钮 -->
       <div class="flex gap-1 mt-2">
         <button class="btn btn-sm flex-1" onclick={copyDetectJson}>复制 JSON</button>
-        <button class="btn btn-sm flex-1" onclick={exportReport}>导出报告</button>
+        <ExportMenu items={exportItems} module="react" serializers={{ json: reactJson, text: reactText }} copySerialize={reactText} />
       </div>
     {/if}
   </div>

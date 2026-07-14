@@ -2,6 +2,7 @@
   // Svelte/SvelteKit 检测面板
   import { sendToContent } from '@/lib/core/messaging';
   import { toastStore } from '@/stores/ui';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
 
   // —— 类型（匹配 inject/svelte-detect.ts 返回结构）——
   interface SvelteDetectResult {
@@ -43,46 +44,24 @@
     }
   }
 
-  // —— 复制 / 导出 ——
-  function copyResults() {
-    if (!result) {
-      toastStore.show('没有检测结果', 'warning');
-      return;
-    }
+  // —— 复制 / 导出（统一 ExportMenu）——
+  function svelteText(items: SvelteDetectResult[]): string {
+    const r = items[0];
     const lines: string[] = [];
-    if (result.detected) {
-      const name = result.variant || 'Svelte';
-      lines.push(`${name} Detected: ${result.version || 'unknown'}`);
-      if (result.isSvelteKit) lines.push('SvelteKit: Yes');
-      if (result.routingMode) lines.push('Routing: ' + result.routingMode);
+    if (r.detected) {
+      const name = r.variant || 'Svelte';
+      lines.push(`${name} Detected: ${r.version || 'unknown'}`);
+      if (r.isSvelteKit) lines.push('SvelteKit: Yes');
+      if (r.routingMode) lines.push('Routing: ' + r.routingMode);
     } else {
       lines.push('Svelte: Not detected');
     }
-    if (result.components.length > 0) {
-      lines.push('Components: ' + result.components.join(', '));
-    }
-    if (result.stores.length > 0) {
-      lines.push('Stores: ' + result.stores.join(', '));
-    }
-    navigator.clipboard.writeText(lines.join('\n')).then(() => {
-      toastStore.show('已复制检测结果', 'success');
-    });
+    if (r.components.length > 0) lines.push('Components: ' + r.components.join(', '));
+    if (r.stores.length > 0) lines.push('Stores: ' + r.stores.join(', '));
+    return lines.join('\n');
   }
-
-  function exportJson() {
-    if (!result) {
-      toastStore.show('没有可导出的结果', 'warning');
-      return;
-    }
-    const report = { timestamp: new Date().toISOString(), result };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'svelte-analysis-' + Date.now() + '.json';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toastStore.show('已导出 JSON', 'success');
+  function svelteJson(items: SvelteDetectResult[]): string {
+    return JSON.stringify(items[0], null, 2);
   }
 </script>
 
@@ -192,8 +171,7 @@
 
     <!-- 操作按钮 -->
     <div class="flex gap-1">
-      <button class="btn btn-sm flex-1" onclick={copyResults}>复制文本</button>
-      <button class="btn btn-sm flex-1" onclick={exportJson}>导出 JSON</button>
+      <ExportMenu items={[result]} module="svelte" serializers={{ json: svelteJson, text: svelteText }} copySerialize={svelteText} />
     </div>
   {/if}
 </div>

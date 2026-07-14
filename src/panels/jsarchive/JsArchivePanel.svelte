@@ -18,6 +18,8 @@
   import ErrorState from '@/components/feedback/ErrorState.svelte';
   import { downloadBlob } from '@/lib/actions/download';
   import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { toCsv } from '@/lib/actions/serializers';
   import {
     urlToZipPath,
     dedupePaths,
@@ -197,6 +199,17 @@
   let skipCount = $derived(entries.filter(e => e.status === 'skip').length);
   let progress = $derived(cs.total && cs.total > 0 ? Math.round((cs.completed / cs.total) * 100) : 0);
 
+  // —— 导出序列化器（JS 清单）——
+  function jsarchiveCsv(items: ArchiveEntry[]): string {
+    return toCsv([['path', 'url', 'size', 'status', 'kind'], ...items.map(e => [e.path, e.url, String(e.size), e.status, e.kind])]);
+  }
+  function jsarchiveJson(items: ArchiveEntry[]): string {
+    return JSON.stringify({ url: pageUrl, entries: items }, null, 2);
+  }
+  function jsarchiveText(items: ArchiveEntry[]): string {
+    return items.map(e => `[${e.status}] ${e.path} (${e.size}B)`).join('\n');
+  }
+
   $effect(() => {
     getActiveTabUrl().then(u => { if (u) pageUrl = u; });
   });
@@ -362,6 +375,8 @@
       {/if}
       {#if lastBytes}<span class="text-gray-400">zip {(lastBytes / 1024).toFixed(1)} KB</span>{/if}
       {#if collectedBytes > 0}<span class="text-gray-400">已收集 {(collectedBytes / 1024).toFixed(1)} KB</span>{/if}
+      <span class="ml-auto"></span>
+      <ExportMenu items={entries} module="jsarchive" serializers={{ json: jsarchiveJson, csv: jsarchiveCsv, text: jsarchiveText }} />
     </div>
 
     <!-- 文件清单 -->

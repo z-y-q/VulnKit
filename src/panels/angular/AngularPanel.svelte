@@ -6,6 +6,8 @@
   import { toastStore } from '@/stores/ui';
   import { flattenStoreTree } from '@/lib/analyzers/vue-analyzer';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
 
   // ===== 类型（与 inject/angular-detect.ts / inject/angular-store-explorer.ts 返回值一致）=====
   interface AngularDetectResult {
@@ -154,9 +156,7 @@
       lines.push('Signals:');
       d.signals.forEach((s) => lines.push(`  - ${s}`));
     }
-    navigator.clipboard.writeText(lines.join('\n')).then(() => {
-      toastStore.show('已复制检测结果', 'success');
-    });
+    copyText(lines.join('\n'), '已复制检测结果');
   }
 
   function copyStoreJson() {
@@ -165,9 +165,7 @@
       return;
     }
     const json = JSON.stringify(storeResult.stores || {}, null, 2);
-    navigator.clipboard.writeText(json).then(() => {
-      toastStore.show('Store JSON 已复制', 'success');
-    });
+    copyText(json, 'Store JSON 已复制');
   }
 
   function copyRoutesText() {
@@ -177,34 +175,30 @@
       return;
     }
     const text = JSON.stringify(sr.routes, null, 2);
-    navigator.clipboard.writeText(text).then(() => {
-      toastStore.show(`已复制 ${sr.routes.length} 个路由（JSON）`, 'success');
-    });
+    copyText(text, `已复制 ${sr.routes.length} 个路由（JSON）`);
   }
 
   function copyEndpoint(url: string) {
-    navigator.clipboard.writeText(url).then(() => {
-      toastStore.show(`已复制: ${url}`, 'success');
-    });
+    copyText(url, `已复制: ${url}`);
   }
 
-  function exportJson() {
-    if (!lastDetectResult && !storeResult) {
-      toastStore.show('没有可导出的结果', 'warning');
-      return;
-    }
-    const report: Record<string, unknown> = { timestamp: new Date().toISOString() };
-    if (lastDetectResult) report.detect = lastDetectResult;
-    if (storeResult) report.store = storeResult;
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `angular-analysis-${Date.now()}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toastStore.show('报告已导出', 'success');
+  // —— 导出序列化器（detect + store 合并报告）——
+  type AngularReport = { detect: AngularDetectResult | null; store: typeof storeResult };
+  function angularJson(items: AngularReport[]): string {
+    const r = items[0];
+    return JSON.stringify({ detect: r.detect, store: r.store }, null, 2);
   }
+  function angularText(items: AngularReport[]): string {
+    const r = items[0];
+    const lines: string[] = [];
+    if (r.detect?.detected) {
+      lines.push(`${r.detect.variant || 'Angular'} ${r.detect.version || ''} (${r.detect.mode})`);
+    }
+    if (r.store?.routes?.length) lines.push(`Routes: ${r.store.routes.length}`);
+    if (r.store?.apiEndpoints?.length) lines.push(`API: ${r.store.apiEndpoints.length}`);
+    return lines.join('\n') || '无数据';
+  }
+  let exportItems = $derived<AngularReport[]>([{ detect: lastDetectResult, store: storeResult }]);
 
   // ===== 渲染辅助 =====
   function modeBadgeColor(mode: string): string {
@@ -257,20 +251,7 @@
         >
           {detectLoading ? '检测中...' : '检测 Angular'}
         </button>
-        <button
-          class="btn btn-sm"
-          disabled={!lastDetectResult}
-          onclick={copyDetectResults}
-        >
-          复制
-        </button>
-        <button
-          class="btn btn-sm"
-          disabled={!lastDetectResult && !storeResult}
-          onclick={exportJson}
-        >
-          导出
-        </button>
+        <ExportMenu items={exportItems} module="angular" serializers={{ json: angularJson, text: angularText }} copySerialize={angularText} disabled={!lastDetectResult && !storeResult} />
       </div>
     </div>
     {#if detectStatus}
