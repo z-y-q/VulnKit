@@ -4,6 +4,7 @@
   // 注意：这是新的"历史档案"面板，与本地扫描历史（HistoryPanel）不同。对齐 v5 vk-history.js。
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
+  import { downloadBlob } from '@/lib/actions/download';
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore } from '@/stores/ui';
   import { analysisContextStore } from '@/stores/analysis-context';
@@ -104,11 +105,7 @@
     if (!results.length) { toastStore.show('无结果', 'warning'); return; }
     const lines = results.map(r => `${fmtTs(r.timestamp)}  [${r.status}]  ${r.url}`);
     const blob = new Blob([`# Wayback 历史快照 @ ${queryTarget()}\n` + lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `wayback-${queryTarget()}-${Date.now()}.txt`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    downloadBlob(blob, `wayback-${queryTarget()}-${Date.now()}.txt`);
     toastStore.show('TXT 已导出', 'success');
   }
 

@@ -1,3 +1,4 @@
+"use strict";
 // 灵眸 - Vue Detect (Stealth Injection)
 // This script is injected via <script> tag by content script, then removed.
 (function () {

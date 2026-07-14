@@ -1,3 +1,4 @@
+"use strict";
 // 灵眸 - Build Tool Detection (MAIN world inject)
 (function () {
     'use strict';

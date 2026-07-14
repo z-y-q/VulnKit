@@ -5,6 +5,7 @@
   import { sendToContent } from '@/lib/core/messaging';
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
+  import { downloadBlob } from '@/lib/actions/download';
   import {
     MENU_KEYWORDS,
     classifyPermType,
@@ -703,12 +704,7 @@
       store: storeResult ? storeResult.store : undefined,
     };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `vue-analysis-${Date.now()}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, `vue-analysis-${Date.now()}.json`);
     toastStore.show('报告已导出', 'success');
   }
 

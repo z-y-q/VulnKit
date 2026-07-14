@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Vue 攻击层注入脚本
  * MAIN world 运行，操作 Vue Router 运行时：

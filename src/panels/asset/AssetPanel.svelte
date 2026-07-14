@@ -4,6 +4,7 @@
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
+  import { downloadBlob } from '@/lib/actions/download';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
   import ResponsiveTable, { type Col } from '@/components/results/ResponsiveTable.svelte';
 
@@ -214,15 +215,6 @@
     const blob = new Blob([json], { type: 'application/json' });
     downloadBlob(blob, `lingmou-asset-zoomeye-${Date.now()}.json`);
     toastStore.show('JSON 已导出', 'success');
-  }
-
-  function downloadBlob(blob: Blob, filename: string) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   function copyIpList() {

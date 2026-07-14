@@ -10,8 +10,9 @@
     "outDir": "public/inject",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-    "strict": false,
-    "noImplicitReturns": true
+    "strict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["src/inject/**/*.ts"]
 }

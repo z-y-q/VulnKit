@@ -14,7 +14,7 @@
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { runConcurrent } from '@/lib/core/concurrency';
   import { copyText } from '@/lib/actions/clipboard';
-  import { downloadText, buildFilename } from '@/lib/actions/download';
+  import { downloadText, downloadBlob, buildFilename } from '@/lib/actions/download';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
   import { toCsv } from '@/lib/actions/serializers';
   import {
@@ -518,12 +518,7 @@
   function downloadFile(f: { path: string; content: string }) {
     const name = f.path.split('/').pop() || 'source.js';
     const blob = new Blob([f.content], { type: 'text/plain' });
-    const a = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, name);
   }
 
   /** 下载某 bundle 的全部还原源码（合并 txt） */
@@ -541,12 +536,7 @@
       }
     }
     const blob = new Blob([out], { type: 'text/plain' });
-    const a = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = `sourcemap-${new URL(r.bundleUrl).pathname.split('/').pop() || 'sources'}.txt`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, `sourcemap-${new URL(r.bundleUrl).pathname.split('/').pop() || 'sources'}.txt`);
     toastStore.show('源码已下载', 'success');
   }
 
@@ -733,11 +723,7 @@
       })),
     );
     const blob = new Blob([JSON.stringify(modules, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `sourcemap-modules-${Date.now()}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    downloadBlob(blob, `sourcemap-modules-${Date.now()}.json`);
     toastStore.show(`已导出 ${modules.length} 个模块`, 'success');
   }
 

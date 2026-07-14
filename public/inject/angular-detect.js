@@ -1,3 +1,4 @@
+"use strict";
 // 灵眸 - Angular Detection Inject Script
 (function () {
     'use strict';

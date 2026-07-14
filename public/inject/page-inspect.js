@@ -1,3 +1,4 @@
+"use strict";
 // page-inspect.ts
 // MAIN world inject script for page inspection (leak-scan + fingerprint)
 // 根据 dataset.vkAction 分支执行，结果通过 postMessage 回传。

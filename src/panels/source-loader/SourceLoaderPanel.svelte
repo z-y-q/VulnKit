@@ -4,6 +4,7 @@
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
+  import { downloadBlob } from '@/lib/actions/download';
   import { analysisContextStore } from '@/stores/analysis-context';
   import type { FetchResult } from '@/lib/types/messaging';
   import { extractScriptSrcs, extractLinkHrefs, formatSize } from '@/lib/source/source-utils';
@@ -140,14 +141,10 @@
       return;
     }
     const blob = new Blob([source], { type: 'text/html;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
     const hostname = (() => {
       try { return new URL(url).hostname; } catch { return 'source'; }
     })();
-    a.download = `${hostname}-${Date.now()}.html`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    downloadBlob(blob, `${hostname}-${Date.now()}.html`);
     toastStore.show('已下载 HTML 文件', 'success');
   }
 

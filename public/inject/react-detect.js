@@ -1,3 +1,4 @@
+"use strict";
 // 灵眸 - React Detection Inject Script
 (function () {
     'use strict';

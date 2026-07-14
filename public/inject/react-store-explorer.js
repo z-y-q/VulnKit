@@ -1,3 +1,4 @@
+"use strict";
 // 灵眸 - React Store/Router Explorer (MAIN world injection)
 // Extracts Redux/Zustand store state, React Router routes, API endpoints
 (function () {

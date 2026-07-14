@@ -1,3 +1,4 @@
+"use strict";
 // 灵眸 - Angular Store/Router Explorer (MAIN world injection)
 // Extracts NgRx store state, Angular signals, Router config, API endpoints
 (function () {

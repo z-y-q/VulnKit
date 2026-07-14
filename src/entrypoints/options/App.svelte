@@ -2,6 +2,7 @@
   // 设置页（阶段2重构：分区导航 + hash 路由 + 统一保存状态 + ConfirmDialog，对齐 §4.3）
   // 业务逻辑不变；布局改为左侧目录 + 右侧分区；10 处原生 confirm 改 confirmStore.ask。
   import { themeStore, toastStore } from '@/stores/ui';
+  import { downloadBlob } from '@/lib/actions/download';
   import { scanHistoryStore, MODULE_LABELS, type ScanHistoryEntry } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
   import { SCAN_SETTINGS_BOUNDS } from '@/lib/core/settings';
@@ -239,12 +240,7 @@
     }
     const bundle = await buildBackup({ includeSecrets, includeHistory: true });
     const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lingmou-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, `lingmou-backup-${new Date().toISOString().slice(0, 10)}.json`);
     toastStore.show(`已导出 ${Object.keys(bundle.data).length} 项${includeSecrets ? '（含敏感配置）' : ''}`, 'success');
   }
 
@@ -491,11 +487,7 @@
   }
   function exportHae() {
     const blob = new Blob([haeText || defaultRulesToYaml()], { type: 'text/yaml;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `hae-rules-${new Date().toISOString().slice(0, 10)}.yaml`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    downloadBlob(blob, `hae-rules-${new Date().toISOString().slice(0, 10)}.yaml`);
   }
   function importHae(e: Event) {
     const input = e.target as HTMLInputElement;

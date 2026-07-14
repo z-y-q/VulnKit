@@ -1,3 +1,4 @@
+"use strict";
 // 灵眸 - Vue Store Explorer (MAIN world injection)
 // Reads Vuex/Pinia state, actions/getters, and scans DOM for custom directives
 (function () {

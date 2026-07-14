@@ -4,6 +4,7 @@
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
+  import { downloadBlob } from '@/lib/actions/download';
   import { scanSettingsStore } from '@/stores/settings';
   import { getAppVersion } from '@/lib/core/app-version';
   import type { ProbeResult, FetchResult } from '@/lib/types/messaging';
@@ -404,23 +405,27 @@
     const found = [...(inline?.discovered || [])];
     const extUrls = inline?.extUrls || [];
     // 抓取外部 JS 扫描
-    const contents = await Promise.allSettled(extUrls.slice(0, 20).map(u => sendMessage({ type: 'FETCH_URL', url: u })));
-    for (let i = 0; i < contents.length; i++) {
-      const c = contents[i];
-      if (c.status !== 'fulfilled') continue;
-      const res = c.value as FetchResult<string>;
-      if (!res?.success || !res.data) continue;
-      const text = res.data;
-      let url = extUrls[i]; if (url.length > 40) url = '...' + url.slice(-37);
-      const routeRe = /path\s*:\s*['"`](\/[a-zA-Z0-9_\-\/]+)['"`]/g;
-      let m: RegExpExecArray | null;
-      const seen = new Set(found.map(f => f.path));
-      while ((m = routeRe.exec(text)) !== null) {
-        const p = m[1];
-        if (/\/api\/|\.js$|\.css$|\.(png|jpg|svg|ico)/i.test(p) || p.length < 4 || seen.has(p)) continue;
-        seen.add(p); found.push({ path: p, source: url });
-      }
-    }
+    // §5.1：外部 JS 抓取改 runConcurrent（并发限流 + 一致性，替代 Promise.allSettled 一次性全发）
+    const seen = new Set(found.map(f => f.path));
+    await runConcurrent(
+      extUrls.slice(0, 20),
+      async (u: string) => {
+        let res: FetchResult<string>;
+        try { res = await sendMessage({ type: 'FETCH_URL', url: u }) as FetchResult<string>; }
+        catch { return; }
+        if (!res?.success || !res.data) return;
+        const text = res.data;
+        let label = u; if (label.length > 40) label = '...' + label.slice(-37);
+        const routeRe = /path\s*:\s*['"`](\/[a-zA-Z0-9_\-\/]+)['"`]/g;
+        let m: RegExpExecArray | null;
+        while ((m = routeRe.exec(text)) !== null) {
+          const p = m[1];
+          if (/\/api\/|\.js$|\.css$|\.(png|jpg|svg|ico)/i.test(p) || p.length < 4 || seen.has(p)) continue;
+          seen.add(p); found.push({ path: p, source: label });
+        }
+      },
+      { concurrency: $scanSettingsStore.concurrency },
+    );
     jsDiscoveredRoutes = found;
     // 合并到 sensitiveRoutes（去重）
     let added = 0;
@@ -604,12 +609,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
 </body></html>`;
 
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ruoyi-report-${Date.now()}.html`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, `ruoyi-report-${Date.now()}.html`);
     toastStore.show('HTML 报告已导出', 'success');
   }
   function severityBadge(severity: string): string {

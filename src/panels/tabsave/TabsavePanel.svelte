@@ -3,6 +3,7 @@
   // 收集当前窗口所有标签页 URL（过滤 chrome:/about:），去重，复制/导出。
   // 对齐 v5 vk-tabsave.js。
   import { toastStore } from '@/stores/ui';
+  import { downloadBlob } from '@/lib/actions/download';
 
   let savedTabs = $state<{ url: string; title: string }[]>([]);
   let collecting = $state(false);
@@ -63,12 +64,7 @@
     if (savedTabs.length === 0) { toastStore.show('没有可导出的内容', 'warning'); return; }
     const text = savedTabs.map(t => `${t.title}\n${t.url}\n`).join('\n');
     const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tabs-${new Date().toISOString().slice(0, 10)}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `tabs-${new Date().toISOString().slice(0, 10)}.txt`);
     toastStore.show('已导出 TXT', 'success');
   }
 
