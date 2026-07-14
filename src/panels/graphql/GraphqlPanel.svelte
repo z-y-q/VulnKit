@@ -27,7 +27,10 @@
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
   import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
-  import FilterBar from '@/components/scanner/FilterBar.svelte';
+  import ResultToolbar from '@/components/results/ResultToolbar.svelte';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
+  import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
 
   let targetUrl = $state('');
   let scanning = $state(false);
@@ -39,8 +42,7 @@
   let findings = $state<GraphqlFinding[]>([]);
   let batchSupported = $state(false);
   let suggestionsEnabled = $state(false);
-  let sortBy = $state<'severity' | 'test'>('severity');
-  let filter = $state<'all' | 'vuln'>('all');
+  let query = $state<ResultQuery>({ search: '', filters: {}, sort: { key: 'severity', direction: 'asc' } });
   let showSchema = $state(false);
   let customPath = $state('');
   let cancelled = $state(false);
@@ -51,17 +53,33 @@
     });
   });
 
-  let sortedFindings = $derived.by(() => {
-    let list = filter === 'vuln'
-      ? findings.filter(f => f.severity !== 'info')
-      : findings;
-    return [...list].sort((a, b) => {
-      if (sortBy === 'test') return a.test.localeCompare(b.test);
-      return SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
-    });
-  });
+  // ===== 派生：结果（统一 ResultAdapter，供 ResultToolbar/ExportMenu 消费）=====
+  const graphqlAdapter: ResultAdapter<GraphqlFinding> = {
+    apply(items, q) {
+      let list = items;
+      if (q.filters.scope?.includes('vuln')) list = list.filter((f) => f.severity !== 'info');
+      const kw = q.search.trim().toLowerCase();
+      if (kw) list = list.filter((f) => graphqlAdapter.getSearchText(f).toLowerCase().includes(kw));
+      return [...list].sort((a, b) => {
+        if (q.sort.key === 'test') return a.test.localeCompare(b.test);
+        return SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
+      });
+    },
+    getSearchText(f) {
+      return `${f.test} ${f.severity} ${f.detail} ${f.evidence ?? ''}`;
+    },
+    getId(f) {
+      return f.test + f.severity;
+    },
+  };
 
-  let vulnCount = $derived(findings.filter(f => f.severity !== 'info').length);
+  let sortedFindings = $derived(graphqlAdapter.apply(findings, query));
+  let vulnOnly = $derived(query.filters.scope?.includes('vuln') ?? false);
+  function toggleVuln() {
+    query.filters = vulnOnly ? {} : { scope: ['vuln'] };
+  }
+
+  let vulnCount = $derived(findings.filter((f) => f.severity !== 'info').length);
 
   // 映射 GraphqlFinding[] → ScanFinding[]
   function mapGraphqlToFindings(items: GraphqlFinding[]): ScanFinding[] {
@@ -242,18 +260,38 @@
 
   function cancel() { cancelled = true; }
 
-  function copyFinding(f: GraphqlFinding) {
+  async function copyFinding(f: GraphqlFinding) {
     const text = [
       `[${f.severity.toUpperCase()}] ${f.test}`,
       f.detail,
       f.evidence ? `Evidence: ${f.evidence}` : '',
     ].filter(Boolean).join('\n');
-    navigator.clipboard.writeText(text);
-    toastStore.show('已复制到剪贴板', 'success');
+    await copyText(text, '已复制到剪贴板');
   }
 
-  function copyAll() {
-    if (findings.length === 0) { toastStore.show('没有扫描结果', 'warning'); return; }
+  // —— 导出/复制序列化器（作用于当前筛选 sortedFindings，展示/导出同源 §6.1）——
+  function graphqlJson(items: GraphqlFinding[]): string {
+    return JSON.stringify(
+      { url: targetUrl, endpoints, schemaInfo, batchSupported, suggestionsEnabled, findings: items },
+      null,
+      2,
+    );
+  }
+  function graphqlMd(items: GraphqlFinding[]): string {
+    const lines = [`# GraphQL 安全扫描`, ``, `**目标:** ${targetUrl}`, ``];
+    if (endpoints.length > 0) {
+      lines.push(`## 端点 (${endpoints.length})`, ...endpoints.map((ep) => `- \`${ep.path}\` (HTTP ${ep.status}, introspection: ${ep.introspection ? '开启' : '关闭'})`), ``);
+    }
+    if (schemaInfo) {
+      lines.push(`## Schema`, `- 类型: ${schemaInfo.totalTypes}`, `- Query: ${schemaInfo.queries.length}`, `- Mutation: ${schemaInfo.mutations.length}`, ``);
+    }
+    lines.push(`## 发现 (${items.length})`);
+    for (const f of items) {
+      lines.push(`- **[${f.severity.toUpperCase()}] ${f.test}** — ${f.detail}`);
+    }
+    return lines.join('\n');
+  }
+  function graphqlText(items: GraphqlFinding[]): string {
     const lines = ['GraphQL Security Scan Results', '==================', `Target: ${targetUrl}`, ''];
     if (endpoints.length > 0) {
       lines.push('Endpoints:');
@@ -265,53 +303,13 @@
     if (schemaInfo) {
       const si = schemaInfo;
       lines.push(`Schema: ${si.totalTypes} types, ${si.queries.length} queries, ${si.mutations.length} mutations`);
-      if (si.queries.length) lines.push(`Queries: ${si.queries.join(', ')}`);
-      if (si.mutations.length) lines.push(`Mutations: ${si.mutations.join(', ')}`);
       lines.push('');
     }
     lines.push('Findings:');
-    for (const f of sortedFindings) {
+    for (const f of items) {
       lines.push(`[${f.severity.toUpperCase()}] ${f.test}: ${f.detail}`);
     }
-    navigator.clipboard.writeText(lines.join('\n'));
-    toastStore.show('已复制全部结果', 'success');
-  }
-
-  function copyMarkdown() {
-    if (findings.length === 0) { toastStore.show('没有扫描结果', 'warning'); return; }
-    const lines = [`# GraphQL 安全扫描`, ``, `**目标:** ${targetUrl}`, ``];
-    if (endpoints.length > 0) {
-      lines.push(`## 端点 (${endpoints.length})`, ...endpoints.map(ep => `- \`${ep.path}\` (HTTP ${ep.status}, introspection: ${ep.introspection ? '开启' : '关闭'})`), ``);
-    }
-    if (schemaInfo) {
-      lines.push(`## Schema`, `- 类型: ${schemaInfo.totalTypes}`, `- Query: ${schemaInfo.queries.length}`, `- Mutation: ${schemaInfo.mutations.length}`, ``);
-    }
-    lines.push(`## 发现 (${sortedFindings.length})`);
-    for (const f of sortedFindings) {
-      lines.push(`- **[${f.severity.toUpperCase()}] ${f.test}** — ${f.detail}`);
-    }
-    navigator.clipboard.writeText(lines.join('\n'));
-    toastStore.show('Markdown 已复制', 'success');
-  }
-
-  function exportResults() {
-    if (findings.length === 0) { toastStore.show('没有扫描结果', 'warning'); return; }
-    const data = {
-      url: targetUrl,
-      endpoints,
-      schemaInfo,
-      batchSupported,
-      suggestionsEnabled,
-      findings: sortedFindings,
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = `graphql-scan-${Date.now()}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toastStore.show('结果已导出', 'success');
+    return lines.join('\n');
   }
 </script>
 
@@ -395,24 +393,27 @@
     </div>
   {/if}
 
-  <!-- 工具栏 -->
+  <!-- 工具栏：ResultToolbar 包裹 风险筛选 / 排序 / 导出 -->
   {#if findings.length > 0}
-    <FilterBar
-      active={filter}
-      options={[
-        { key: 'all', label: '全部', count: findings.length, color: 'bg-primary text-white' },
-        { key: 'vuln', label: '风险', count: vulnCount, color: 'bg-red-500 text-white' },
-      ]}
-      onchange={(k) => (filter = k as 'all' | 'vuln')}
-    >
-      <select class="input text-xs w-24" bind:value={sortBy}>
+    <ResultToolbar {query} total={findings.length} shown={sortedFindings.length} searchPlaceholder="搜索测试/详情...">
+      <button
+        class="badge cursor-pointer {vulnOnly ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
+        aria-pressed={vulnOnly}
+        onclick={toggleVuln}
+      >
+        风险 {vulnCount}
+      </button>
+      <select
+        class="input text-xs w-24"
+        value={query.sort.key}
+        onchange={(e) => { query.sort.key = (e.currentTarget as HTMLSelectElement).value; }}
+        aria-label="排序"
+      >
         <option value="severity">按风险</option>
         <option value="test">按类型</option>
       </select>
-      <button class="btn btn-sm" onclick={copyAll}>复制</button>
-      <button class="btn btn-sm" onclick={copyMarkdown}>MD</button>
-      <button class="btn btn-sm" onclick={exportResults}>导出</button>
-    </FilterBar>
+      <ExportMenu items={sortedFindings} module="graphql" serializers={{ json: graphqlJson, markdown: graphqlMd, text: graphqlText }} />
+    </ResultToolbar>
   {/if}
 
   <!-- 安全发现 -->

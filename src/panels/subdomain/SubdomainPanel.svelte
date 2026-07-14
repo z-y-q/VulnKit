@@ -27,14 +27,18 @@
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
+  import ResultToolbar from '@/components/results/ResultToolbar.svelte';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
+  import { toCsv } from '@/lib/actions/serializers';
+  import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
 
   let targetUrl = $state('');
   let scanning = $state(false);
   let scanned = $state(0);
   let total = $state(0);
   let results = $state<SubdomainResult[]>([]);
-  let searchQuery = $state('');
-  let sortBy = $state<'name' | 'ips'>('name');
+  let query = $state<ResultQuery>({ search: '', filters: {}, sort: { key: 'name', direction: 'asc' } });
   let cancelled = $state(false);
 
   // 枚举方法开关
@@ -63,19 +67,26 @@
     }
   });
 
-  let filteredResults = $derived.by(() => {
-    let list = dedupAliveResults(results);
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(r => r.subdomain.toLowerCase().includes(q));
-    }
-    if (sortBy === 'name') {
-      list.sort((a, b) => a.subdomain.localeCompare(b.subdomain));
-    } else {
-      list.sort((a, b) => b.ips.length - a.ips.length);
-    }
-    return list;
-  });
+  // ===== 派生：结果（统一 ResultAdapter，供 ResultToolbar/ExportMenu 消费）=====
+  const subdomainAdapter: ResultAdapter<SubdomainResult> = {
+    apply(items, q) {
+      let list = dedupAliveResults(items);
+      const kw = q.search.trim().toLowerCase();
+      if (kw) list = list.filter((r) => r.subdomain.toLowerCase().includes(kw));
+      return [...list].sort((a, b) => {
+        if (q.sort.key === 'ips') return b.ips.length - a.ips.length;
+        return a.subdomain.localeCompare(b.subdomain);
+      });
+    },
+    getSearchText(r) {
+      return r.subdomain;
+    },
+    getId(r) {
+      return r.subdomain;
+    },
+  };
+
+  let filteredResults = $derived(subdomainAdapter.apply(results, query));
 
   let stats = $derived(buildStats(results, 0));
   let elapsed = $state(0);
@@ -368,40 +379,25 @@
 
   function cancel() { cancelled = true; }
 
-  function copyAll() {
-    if (filteredResults.length === 0) {
-      toastStore.show('没有可复制的结果', 'warning');
-      return;
-    }
-    const text = filteredResults.map(r => r.subdomain).join('\n');
-    navigator.clipboard.writeText(text);
-    toastStore.show(`已复制 ${filteredResults.length} 个子域名`, 'success');
+  // —— 导出/复制序列化器（作用于当前筛选 filteredResults，展示/导出同源 §6.1）——
+  function subdomainCsv(items: SubdomainResult[]): string {
+    return toCsv([
+      ['subdomain', 'ips', 'cname', 'record_count'],
+      ...items.map((r) => [r.subdomain, r.ips.join(';'), r.cname || '', String(r.records.length)]),
+    ]);
+  }
+  function subdomainText(items: SubdomainResult[]): string {
+    return items.map((r) => r.subdomain).join('\n');
   }
 
-  function exportCsv() {
-    if (filteredResults.length === 0) return;
-    const rows = [['subdomain', 'ips', 'cname', 'record_count']];
-    for (const r of filteredResults) {
-      rows.push([r.subdomain, r.ips.join(';'), r.cname || '', String(r.records.length)]);
-    }
-    const csv = rows.map(row => row.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'subdomains.csv';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
-  function copyRow(r: SubdomainResult) {
+  async function copyRow(r: SubdomainResult) {
     const text = [
       `Subdomain: ${r.subdomain}`,
       `IPs: ${r.ips.join(', ') || '(无)'}`,
       `CNAME: ${r.cname || '(无)'}`,
-      `Records: ${r.records.map(rec => `${rec.type}: ${rec.data}`).join(', ') || '(无)'}`,
+      `Records: ${r.records.map((rec) => `${rec.type}: ${rec.data}`).join(', ') || '(无)'}`,
     ].join('\n');
-    navigator.clipboard.writeText(text);
-    toastStore.show(`已复制: ${r.subdomain}`, 'success');
+    await copyText(text, `已复制: ${r.subdomain}`);
   }
 
   function formatElapsed(ms: number): string {
@@ -466,25 +462,22 @@
     <ScanProgress {scanned} {total} {scanning} label="子域名枚举" />
   </div>
 
-  <!-- 工具栏 -->
+  <!-- 工具栏：ResultToolbar 包裹 搜索 / 排序 / 导出 -->
   {#if results.length > 0}
-    <div class="flex items-center gap-2 text-xs">
+    <ResultToolbar {query} total={results.length} shown={filteredResults.length} searchPlaceholder="搜索子域名...">
       <span class="badge bg-green-500 text-white">存活 {stats.alive}</span>
       <span class="badge bg-gray-200 dark:bg-gray-700">总计 {stats.total}</span>
-      <span class="text-gray-400">·</span>
-      <span>{filteredResults.length} 条</span>
-      <input
-        class="input text-xs flex-1 ml-2"
-        placeholder="搜索子域名..."
-        bind:value={searchQuery}
-      />
-      <select class="input text-xs w-20" bind:value={sortBy}>
+      <select
+        class="input text-xs w-20"
+        value={query.sort.key}
+        onchange={(e) => { query.sort.key = (e.currentTarget as HTMLSelectElement).value; }}
+        aria-label="排序"
+      >
         <option value="name">按名称</option>
         <option value="ips">按 IP 数</option>
       </select>
-      <button class="btn btn-sm" onclick={copyAll}>复制</button>
-      <button class="btn btn-sm" onclick={exportCsv}>导出</button>
-    </div>
+      <ExportMenu items={filteredResults} module="subdomain" serializers={{ csv: subdomainCsv, text: subdomainText }} />
+    </ResultToolbar>
   {/if}
 
   <!-- 结果 -->
