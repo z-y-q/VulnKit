@@ -70,14 +70,14 @@
       </div>
     </div>
     <div class="text-xs text-gray-400">{groups.length} 个规则组 · {totalRules} 条规则（指纹/凭证/敏感信息高亮提取）</div>
-    <textarea class="input font-mono text-xs" rows="5" placeholder="粘贴响应体/页面 HTML，或点「采集当前页」自动填入..." bind:value={inputText}></textarea>
+    <textarea class="input font-mono text-xs" rows="5" placeholder="粘贴响应体/页面 HTML，或点「采集当前页」自动填入..." aria-label="响应体" bind:value={inputText}></textarea>
   </div>
 
   {#if matches.length > 0}
     <div class="flex items-center gap-2 text-xs flex-wrap">
       <span>共 {matches.length} 处</span>
       {#if sensitiveCount > 0}<span class="badge bg-red-500 text-white">敏感 {sensitiveCount}</span>{/if}
-      <select class="input text-xs w-32 ml-auto" bind:value={groupFilter}>
+      <select class="input text-xs w-32 ml-auto" aria-label="分组筛选" bind:value={groupFilter}>
         <option value="all">全部分组</option>
         {#each groups as g}<option value={g}>{g}</option>{/each}
       </select>

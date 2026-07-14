@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Toolchain versions
+        run: |
+          echo "pnpm $(pnpm --version)"
+          echo "node $(node --version)"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm run check
+
+      # lint 暂未接入：eslint 尚未安装，待补充 flat config 后启用
+      # - name: Lint
+      #   run: pnpm run lint
+
+      - name: Test + coverage
+        run: pnpm test:coverage
+
+      - name: Build (Chrome)
+        run: pnpm run build
+
+      - name: Build (Firefox)
+        run: pnpm run build:firefox
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          retention-days: 7
+
+      - name: Upload build output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: .output/
+          retention-days: 7

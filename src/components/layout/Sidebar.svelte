@@ -90,6 +90,23 @@
   function select(id: string) {
     onselect(id);
   }
+
+  // §11.2：combobox 键盘导航（方向键移动高亮、Enter 选中；Escape 清空由 SearchField 处理）
+  let activeIdx = $state(-1);
+  $effect(() => { void searchResults.length; activeIdx = -1; });
+  function searchKeydown(e: KeyboardEvent) {
+    if (!searchResults.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeIdx = (activeIdx + 1) % searchResults.length;
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeIdx = (activeIdx - 1 + searchResults.length) % searchResults.length;
+    } else if (e.key === 'Enter' && activeIdx >= 0) {
+      e.preventDefault();
+      select(searchResults[activeIdx].id);
+    }
+  }
 </script>
 
 <aside
@@ -142,9 +159,11 @@
         label="搜索工具"
         placeholder="搜索工具 ⌘K"
         role="combobox"
-        aria-expanded="true"
+        aria-expanded={searchResults.length > 0}
         aria-controls="sb-results"
         aria-autocomplete="list"
+        aria-activedescendant={activeIdx >= 0 && searchResults[activeIdx] ? `sb-opt-${searchResults[activeIdx].id}` : undefined}
+        onkeydown={searchKeydown}
       />
     </div>
 
@@ -152,10 +171,10 @@
       {#if q}
         <!-- 搜索结果（扁平） -->
         {#if searchResults.length}
-          <div class="p-1.5 space-y-0.5">
+          <div class="p-1.5 space-y-0.5" role="listbox" aria-label="搜索结果">
             <div class="px-2 py-1 text-[10px] text-gray-400 dark:text-gray-500">匹配 {searchResults.length} 个工具</div>
-            {#each searchResults as panel (panel.id)}
-              {@render panelRow(panel, false)}
+            {#each searchResults as panel, i (panel.id)}
+              {@render panelRow(panel, false, i)}
             {/each}
           </div>
         {:else}
@@ -238,11 +257,16 @@
   {/if}
 </aside>
 
-{#snippet panelRow(panel: PanelConfig, withShortcut: boolean)}
+{#snippet panelRow(panel: PanelConfig, withShortcut: boolean, optionIdx: number = -1)}
   {@const idx = withShortcut ? shortcutIdx(panel) : 0}
-  <div class="group relative flex items-center rounded-lg transition-all duration-200 {activePanel === panel.id
-    ? 'bg-white dark:bg-gray-800/80 shadow-sm vk-glass'
-    : 'hover:bg-white/60 dark:hover:bg-gray-800/40'}">
+  <div
+    class="group relative flex items-center rounded-lg transition-all duration-200 {activePanel === panel.id
+      ? 'bg-white dark:bg-gray-800/80 shadow-sm vk-glass'
+      : 'hover:bg-white/60 dark:hover:bg-gray-800/40'}{optionIdx >= 0 && optionIdx === activeIdx ? ' ring-2 ring-blue-400/50 bg-blue-50 dark:bg-blue-900/20' : ''}"
+    role={optionIdx >= 0 ? 'option' : undefined}
+    id={optionIdx >= 0 ? `sb-opt-${panel.id}` : undefined}
+    aria-selected={optionIdx >= 0 ? optionIdx === activeIdx : undefined}
+  >
     {#if activePanel === panel.id}
       <span class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full" style="background: {panel.catColor}; box-shadow: 0 0 8px {panel.catColor}60"></span>
     {/if}

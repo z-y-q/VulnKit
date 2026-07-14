@@ -18,7 +18,10 @@ let onChangedListener: ((changes: any, area: string) => void) | null = null;
         for (const k of arr) delete mem[k];
       },
     },
-    onChanged: { addListener: (fn: any) => { onChangedListener = fn; } },
+    onChanged: {
+      addListener: (fn: any) => { onChangedListener = fn; },
+      removeListener: (fn: any) => { if (onChangedListener === fn) onChangedListener = null; },
+    },
   },
 };
 
@@ -234,5 +237,26 @@ describe('analysis-context store', () => {
     expect(c.payload.ok).toBe('str');
     expect('bad' in c.payload).toBe(false); // 非字符串已过滤
     expect('nest' in c.payload).toBe(false);
+  });
+
+  it('consumePayload 多 key：只删指定 key，保留其他 key（§8.1）', async () => {
+    await analysisContextStore.handoff({
+      sourcePanel: 'gather', sourceLabel: '信息收集',
+      targetPanel: 'fuzz', payload: { targetUrl: 'https://a.test/', paths: '/admin' },
+    }, { navigate: false });
+    const v = await analysisContextStore.consumePayload('fuzz', 'targetUrl');
+    expect(v).toBe('https://a.test/');
+    expect(mem[KEY]).toBeDefined(); // 未整体清空
+    expect(mem[KEY].payload.targetUrl).toBeUndefined();
+    expect(mem[KEY].payload.paths).toBe('/admin');
+    const p = await analysisContextStore.consumePayload('fuzz', 'paths');
+    expect(p).toBe('/admin');
+    expect(mem[KEY]).toBeUndefined(); // 全空后整体清
+  });
+
+  it('dispose 移除 storage listener（§8.1）', () => {
+    expect(onChangedListener).toBeTruthy();
+    analysisContextStore.dispose();
+    expect(onChangedListener).toBeNull();
   });
 });

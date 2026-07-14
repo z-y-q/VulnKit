@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   extractSourceMapUrl,
+  extractInlineSourceMap,
   parseSourceMap,
   hasSourceContent,
   classifySources,
@@ -220,5 +221,53 @@ describe('sourcemap-analyzer: extractInlineSourceMapHints', () => {
     const html = '<script src="/app.js"></script>';
     const urls = extractInlineSourceMapHints(html, 'https://example.com');
     expect(urls).toEqual([]);
+  });
+});
+
+describe('sourcemap-analyzer: extractInlineSourceMap', () => {
+  // 拆分字面量构造 sourceMappingURL 注释，避免 Vite 误把字面量当真实注释解析（§3.3 警告根因）
+  const sm = (url: string) => `//# sourceMapping${'URL='}${url}`;
+
+  it('解析内联 base64 source map', () => {
+    const body = sm(`data:application/json;base64,${btoa(JSON.stringify({ version: 3, sources: ['a.ts'] }))}`);
+    const info = extractInlineSourceMap(body);
+    expect(info).not.toBeNull();
+    expect(info!.version).toBe(3);
+    expect(info!.sources).toEqual(['a.ts']);
+  });
+
+  it('解析 URL encoded JSON', () => {
+    const json = JSON.stringify({ version: 3, file: 'b.js' });
+    const body = sm(`data:application/json,${encodeURIComponent(json)}`);
+    const info = extractInlineSourceMap(body);
+    expect(info).not.toBeNull();
+    expect(info!.file).toBe('b.js');
+  });
+
+  it('MIME 参数顺序不影响 base64 识别', () => {
+    const json = JSON.stringify({ version: 3 });
+    const body = sm(`data:application/json;charset=utf-8;base64,${btoa(json)}`);
+    const info = extractInlineSourceMap(body);
+    expect(info).not.toBeNull();
+    expect(info!.version).toBe(3);
+  });
+
+  it('非法 base64 返回 null（不抛文件系统错误）', () => {
+    const body = sm('data:application/json;base64,!!!invalid-base64!!!');
+    expect(extractInlineSourceMap(body)).toBeNull();
+  });
+
+  it('空 payload 返回 null', () => {
+    const body = sm('data:application/json;base64,');
+    expect(extractInlineSourceMap(body)).toBeNull();
+  });
+
+  it('非 data: URL（外部相对路径）返回 null', () => {
+    const body = sm('app.js.map');
+    expect(extractInlineSourceMap(body)).toBeNull();
+  });
+
+  it('无 sourceMappingURL 返回 null', () => {
+    expect(extractInlineSourceMap('var a = 1;')).toBeNull();
   });
 });

@@ -84,8 +84,12 @@ function create(): Readable<AnalysisContext | null> & {
   /** 切回来源面板（context 未消费时有效） */
   back(): void;
   reload(): Promise<void>;
+  /** §8.1：移除 storage listener 与 in-flight 映射，供测试/HMR 清理 */
+  dispose(): void;
 } {
   const store = writable<AnalysisContext | null>(null);
+  // §8.1：同 key 并发消费串行化，避免双消费（两个消费者并发读到同一 key 各拿一次）
+  const inFlight = new Map<string, Promise<string | null>>();
 
   async function reload(): Promise<void> {
     try {
@@ -144,17 +148,34 @@ function create(): Readable<AnalysisContext | null> & {
   }
 
   async function consumePayload(targetPanel: string, key: string): Promise<string | null> {
-    try {
-      const r = await browser.storage.local.get(STORAGE_KEY);
-      const cur = normalize(r?.[STORAGE_KEY]);
-      if (!cur || cur.targetPanel !== targetPanel) return null;
-      const v = cur.payload[key];
-      if (typeof v !== 'string' || !v) return null; // 无此 key：不消费、不清除
-      await persist(null); // 有此 key：消费并清除（context 实际单 key，整体清空安全）
-      return v;
-    } catch {
-      return null;
-    }
+    // §8.1：同 key 并发消费共享同一 in-flight Promise，避免双消费
+    const flightKey = `${targetPanel}:${key}`;
+    const existing = inFlight.get(flightKey);
+    if (existing) return existing;
+    const p = (async () => {
+      try {
+        const r = await browser.storage.local.get(STORAGE_KEY);
+        const cur = normalize(r?.[STORAGE_KEY]);
+        if (!cur || cur.targetPanel !== targetPanel) return null;
+        const v = cur.payload[key];
+        if (typeof v !== 'string' || !v) return null; // 无此 key：不消费、不清除
+        // §8.1：只删指定 key，保留其他 key 供其他消费者（如 UrlInput 取 targetUrl、面板取 paths）；
+        // payload 全空时才整体清除
+        const remaining = { ...cur.payload };
+        delete remaining[key];
+        if (Object.keys(remaining).length === 0) {
+          await persist(null);
+        } else {
+          await persist({ ...cur, payload: remaining });
+        }
+        return v;
+      } catch {
+        return null;
+      }
+    })();
+    inFlight.set(flightKey, p);
+    p.finally(() => inFlight.delete(flightKey));
+    return p;
   }
 
   function peek(): AnalysisContext | null {
@@ -170,16 +191,27 @@ function create(): Readable<AnalysisContext | null> & {
     if (cur?.sourcePanel) activePanelStore.set(cur.sourcePanel);
   }
 
+  let storageListener: ((changes: Record<string, { newValue?: unknown }>, area: string) => void) | null = null;
   if (typeof browser !== 'undefined' && browser.storage?.local) {
     reload();
-    browser.storage.onChanged.addListener((changes, area) => {
+    storageListener = (changes, area) => {
       if (area === 'local' && changes[STORAGE_KEY]) {
         store.set(normalize(changes[STORAGE_KEY].newValue));
       }
-    });
+    };
+    browser.storage.onChanged.addListener(storageListener);
   }
 
-  return { subscribe: store.subscribe, handoff, consume, consumePayload, peek, clear, back, reload };
+  // §8.1：移除 storage listener 与 in-flight 映射，供测试 / HMR 清理，避免监听器叠加
+  function dispose(): void {
+    if (storageListener && typeof browser !== 'undefined' && browser.storage?.onChanged && typeof browser.storage.onChanged.removeListener === 'function') {
+      browser.storage.onChanged.removeListener(storageListener);
+      storageListener = null;
+    }
+    inFlight.clear();
+  }
+
+  return { subscribe: store.subscribe, handoff, consume, consumePayload, peek, clear, back, reload, dispose };
 }
 
 export const analysisContextStore = create();

@@ -825,7 +825,7 @@
             <span class="text-xs font-bold text-red-600 dark:text-red-400">🔑 密钥泄露（{allSecrets.length}）</span>
           </div>
           <div class="space-y-1 max-h-40 overflow-y-auto">
-            {#each allSecrets.slice(0, 50) as s}
+            {#each allSecrets.slice(0, 50) as s (`${s.rule}:${s.value}`)}
               <div class="flex items-center gap-2 text-xs">
                 <span class="badge {s.severity === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'} shrink-0">{s.rule}</span>
                 <code class="font-mono text-gray-600 dark:text-gray-300 truncate" title={s.value}>{s.value}</code>
@@ -842,7 +842,7 @@
             <ExportMenu items={allEndpoints} module="sourcemap-endpoints" serializers={{ json: epJson, csv: epCsv, text: epText }} />
           </div>
           <div class="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
-            {#each allEndpoints.slice(0, 80) as e}
+            {#each allEndpoints.slice(0, 80) as e (`${e.type}:${e.value}`)}
               <span class="badge text-xs {e.type === 'websocket' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' : e.type === 'graphql' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300' : 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400'} font-mono" title={e.value}>{e.value}</span>
             {/each}
             {#if allEndpoints.length > 80}
@@ -938,7 +938,7 @@
       {:else}
         <div class="flex-1 flex flex-col overflow-hidden">
           <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700/50">
-            <input class="input text-xs" placeholder="搜索文件路径..." bind:value={fileSearch} />
+            <input class="input text-xs" placeholder="搜索文件路径..." aria-label="搜索文件路径" bind:value={fileSearch} />
           </div>
           <div class="flex-1 overflow-y-auto p-2 space-y-0.5">
             {#each viewerFiles as f (f.path)}

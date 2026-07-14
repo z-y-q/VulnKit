@@ -1,6 +1,7 @@
 <script lang="ts">
   // Vue 分析面板
   // 检测 Vue 框架、分析路由/守卫、探索 Vuex/Pinia Store
+  import { onDestroy } from 'svelte';
   import { sendToContent } from '@/lib/core/messaging';
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
@@ -31,6 +32,8 @@
     isSensitiveEntry,
   } from '@/lib/analyzers/vue-analyzer';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
+  import { abortableDelay } from '@/lib/tasks/abortable-delay';
 
   // ===== 状态 =====
   let detecting = $state(false);
@@ -274,7 +277,13 @@
     if (permRefreshTimer) { clearInterval(permRefreshTimer); permRefreshTimer = null; }
     const tab = await getActiveTab();
     if (tab?.id) {
-      await execInTab(tab.id, function () { const P = (window as any).__VK_PERM__; if (P) P.stop(); }, { world: 'MAIN' });
+      // §2.2：stop 置 active=false 后必须 _restore 还原原生 fetch/XHR，并删除全局对象；
+      // 否则页面 fetch/XHR 长期被 patch，且下次 start 会走 'already' 分支但 fetch 已是原生 → 拦截失效
+      await execInTab(tab.id, function () {
+        const P = (window as any).__VK_PERM__;
+        if (P) { P.stop(); if (typeof P._restore === 'function') P._restore(); }
+        try { delete (window as any).__VK_PERM__; } catch (e) { /* */ }
+      }, { world: 'MAIN' });
     }
     permActive = false;
     toastStore.show('拦截已停止', 'info');
@@ -347,9 +356,39 @@
   let hiddenRoutes = $state<RoutePath[]>([]);
   let visibleRoutes = $state<RoutePath[]>([]);
   let traverseLog = $state<{ idx: number; path: string; ok: boolean }[]>([]);
-  let traverseActive = $state(false);
-  let traverseTimer: ReturnType<typeof setTimeout> | null = null;
   let traverseDelay = $state(2500);
+
+  // §5.1：路由遍历接入 TaskController（可取消 signal + 进度上报 + dispose 统一）
+  const traverseCtrl = createTaskController<{ routes: RoutePath[]; tabId: number }, void>({
+    run: async (input, ctx) => {
+      const { routes, tabId } = input;
+      traverseLog = [];
+      ctx.reportProgress({ total: routes.length, completed: 0, phase: '路由遍历' });
+      for (let i = 0; i < routes.length; i++) {
+        if (ctx.signal.aborted) break;
+        const path = routes[i].path;
+        const res = await execInTab<{ ok: boolean }>(tabId, function (p: string) {
+          const appEl = document.querySelector('#app,[data-v-app],[id^="app"],#root,#application,#main') as any;
+          let router: any = null;
+          if (appEl && appEl.__vue_app__) router = appEl.__vue_app__.config.globalProperties.$router;
+          else { const els = document.querySelectorAll('*'); for (let i = 0; i < els.length; i++) { const el = els[i] as any; if (el.__vue__) { const vm = el.__vue__.$root || el.__vue__; if (vm.$router) { router = vm.$router; break; } } } }
+          if (router) { try { router.push(p); return { ok: true }; } catch (e) { return { ok: false }; } }
+          return { ok: false };
+        }, { world: 'MAIN', args: [path] });
+        if (!ctx.isCurrent()) return; // 旧 run，丢弃回写
+        traverseLog = [...traverseLog, { idx: i + 1, path, ok: !!res?.ok }];
+        ctx.reportProgress({ completed: i + 1, phase: `遍历路由 (${i + 1}/${routes.length})` });
+        if (i < routes.length - 1 && !ctx.signal.aborted) {
+          try { await abortableDelay(traverseDelay, ctx.signal); }
+          catch { break; } // 取消：退出循环，走 cancelled（非 failed）
+        }
+      }
+    },
+  }, { centerPanel: 'vue', centerLabel: 'Vue 路由遍历' });
+
+  let traverseState = $state<TaskState>({ ...IDLE });
+  $effect(() => traverseCtrl.state.subscribe((v: TaskState) => { traverseState = v; }));
+  let traverseActive = $derived(traverseState.status === 'running' || traverseState.status === 'paused' || traverseState.status === 'validating');
 
   /** 从页面 Vue Router 提取全部路由（MAIN world） */
   async function getPageRoutes(): Promise<RoutePath[]> {
@@ -400,32 +439,34 @@
     toastStore.show(`已注入 ${injected} 条隐藏路由到菜单数据`, 'success');
   }
 
-  /** 自动遍历隐藏路由（router.push 逐条） */
+  /** 自动遍历隐藏路由（router.push 逐条，TaskController 接管可取消/进度） */
   async function startTraverse(hiddenOnly: boolean) {
     const routes = hiddenOnly ? hiddenRoutes : await getPageRoutes();
     if (routes.length === 0) { toastStore.show(hiddenOnly ? '无隐藏路由，请先「路由对比」' : '未检测到路由', 'warning'); return; }
     const tab = await getActiveTab();
-    if (!tab?.id) return;
-    traverseActive = true; traverseLog = [];
-    for (let i = 0; i < routes.length; i++) {
-      if (!traverseActive) break;
-      const path = routes[i].path;
-      const res = await execInTab<{ ok: boolean }>(tab.id, function (p: string) {
-        const appEl = document.querySelector('#app,[data-v-app],[id^="app"],#root,#application,#main') as any;
-        let router: any = null;
-        if (appEl && appEl.__vue_app__) router = appEl.__vue_app__.config.globalProperties.$router;
-        else { const els = document.querySelectorAll('*'); for (let i = 0; i < els.length; i++) { const el = els[i] as any; if (el.__vue__) { const vm = el.__vue__.$root || el.__vue__; if (vm.$router) { router = vm.$router; break; } } } }
-        if (router) { try { router.push(p); return { ok: true }; } catch (e) { return { ok: false }; } }
-        return { ok: false };
-      }, { world: 'MAIN', args: [path] });
-      traverseLog = [...traverseLog, { idx: i + 1, path, ok: !!res?.ok }];
-      await new Promise(r => { traverseTimer = setTimeout(r, traverseDelay); });
-    }
-    traverseActive = false;
-    toastStore.show(`遍历完成，共 ${routes.length} 条`, 'success');
+    if (!tab?.id) { toastStore.show('无法获取标签页', 'error'); return; }
+    try {
+      const r = await traverseCtrl.start({ routes, tabId: tab.id });
+      if (r.status === 'succeeded') toastStore.show(`遍历完成，共 ${routes.length} 条`, 'success');
+    } catch { /* failed：actionable error 已由 task-center/UI 反馈 */ }
   }
 
-  function stopTraverse() { traverseActive = false; if (traverseTimer) clearTimeout(traverseTimer); }
+  function stopTraverse() { traverseCtrl.cancel(); }
+
+  // §2.2：组件卸载时清残留定时器并恢复页面 fetch/XHR（不写组件状态，避免卸载后更新警告）
+  onDestroy(() => {
+    if (permRefreshTimer) { clearInterval(permRefreshTimer); permRefreshTimer = null; }
+    traverseCtrl.dispose();
+    if (!permActive) return;
+    getActiveTab().then((tab) => {
+      if (!tab?.id) return;
+      execInTab(tab.id, function () {
+        const P = (window as any).__VK_PERM__;
+        if (P) { P.stop(); if (typeof P._restore === 'function') P._restore(); }
+        try { delete (window as any).__VK_PERM__; } catch (e) { /* */ }
+      }, { world: 'MAIN' }).catch(() => { /* 标签已关或无权限 */ });
+    }).catch(() => { /* */ });
+  });
 
   // ===== JS 搜索（vue-jssearch）=====
   let jsKeyword = $state('');

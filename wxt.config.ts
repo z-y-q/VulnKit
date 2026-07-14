@@ -1,4 +1,8 @@
 import { defineConfig } from 'wxt';
+import { readFileSync } from 'node:fs';
+
+// 版本号单一来源（§10.1）：从 package.json 读取，避免 manifest 与 package 两处人工同步
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8')) as { version: string };
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -7,7 +11,7 @@ export default defineConfig({
   manifest: {
     name: '灵眸',
     description: '灵眸 - 编码解码、图标识别、资产测绘、信息收集、权限分析',
-    version: '7.2.0',
+    version: pkg.version,
     // 权限矩阵详见 docs/权限矩阵.md；每项权限必须有功能与调用位置佐证。
     // 历史曾含 'downloads'，但所有下载均走 <a download> + blob URL（无需该权限），已移除。
     permissions: [

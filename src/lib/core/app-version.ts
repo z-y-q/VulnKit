@@ -1,5 +1,5 @@
 /**
- * 应用版本统一来源 — 灵眸 v7.3
+ * 应用版本统一来源（runtime 从 manifest 读取，manifest 由 wxt.config 从 package.json 读取）
  *
  * 解决历史版本号漂移：Popup 曾写 v7.0、StatusBar/Options 写 v6.0、
  * 报告元数据写 6.0.0，而 Side Panel 顶栏从 manifest 动态读取。

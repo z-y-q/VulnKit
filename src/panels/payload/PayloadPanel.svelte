@@ -193,7 +193,7 @@
   </div>
 
   <!-- 搜索框 -->
-  <input class="input text-xs font-mono" placeholder="搜索 payload / 分类名..." bind:value={searchText} />
+  <input class="input text-xs font-mono" placeholder="搜索 payload / 分类名..." aria-label="搜索 payload" bind:value={searchText} />
 
   <!-- 分类 Tab 切换 -->
   <div class="flex gap-1 flex-wrap">

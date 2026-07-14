@@ -16,6 +16,7 @@
   import { copyText } from '@/lib/actions/clipboard';
   import { toCsv, toMarkdownTable } from '@/lib/actions/serializers';
   import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
+  import { runConcurrent } from '@/lib/core/concurrency';
 
   // ===== 类型 =====
   interface Finding {
@@ -238,6 +239,7 @@
     scriptSrcs: string[],
     pageUrl: string,
     patterns: typeof patternsData,
+    signal: AbortSignal,
   ): Promise<{ resources: Finding[]; leaks: Finding[] }> {
     const apiPatterns = patterns.API_PATTERNS as ApiPattern[];
     const sensitivePatterns = patterns.SENSITIVE_PATTERNS as SensitivePattern[];
@@ -248,49 +250,55 @@
     // 只取同源 JS，最多 30 个
     let pageOrigin = '';
     try { pageOrigin = new URL(pageUrl).origin; } catch { /* ignore */ }
-    const toFetch = scriptSrcs
+    const toFetch = [...new Set(scriptSrcs)]
       .filter(s => { try { return new URL(s).origin === pageOrigin; } catch { return false; } })
       .slice(0, 30);
 
-    const fetchResults = await Promise.all(
-      toFetch.map(src => sendMessage({ type: 'FETCH_URL', url: src, timeout: 10000 })),
+    // §5.1：runConcurrent 限流（并发6）+ 可取消，取代 Promise.all 一次性并发；
+    // 单个失败记录为结果不终止全部；取消后不再调度新请求
+    await runConcurrent(
+      toFetch,
+      async (src) => {
+        let result: any;
+        try {
+          result = await sendMessage({ type: 'FETCH_URL', url: src, timeout: 10000 });
+        } catch { return; }
+        if (!result || !result.success) return;
+        const content = result.data as string;
+        if (!content) return;
+        const text = content.length > 300000 ? content.substring(0, 300000) : content;
+
+        // API 端点
+        for (const p of apiPatterns) {
+          const regex = new RegExp(p.regex.source, p.regex.flags);
+          let match;
+          while ((match = regex.exec(text)) !== null) {
+            const path = match[1];
+            if (!path || path.length < 3 || path.length > 200) continue;
+            if (/\.js(\?|$)/i.test(path) || /\.(css|png|jpg|svg|woff)(\?|$)/i.test(path)) continue;
+            const key = `api::${path}`.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            resources.push({ name: 'API', value: path, color: 'api', group: 'resources' });
+          }
+        }
+
+        // 敏感信息
+        for (const p of sensitivePatterns) {
+          const regex = new RegExp(p.regex.source, p.regex.flags);
+          let match;
+          while ((match = regex.exec(text)) !== null) {
+            let value = p.captureIdx ? match[p.captureIdx] : match[0];
+            if (!value) continue;
+            const key = `${p.label}::${value}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            leaks.push({ name: p.label, value: truncate(value), color: p.color, group: 'leaks' });
+          }
+        }
+      },
+      { concurrency: 6, cancelled: () => signal.aborted },
     );
-
-    for (const result of fetchResults) {
-      if (!result || !(result as any).success) continue;
-      const content = (result as any).data as string;
-      if (!content) continue;
-      const text = content.length > 300000 ? content.substring(0, 300000) : content;
-
-      // API 端点
-      for (const p of apiPatterns) {
-        const regex = new RegExp(p.regex.source, p.regex.flags);
-        let match;
-        while ((match = regex.exec(text)) !== null) {
-          const path = match[1];
-          if (!path || path.length < 3 || path.length > 200) continue;
-          if (/\.js(\?|$)/i.test(path) || /\.(css|png|jpg|svg|woff)(\?|$)/i.test(path)) continue;
-          const key = `api::${path}`.toLowerCase();
-          if (seen.has(key)) continue;
-          seen.add(key);
-          resources.push({ name: 'API', value: path, color: 'api', group: 'resources' });
-        }
-      }
-
-      // 敏感信息
-      for (const p of sensitivePatterns) {
-        const regex = new RegExp(p.regex.source, p.regex.flags);
-        let match;
-        while ((match = regex.exec(text)) !== null) {
-          let value = p.captureIdx ? match[p.captureIdx] : match[0];
-          if (!value) continue;
-          const key = `${p.label}::${value}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          leaks.push({ name: p.label, value: truncate(value), color: p.color, group: 'leaks' });
-        }
-      }
-    }
 
     return { resources, leaks };
   }
@@ -331,7 +339,7 @@
 
       if (fp.scriptSrcs.length > 0) {
         ctx.reportProgress({ phase: `分析 ${fp.scriptSrcs.length} 个 JS 文件` });
-        const jsResult = await extractFromJsFiles(fp.scriptSrcs, url, patternsData);
+        const jsResult = await extractFromJsFiles(fp.scriptSrcs, url, patternsData, ctx.signal);
         if (jsResult.resources.length > 0) resourceFindings = [...resourceFindings, ...jsResult.resources];
         if (jsResult.leaks.length > 0) leakFindings = [...leakFindings, ...jsResult.leaks];
       }
@@ -484,7 +492,7 @@
       <div class="card p-3">
         <div class="text-xs font-medium mb-2 text-blue-600 dark:text-blue-400">全局搜索（{allFiltered.length} 条匹配）</div>
         <div class="space-y-1 max-h-64 overflow-y-auto">
-          {#each allFiltered.slice(0, 100) as f}
+          {#each allFiltered.slice(0, 100) as f (`${f._cat}:${f.name}:${f.value}`)}
             <div class="flex items-center justify-between gap-2 group">
               <div class="flex items-center gap-2 min-w-0 flex-1">
                 <span class="badge badge-sm text-white" style="background-color: var(--color-{f.color}, #666)">{f.name}</span>
@@ -524,7 +532,7 @@
           <div class="text-xs text-gray-400">未检测到</div>
         {:else}
           <div class="space-y-1 max-h-64 overflow-y-auto">
-            {#each filteredTech as f}
+            {#each filteredTech as f (`${f.name}:${f.value}`)}
               <div class="flex items-center justify-between gap-2 group">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                   <span class="badge badge-sm text-white" style="background-color: var(--color-{f.color}, #666)">{f.name}</span>
@@ -546,7 +554,7 @@
           <div class="text-xs text-gray-400">未发现</div>
         {:else}
           <div class="space-y-1 max-h-64 overflow-y-auto">
-            {#each filteredResources as f}
+            {#each filteredResources as f (`${f.name}:${f.value}`)}
               <div class="flex items-center justify-between gap-2 group">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                   <span class="badge badge-sm text-white" style="background-color: var(--color-{f.color}, #666)">{f.name}</span>
@@ -568,7 +576,7 @@
           <div class="text-xs text-green-600 dark:text-green-400">未发现敏感信息泄露</div>
         {:else}
           <div class="space-y-1 max-h-64 overflow-y-auto">
-            {#each filteredLeaks as f}
+            {#each filteredLeaks as f (`${f.name}:${f.value}`)}
               <div class="flex items-center justify-between gap-2 group">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                   <span class="badge badge-sm text-white {f.color === 'red' ? 'bg-red-600' : f.color === 'yellow' ? 'bg-yellow-600' : 'bg-gray-600'}">{f.name}</span>

@@ -7,7 +7,7 @@
   // 泛型 T 为行类型，调用方 cell 片段直接拿到强类型 row，无需 cast。
   import type { Snippet } from 'svelte';
   export type { Col } from './responsive-table-utils';
-  import { visibleColumns, pickPrimary, cardColumns, shouldUseCardMode, type Col } from './responsive-table-utils';
+  import { visibleColumns, pickPrimary, cardColumns, shouldUseCardMode, paginate, type Col } from './responsive-table-utils';
 </script>
 
 <script lang="ts" generics="T">
@@ -21,6 +21,7 @@
     tableClass = 'w-full text-xs',
     cardClass = 'space-y-1.5',
     rowKey,
+    pagination = false,
   }: {
     cols: Col[];
     rows: T[];
@@ -35,18 +36,27 @@
     cardClass?: string;
     /** {#each} key；不传则用索引 */
     rowKey?: (row: T, i: number) => string | number;
+    /** 启用分页（§4.1）；传对象可定制 pageSizeOptions，不传则全渲染（向后兼容） */
+    pagination?: boolean | { pageSizeOptions?: number[] };
   } = $props();
 
   let el: HTMLDivElement | undefined = $state();
   let width = $state(1024);
 
+  // §4.2：宽度去重 + rAF 合并，拖动侧栏时每帧最多一次状态更新
   $effect(() => {
     if (!el) return;
+    let raf = 0;
+    let lastW = -1;
     const ro = new ResizeObserver((entries) => {
-      for (const e of entries) width = Math.round(e.contentRect.width);
+      const w = Math.round(entries[0]?.contentRect.width ?? 0);
+      if (w === lastW) return;
+      lastW = w;
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => { width = w; raf = 0; });
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { if (raf) cancelAnimationFrame(raf); ro.disconnect(); };
   });
 
   const isCard = $derived(shouldUseCardMode(width, cardBreakpoint));
@@ -54,6 +64,17 @@
   const primary = $derived(pickPrimary(cols));
   const cardCols = $derived(cardColumns(cols, primary));
   const minPx = $derived(Math.max(visibleCols.length * 96, 300));
+
+  // §4.1：分页状态
+  const pageSizeOpts = $derived(
+    typeof pagination === 'object' && pagination.pageSizeOptions ? pagination.pageSizeOptions : [50, 100, 200],
+  );
+  let pageSize = $state(50);
+  let page = $state(1);
+  // rows 变化（搜索/排序/刷新）时回到第一页
+  $effect(() => { void rows.length; page = 1; });
+  const pagi = $derived(pagination ? paginate(rows.length, page, pageSize) : null);
+  const visibleRows = $derived(pagi ? rows.slice(pagi.start, pagi.end) : rows);
 
   function fallbackTitle(row: T): string {
     if (!primary) return '';
@@ -64,7 +85,7 @@
 <div bind:this={el} class="w-full">
   {#if isCard}
     <div class={cardClass}>
-      {#each rows as row, i (rowKey ? rowKey(row, i) : i)}
+      {#each visibleRows as row, i (rowKey ? rowKey(row, i) : i)}
         <div class="card p-2.5 text-xs space-y-1">
           <div class="font-semibold text-gray-700 dark:text-gray-200 break-all">
             {cardLabel ? cardLabel(row) : fallbackTitle(row)}
@@ -89,7 +110,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each rows as row, i (rowKey ? rowKey(row, i) : i)}
+          {#each visibleRows as row, i (rowKey ? rowKey(row, i) : i)}
             <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
               {#each visibleCols as col (col.key)}
                 <td class="px-3 py-1.5 align-top">{@render cell(col, row)}</td>
@@ -98,6 +119,21 @@
           {/each}
         </tbody>
       </table>
+    </div>
+  {/if}
+  {#if pagi && pagi.totalPages > 1}
+    <div class="flex items-center justify-between gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
+      <span>共 {rows.length} 条，第 {pagi.start + 1}-{pagi.end} 条</span>
+      <div class="flex items-center gap-1">
+        <select class="input !py-0.5 !text-xs" aria-label="每页条数" bind:value={pageSize} onchange={() => { page = 1; }}>
+          {#each pageSizeOpts as ps}
+            <option value={ps}>{ps} / 页</option>
+          {/each}
+        </select>
+        <button type="button" class="btn btn-xs" disabled={pagi.safePage <= 1} onclick={() => (page = pagi!.safePage - 1)}>上一页</button>
+        <span>{pagi.safePage} / {pagi.totalPages}</span>
+        <button type="button" class="btn btn-xs" disabled={pagi.safePage >= pagi.totalPages} onclick={() => (page = pagi!.safePage + 1)}>下一页</button>
+      </div>
     </div>
   {/if}
 </div>

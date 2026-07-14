@@ -365,7 +365,7 @@
   <!-- 结果表格 -->
   {#if filtered.length > 0}
     <div class="card overflow-hidden">
-      <ResponsiveTable cols={ASSET_COLS} rows={filtered} cardLabel={(r) => r.ip}>
+      <ResponsiveTable cols={ASSET_COLS} rows={filtered} cardLabel={(r) => r.ip} rowKey={(r) => `${r.ip}:${r.port ?? ''}`}>
         {#snippet cell(col, r)}
           {#if col.key === 'ip'}
             <span class="font-mono">{r.ip}</span>

@@ -23,3 +23,6 @@ pnpm-debug.log*
 
 # playwright mcp session artifacts
 .playwright-mcp/
+
+# test coverage
+coverage/

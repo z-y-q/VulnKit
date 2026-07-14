@@ -150,7 +150,7 @@ export function extractSourceMapUrl(jsBody: string, baseUrl: string): string | n
 }
 
 /**
- * 提取并解析内联 base64 source map（//# sourceMappingURL=data:application/json;base64,...）。
+ * 提取并解析内联 base64 source map（注释形如 sourceMappingURL=data:application/json;base64,...）。
  * 直接返回 SourceMapInfo，无需网络请求。找不到返回 null。
  */
 export function extractInlineSourceMap(jsBody: string): SourceMapInfo | null {

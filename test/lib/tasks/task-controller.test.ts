@@ -147,4 +147,35 @@ describe('task-controller（§3.4 / §10.2）', () => {
     expect(r.status).toBe('succeeded');
     expect(seen).toEqual(['all', 'only-failed']);
   });
+
+  it('taskId 递增，运行中 isCurrent 为 true', async () => {
+    let ctx!: TaskRunContext;
+    const ctrl = createTaskController<string, string>({
+      run: async (_i, c) => { ctx = c; await delay(20); return 'done'; },
+    });
+    await ctrl.start('x');
+    expect(ctx.taskId).toBeGreaterThan(0);
+    expect(ctx.isCurrent()).toBe(true); // 同一 run 未被后续 start 取代
+  });
+
+  it('dispose：进行中任务回 idle 且旧 run 完成后不回写', async () => {
+    const ctrl = createTaskController<string, string>({
+      run: async () => { await delay(60); return 'done'; },
+    });
+    const p = ctrl.start('x');
+    await delay(10);
+    ctrl.dispose();
+    expect(get(ctrl.state).status).toBe('idle');
+    const r = await p; // 等 60ms 旧 run 完成
+    expect(r.status).toBe('idle'); // 不回写为 succeeded
+    expect(get(ctrl.state).status).toBe('idle');
+  });
+
+  it('dispose 后 start 不再派发', async () => {
+    const ctrl = createTaskController<string, string>({ run: async () => 'done' });
+    ctrl.dispose();
+    const r = await ctrl.start('x');
+    expect(r.status).toBe('idle');
+    expect(get(ctrl.state).status).toBe('idle');
+  });
 });

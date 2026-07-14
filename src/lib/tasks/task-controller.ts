@@ -37,6 +37,10 @@ export interface TaskState {
 export interface TaskRunContext {
   /** 取消信号；aborted 时 adapter 应停止派发后续工作 */
   signal: AbortSignal;
+  /** 本次任务轮次 id（每次 start 递增）；adapter 可用于日志/去重 */
+  taskId: number;
+  /** 是否仍是当前任务（未被后续 start/重跑取代）；旧回调回写状态前应检查，丢弃过期结果 */
+  isCurrent(): boolean;
   /** 是否暂停（adapter 可传给 runConcurrent 的 paused 回调） */
   isPaused: () => boolean;
   /** 上报进度（phase/completed/total/succeeded/failed/skipped），不改 status */
@@ -67,6 +71,8 @@ export interface TaskController<TInput, TResult> {
   reset(): void;
   /** 重跑：无参用上次 input（retry 'all'）；传参换 input（retry 'failed' 复用）。仅终态后可调 */
   retry(input?: TInput): Promise<StartResult<TResult>>;
+  /** 释放资源：abort 进行中任务 + 停计时器 + 回到 idle。供面板 onDestroy 调用 */
+  dispose(): void;
 }
 
 export interface CreateTaskOptions {
@@ -104,6 +110,10 @@ export function createTaskController<TInput, TResult>(
   let startedAt = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
   let lastInput: TInput | undefined;
+  /** 任务轮次 id：每次 start 递增；adapter 据此判断回调是否仍属当前任务 */
+  let runId = 0;
+  /** 是否已释放（dispose 后）；释放后 start 不再派发 */
+  let disposed = false;
 
   function patch(p: Partial<TaskState>) {
     store.update((s) => ({ ...s, ...p }));
@@ -138,12 +148,14 @@ export function createTaskController<TInput, TResult>(
   }
 
   async function start(input: TInput): Promise<StartResult<TResult>> {
+    if (disposed) return { status: 'idle' };
     const cur = get(store);
     if (cur.status === 'running' || cur.status === 'validating' || cur.status === 'paused') {
       // 防重复派发
       return { status: cur.status };
     }
 
+    const myRun = ++runId;
     ac = new AbortController();
     paused = false;
     startedAt = Date.now();
@@ -181,11 +193,14 @@ export function createTaskController<TInput, TResult>(
     try {
       result = await adapter.run(input, {
         signal: ac.signal,
+        taskId: myRun,
+        isCurrent: () => myRun === runId,
         isPaused: () => paused,
         reportProgress,
       });
     } catch (e) {
       stopTimer();
+      if (disposed) return { status: 'idle' }; // dispose 已处理状态，旧 run 错误丢弃
       const err = toActionableError(e);
       patch({ status: 'failed', error: err, elapsedMs: elapsed(), canCancel: false, canPause: false });
       reportToCenter('failed');
@@ -194,6 +209,8 @@ export function createTaskController<TInput, TResult>(
 
     stopTimer();
     const finalElapsed = elapsed();
+
+    if (disposed) return { status: 'idle', result }; // dispose 已置 idle，旧 run 结果丢弃
 
     if (ac.signal.aborted) {
       // 取消：adapter 已停止派发并返回；result 可能含部分结果（面板自行展示/标记 partial）
@@ -243,5 +260,16 @@ export function createTaskController<TInput, TResult>(
     return start(input ?? lastInput!);
   }
 
-  return { state: store, start, pause, resume, cancel, reset, retry };
+  /** 释放资源：abort 进行中任务 + 停计时器 + 回到 idle。供面板 onDestroy 调用，之后 start 不再派发 */
+  function dispose(): void {
+    disposed = true;
+    if (ac) ac.abort();
+    paused = false;
+    stopTimer();
+    startedAt = 0;
+    ac = null;
+    patch({ ...IDLE });
+  }
+
+  return { state: store, start, pause, resume, cancel, reset, retry, dispose };
 }

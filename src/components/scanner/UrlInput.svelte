@@ -80,6 +80,14 @@
     value = url;
     showRecent = false;
   }
+
+  // §2.4：focusout + relatedTarget 判定焦点是否仍在组件内，避免 onblur+setTimeout 的 150ms 竞态
+  // （点 listbox 项时 input blur，但 relatedTarget 仍在组件内 → 不关闭，交由 pick 处理）
+  function onFocusOut(e: FocusEvent) {
+    const rt = e.relatedTarget as Node | null;
+    if (rt && (e.currentTarget as HTMLElement).contains(rt)) return;
+    showRecent = false;
+  }
 </script>
 
 <div class={label ? 'space-y-1' : ''}>
@@ -87,7 +95,7 @@
     <label for={uid} class="panel-label">{label}</label>
   {/if}
   <div class="flex gap-1">
-    <div class="flex-1 relative">
+    <div class="flex-1 relative" onfocusout={onFocusOut}>
       <input
         id={uid}
         class="input w-full text-sm"
@@ -95,7 +103,6 @@
         bind:value
         onkeydown={onKeydown}
         onfocus={() => { if (recordTarget) showRecent = true; }}
-        onblur={() => setTimeout(() => (showRecent = false), 150)}
         aria-invalid={validationError ? 'true' : undefined}
         aria-describedby={validationError ? `${uid}-err` : undefined}
         aria-expanded={recordTarget && candidates.length ? showRecent : undefined}

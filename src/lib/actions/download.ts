@@ -18,6 +18,12 @@ export function buildFilename(module: string, ext: string): string {
   return `lingmou-${module}-${yyyy}-${mm}-${dd}.${cleanExt}`;
 }
 
+/** 清理文件名非法字符（Windows/macOS/Linux 通用）：去掉路径分隔、控制字符、保留字，空名回退 'download' */
+export function sanitizeFilename(name: string): string {
+  const cleaned = name.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').trim();
+  return cleaned || 'download';
+}
+
 /** 触发文本内容下载。createObjectURL → click，1s 后释放 URL。 */
 export function downloadText(
   content: string,
@@ -43,7 +49,7 @@ function triggerDownload(blob: Blob, filename: string): void {
   try {
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = sanitizeFilename(filename);
     document.body.appendChild(a);
     a.click();
     a.remove();

@@ -37,3 +37,27 @@ export function cardColumns<T extends Col>(cols: T[], primary: T | undefined): T
 export function shouldUseCardMode(width: number, cardBreakpoint = 480): boolean {
   return width < cardBreakpoint;
 }
+
+/** 分页计算结果 */
+export interface PaginationResult {
+  totalPages: number;
+  /** 夹紧到 [1, totalPages] 后的当前页 */
+  safePage: number;
+  /** 可见行起始下标（含） */
+  start: number;
+  /** 可见行结束下标（不含） */
+  end: number;
+}
+
+/**
+ * 分页计算（§4.1）：返回总页数、夹紧后的当前页与可见行范围 [start, end)。
+ * pageSize ≤ 0 视为 1；page 超界自动夹紧；total 为 0 时 totalPages=1、start=end=0。
+ */
+export function paginate(total: number, page: number, pageSize: number): PaginationResult {
+  const ps = Math.max(1, Math.floor(pageSize) || 1);
+  const totalPages = Math.max(1, Math.ceil(total / ps));
+  const safePage = Math.min(Math.max(1, Math.floor(page) || 1), totalPages);
+  const start = (safePage - 1) * ps;
+  const end = Math.min(start + ps, Math.max(0, total));
+  return { totalPages, safePage, start, end };
+}

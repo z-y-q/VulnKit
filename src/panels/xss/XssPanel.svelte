@@ -1,6 +1,7 @@
 <script lang="ts">
   // XSS 扫描面板（对齐 v5 完整能力）
   // 三大区块：① 反射扫描（参数×payload）② 注入点管理（采集/筛选/批量）③ DOM Sink 静态分析
+  import { onDestroy } from 'svelte';
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
@@ -17,6 +18,7 @@
   import ExportMenu from '@/components/results/ExportMenu.svelte';
   import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
   import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
+  import { abortableDelay } from '@/lib/tasks/abortable-delay';
   import DetailDrawer from '@/components/results/DetailDrawer.svelte';
   import type { DetailField, DetailHandoffAction } from '@/components/results/detail-drawer-utils';
   import { downloadText, buildFilename } from '@/lib/actions/download';
@@ -80,6 +82,12 @@
   let capturedAjax = $state<{ url: string; method: string; params: string[] }[]>([]);
   let intercepting = $state(false);
   let interceptMsg = $state('');
+  // 拦截定时器与轮次（§2.1）：实例级保存句柄，避免卸载/重复启动后旧回调回写状态
+  let interceptPollTimer: ReturnType<typeof setInterval> | undefined;
+  let interceptStopTimer: ReturnType<typeof setTimeout> | undefined;
+  let interceptEpoch = 0;
+  // batchVerify 的 3s 等待信号（§2.1）：卸载时 abort，避免后续写已卸载组件状态
+  let verifyAbort: AbortController | null = null;
 
   // DOM Sink 分析
   let sinkLoading = $state(false);
@@ -365,20 +373,30 @@
     return Array.isArray(data) ? data : [];
   }
 
+  /** 幂等清理拦截定时器（§2.1）：重复调用安全 */
+  function clearInterceptTimers() {
+    if (interceptPollTimer !== undefined) { clearInterval(interceptPollTimer); interceptPollTimer = undefined; }
+    if (interceptStopTimer !== undefined) { clearTimeout(interceptStopTimer); interceptStopTimer = undefined; }
+  }
+
   async function runIntercept() {
     if (intercepting) return;
     const ok = await installAjaxIntercept();
     if (!ok) { toastStore.show('拦截器安装失败（可能无权限）', 'error'); return; }
+    clearInterceptTimers();          // 启动前清理旧 timer，避免重复启动叠加
+    const epoch = ++interceptEpoch;  // 轮次递增：旧回调回写前校验，丢弃过期结果
     intercepting = true;
     interceptMsg = '拦截中... 请操作页面触发 AJAX（8 秒后自动采集）';
     let remaining = 8;
-    const timer = setInterval(() => {
+    interceptPollTimer = setInterval(() => {
       remaining--;
       if (remaining > 0) interceptMsg = `拦截中... 请操作页面触发 AJAX（${remaining} 秒后采集）`;
     }, 1000);
-    setTimeout(async () => {
-      clearInterval(timer);
+    interceptStopTimer = setTimeout(async () => {
+      clearInterceptTimers();
+      if (epoch !== interceptEpoch) return;  // 已被新轮次取代，丢弃
       const data = await collectAjaxIntercept();
+      if (epoch !== interceptEpoch) return;  // await 后再次校验
       intercepting = false;
       capturedAjax = data;
       const n = data.reduce((s, e) => s + e.params.length, 0);
@@ -390,6 +408,21 @@
   }
 
   function clearIntercept() { capturedAjax = []; interceptMsg = ''; }
+
+  // §2.1：组件卸载时清理进行中的拦截定时器，并恢复页面侧 fetch/XHR 拦截器
+  onDestroy(() => {
+    clearInterceptTimers();
+    verifyAbort?.abort();
+    if (!intercepting) return;
+    intercepting = false;
+    getActiveTab().then((tab) => {
+      if (!tab?.id) return;
+      execInTab(tab.id, function () {
+        const w = window as any;
+        if (typeof w.__vkXssRestore === 'function') w.__vkXssRestore();
+      }, { world: 'MAIN' }).catch(() => { /* 标签已关或无权限 */ });
+    }).catch(() => { /* */ });
+  });
 
   // ===== 探测 =====
   function buildTestUrl(baseUrl: string, param: string, payload: string): string {
@@ -792,8 +825,13 @@
         if (tab?.id) tabs.push({ p, tabId: tab.id });
       } catch { /* */ }
     }
-    // 等待页面加载渲染
-    await new Promise(r => setTimeout(r, 3000));
+    // 等待页面加载渲染（§2.1：可取消，卸载时 abort 避免后续写已卸载组件状态）
+    verifyAbort = new AbortController();
+    try {
+      await abortableDelay(3000, verifyAbort.signal);
+    } catch {
+      return;  // 卸载/取消：放弃后续验证
+    }
     for (const { p, tabId } of tabs) {
       let reflected = false;
       try {

@@ -4,6 +4,7 @@ import {
   pickPrimary,
   cardColumns,
   shouldUseCardMode,
+  paginate,
   type Col,
 } from '@/components/results/responsive-table-utils';
 
@@ -62,5 +63,39 @@ describe('responsive-table-utils', () => {
   it('shouldUseCardMode: 自定义断点', () => {
     expect(shouldUseCardMode(600, 720)).toBe(true);
     expect(shouldUseCardMode(800, 720)).toBe(false);
+  });
+});
+
+describe('paginate', () => {
+  it('常规分页：第一页', () => {
+    expect(paginate(120, 1, 50)).toEqual({ totalPages: 3, safePage: 1, start: 0, end: 50 });
+  });
+
+  it('常规分页：第二页', () => {
+    expect(paginate(120, 2, 50)).toEqual({ totalPages: 3, safePage: 2, start: 50, end: 100 });
+  });
+
+  it('末页不足一页', () => {
+    expect(paginate(120, 3, 50)).toEqual({ totalPages: 3, safePage: 3, start: 100, end: 120 });
+  });
+
+  it('page 超界夹紧到末页', () => {
+    expect(paginate(120, 99, 50)).toEqual({ totalPages: 3, safePage: 3, start: 100, end: 120 });
+  });
+
+  it('page ≤ 0 夹紧到第一页', () => {
+    expect(paginate(120, 0, 50)).toEqual({ totalPages: 3, safePage: 1, start: 0, end: 50 });
+  });
+
+  it('total 为 0 时 totalPages=1、范围为空', () => {
+    expect(paginate(0, 1, 50)).toEqual({ totalPages: 1, safePage: 1, start: 0, end: 0 });
+  });
+
+  it('pageSize ≤ 0 视为 1', () => {
+    expect(paginate(5, 1, 0)).toEqual({ totalPages: 5, safePage: 1, start: 0, end: 1 });
+  });
+
+  it('total 恰好整除', () => {
+    expect(paginate(100, 2, 50)).toEqual({ totalPages: 2, safePage: 2, start: 50, end: 100 });
   });
 });

@@ -9,6 +9,7 @@
   import ExportMenu from '@/components/results/ExportMenu.svelte';
   import { copyText } from '@/lib/actions/clipboard';
   import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
+  import { abortableDelay } from '@/lib/tasks/abortable-delay';
 
   let rawText = $state('');
   let delay = $state(0);
@@ -55,7 +56,10 @@
           failed: fail,
           phase: `打开中 (${ok + fail}/${input.urls.length})`,
         });
-        if (input.delay > 0 && !ctx.signal.aborted) await sleep(input.delay, ctx.signal);
+        if (input.delay > 0 && !ctx.signal.aborted) {
+          try { await abortableDelay(input.delay, ctx.signal); }
+          catch { break; }  // 取消：退出循环，由 TaskController 走 cancelled（非 failed）
+        }
       }
       return { ok, fail, failedUrls };
     },
@@ -66,15 +70,6 @@
   $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
   let opening = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
   let lastFailedUrls = $state<string[]>([]);
-
-  /** 可取消的 sleep：每 100ms 检查 signal，避免取消后仍等满 delay */
-  async function sleep(ms: number, signal: AbortSignal): Promise<void> {
-    const start = Date.now();
-    while (Date.now() - start < ms) {
-      if (signal.aborted) return;
-      await new Promise<void>((r) => setTimeout(r, Math.min(100, ms - (Date.now() - start))));
-    }
-  }
 
   // 消费跨面板 handoff（统一 analysisContextStore，替代旧 lingmou:multiurl-pending）
   $effect(() => {

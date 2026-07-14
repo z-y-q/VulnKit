@@ -587,18 +587,18 @@
           <div class="flex justify-end">
             <button class="btn btn-xs" onclick={copyIdbData}>复制全部</button>
           </div>
-          {#each idbInfo.databases as db}
+          {#each idbInfo.databases as db (db.name)}
             <div class="space-y-1">
               <div class="text-sm font-medium">{db.name} <span class="badge text-xs">v{db.version}</span></div>
               {#if db.stores?.length > 0}
-                {#each db.stores as store}
+                {#each db.stores as store (`${db.name}:${store.name}`)}
                   <div class="ml-3 space-y-1">
                     <div class="text-xs text-gray-500">
                       {store.name} <span class="badge text-xs">{store.count} 条</span>
                     </div>
                     {#if store.records?.length > 0}
                       <div class="space-y-0.5 ml-3">
-                        {#each store.records as record}
+                        {#each store.records as record, i (i)}
                           <div class="text-xs font-mono bg-gray-50 dark:bg-gray-800 rounded p-1 break-all">{truncate(record, 200)}</div>
                         {/each}
                       </div>
@@ -625,14 +625,14 @@
         <div class="text-sm text-gray-400">{filter === 'sensitive' ? '无匹配的敏感数据' : '存储为空'}</div>
       </div>
     {:else}
-      {#each items as item}
+      {#each items as item (`${storageType}:${item.key}`)}
         <div class="card p-2 text-xs {item.isSensitive ? severityBg(item.severity) : ''}">
           <div class="flex items-start gap-2">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-1">
                 <span class="font-mono font-medium truncate">{escapeHtml(item.key)}</span>
                 {#if item.isSensitive}
-                  {#each item.matchedPatterns as pat}
+                  {#each item.matchedPatterns as pat (pat)}
                     <span class="badge {severityColor(item.severity)}">{escapeHtml(pat)}</span>
                   {/each}
                 {/if}
