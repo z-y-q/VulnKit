@@ -5,6 +5,7 @@
   // 折叠分类 aria-expanded+aria-controls；icon-only 按钮均带 aria-label。
   import { panels, type PanelConfig } from '@/panels';
   import { panelMatches } from '@/panels/registry';
+  import SearchField from '@/components/form/SearchField.svelte';
   import { sniffBadgeStore } from '@/stores/sniff-badge';
   import { panelLayoutStore, applyLayout } from '@/stores/panel-layout';
   import { sidebarStateStore } from '@/stores/sidebar-state';
@@ -134,24 +135,17 @@
     <!-- ====== 完整模式 ====== -->
     <!-- 搜索框 -->
     <div class="shrink-0 p-2 border-b border-gray-200/40 dark:border-gray-700/20">
-      <label for="sb-search" class="sr-only">搜索工具</label>
-      <div class="relative">
-        <svg class="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-        <input
-          id="sb-search"
-          bind:this={searchInput}
-          bind:value={query}
-          type="search"
-          placeholder="搜索工具 ⌘K"
-          role="combobox"
-          aria-expanded="true"
-          aria-controls="sb-results"
-          aria-autocomplete="list"
-          autocomplete="off"
-          spellcheck="false"
-          class="w-full pl-7 pr-2 py-1.5 text-xs rounded-lg bg-white/80 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/50 text-gray-700 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
-        />
-      </div>
+      <SearchField
+        bind:value={query}
+        bind:inputEl={searchInput}
+        id="sb-search"
+        label="搜索工具"
+        placeholder="搜索工具 ⌘K"
+        role="combobox"
+        aria-expanded="true"
+        aria-controls="sb-results"
+        aria-autocomplete="list"
+      />
     </div>
 
     <div id="sb-results" class="overflow-y-auto flex-1">

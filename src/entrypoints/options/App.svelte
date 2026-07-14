@@ -8,6 +8,8 @@
   import { getAppVersion } from '@/lib/core/app-version';
   import { confirmStore } from '@/stores/confirm';
   import ConfirmDialog from '@/components/feedback/ConfirmDialog.svelte';
+  import SecretField from '@/components/form/SecretField.svelte';
+  import UrlField from '@/components/form/UrlField.svelte';
   import {
     buildBackup,
     applyBundle,
@@ -672,13 +674,17 @@
             <span class="text-xs text-gray-400">手动保存</span>
           </div>
           <div>
-            <label class="text-xs text-gray-500" for="zy-key">ZoomEye API Key</label>
+            <SecretField
+              id="zy-key"
+              label="ZoomEye API Key"
+              placeholder="ZoomEye API KEY"
+              bind:value={apiKey}
+              hint="用于「资产测绘」面板。密钥仅本地存储，不上传任何服务器。"
+            />
             <div class="flex gap-1 mt-1">
-              <input id="zy-key" class="input flex-1 text-sm font-mono" type="password" placeholder="ZoomEye API KEY" bind:value={apiKey} />
               <button type="button" class="btn btn-sm btn-primary" onclick={saveApiKey}>保存</button>
               <button type="button" class="btn btn-sm" onclick={clearApiKey} disabled={!apiKey}>清除</button>
             </div>
-            <p class="text-xs text-gray-400 mt-1">用于「资产测绘」面板。密钥仅本地存储，不上传任何服务器。</p>
           </div>
         </div>
 
@@ -695,16 +701,13 @@
               {/if}
             </div>
             <p class="text-xs text-gray-400 -mt-1">配置远程 JSON（需含 <code class="text-[10px]">version</code> + <code class="text-[10px]">payloads</code> 字段），拉取后缓存，XSS/Payload 面板优先使用。</p>
-            <div class="flex gap-1">
-              <input
-                class="input flex-1 text-xs font-mono"
-                type="url"
-                placeholder="https://example.com/lingmou-payloads.json"
-                bind:value={prefs.payloadRemoteUrl}
-              />
-              <button type="button" class="btn btn-sm" onclick={saveRemoteUrl}>保存 URL</button>
-            </div>
+            <UrlField
+              label="远程 Payload URL"
+              placeholder="https://example.com/lingmou-payloads.json"
+              bind:value={prefs.payloadRemoteUrl}
+            />
             <div class="flex gap-1 flex-wrap">
+              <button type="button" class="btn btn-sm" onclick={saveRemoteUrl}>保存 URL</button>
               <button type="button" class="btn btn-sm btn-primary" onclick={fetchRemote} disabled={remoteFetching || !prefs.payloadRemoteUrl}>
                 {remoteFetching ? '拉取中...' : '⬇ 拉取并缓存'}
               </button>
