@@ -1,5 +1,5 @@
 /**
- * 通用偏好设置 — 灵眸 v6.0
+ * 通用偏好设置
  *
  * 对齐 v5 options 页的「工具默认值 / 采集过滤 / 远程 Payload」三类配置。
  * 统一存于 browser.storage.local key `lingmouPrefs`，供 options 页编辑、

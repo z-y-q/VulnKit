@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — MD5 实现（纯函数，无依赖）
+// MD5 实现（纯函数，无依赖）
 // crypto.subtle 不支持 MD5，service worker 中需自带实现。
 // 修正了旧版 background.js 中的长度计算 bug，输出标准 MD5。
 

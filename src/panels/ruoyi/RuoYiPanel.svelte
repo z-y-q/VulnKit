@@ -1,5 +1,5 @@
 <script lang="ts">
-  // RuoYi 路由分析面板 — 灵眸 v6.0
+  // RuoYi 路由分析面板
   // 流程：注册 Hook → 监听 VK_RUOYI_HOOK_EVENT → 实时显示捕获的路由/请求
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 编码工具面板 — 灵眸 v6.0
+  // 编码工具面板
   // 三个子视图：经典编码（Base64/URL/HTML/Hex）、JWT 解析、加密解密（占位）
   import { encodingTools } from '@/lib/crypto/encoding';
   import { decode as decodeJwt, verifySignature, forgeNoneToken, type DecodedJwt, type JwtVerifyResult } from '@/lib/crypto/jwt';

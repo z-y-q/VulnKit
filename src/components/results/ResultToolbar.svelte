@@ -1,5 +1,5 @@
 <script lang="ts" generics="TItem">
-  // 结果工具栏 — 灵眸 v6.0
+  // 结果工具栏
   // 对齐 docs/UX-UI优化建议.md §5.2：统一「发现 N · 显示 M + 搜索 + 自定义筛选 + 清除 + 复制」。
   // query 由面板持有并 $derived(adapter.apply(items, query)) 算 shown；toolbar 只负责
   // 渲染搜索框（bind query.search）、计数、清除、复制，以及 children slot 供面板放

@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — Background 代理抓取函数
+// Background 代理抓取函数
 // 所有函数已与 SSRF 防护（url-guard）解耦：调用方负责校验。
 // 从 background.js 提取，统一返回结构。
 

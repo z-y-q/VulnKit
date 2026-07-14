@@ -1,10 +1,22 @@
 <script lang="ts">
-  // 资产测绘面板 — 灵眸 v6.0
+  // 资产测绘面板
   // ZoomEye API 集成：搜索主机/服务，结果分页，导出 CSV/JSON，复制 IP 列表
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
+  import ResponsiveTable, { type Col } from '@/components/results/ResponsiveTable.svelte';
+
+  // ResponsiveTable 列配置：宽屏全显，按 hideUnder 逐级隐藏，<480px 切卡片（IP 做标题）
+  const ASSET_COLS: Col[] = [
+    { key: 'ip', header: 'IP', primary: true },
+    { key: 'port', header: '端口', hideUnder: 480 },
+    { key: 'service', header: '服务', hideUnder: 560 },
+    { key: 'hostname', header: '主机名', hideUnder: 720 },
+    { key: 'country', header: '国家', hideUnder: 480 },
+    { key: 'region', header: '地区', hideUnder: 600 },
+    { key: 'title', header: '标题', hideUnder: 720 },
+  ];
   import {
     buildZoomEyeUrl,
     normalizeResults,
@@ -353,36 +365,25 @@
   <!-- 结果表格 -->
   {#if filtered.length > 0}
     <div class="card overflow-hidden">
-      <div class="overflow-x-auto max-h-72 overflow-y-auto">
-        <table class="w-full text-xs">
-          <thead class="sticky top-0 bg-white dark:bg-gray-800">
-            <tr class="border-b border-gray-200 dark:border-gray-700">
-              <th class="text-left px-3 py-1.5 font-medium text-gray-500">IP</th>
-              <th class="text-left px-3 py-1.5 font-medium text-gray-500">端口</th>
-              <th class="text-left px-3 py-1.5 font-medium text-gray-500">服务</th>
-              <th class="text-left px-3 py-1.5 font-medium text-gray-500">主机名</th>
-              <th class="text-left px-3 py-1.5 font-medium text-gray-500">国家</th>
-              <th class="text-left px-3 py-1.5 font-medium text-gray-500">地区</th>
-              <th class="text-left px-3 py-1.5 font-medium text-gray-500">标题</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each filtered as r}
-              <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                <td class="px-3 py-1.5 font-mono">{r.ip}</td>
-                <td class="px-3 py-1.5 font-mono">{r.port || '-'}</td>
-                <td class="px-3 py-1.5">
-                  <span class="badge badge-sm bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">{r.service}</span>
-                </td>
-                <td class="px-3 py-1.5 font-mono truncate max-w-32" title={r.hostname}>{r.hostname}</td>
-                <td class="px-3 py-1.5">{r.country}</td>
-                <td class="px-3 py-1.5">{r.region}</td>
-                <td class="px-3 py-1.5 truncate max-w-32" title={r.title}>{r.title}</td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+      <ResponsiveTable cols={ASSET_COLS} rows={filtered} cardLabel={(r) => r.ip}>
+        {#snippet cell(col, r)}
+          {#if col.key === 'ip'}
+            <span class="font-mono">{r.ip}</span>
+          {:else if col.key === 'port'}
+            <span class="font-mono">{r.port || '-'}</span>
+          {:else if col.key === 'service'}
+            <span class="badge badge-sm bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">{r.service}</span>
+          {:else if col.key === 'hostname'}
+            <span class="font-mono block truncate max-w-32" title={r.hostname}>{r.hostname}</span>
+          {:else if col.key === 'country'}
+            {r.country}
+          {:else if col.key === 'region'}
+            {r.region}
+          {:else if col.key === 'title'}
+            <span class="block truncate max-w-32" title={r.title}>{r.title}</span>
+          {/if}
+        {/snippet}
+      </ResponsiveTable>
     </div>
   {:else if !searching && results.length === 0 && statusText}
     <EmptyState message="未找到匹配结果" />

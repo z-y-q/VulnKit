@@ -1,5 +1,5 @@
 /**
- * 结果查询适配器 — 灵眸 v6.0
+ * 结果查询适配器
  *
  * 对齐 docs/UX-UI优化建议.md §10.3：不强迫面板共享同一种 finding 结构，
  * 而是共享 query 协议。ResultToolbar 通过 adapter.apply(rawItems, query) 得到

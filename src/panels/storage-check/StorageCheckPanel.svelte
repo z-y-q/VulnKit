@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 存储检查面板 — 灵眸 v6.0
+  // 存储检查面板
   // 检查 localStorage / sessionStorage / Cookies / IndexedDB / window 全局变量
   import { getActiveTab, getActiveTabUrl, execInTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';

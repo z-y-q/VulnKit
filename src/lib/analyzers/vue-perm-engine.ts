@@ -1,5 +1,5 @@
 /**
- * Vue 权限拦截引擎 — 灵眸 v6.0
+ * Vue 权限拦截引擎
  * 从 vk-vue-perm.js 提取的纯逻辑：响应分类、权限类型判定、数据变换。
  * MAIN world 注入与 Store 读写由 VuePanel 通过 execInTab 完成。
  */

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Vue 分析面板 — 灵眸 v6.0
+  // Vue 分析面板
   // 检测 Vue 框架、分析路由/守卫、探索 Vuex/Pinia Store
   import { sendToContent } from '@/lib/core/messaging';
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';

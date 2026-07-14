@@ -1,5 +1,5 @@
 /**
- * 按主机限流器 — 灵眸 v6.0 background 侧
+ * 按主机限流器 background 侧
  *
  * 双重控制：
  *   1. 最大并发（per-host semaphore）—— 同一主机同时在飞的请求上限

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 统一报告面板 — 灵眸 v6.0
+  // 统一报告面板
   // 从 scan-history store 读取扫描记录，聚合展示 + 多格式导出
   import { scanHistoryStore, type ScanHistoryEntry, type ScanSeverity } from '@/stores/scan-history';
   import { toastStore } from '@/stores/ui';

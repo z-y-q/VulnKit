@@ -1,5 +1,5 @@
 <script lang="ts">
-  // CORS 检测面板 — 灵眸 v6.0
+  // CORS 检测面板
   // 流程：自动填充 URL → 端点 × Origin 变体并发探测 → 引擎分析 → 按风险排序渲染
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';

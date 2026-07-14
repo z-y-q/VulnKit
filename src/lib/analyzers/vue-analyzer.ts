@@ -1,5 +1,5 @@
 /**
- * Vue 分析引擎 — 灵眸 v6.0
+ * Vue 分析引擎
  * 从 vk-vue-detect.js / vk-vue-store.js 提取的纯分析逻辑
  * 路由统计、路径展平、Store 树展平均为纯函数，可独立测试
  */

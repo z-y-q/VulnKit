@@ -1,5 +1,5 @@
 <script lang="ts" generics="TInput, TResult">
-  // 任务运行控件 — 灵眸 v6.0
+  // 任务运行控件
   // 对齐 docs/UX-UI优化建议.md §5.1 运行区 / §3.4 状态机：
   // 主按钮随状态切换（开始 → 暂停/继续 + 取消），并委托 ScanProgress 展示
   // controller.state 的 phase/completed/total/failed/elapsed。

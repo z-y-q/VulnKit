@@ -1,5 +1,5 @@
 /**
- * 敏感信息泄露扫描引擎 — 灵眸 v6.0
+ * 敏感信息泄露扫描引擎
  * 加载 leak-rules-{cloud,crypto,exposure}.json 共 90 条规则，预编译正则，
  * 应用 validate 回调（占位符过滤 / 熵值 / Luhn / JWT 升级 / 加密上下文）降低误报。
  * 供 SourceMap 源码扫描、Leakscan 深度扫描等模块共用。

@@ -1,5 +1,5 @@
 /**
- * 备份/恢复字段白名单 — 灵眸 v6.0（对齐 docs/UX-UI优化建议.md §7.7 / §10.5）
+ * 备份/恢复字段白名单（对齐 docs/UX-UI优化建议.md §7.7 / §10.5）
  *
  * 旧实现 `storage.local.get(null)` 无条件导出全部本地存储（含 ZoomEye API Key、伪装状态、
  * pending action），既是安全问题也是 UX 问题。本模块按字段分类建立白名单：

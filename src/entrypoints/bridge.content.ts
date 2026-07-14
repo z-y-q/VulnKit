@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — Content Script Bridge
+// Content Script Bridge
 // 注入到页面 ISOLATED world，负责：
 // 1. 把 background/panel 的探测请求转发为 MAIN world 脚本注入，并回传结果
 // 2. RuoYi hook 事件转发

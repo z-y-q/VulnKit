@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Angular 分析面板 -- 灵眸 v6.0
+  // Angular 分析面板
   // 1. Angular 框架检测（版本/变体/模式/组件/路由/信号）
   // 2. NgRx Store / Angular Signals / Router / API 端点探索
   import { sendToContent } from '@/lib/core/messaging';

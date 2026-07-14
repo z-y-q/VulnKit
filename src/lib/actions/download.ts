@@ -1,5 +1,5 @@
 /**
- * 文件下载 — 灵眸 v6.0
+ * 文件下载
  *
  * 统一各面板手写的 `new Blob + createObjectURL + a.click + setTimeout(revoke)` 模板。
  * 对齐 docs/UX-UI优化建议.md §6.1：文件名规范 lingmou-{module}-{yyyy-mm-dd}.{ext}，

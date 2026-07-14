@@ -1,5 +1,5 @@
 /**
- * Source Map 分析引擎 — 灵眸 v6.0
+ * Source Map 分析引擎
  * 纯分析逻辑（不含网络请求与 UI）
  * 从 vk-sourcemap-*.js 提取的 source map 解析、敏感路径分类
  */

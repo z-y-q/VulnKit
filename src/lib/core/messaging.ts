@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — 类型安全的消息发送器（UI/content 侧调用）
+// 类型安全的消息发送器（UI/content 侧调用）
 // 用法：const r = await sendMessage({ type: 'FETCH_URL', url });  // r 自动推断为 FetchResult
 
 import type {

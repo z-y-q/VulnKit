@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — 链接提取引擎（纯函数，无 DOM/网络依赖）
+// 链接提取引擎（纯函数，无 DOM/网络依赖）
 
 /** 提取到的链接 */
 export interface ExtractedLink {

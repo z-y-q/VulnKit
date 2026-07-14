@@ -1,5 +1,5 @@
 /**
- * 结构化错误模型 — 灵眸 v6.0
+ * 结构化错误模型
  *
  * 对齐 docs/UX-UI优化建议.md §5.4：Toast 不应是错误的唯一载体。
  * ActionableError 携带 code/title/message/cause 与一组恢复动作，

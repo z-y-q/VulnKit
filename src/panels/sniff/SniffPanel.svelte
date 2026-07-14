@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 网站嗅探面板 — 灵眸 v6.0
+  // 网站嗅探面板
   // 流程：自动填充 URL → FETCH_URL 获取 HTML + FETCH_PROBE 获取 headers → 解析 meta/scriptSrc → scan() 匹配 → 分类标签展示
   import { sendMessage, sendToContent } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';

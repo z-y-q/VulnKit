@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 信息收集面板 — 灵眸 v6.0
+  // 信息收集面板
   // 一键收集：技术栈指纹 / 外链资源 / 敏感信息泄露
   import { sendToContent } from '@/lib/core/messaging';
   import { sendMessage } from '@/lib/core/messaging';

@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — 若依路由 Hook（动态注册 MAIN world content script）
+// 若依路由 Hook（动态注册 MAIN world content script）
 
 const RUOYI_HOOK_CS_ID = 'ruoyi-route-hook-auto';
 

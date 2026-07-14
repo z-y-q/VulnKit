@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Cookie 安全审计面板 — 灵眸 v6.0
+  // Cookie 安全审计面板
   import { getActiveTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 历史档案面板 — 灵眸 v6.0
+  // 历史档案面板
   // 订阅 scanHistoryStore，展示/筛选/删除历史扫描记录
   import { scanHistoryStore, MODULE_LABELS, SEV_ORDER, type ScanHistoryEntry, type ScanSeverity } from '@/stores/scan-history';
   import { toastStore } from '@/stores/ui';

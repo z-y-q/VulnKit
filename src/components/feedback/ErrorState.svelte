@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 错误状态卡片 — 灵眸 v6.0
+  // 错误状态卡片
   // 对齐 docs/UX-UI优化建议.md §5.4：内联展示 ActionableError + 恢复动作，
   // 取代「错误只靠 Toast」。role="alert" 让读屏即时感知。
   import type { ActionableError } from '@/lib/errors/actionable-error';

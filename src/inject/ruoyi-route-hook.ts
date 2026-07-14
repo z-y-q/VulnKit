@@ -1,4 +1,4 @@
-// 灵眸 v6.0 - RuoYi Route Hook (document_start, MAIN world)
+// RuoYi Route Hook (document_start, MAIN world)
 // 拦截 fetch/XHR 捕获并增强 /getRouters 响应。
 // 捕获始终被动进行；`enabled` 仅控制增强与 API 日志记录。
 // 注意：此脚本由 background 通过 chrome.scripting.registerContentScripts 在

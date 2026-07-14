@@ -1,5 +1,5 @@
 /**
- * HaE 自定义规则持久化 — 灵眸 v6.0
+ * HaE 自定义规则持久化
  * 用户可在选项页用 YAML 编辑自定义 HaE 规则（对齐 v5 vk-hae-rules.js 的 YAML 管理）。
  * 自定义规则与默认规则合并后供 gather / leakscan 使用。
  */

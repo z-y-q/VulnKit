@@ -1,5 +1,5 @@
 /**
- * 统一任务状态机 — 灵眸 v6.0
+ * 统一任务状态机
  *
  * 对齐 docs/UX-UI优化建议.md §3.4 / §10.2。
  * createTaskController(adapter) 在既有 runConcurrent + sendMessage 之上加状态机语义层：

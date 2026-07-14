@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 安全头检测面板 — 灵眸 v6.0
+  // 安全头检测面板
   // 流程：自动填充 URL → FETCH_HEADER_PROBE → analyzeHeaders → 评分环 + 缺失/问题/签名
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';

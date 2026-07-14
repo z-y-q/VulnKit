@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Source Map 检测面板 — 灵眸 v6.0（增强版，对齐 v5 能力）
+  // Source Map 检测面板（增强版，对齐 v5 能力）
   // 检测构建工具 + JS Bundle → 抓取 → 解析 Source Map → 源码还原/查看/下载 + 内容安全扫描
   import { sendToContent, sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';

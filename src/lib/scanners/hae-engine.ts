@@ -1,5 +1,5 @@
 /**
- * HAE 规则引擎 — 灵眸 v6.0
+ * HAE 规则引擎
  * HaE (Highlight and Extract) 风格的正则匹配引擎，对齐 v5 vk-hae-rules.js。
  * 加载 hae-default-rules.json，对文本应用 f_regex + s_regex 二次过滤 + format 模板格式化。
  */

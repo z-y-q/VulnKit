@@ -1,5 +1,5 @@
 /**
- * 最近目标 URL — 灵眸 v6.0（对齐 docs/UX-UI优化建议.md §4.1 / §9.2）
+ * 最近目标 URL（对齐 docs/UX-UI优化建议.md §4.1 / §9.2）
  *
  * 扫描类面板启动扫描时 record(url, panel)，UrlInput focus 时显示候选下拉回填，
  * 避免每次切面板重新粘贴 URL。跨面板共享（扫描 a.com 后切 cors 仍可见候选）。

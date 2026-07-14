@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 任务中心气泡 — 灵眸 v6.0（对齐 docs/UX-UI优化建议.md §9.2）
+  // 任务中心气泡（对齐 docs/UX-UI优化建议.md §9.2）
   // 显示最近已结束任务（succeeded/partial/cancelled/failed），点击切到对应面板。
   // 务实范围：只聚合历史（架构限制，运行中任务随面板卸载中断，不做实时聚合）。
   import { taskCenterStore, type TaskRecord, type TaskRecordStatus } from '@/stores/task-center';

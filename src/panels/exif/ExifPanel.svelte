@@ -1,5 +1,5 @@
 <script lang="ts">
-  // EXIF 查看面板 — 灵眸 v6.0
+  // EXIF 查看面板
   // 支持本地文件 / URL / 页面图片三种模式
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTab, execInTab } from '@/lib/core/tabs';

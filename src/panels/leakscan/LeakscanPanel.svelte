@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 敏感信息泄露深度扫描面板 — 灵眸 v6.0
+  // 敏感信息泄露深度扫描面板
   // 采集当前页 DOM + localStorage + sessionStorage + 全局变量，用 90 条泄露规则引擎扫描。
   import { sendToContent, sendMessage } from '@/lib/core/messaging';
   import { getActiveTab, getActiveTabUrl, execInTab } from '@/lib/core/tabs';

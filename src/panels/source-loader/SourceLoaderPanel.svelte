@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 源码加载面板 — 灵眸 v6.0
+  // 源码加载面板
   // 获取页面 HTML 源码并展示，支持搜索/高亮/下载/外部资源提取
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';

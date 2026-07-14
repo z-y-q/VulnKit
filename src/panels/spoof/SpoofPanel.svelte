@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 请求伪造面板 — 灵眸 v6.0
+  // 请求伪造面板
   // UA 伪造 + 请求头伪造（X-Forwarded-For / Referer / Client-IP / 自定义）+ Cookie 管理
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl, getActiveTab } from '@/lib/core/tabs';

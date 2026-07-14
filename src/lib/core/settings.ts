@@ -1,5 +1,5 @@
 /**
- * 扫描参数设置 — 灵眸 v6.0
+ * 扫描参数设置
  *
  * 复用 browser.storage.local key `pentestSettings`（contextMenus 已用此 key 存
  * enableContextMenu）。此处扩展扫描相关参数：请求超时、并发数、每主机限流。

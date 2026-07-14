@@ -1,5 +1,5 @@
 <script lang="ts" generics="TItem">
-  // 导出菜单 — 灵眸 v6.0
+  // 导出菜单
   // 对齐 docs/UX-UI优化建议.md §6.1：统一「复制当前 / 导出 CSV|JSON|Markdown」，
   // 文件名规范 lingmou-{module}-{date}.{ext}，空结果禁用，复制/导出仅作用于传入的 items（当前筛选集）。
   import { copyText } from '@/lib/actions/clipboard';

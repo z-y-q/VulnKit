@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Popup — 灵眸 v6.0（阶段2重构：当前页状态 + 搜索 + 最近，对齐 §4.2）
+  // Popup（阶段2重构：当前页状态 + 搜索 + 最近，对齐 §4.2）
   // 纯 scoped CSS，不依赖 UnoCSS，确保 Chrome 扩展 popup 渲染正确。
   // 暗色 class 钩子已留，批次 2c 接入 shared.css 变量后即跟随主题。
   import { panelMeta, panelMatches } from '@/panels/registry';

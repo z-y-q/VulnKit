@@ -1,5 +1,5 @@
 /**
- * Sidebar 状态 — 灵眸 v6.0（对齐 docs/UX-UI优化建议.md §4.1.3）
+ * Sidebar 状态（对齐 docs/UX-UI优化建议.md §4.1.3）
  *
  * 仅持久化「分类折叠状态」。分类折叠此前存内存（重启丢失），现落盘 storage.local。
  *

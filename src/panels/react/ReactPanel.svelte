@@ -1,5 +1,5 @@
 <script lang="ts">
-  // React 分析面板 — 灵眸 v6.0
+  // React 分析面板
   // 检测 React 框架、分析路由/信号、探索 Redux/Zustand/Jotai/Recoil Store
   import { sendToContent } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';

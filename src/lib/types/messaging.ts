@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — 类型安全的消息协议
+// 类型安全的消息协议
 // 所有 background ↔ content ↔ UI 之间的消息在此统一声明为 discriminated union。
 
 // ====== Background 消息（UI/content → background）======

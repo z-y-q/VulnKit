@@ -1,5 +1,5 @@
 /**
- * XSS 检测引擎 — 灵眸 v6.0
+ * XSS 检测引擎
  * 从 vk-xss.js / vk-xss-verify.js / vk-xss-autofuzz.js 提取的纯分析逻辑
  * 不含 browser / fetch / DOM 操作；网络探测由调用方提供
  */

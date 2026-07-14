@@ -1,5 +1,5 @@
 /**
- * JWT 解析与漏洞检测 — 灵眸 v6.0
+ * JWT 解析与漏洞检测
  * 从 vk-jwt.js 提取的纯逻辑（解码 + 算法混淆检测 + 敏感 claim 分析）
  * 签名验证依赖 Web Crypto API（crypto.subtle）
  */

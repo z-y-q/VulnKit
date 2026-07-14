@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Wayback Machine 历史档案面板 — 灵眸 v6.0
+  // Wayback Machine 历史档案面板
   // 通过 CDX API 查询目标的 Web Archive 历史快照（URL/状态码/MIME/时间）。
   // 注意：这是新的"历史档案"面板，与本地扫描历史（HistoryPanel）不同。对齐 v5 vk-history.js。
   import { sendMessage } from '@/lib/core/messaging';

@@ -1,5 +1,5 @@
 /**
- * HTTP Security Headers 检测引擎 — 灵眸 v6.0
+ * HTTP Security Headers 检测引擎
  * 从 vk-headers.js / vk-headers-checkers.js / vk-headers-render.js 提取的纯分析逻辑
  * 纯函数：不含 browser、fetch、DOM、UI
  */

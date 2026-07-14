@@ -1,5 +1,5 @@
 /**
- * 面板布局偏好 — 灵眸 v6.0
+ * 面板布局偏好
  * 用户可在选项页拖拽排序 / 勾选显示隐藏面板（对齐 v5 工具栏配置）。
  * 持久化到 storage.local（key: panelLayout）。popup 与 sidebar 共同消费。
  */

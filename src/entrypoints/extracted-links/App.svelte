@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 提取链接结果页 — 灵眸 v6.0
+  // 提取链接结果页
   // 右键「提取链接」后在此全屏页展示：搜索 / 标签筛选 / 复制 / 导出
   import { themeStore, toastStore } from '@/stores/ui';
 

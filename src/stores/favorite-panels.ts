@@ -1,5 +1,5 @@
 /**
- * 收藏面板 — 灵眸 v6.0（对齐 docs/UX-UI优化建议.md §4.1 / §9.2）
+ * 收藏面板（对齐 docs/UX-UI优化建议.md §4.1 / §9.2）
  *
  * 用户显式收藏的面板 id 集合（无序）。Sidebar 顶部「收藏」区与面板项星标共同消费。
  * 模式复用 panel-layout.ts：writable + reload + storage.onChanged + 串行写队列。

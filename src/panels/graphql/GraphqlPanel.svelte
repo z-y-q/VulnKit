@@ -1,5 +1,5 @@
 <script lang="ts">
-  // GraphQL 安全检测面板 — 灵眸 v6.0
+  // GraphQL 安全检测面板
   // 流程：自动填充 URL → 常见路径探测 → 安全测试并发 → 引擎分析 → 排序渲染
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';

@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — Background Service Worker
+// Background Service Worker
 // 编排：消息分发 → fetchers / dnr / context-menus / ruoyi-hook
 // SSRF 防护统一在分发层用 url-guard 校验；消息来源统一由 sender-guard 校验。
 

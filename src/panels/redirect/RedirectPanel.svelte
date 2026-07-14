@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 开放重定向检测面板 — 灵眸 v6.0
+  // 开放重定向检测面板
   // 流程：构建 参数 × 协议变体 测试 URL → 不跟随重定向探测 → 引擎判定 → 渲染
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';

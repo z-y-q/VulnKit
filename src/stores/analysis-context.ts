@@ -1,5 +1,5 @@
 /**
- * 跨面板分析上下文 — 灵眸 v6.0（对齐 docs/UX-UI优化建议.md §6.3 / §9.2）
+ * 跨面板分析上下文（对齐 docs/UX-UI优化建议.md §6.3 / §9.2）
  *
  * 统一替代散落的 `lingmou:{multiurl,fuzz,source}-pending` 字符串 storage key。
  * 一个面板 handoff 到另一面板：写 context + 自动切到目标面板（可选）+ 来源横幅提示。

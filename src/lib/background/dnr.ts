@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — declarativeNetRequest 规则管理
+// declarativeNetRequest 规则管理
 // JS 阻断、UA 伪造、请求头伪造。状态持久化到 browser.storage.local。
 
 import type { SpoofHeaders } from '@/lib/types/messaging';

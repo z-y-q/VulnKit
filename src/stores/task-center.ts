@@ -1,5 +1,5 @@
 /**
- * 任务中心（历史聚合）— 灵眸 v6.0（对齐 docs/UX-UI优化建议.md §9.2 / §6.3）
+ * 任务中心（历史聚合）（对齐 docs/UX-UI优化建议.md §9.2 / §6.3）
  *
  * 聚合各面板 TaskController 的「已结束」任务（succeeded/partial/cancelled/failed），
  * 供 StatusBar 最近任务气泡展示与回跳。最近 20 条，持久化 storage.local。

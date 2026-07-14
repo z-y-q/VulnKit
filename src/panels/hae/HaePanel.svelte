@@ -1,5 +1,5 @@
 <script lang="ts">
-  // HAE 规则引擎面板 — 灵眸 v6.0
+  // HAE 规则引擎面板
   // HaE 风格正则匹配：对响应体/页面 HTML 应用规则组，提取敏感信息/指纹/凭证。
   import { getActiveTab, execInTab } from '@/lib/core/tabs';
   import { toastStore } from '@/stores/ui';

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // WAF 指纹检测面板 — 灵眸 v6.0
+  // WAF 指纹检测面板
   // 通过多路径探测 + 签名匹配识别目标 WAF 类型
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';

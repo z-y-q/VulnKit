@@ -1,5 +1,5 @@
 /**
- * Vue 攻击层注入脚本 — 灵眸 v6.0
+ * Vue 攻击层注入脚本
  * MAIN world 运行，操作 Vue Router 运行时：
  *   - bypass: 清空所有导航守卫 + 禁用路由 auth meta（备份可恢复）
  *   - disableAuth: 仅禁用路由 auth meta，不清空守卫（备份可恢复）

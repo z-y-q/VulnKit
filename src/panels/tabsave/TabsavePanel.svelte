@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 标签页保存面板 — 灵眸 v6.0
+  // 标签页保存面板
   // 收集当前窗口所有标签页 URL（过滤 chrome:/about:），去重，复制/导出。
   // 对齐 v5 vk-tabsave.js。
   import { toastStore } from '@/stores/ui';

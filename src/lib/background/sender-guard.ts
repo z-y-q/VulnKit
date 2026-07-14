@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — 消息来源校验
+// 消息来源校验
 // background.onMessage 的统一前置门控：只放行本扩展自身（页面或 content script）发出的消息，
 // 并按消息类型施加更细的来源策略（扩展页面 / content script / 任意可信来源）。
 //

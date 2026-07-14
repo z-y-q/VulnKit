@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Svelte/SvelteKit 检测面板 — 灵眸 v6.0
+  // Svelte/SvelteKit 检测面板
   import { sendToContent } from '@/lib/core/messaging';
   import { toastStore } from '@/stores/ui';
 

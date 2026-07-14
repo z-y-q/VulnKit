@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 图标识别面板 -- 灵眸 v6.0
+  // 图标识别面板
   // Fetch favicon, compute mmh3 hash (Shodan/FOFA format), show queries + product match.
 
   import { sendMessage } from '@/lib/core/messaging';

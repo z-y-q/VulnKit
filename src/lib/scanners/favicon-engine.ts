@@ -1,5 +1,5 @@
 /**
- * Favicon hash engine -- 灵眸 v6.0
+ * Favicon hash engine
  * Pure functions: MurmurHash3-32, favicon hash computation (Shodan/FOFA format),
  * query builders, and a known-favicon lookup table.
  * No network / DOM dependencies.

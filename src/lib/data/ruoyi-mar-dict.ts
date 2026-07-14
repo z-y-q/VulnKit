@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — RuoYi MaR 路由字典
+// RuoYi MaR 路由字典
 // 移植自 v5 vk-ruoyi-mar.js
 
 export interface MarRouteEntry {

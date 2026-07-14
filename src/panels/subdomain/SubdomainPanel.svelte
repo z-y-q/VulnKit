@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 子域名枚举面板 — 灵眸 v6.0
+  // 子域名枚举面板
   // 流程：自动填充 URL → 提取根域 → 词表生成 → DNS 并发解析 → 结果渲染
   import { sendMessage, sendToContent } from '@/lib/core/messaging';
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';

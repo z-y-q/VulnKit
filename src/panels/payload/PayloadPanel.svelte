@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Payload 参考库面板 — 灵眸 v6.0
+  // Payload 参考库面板
   // XSS / SQLi / LFI / 反弹Shell / Webshell / 命令参考
   import { toastStore } from '@/stores/ui';
   import payloadsData from '@/lib/data/payloads.json';

@@ -1,5 +1,5 @@
 /**
- * 剪贴板操作 — 灵眸 v6.0
+ * 剪贴板操作
  *
  * 统一各面板裸 `navigator.clipboard.writeText` 调用。
  * 对齐 docs/UX-UI优化建议.md §6.1：Promise 成功后才提示成功；

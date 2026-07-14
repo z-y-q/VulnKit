@@ -1,5 +1,5 @@
 /**
- * 确认对话框 store — 灵眸 v6.0（对齐 docs/UX-UI优化建议.md §4.3.7 / §8）
+ * 确认对话框 store（对齐 docs/UX-UI优化建议.md §4.3.7 / §8）
  *
  * Imperative API：`await confirmStore.ask({...})` 返回 Promise<boolean>。
  * 替代浏览器原生 confirm()，由 ConfirmDialog 组件渲染模态。Options 各危险操作调用。

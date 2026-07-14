@@ -1,5 +1,5 @@
 <script lang="ts">
-  // JS 控制面板 — 灵眸 v6.0
+  // JS 控制面板
   // 1. JS 启用/禁用（declarativeNetRequest）
   // 2. 反调试扫描 + 绕过（scripting MAIN world）
   // 3. 复制限制解除（scripting insertCSS + 事件拦截）

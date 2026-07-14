@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 链接提取面板 — 灵眸 v6.0
+  // 链接提取面板
   // 提取当前页面所有链接/图片/脚本/资源/框架/表单，分类、去重、筛选、复制、导出
   import { getActiveTab, execInTab } from '@/lib/core/tabs';
   import { toastStore, autoRunStore } from '@/stores/ui';

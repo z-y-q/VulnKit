@@ -1,5 +1,5 @@
 <script lang="ts">
-  // 设置页 — 灵眸 v6.0（阶段2重构：分区导航 + hash 路由 + 统一保存状态 + ConfirmDialog，对齐 §4.3）
+  // 设置页（阶段2重构：分区导航 + hash 路由 + 统一保存状态 + ConfirmDialog，对齐 §4.3）
   // 业务逻辑不变；布局改为左侧目录 + 右侧分区；10 处原生 confirm 改 confirmStore.ask。
   import { themeStore, toastStore } from '@/stores/ui';
   import { scanHistoryStore, MODULE_LABELS, type ScanHistoryEntry } from '@/stores/scan-history';

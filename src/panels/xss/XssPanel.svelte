@@ -1,5 +1,5 @@
 <script lang="ts">
-  // XSS 扫描面板 — 灵眸 v6.0（对齐 v5 完整能力）
+  // XSS 扫描面板（对齐 v5 完整能力）
   // 三大区块：① 反射扫描（参数×payload）② 注入点管理（采集/筛选/批量）③ DOM Sink 静态分析
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';

@@ -1,4 +1,4 @@
-// 灵眸 v6.0 — Webpack Phase1: MAIN world webpack runtime detection
+// Webpack Phase1: MAIN world webpack runtime detection
 // 忠实移植 v5 vk-sourcemap-phase1.js 的 PHASE1_MAIN_WORLD_FN
 // 通过 execInTab(tabId, PHASE1_MAIN_WORLD_FN, { world: 'MAIN' }) 直接注入执行
 // 结果直接 return（不走 postMessage / bridge 链路）

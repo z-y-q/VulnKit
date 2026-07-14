@@ -1,5 +1,5 @@
 /**
- * 加密/解密引擎 — 灵眸 v6.0
+ * 加密/解密引擎
  * 对齐 v5 vk-crypto.js 的全部算法：AES / DES / RC4 / SM2 / SM4 / RSA / Hash+HMAC
  * - 对称/流密码/哈希：crypto-js
  * - 国密 SM2/SM4：sm-crypto

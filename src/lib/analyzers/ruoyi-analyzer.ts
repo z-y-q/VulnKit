@@ -1,5 +1,5 @@
 /**
- * RuoYi 分析引擎 — 灵眸 v6.0
+ * RuoYi 分析引擎
  * 从 vk-ruoyi-detect.js / vk-ruoyi-mar.js / vk-ruoyi.js 提取的纯分析逻辑
  * 职责：CVE 匹配、路由分类、事件聚合
  */

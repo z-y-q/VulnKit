@@ -1,5 +1,5 @@
 /**
- * 统一报告引擎 — 灵眸 v6.0
+ * 统一报告引擎
  * 纯函数：聚合 / 排序 / 导出（CSV / JSON / Markdown）
  * 不含 UI 逻辑，不依赖 Svelte store
  */
