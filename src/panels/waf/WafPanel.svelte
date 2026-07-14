@@ -7,6 +7,8 @@
   import type { ProbeResult } from '@/lib/types/messaging';
   import wafSignaturesJson from '@/lib/data/waf-signatures.json';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
+  import { confirmStore } from '@/stores/confirm';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
 
   // —— 类型 ——
   interface WafPattern {
@@ -195,7 +197,13 @@
       return;
     }
 
-    if (!confirm('WAF 扫描将向目标发送攻击载荷（SQL注入/XSS/路径穿越等），是否继续？')) {
+    const confirmed = await confirmStore.ask({
+      title: 'WAF 指纹检测',
+      message: 'WAF 扫描将向目标发送攻击载荷（SQL注入/XSS/路径穿越等），是否继续？',
+      confirmLabel: '开始扫描',
+      variant: 'danger',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -288,69 +296,37 @@
 
   // —— 复制 / 导出 ——
 
-  function copyResults() {
-    if (detections.length === 0) {
-      toastStore.show('没有可复制的结果', 'warning');
-      return;
-    }
-    const text = detections
-      .map((d) => {
-        const lines = [`${d.name} [${d.severity}] 置信度: ${d.confidence}`];
-        for (const e of d.evidence) {
-          lines.push(`  [${e.type}] ${e.value}`);
-        }
-        return lines.join('\n');
-      })
-      .join('\n\n');
-    navigator.clipboard.writeText(text).then(() => {
-      toastStore.show('已复制 WAF 检测结果', 'success');
-    });
-  }
-
-  function copyMarkdown() {
-    if (detections.length === 0) {
-      toastStore.show('没有可复制的结果', 'warning');
-      return;
-    }
-    const rows = detections.map((d) => [
-      d.name,
-      d.severity,
-      d.confidence,
-      d.evidence.map((e) => e.value).join('; '),
-    ]);
-    const header = '| Name | Severity | Confidence | Evidence |';
-    const sep = '|------|----------|------------|----------|';
-    const body = rows.map((r) => `| ${r[0]} | ${r[1]} | ${r[2]} | ${r[3]} |`).join('\n');
-    const md = `# WAF Detection Results\n\n${header}\n${sep}\n${body}\n`;
-    navigator.clipboard.writeText(md).then(() => {
-      toastStore.show('已复制 Markdown', 'success');
-    });
-  }
-
-  function exportJson() {
-    if (detections.length === 0) {
-      toastStore.show('没有可导出的结果', 'warning');
-      return;
-    }
+  // —— 导出/复制序列化器（统一走 ExportMenu；修原 navigator.clipboard 未 await）——
+  function wafJson(items: WafDetection[]): string {
     const report = {
       timestamp: new Date().toISOString(),
       target: probeDomain,
       probeCount,
-      detections: detections.map((d) => ({
+      detections: items.map((d) => ({
         name: d.name,
         severity: d.severity,
         confidence: d.confidence,
         evidence: d.evidence,
       })),
     };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `waf-report-${Date.now()}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toastStore.show('报告已导出', 'success');
+    return JSON.stringify(report, null, 2);
+  }
+  function wafMd(items: WafDetection[]): string {
+    const header = '| Name | Severity | Confidence | Evidence |';
+    const sep = '|------|----------|------------|----------|';
+    const body = items
+      .map((d) => `| ${d.name} | ${d.severity} | ${d.confidence} | ${d.evidence.map((e) => e.value).join('; ')} |`)
+      .join('\n');
+    return `# WAF Detection Results\n\n${header}\n${sep}\n${body}\n`;
+  }
+  function wafText(items: WafDetection[]): string {
+    return items
+      .map((d) => {
+        const lines = [`${d.name} [${d.severity}] 置信度: ${d.confidence}`];
+        for (const e of d.evidence) lines.push(`  [${e.type}] ${e.value}`);
+        return lines.join('\n');
+      })
+      .join('\n\n');
   }
 
   // —— 辅助 ——
@@ -487,12 +463,8 @@
     </div>
   {/if}
 
-  <!-- 操作按钮 -->
+  <!-- 导出菜单（复制文本/MD + 导出 JSON） -->
   {#if !scanning && detections.length > 0}
-    <div class="flex gap-1">
-      <button class="btn btn-sm flex-1" onclick={copyResults}>复制文本</button>
-      <button class="btn btn-sm flex-1" onclick={copyMarkdown}>复制 Markdown</button>
-      <button class="btn btn-sm flex-1" onclick={exportJson}>导出 JSON</button>
-    </div>
+    <ExportMenu items={detections} module="waf" serializers={{ json: wafJson, markdown: wafMd, text: wafText }} />
   {/if}
 </div>

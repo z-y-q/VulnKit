@@ -21,6 +21,7 @@
   import { scanSettingsStore } from '@/stores/settings';
   import { activePanelStore } from '@/stores/ui';
   import { sniffBadgeStore } from '@/stores/sniff-badge';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
 
   /** 框架名 → 对应分析面板 id（用于一键跳转）*/
   const FRAMEWORK_PANEL: Record<string, string> = {
@@ -246,57 +247,38 @@
     expandedName = expandedName === name ? null : name;
   }
 
-  function copyResults() {
-    if (results.length === 0) {
-      toastStore.show('没有可复制的结果', 'warning');
-      return;
-    }
-    const lines = results.map(r => `${r.name}${r.version ? ' v' + r.version : ''} [${r.category}] 置信${r.confidence}(${CONFIDENCE_LABELS[r.confidenceLevel]}) (${r.matchedCount} 匹配)`);
-    navigator.clipboard.writeText(lines.join('\n'));
-    toastStore.show(`已复制 ${lines.length} 项技术指纹`, 'success');
-  }
-
-  function copyMarkdown() {
-    if (results.length === 0) {
-      toastStore.show('没有可复制的结果', 'warning');
-      return;
-    }
-    const lines = [`# 网站技术指纹嗅探`, ``, `**目标:** ${targetUrl}`, ``, `## 识别技术 (${results.length})`];
-    for (const g of groupedResults) {
-      lines.push(``, `### ${g.label} (${g.items.length})`);
-      for (const r of g.items) {
-        lines.push(`- **${r.name}**${r.version ? ` v${r.version}` : ''} — 置信 ${r.confidence}/100 (${CONFIDENCE_LABELS[r.confidenceLevel]})`);
-      }
-    }
-    navigator.clipboard.writeText(lines.join('\n'));
-    toastStore.show('Markdown 已复制', 'success');
-  }
-
-  function exportResults() {
-    if (results.length === 0) {
-      toastStore.show('没有可导出的结果', 'warning');
-      return;
-    }
-    const exportData = results.map(r => ({
-      name: r.name,
-      category: r.category,
-      version: r.version || null,
-      confidence: r.confidence,
-      confidenceLevel: r.confidenceLevel,
-      matchCount: r.matchedCount,
-      evidences: r.evidences.map(e => ({
-        source: e.source,
-        evidence: typeof e.evidence === 'string' ? e.evidence.substring(0, 200) : null,
+  // —— 导出/复制序列化器（统一走 ExportMenu；修原 navigator.clipboard 未 await）——
+  function sniffJson(items: SniffMatch[]): string {
+    return JSON.stringify(
+      items.map((r) => ({
+        name: r.name,
+        category: r.category,
+        version: r.version || null,
+        confidence: r.confidence,
+        confidenceLevel: r.confidenceLevel,
+        matchCount: r.matchedCount,
+        evidences: r.evidences.map((e) => ({
+          source: e.source,
+          evidence: typeof e.evidence === 'string' ? e.evidence.substring(0, 200) : null,
+        })),
       })),
-    }));
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sniff-results-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toastStore.show('已导出 JSON', 'success');
+      null,
+      2,
+    );
+  }
+  function sniffMd(items: SniffMatch[]): string {
+    const lines = [`# 网站技术指纹嗅探`, ``, `**目标:** ${targetUrl}`, ``, `## 识别技术 (${items.length})`];
+    for (const r of items) {
+      lines.push(
+        `- **${r.name}**${r.version ? ` v${r.version}` : ''} [${r.category}] — 置信 ${r.confidence}/100 (${CONFIDENCE_LABELS[r.confidenceLevel]})`,
+      );
+    }
+    return lines.join('\n');
+  }
+  function sniffText(items: SniffMatch[]): string {
+    return items
+      .map((r) => `${r.name}${r.version ? ' v' + r.version : ''} [${r.category}] 置信${r.confidence}(${CONFIDENCE_LABELS[r.confidenceLevel]}) (${r.matchedCount} 匹配)`)
+      .join('\n');
   }
 </script>
 
@@ -321,10 +303,8 @@
         <span>识别 <strong class="text-primary">{techCount}</strong> 项技术</span>
         <span class="text-gray-300 dark:text-gray-600">|</span>
         <span>涵盖 <strong class="text-primary">{catCount}</strong> 个分类</span>
-        <div class="ml-auto flex gap-1">
-          <button class="btn btn-sm" onclick={copyResults}>复制</button>
-          <button class="btn btn-sm" onclick={copyMarkdown}>MD</button>
-          <button class="btn btn-sm" onclick={exportResults}>导出</button>
+        <div class="ml-auto">
+          <ExportMenu items={results} module="sniff" serializers={{ json: sniffJson, markdown: sniffMd, text: sniffText }} />
         </div>
       </div>
     </div>
