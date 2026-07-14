@@ -16,6 +16,8 @@
   import ResultToolbar from '@/components/results/ResultToolbar.svelte';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
   import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
+  import DetailDrawer from '@/components/results/DetailDrawer.svelte';
+  import type { DetailField, DetailHandoffAction } from '@/components/results/detail-drawer-utils';
   import { downloadText, buildFilename } from '@/lib/actions/download';
   import { toCsv } from '@/lib/actions/serializers';
   import type { ProbeResult } from '@/lib/types/messaging';
@@ -121,6 +123,29 @@
 
   let vulnCount = $derived(findings.filter((f) => f.reflected && !f.sanitized).length);
   let reflectedCount = $derived(findings.filter((f) => f.reflected).length);
+
+  // ===== 详情抽屉（结果集变化时关闭，避免索引错位）=====
+  let detailIndex = $state<number | null>(null);
+  $effect(() => {
+    void filteredFindings;
+    detailIndex = null;
+  });
+  function xssFields(f: XssFinding): DetailField[] {
+    return [
+      { label: '参数', value: f.param, mono: true },
+      { label: '上下文', value: CTX_LABELS[f.context] ?? f.context },
+      { label: '严重度', value: f.severity },
+      { label: '反射', value: f.reflected ? '是' : '否' },
+      { label: '已净化', value: f.sanitized ? '是' : '否' },
+    ];
+  }
+  function xssEvidence(f: XssFinding): string {
+    return `Payload:\n${f.payload}${f.evidence ? `\n\n证据:\n${f.evidence}` : ''}`;
+  }
+  const xssDetailActions: DetailHandoffAction<XssFinding>[] = [
+    { label: '在 Fuzz 中探测', targetPanel: 'fuzz', build: () => ({ payload: { targetUrl }, summary: 'XSS 目标' }) },
+    { label: '在 安全头 中检测', targetPanel: 'headers', build: () => ({ payload: { targetUrl }, summary: 'XSS 目标' }) },
+  ];
 
   // ===== 派生：注入点视图 =====
   let filteredPoints = $derived.by(() => {
@@ -1004,8 +1029,15 @@ ${cards}
   <!-- 结果 -->
   {#if filteredFindings.length > 0}
     <div class="space-y-1.5">
-      {#each filteredFindings as f (f.param + f.payload + f.context)}
-        <div class="card p-2.5 space-y-1">
+      {#each filteredFindings as f, i (f.param + f.payload + f.context)}
+        <div
+          class="card p-2.5 space-y-1 cursor-pointer hover:border-primary transition-colors"
+          role="button"
+          tabindex="0"
+          aria-label="查看 XSS 详情"
+          onclick={() => (detailIndex = i)}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); detailIndex = i; } }}
+        >
           <div class="flex items-center gap-2 flex-wrap">
             <SeverityBadge severity={f.severity} />
             <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{f.param}</span>
@@ -1078,6 +1110,23 @@ ${cards}
       <div class="text-xs text-gray-400 text-center py-4">点击「分析 DOM 汇点」检测 DOM XSS 危险 sink</div>
     {/if}
   </div>
+
+  <!-- 详情抽屉 -->
+  <DetailDrawer
+    items={filteredFindings}
+    index={detailIndex}
+    onclose={() => (detailIndex = null)}
+    onnavigate={(idx) => (detailIndex = idx)}
+    sourcePanel="xss"
+    sourceLabel="XSS 检测"
+    moduleLabel="XSS"
+    target={() => targetUrl}
+    title={(f) => `XSS [${f.param}]`}
+    severity={(f) => f.severity}
+    fields={xssFields}
+    evidence={xssEvidence}
+    actions={xssDetailActions}
+  />
 
   {#if !scanning && findings.length === 0 && scanned === 0 && sinks.length === 0}
     <div class="text-center text-gray-400 text-sm py-4">

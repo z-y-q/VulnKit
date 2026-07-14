@@ -1,10 +1,12 @@
 <script lang="ts">
   // 统一报告面板
   // 从 scan-history store 读取扫描记录，聚合展示 + 多格式导出
-  import { scanHistoryStore, type ScanHistoryEntry, type ScanSeverity } from '@/stores/scan-history';
+  import { scanHistoryStore, type ScanHistoryEntry, type ScanFinding, type ScanSeverity } from '@/stores/scan-history';
   import { toastStore } from '@/stores/ui';
   import { confirmStore } from '@/stores/confirm';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import DetailDrawer from '@/components/results/DetailDrawer.svelte';
+  import type { DetailField } from '@/components/results/detail-drawer-utils';
   import {
     aggregateByModule,
     extractDomains,
@@ -106,6 +108,24 @@
   // —— 严重程度 badge 列表 ——
 
   const SEV_KEYS: ScanSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
+
+  // ===== 详情抽屉（按模块分组点击进入；items 为当前组的 findings）=====
+  let detailFindings = $state<ScanFinding[]>([]);
+  let detailIndex = $state<number | null>(null);
+  let detailModule = $state('');
+  function openDetail(group: ModuleGroup, idx: number) {
+    detailFindings = group.findings;
+    detailModule = group.label;
+    detailIndex = idx;
+  }
+  function reportFields(f: ScanFinding): DetailField[] {
+    const fields: DetailField[] = [{ label: '严重度', value: severityLabel(f.severity) }];
+    if (f.url) fields.push({ label: 'URL', value: f.url, mono: true });
+    return fields;
+  }
+  function reportEvidence(f: ScanFinding): string {
+    return [f.detail, f.evidence].filter(Boolean).join('\n');
+  }
 </script>
 
 <div class="space-y-3">
@@ -181,8 +201,15 @@
           <span class="badge text-xs">{group.findings.length}</span>
         </div>
         <div class="space-y-1">
-          {#each group.findings as f (f.title + f.severity + (f.url || ''))}
-            <div class="p-2 rounded bg-gray-50 dark:bg-gray-800/50 space-y-1">
+          {#each group.findings as f, i (f.title + f.severity + (f.url || ''))}
+            <div
+              class="p-2 rounded bg-gray-50 dark:bg-gray-800/50 space-y-1 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              role="button"
+              tabindex="0"
+              aria-label="查看发现详情"
+              onclick={() => openDetail(group, i)}
+              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(group, i); } }}
+            >
               <div class="flex items-center gap-2">
                 <span class="badge text-xs {severityBadgeClass(f.severity)}">{severityLabel(f.severity)}</span>
                 <span class="text-xs font-medium">{f.title}</span>
@@ -203,4 +230,20 @@
       当前筛选条件下无结果
     </div>
   {/if}
+
+  <!-- 详情抽屉 -->
+  <DetailDrawer
+    items={detailFindings}
+    index={detailIndex}
+    onclose={() => (detailIndex = null)}
+    onnavigate={(idx) => (detailIndex = idx)}
+    sourcePanel="report"
+    sourceLabel="统一报告"
+    moduleLabel={detailModule}
+    title={(f) => f.title}
+    severity={(f) => f.severity}
+    target={(f) => f.url || ''}
+    fields={reportFields}
+    evidence={reportEvidence}
+  />
 </div>
