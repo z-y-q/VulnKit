@@ -11,7 +11,10 @@
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
-  import FilterBar from '@/components/scanner/FilterBar.svelte';
+  import ResultToolbar from '@/components/results/ResultToolbar.svelte';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { toCsv, toMarkdownTable } from '@/lib/actions/serializers';
+  import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
   import type { ProbeResult } from '@/lib/types/messaging';
   import {
     buildTestUrls,
@@ -27,7 +30,7 @@
   let total = $state(0);
   let cancelled = $state(false);
   let results = $state<RedirectResult[]>([]);
-  let filter = $state<'all' | 'vuln'>('all');
+  let query = $state<ResultQuery>({ search: '', filters: {}, sort: { key: 'vuln', direction: 'asc' } });
 
   $effect(() => {
     getActiveTabUrl().then(u => {
@@ -45,8 +48,32 @@
     }
   });
 
-  let filtered = $derived(filter === 'vuln' ? results.filter(r => r.status === 'vulnerable') : results);
-  let vulnCount = $derived(results.filter(r => r.status === 'vulnerable').length);
+  // ===== 派生：结果（统一 ResultAdapter，供 ResultToolbar/ExportMenu 消费）=====
+  const redirectAdapter: ResultAdapter<RedirectResult> = {
+    apply(items, q) {
+      let list = items;
+      if (q.filters.scope?.includes('vuln')) list = list.filter((r) => r.status === 'vulnerable');
+      const kw = q.search.trim().toLowerCase();
+      if (kw) list = list.filter((r) => redirectAdapter.getSearchText(r).toLowerCase().includes(kw));
+      return [...list].sort((a, b) => {
+        if (a.status !== b.status) return a.status === 'vulnerable' ? -1 : 1;
+        return a.param.localeCompare(b.param);
+      });
+    },
+    getSearchText(r) {
+      return `${r.param} ${r.variant} ${r.url} ${r.status}`;
+    },
+    getId(r) {
+      return r.url;
+    },
+  };
+
+  let filtered = $derived(redirectAdapter.apply(results, query));
+  let vulnOnly = $derived(query.filters.scope?.includes('vuln') ?? false);
+  function toggleVuln() {
+    query.filters = vulnOnly ? {} : { scope: ['vuln'] };
+  }
+  let vulnCount = $derived(results.filter((r) => r.status === 'vulnerable').length);
 
   function mapToFindings(results: RedirectResult[]): ScanFinding[] {
     return results
@@ -141,40 +168,23 @@
 
   function cancel() { cancelled = true; }
 
-  function download(filename: string, content: string, mime: string) {
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // —— 导出/复制序列化器（作用于当前筛选 filtered，展示/导出同源 §6.1）——
+  function redirectCsv(items: RedirectResult[]): string {
+    return toCsv([
+      ['param', 'variant', 'url', 'status', 'statusCode'],
+      ...items.map((r) => [r.param, r.variant, r.url, r.status, r.statusCode]),
+    ]);
   }
-
-  function exportCsv() {
-    if (!results.length) { toastStore.show('无结果', 'warning'); return; }
-    const rows = ['param,variant,url,status,statusCode', ...results.map(r =>
-      `"${r.param}","${r.variant}","${r.url}","${r.status}","${r.statusCode}"`)];
-    download(`redirect-${Date.now()}.csv`, '﻿' + rows.join('\n'), 'text/csv;charset=utf-8');
-    toastStore.show('CSV 已导出', 'success');
+  function redirectText(items: RedirectResult[]): string {
+    return items
+      .map((r) => `[${r.status}] ${r.param} (${r.variant}) [${r.statusCode}]\n  ${r.url}`)
+      .join('\n\n');
   }
-
-  function exportTxt() {
-    if (!results.length) { toastStore.show('无结果', 'warning'); return; }
-    const txt = results.map(r => `[${r.status}] ${r.param} (${r.variant}) [${r.statusCode}]\n  ${r.url}`).join('\n\n');
-    download(`redirect-${Date.now()}.txt`, txt, 'text/plain;charset=utf-8');
-    toastStore.show('TXT 已导出', 'success');
-  }
-
-  function copyMarkdown() {
-    if (!results.length) { toastStore.show('无结果', 'warning'); return; }
-    const md = ['| 参数 | 协议变体 | 状态 | 状态码 | URL |', '|------|---------|------|-------|-----|',
-      ...results.map(r => `| ${r.param} | ${r.variant} | ${r.status} | ${r.statusCode} | ${r.url} |`)].join('\n');
-    navigator.clipboard.writeText(md).then(() => toastStore.show('Markdown 已复制', 'success'));
-  }
-
-  function copyResults() {
-    if (!results.length) { toastStore.show('无结果', 'warning'); return; }
-    const txt = results.map(r => `[${r.status}] ${r.param} (${r.variant}) [${r.statusCode}]\n  ${r.url}`).join('\n\n');
-    navigator.clipboard.writeText(txt).then(() => toastStore.show('已复制纯文本', 'success'));
+  function redirectMd(items: RedirectResult[]): string {
+    return toMarkdownTable(
+      ['参数', '协议变体', '状态', '状态码', 'URL'],
+      items.map((r) => [r.param, r.variant, r.status, r.statusCode, r.url]),
+    );
   }
 </script>
 
@@ -193,21 +203,18 @@
     <ScanProgress {scanned} {total} {scanning} label="重定向检测" />
   </div>
 
-  <!-- 统计 -->
+  <!-- 工具栏：ResultToolbar 包裹 漏洞筛选 / 导出 -->
   {#if results.length > 0}
-    <FilterBar
-      active={filter}
-      options={[
-        { key: 'all', label: '全部', count: results.length, color: 'bg-primary text-white' },
-        { key: 'vuln', label: '漏洞', count: vulnCount, color: 'bg-red-500 text-white' },
-      ]}
-      onchange={(k) => (filter = k as 'all' | 'vuln')}
-    >
-      <button class="btn btn-xs" onclick={copyResults}>复制</button>
-      <button class="btn btn-xs" onclick={exportCsv}>CSV</button>
-      <button class="btn btn-xs" onclick={exportTxt}>TXT</button>
-      <button class="btn btn-xs" onclick={copyMarkdown}>MD</button>
-    </FilterBar>
+    <ResultToolbar {query} total={results.length} shown={filtered.length} searchPlaceholder="搜索参数/URL...">
+      <button
+        class="badge cursor-pointer {vulnOnly ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
+        aria-pressed={vulnOnly}
+        onclick={toggleVuln}
+      >
+        漏洞 {vulnCount}
+      </button>
+      <ExportMenu items={filtered} module="redirect" serializers={{ csv: redirectCsv, text: redirectText, markdown: redirectMd }} />
+    </ResultToolbar>
   {/if}
 
   <!-- 结果 -->

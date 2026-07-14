@@ -10,6 +10,7 @@
   import EmptyState from '@/components/scanner/EmptyState.svelte';
   import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
   import FilterBar from '@/components/scanner/FilterBar.svelte';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
 
   let targetUrl = $state('');
   let scanning = $state(false);
@@ -129,36 +130,24 @@
     }));
   }
 
-  function copyAll() {
-    if (!findings.length) return;
-    const text = findings.map(f => `[${f.severity}] ${f.rule} (${f.confidence})\n  值: ${f.value}\n  ${f.description || ''}`).join('\n\n');
-    navigator.clipboard.writeText(text);
-    toastStore.show('已复制泄露报告', 'success');
+  // —— 导出/复制序列化器（作用于当前筛选 filtered，统一走 ExportMenu；修原 navigator.clipboard 未 await）——
+  function leakJson(items: LeakFinding[]): string {
+    return JSON.stringify(items, null, 2);
   }
-
-  function copyMarkdown() {
-    if (!findings.length) return;
-    const lines = [`# 敏感信息泄露扫描`, ``, `**目标:** ${targetUrl}`, ``, `## 发现 (${findings.length})`];
-    for (const f of findings) {
+  function leakMd(items: LeakFinding[]): string {
+    const lines = [`# 敏感信息泄露扫描`, ``, `**目标:** ${targetUrl}`, ``, `## 发现 (${items.length})`];
+    for (const f of items) {
       lines.push(`- **[${f.severity.toUpperCase()}] ${f.rule}** (${f.category}, ${f.confidence})`);
       lines.push(`  - 值: \`${f.value}\``);
       if (f.description) lines.push(`  - ${f.description}`);
       if (f.exploit) lines.push(`  - ⚡ ${f.exploit}`);
     }
-    navigator.clipboard.writeText(lines.join('\n'));
-    toastStore.show('Markdown 已复制', 'success');
+    return lines.join('\n');
   }
-
-  function exportResults() {
-    if (!findings.length) return;
-    const blob = new Blob([JSON.stringify(findings, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `leakscan-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toastStore.show('已导出 JSON', 'success');
+  function leakText(items: LeakFinding[]): string {
+    return items
+      .map((f) => `[${f.severity}] ${f.rule} (${f.confidence})\n  值: ${f.value}\n  ${f.description || ''}`)
+      .join('\n\n');
   }
 </script>
 
@@ -189,9 +178,7 @@
       ]}
       onchange={(k) => (filter = k as 'all' | LeakSeverity)}
     >
-      <button class="btn btn-sm" onclick={copyAll}>复制</button>
-      <button class="btn btn-sm" onclick={copyMarkdown}>MD</button>
-      <button class="btn btn-sm" onclick={exportResults}>导出</button>
+      <ExportMenu items={filtered} module="leakscan" serializers={{ json: leakJson, markdown: leakMd, text: leakText }} />
     </FilterBar>
     <div class="text-xs text-gray-400 px-1">
       来源大小：DOM {(sources.dom / 1024).toFixed(1)}KB · 存储 {(sources.storage / 1024).toFixed(1)}KB · JS {(sources.js / 1024).toFixed(1)}KB
