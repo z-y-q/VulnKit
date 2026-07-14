@@ -13,6 +13,8 @@
   import { scanSettingsStore } from '@/stores/settings';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { runConcurrent } from '@/lib/core/concurrency';
+  import { copyText } from '@/lib/actions/clipboard';
+  import { downloadText, buildFilename } from '@/lib/actions/download';
   import {
     extractScriptUrls,
     extractInlineSourceMapHints,
@@ -580,13 +582,7 @@
       ]);
     }
     const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = 'sourcemap-results.csv';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadText(csv, buildFilename('sourcemap-results', 'csv'), 'text/csv');
     toastStore.show(`已导出 ${filteredResults.length} 条`, 'success');
   }
 
@@ -596,13 +592,7 @@
       return;
     }
     const json = JSON.stringify(allEndpoints, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const a = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = 'sourcemap-endpoints.json';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadText(json, buildFilename('sourcemap-endpoints', 'json'), 'application/json;charset=utf-8');
     toastStore.show(`已导出 ${allEndpoints.length} 个端点`, 'success');
   }
 
@@ -712,9 +702,7 @@
       return lines;
     }
     const text = render(tree, '').join('\n');
-    navigator.clipboard.writeText(text).then(() => {
-      toastStore.show(`目录树已复制（${paths.length} 个文件）`, 'success');
-    });
+    void copyText(text, `目录树已复制（${paths.length} 个文件）`);
   }
 
   /** 导出全部模块 JSON（对齐 v5 exportModulesJSON） */

@@ -12,6 +12,9 @@
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
+  import { copyText as clipboardCopy } from '@/lib/actions/clipboard';
+  import { downloadText, buildFilename } from '@/lib/actions/download';
+  import { toCsv } from '@/lib/actions/serializers';
   import type { ProbeResult } from '@/lib/types/messaging';
   import {
     buildPayloadsForContext,
@@ -627,19 +630,18 @@
   function clearSinks() { sinks = []; }
 
   // ===== 单条复制 =====
-  function copyFinding(f: XssFinding) {
+  async function copyFinding(f: XssFinding) {
     const text = [
       `Param: ${f.param}`, `Payload: ${f.payload}`,
       `Context: ${CTX_LABELS[f.context] ?? f.context}`, `Severity: ${severityLabel(f.severity)}`,
       `Reflected: ${f.reflected}`, `Sanitized: ${f.sanitized}`,
       f.evidence ? `Evidence: ${f.evidence}` : '',
     ].filter(Boolean).join('\n');
-    navigator.clipboard.writeText(text);
-    toastStore.show('已复制到剪贴板', 'success');
+    await clipboardCopy(text, '已复制到剪贴板');
   }
 
-  function copyText(text: string, msg = '已复制') {
-    navigator.clipboard.writeText(text).then(() => toastStore.show(msg, 'success'));
+  async function copyText(text: string, msg = '已复制') {
+    await clipboardCopy(text, msg);
   }
 
   // ===== 批量导出 =====
@@ -653,21 +655,19 @@
 
   function exportPointsCsv() {
     if (points.length === 0) { toastStore.show('无注入点', 'warning'); return; }
-    const rows = [['Source', 'URL', 'Param', 'Method']];
+    const rows: string[][] = [['Source', 'URL', 'Param', 'Method']];
     for (const p of points) rows.push([p.source, p.url, p.param, p.method]);
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    downloadBlob(csv, `lingmou-xss-points-${Date.now()}.csv`, 'text/csv');
+    downloadText(toCsv(rows), buildFilename('xss-points', 'csv'), 'text/csv');
     toastStore.show('注入点 CSV 已导出', 'success');
   }
 
   function exportFindingsCsv() {
     if (findings.length === 0) { toastStore.show('无扫描结果', 'warning'); return; }
-    const rows = [['Severity', 'Param', 'Method', 'URL', 'Payload', 'Context', 'Reflected', 'Sanitized']];
+    const rows: string[][] = [['Severity', 'Param', 'Method', 'URL', 'Payload', 'Context', 'Reflected', 'Sanitized']];
     for (const f of findings) {
       rows.push([f.severity, f.param, '', targetUrl, f.payload, f.context, String(f.reflected), String(f.sanitized)]);
     }
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    downloadBlob(csv, `lingmou-xss-autofuzz-${Date.now()}.csv`, 'text/csv');
+    downloadText(toCsv(rows), buildFilename('xss-findings', 'csv'), 'text/csv');
     toastStore.show('结果 CSV 已导出', 'success');
   }
 

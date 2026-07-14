@@ -1,24 +1,17 @@
 <script lang="ts">
-  // URL多开面板 — 灵眸 v6.0
-  // 粘贴多个 URL，批量在新标签页中打开
+  // URL多开面板 — 灵眸 v7.3
+  // 粘贴多个 URL，批量在新标签页中打开。
+  // v7.3：统一 TaskController（逐项成功/失败统计 + 可取消）+ ConfirmDialog（替代原生 confirm）
+  //      + ExportMenu/copyText（规范文件名 + 修复未 await）。
+  import { confirmStore } from '@/stores/confirm';
   import { toastStore } from '@/stores/ui';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
 
   let rawText = $state('');
   let delay = $state(0);
-  let maxUrls = 50;
-  let opening = $state(false);
-  let openedCount = $state(0);
-
-  // 启动时检查是否有从其他面板发送过来的 URL
-  $effect(() => {
-    browser.storage.local.get('lingmou:multiurl-pending').then(result => {
-      const pending = result['lingmou:multiurl-pending'] as string | undefined;
-      if (pending) {
-        rawText = pending;
-        browser.storage.local.remove('lingmou:multiurl-pending');
-      }
-    }).catch(() => { /* ignore */ });
-  });
+  const maxUrls = 50;
 
   let urls = $derived.by(() => {
     return rawText
@@ -32,41 +25,87 @@
       .filter((u): u is string => u !== null);
   });
 
-  let uniqueUrls = $derived.by(() => {
-    return [...new Set(urls)];
-  });
-
+  let uniqueUrls = $derived.by(() => [...new Set(urls)]);
   let duplicateCount = $derived(urls.length - uniqueUrls.length);
 
-  function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  // —— TaskController 接管批量打开（逐项成败 + 可取消）——
+  const controller = createTaskController<{ urls: string[]; delay: number }, { ok: number; fail: number }>({
+    validate: (input) => {
+      if (input.urls.length === 0) throw new Error('请输入 URL');
+      if (input.urls.length > maxUrls) throw new Error(`一次最多打开 ${maxUrls} 个标签页`);
+    },
+    run: async (input, ctx) => {
+      ctx.reportProgress({ total: input.urls.length, completed: 0, succeeded: 0, failed: 0, phase: '批量打开' });
+      let ok = 0;
+      let fail = 0;
+      for (const url of input.urls) {
+        if (ctx.signal.aborted) break;
+        try {
+          await browser.tabs.create({ url, active: false });
+          ok++;
+        } catch {
+          fail++;
+        }
+        ctx.reportProgress({
+          completed: ok + fail,
+          succeeded: ok,
+          failed: fail,
+          phase: `打开中 (${ok + fail}/${input.urls.length})`,
+        });
+        if (input.delay > 0 && !ctx.signal.aborted) await sleep(input.delay, ctx.signal);
+      }
+      return { ok, fail };
+    },
+  });
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let opening = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+
+  /** 可取消的 sleep：每 100ms 检查 signal，避免取消后仍等满 delay */
+  async function sleep(ms: number, signal: AbortSignal): Promise<void> {
+    const start = Date.now();
+    while (Date.now() - start < ms) {
+      if (signal.aborted) return;
+      await new Promise<void>((r) => setTimeout(r, Math.min(100, ms - (Date.now() - start))));
+    }
   }
 
+  // 启动时检查是否有从其他面板发送过来的 URL
+  $effect(() => {
+    browser.storage.local.get('lingmou:multiurl-pending').then(result => {
+      const pending = result['lingmou:multiurl-pending'] as string | undefined;
+      if (pending) {
+        rawText = pending;
+        browser.storage.local.remove('lingmou:multiurl-pending');
+      }
+    }).catch(() => { /* ignore */ });
+  });
+
   async function openAll() {
-    if (uniqueUrls.length === 0) {
-      toastStore.show('请输入 URL', 'warning');
+    if (!(await confirmStore.ask({
+      title: '批量打开',
+      message: `即将打开 ${uniqueUrls.length} 个标签页，是否继续？`,
+      confirmLabel: '打开',
+      variant: 'default',
+    }))) {
       return;
     }
-    if (uniqueUrls.length > maxUrls) {
-      toastStore.show(`一次最多打开 ${maxUrls} 个标签页`, 'warning');
-      return;
+    try {
+      const r = await controller.start({ urls: uniqueUrls, delay });
+      if (r.status === 'succeeded' && r.result) {
+        const { ok, fail } = r.result;
+        toastStore.show(
+          fail > 0 ? `已打开 ${ok} 个，失败 ${fail} 个` : `已打开 ${ok} 个标签页`,
+          fail > 0 ? 'warning' : 'success',
+        );
+      } else if (r.status === 'cancelled') {
+        toastStore.show('已取消打开', 'info');
+      }
+    } catch {
+      // failed：toast 已由 controller? 否；这里补一条
+      toastStore.show('打开失败', 'error');
     }
-
-    if (!confirm(`即将打开 ${uniqueUrls.length} 个标签页，是否继续？`)) {
-      return;
-    }
-
-    opening = true;
-    openedCount = 0;
-
-    for (const url of uniqueUrls) {
-      browser.tabs.create({ url, active: false });
-      openedCount++;
-      if (delay > 0) await sleep(delay);
-    }
-
-    opening = false;
-    toastStore.show(`已打开 ${uniqueUrls.length} 个标签页`, 'success');
   }
 
   function dedup() {
@@ -78,19 +117,14 @@
     toastStore.show(`去重完成，移除 ${duplicateCount} 个重复`, 'success');
   }
 
-  function copyUrls() {
-    if (uniqueUrls.length === 0) {
-      toastStore.show('没有可复制的 URL', 'warning');
-      return;
-    }
-    navigator.clipboard.writeText(uniqueUrls.join('\n')).then(() => {
-      toastStore.show(`已复制 ${uniqueUrls.length} 个 URL`, 'success');
-    });
+  async function copyUrls() {
+    if (uniqueUrls.length === 0) { toastStore.show('没有可复制的 URL', 'warning'); return; }
+    await copyText(uniqueUrls.join('\n'), `已复制 ${uniqueUrls.length} 个 URL`);
   }
 
   function clearAll() {
     rawText = '';
-    openedCount = 0;
+    controller.reset();
   }
 
   /** 抓取当前标签页及右侧所有标签页的 URL，填入文本框 */
@@ -99,27 +133,17 @@
       const [active] = await browser.tabs.query({ active: true, currentWindow: true });
       if (!active?.url) { toastStore.show('当前标签页无可抓取的 URL', 'warning'); return; }
       const all = await browser.tabs.query({ currentWindow: true });
-      const urls = all.map(t => t.url).filter((u): u is string => !!u && /^https?:\/\//i.test(u));
-      const merged = rawText.trim() ? `${rawText.trim()}\n${urls.join('\n')}` : urls.join('\n');
+      const list = all.map(t => t.url).filter((u): u is string => !!u && /^https?:\/\//i.test(u));
+      const merged = rawText.trim() ? `${rawText.trim()}\n${list.join('\n')}` : list.join('\n');
       rawText = merged;
-      toastStore.show(`已抓取 ${urls.length} 个标签页 URL`, 'success');
+      toastStore.show(`已抓取 ${list.length} 个标签页 URL`, 'success');
     } catch (e: any) {
       toastStore.show('抓取失败: ' + (e?.message || ''), 'warning');
     }
   }
 
-  function exportTxt() {
-    if (uniqueUrls.length === 0) {
-      toastStore.show('没有可导出的 URL', 'warning');
-      return;
-    }
-    const blob = new Blob([uniqueUrls.join('\n')], { type: 'text/plain;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `urls-${new Date().toISOString().slice(0, 10)}.txt`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    toastStore.show(`已导出 ${uniqueUrls.length} 个 URL`, 'success');
+  function urlsText(list: string[]): string {
+    return list.join('\n');
   }
 </script>
 
@@ -131,6 +155,7 @@
       rows="8"
       placeholder="粘贴多个 URL，每行一个，或用逗号/分号分隔&#10;https://example.com/1&#10;https://example.com/2&#10;https://example.com/3"
       bind:value={rawText}
+      disabled={opening}
     ></textarea>
 
     <!-- 统计 -->
@@ -150,6 +175,12 @@
         </span>
       </div>
     {/if}
+
+    {#if opening}
+      <div class="text-xs text-gray-500 dark:text-gray-400">
+        {cs.phase} · 成功 {cs.succeeded} · 失败 {cs.failed}
+      </div>
+    {/if}
   </div>
 
   <!-- 选项 -->
@@ -163,6 +194,7 @@
         max="5000"
         step="100"
         bind:value={delay}
+        disabled={opening}
       />
       <span class="text-gray-400">ms</span>
       <span class="text-gray-400 ml-auto">
@@ -172,54 +204,43 @@
   </div>
 
   <!-- 操作按钮 -->
-  <div class="flex gap-1">
-    <button
-      class="btn btn-sm btn-primary flex-1"
-      disabled={opening || uniqueUrls.length === 0}
-      onclick={openAll}
-    >
-      {opening ? `打开中... (${openedCount}/${uniqueUrls.length})` : '全部打开'}
-    </button>
-    <button
-      class="btn btn-sm flex-1"
-      disabled={uniqueUrls.length === 0 || duplicateCount === 0}
-      onclick={dedup}
-    >
+  <div class="flex gap-1 flex-wrap">
+    {#if opening}
+      <button class="btn btn-sm btn-danger flex-1" onclick={() => controller.cancel()} disabled={!cs.canCancel}>
+        取消（已打开 {cs.completed}/{cs.total ?? uniqueUrls.length}）
+      </button>
+    {:else}
+      <button
+        class="btn btn-sm btn-primary flex-1"
+        disabled={uniqueUrls.length === 0}
+        onclick={openAll}
+      >
+        全部打开
+      </button>
+    {/if}
+    <button class="btn btn-sm flex-1" disabled={opening || uniqueUrls.length === 0 || duplicateCount === 0} onclick={dedup}>
       去重
     </button>
-    <button
-      class="btn btn-sm flex-1"
-      disabled={uniqueUrls.length === 0}
-      onclick={copyUrls}
-    >
+    <button class="btn btn-sm" disabled={opening || uniqueUrls.length === 0} onclick={copyUrls} title="复制 URL 列表">
       复制
     </button>
-    <button
-      class="btn btn-sm"
-      disabled={uniqueUrls.length === 0}
-      onclick={exportTxt}
-      title="导出 TXT"
-    >
-      导出
-    </button>
-    <button
-      class="btn btn-sm"
-      onclick={grabCurrentTab}
-      title="抓取当前窗口所有标签页 URL"
-    >
+    <ExportMenu
+      items={uniqueUrls}
+      module="multiurl"
+      serializers={{ text: urlsText }}
+      copySerialize={urlsText}
+      disabled={opening}
+    />
+    <button class="btn btn-sm" disabled={opening} onclick={grabCurrentTab} title="抓取当前窗口所有标签页 URL">
       抓取
     </button>
-    <button
-      class="btn btn-sm"
-      disabled={urls.length === 0}
-      onclick={clearAll}
-    >
+    <button class="btn btn-sm" disabled={opening || urls.length === 0} onclick={clearAll}>
       清空
     </button>
   </div>
 
   <!-- 空状态 -->
-  {#if urls.length === 0}
+  {#if urls.length === 0 && !opening}
     <div class="text-center text-gray-400 text-sm py-6">
       粘贴多个 URL，点击「全部打开」批量在新标签页中打开
     </div>

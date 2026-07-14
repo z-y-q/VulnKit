@@ -1,6 +1,8 @@
 <script lang="ts">
-  // 目录扫描面板 — 灵眸 v6.0
+  // 目录扫描面板 — 灵眸 v7.3
   // 流程：选字典 → 拼路径 → 并发探测 → 内容分析 → 排序渲染
+  // v7.3：统一 TaskController（暂停/取消/partial）+ ResultToolbar（搜索/筛选/排序/计数）
+  //      + ExportMenu（规范文件名）+ copyText（修复未 await）
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
@@ -11,6 +13,14 @@
   import UrlInput from '@/components/scanner/UrlInput.svelte';
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import ResultToolbar from '@/components/results/ResultToolbar.svelte';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { copyText } from '@/lib/actions/clipboard';
+  import { downloadText, buildFilename } from '@/lib/actions/download';
+  import { toCsv, toMarkdownTable } from '@/lib/actions/serializers';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
+  import { EMPTY_QUERY, type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
   import type { ProbeResult } from '@/lib/types/messaging';
   import {
     analyzeContent,
@@ -25,23 +35,61 @@
 
   let targetUrl = $state('');
   let wordlistKey = $state<ReturnType<typeof getWordlistKeys>[number]>('common');
-  let scanning = $state(false);
-  let scanned = $state(0);
-  let total = $state(0);
   let results = $state<FuzzResult[]>([]);
-  let foundOnly = $state(true);
-  let sortBy = $state<'status' | 'size' | 'time'>('status');
   let customPaths = $state('');
-  let cancelled = $state(false);
-  let paused = $state(false);
-  let statusFilter = $state<number | null>(null);
+  let query = $state<ResultQuery>({ search: '', filters: {}, sort: { key: 'status', direction: 'desc' } });
 
   const wordlistKeys = getWordlistKeys();
 
+  // —— TaskController 接管扫描状态机（替代 scanning/cancelled/paused）——
+  type FuzzInput = { targetUrl: string; wordlistKey: typeof wordlistKey; customPaths: string };
+  const controller = createTaskController<FuzzInput, FuzzResult[]>(
+    {
+      validate: (input) => {
+        const v = validateProbeUrl(input.targetUrl);
+        if ('error' in v) throw new Error('请输入合法的 http(s) URL');
+      },
+      run: async (input, ctx) => {
+        const v = validateProbeUrl(input.targetUrl);
+        if ('error' in v) throw new Error('无效的目标 URL');
+        const base = v.parsed.origin + v.parsed.pathname.replace(/[?#].*$/, '');
+        const baseUrl = base.endsWith('/') ? base : base + '/';
+
+        let paths = getWordlist(input.wordlistKey);
+        if (input.customPaths.trim()) {
+          paths = [...new Set([...input.customPaths.split(/\r?\n/).map(p => p.trim()).filter(Boolean), ...paths])];
+        }
+        ctx.reportProgress({ total: paths.length, completed: 0, phase: '目录扫描' });
+
+        const collected: FuzzResult[] = [];
+        let scanned = 0;
+        await runConcurrent(paths, async (path) => {
+          if (ctx.signal.aborted) return;
+          const cleanPath = path.replace(/^\/+/, '');
+          const r = await probeSmart(baseUrl, cleanPath);
+          if (r) collected.push(r);
+          scanned++;
+          ctx.reportProgress({ completed: scanned });
+        }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => ctx.signal.aborted, paused: ctx.isPaused });
+
+        // 去重（软 404 标记）+ 严重级别评估
+        markDuplicates(collected);
+        for (const r of collected) {
+          if (!r.severity) r.severity = gradeSeverity(r);
+        }
+        results = collected;
+        return collected;
+      },
+    },
+    { canPause: true },
+  );
+
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+  let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+
   $effect(() => {
-    getActiveTabUrl().then(u => {
-      if (u) targetUrl = u;
-    });
+    getActiveTabUrl().then(u => { if (u) targetUrl = u; });
   });
 
   // 消费来自其他面板（如 Wayback 历史档案）发送的路径
@@ -55,33 +103,44 @@
     }).catch(() => { /* ignore */ });
   });
 
-  let filtered = $derived.by(() => {
-    let list = results;
-    if (statusFilter !== null) {
-      list = list.filter(r => r.status === statusFilter);
-    } else if (foundOnly) {
-      list = list.filter(r => isFoundStatus(r.status));
-    }
-    const fns: Record<string, (a: FuzzResult, b: FuzzResult) => number> = {
-      status: (a, b) => a.status - b.status,
-      size: (a, b) => b.size - a.size,
-      time: (a, b) => a.time - b.time,
-    };
-    return [...list].sort(fns[sortBy]);
-  });
+  // —— ResultAdapter：把 foundOnly/statusFilter/sortBy/search 统一为 query 协议 ——
+  const fuzzResultAdapter: ResultAdapter<FuzzResult> = {
+    apply(items, q) {
+      let list = items;
+      const statusSel = q.filters.status?.[0];
+      if (statusSel != null && statusSel !== '') {
+        const code = Number(statusSel);
+        list = list.filter(r => r.status === code);
+      } else {
+        list = list.filter(r => isFoundStatus(r.status)); // 默认仅有效
+      }
+      const kw = q.search.trim().toLowerCase();
+      if (kw) list = list.filter(r => fuzzResultAdapter.getSearchText(r).toLowerCase().includes(kw));
+      const fns: Record<string, (a: FuzzResult, b: FuzzResult) => number> = {
+        status: (a, b) => a.status - b.status,
+        size: (a, b) => b.size - a.size,
+        time: (a, b) => b.time - a.time,
+      };
+      return [...list].sort(fns[q.sort.key] ?? fns.status);
+    },
+    getSearchText(r) {
+      return `${r.path} ${r.url} ${(r.analysis?.tags ?? []).join(' ')}`;
+    },
+    getId(r) { return r.url; },
+  };
 
+  let filtered = $derived(fuzzResultAdapter.apply(results, query));
   let uniqueStatusCodes = $derived.by(() => {
     const codes = new Set<number>();
-    for (const r of results) {
-      if (r.status > 0) codes.add(r.status);
-    }
+    for (const r of results) if (r.status > 0) codes.add(r.status);
     return [...codes].sort((a, b) => a - b);
   });
+  let statusSel = $derived(query.filters.status?.[0] ?? '');
 
   const SENSITIVE_TAGS = new Set(['敏感信息', 'WAF', '管理界面']);
 
-  function mapToFindings(results: FuzzResult[]): ScanFinding[] {
-    return results
+  function mapToFindings(rs: FuzzResult[]): ScanFinding[] {
+    return rs
       .filter(r => isFoundStatus(r.status))
       .map(r => {
         const tags = r.analysis?.tags ?? [];
@@ -104,8 +163,8 @@
     return 'text-gray-500';
   }
 
-  async function probe(path: string, method: string): Promise<FuzzResult | null> {
-    const u = new URL(path, targetUrl).href;
+  async function probe(baseUrl: string, path: string, method: string): Promise<FuzzResult | null> {
+    const u = new URL(path, baseUrl).href;
     const start = Date.now();
     try {
       const res = await sendMessage({
@@ -117,179 +176,82 @@
       const r = res as ProbeResult;
       const size = extractContentLength(r.headers) || (r.body ? r.body.length : 0);
       const analysis = method === 'GET' ? analyzeContent(r.body) : null;
-      return {
-        path,
-        url: u,
-        status: r.status || 0,
-        size,
-        time: Date.now() - start,
-        method,
-        analysis,
-      };
+      return { path, url: u, status: r.status || 0, size, time: Date.now() - start, method, analysis };
     } catch {
       return null;
     }
   }
 
-  /**
-   * HEAD 优先策略：先发 HEAD（省带宽），仅在 405/501 或 HEAD 无有效状态时回退 GET。
-   * GET 才做内容分析（识别备份/SQL/配置等）。
-   */
-  async function probeSmart(path: string): Promise<FuzzResult | null> {
-    const head = await probe(path, 'HEAD');
+  /** HEAD 优先策略：先发 HEAD（省带宽），仅在 405/501 或 HEAD 无有效状态时回退 GET。 */
+  async function probeSmart(baseUrl: string, path: string): Promise<FuzzResult | null> {
+    const head = await probe(baseUrl, path, 'HEAD');
     if (head && head.status !== 0 && head.status !== 405 && head.status !== 501) {
       head.severity = gradeSeverity(head);
       return head;
     }
-    // 回退 GET（需要 body 做内容分析）
-    const get = await probe(path, 'GET');
+    const get = await probe(baseUrl, path, 'GET');
     if (get) get.severity = gradeSeverity(get);
     return get;
   }
 
-  async function scan() {
-    const v = validateProbeUrl(targetUrl);
-    if ('error' in v) {
-      toastStore.show('请输入合法的 http(s) URL', 'error');
-      return;
-    }
-    // 规整 base：去 query/hash，保证以 / 结尾
-    const base = v.parsed.origin + v.parsed.pathname.replace(/[?#].*$/, '');
-    const baseUrl = base.endsWith('/') ? base : base + '/';
-
-    scanning = true;
-    results = [];
-    scanned = 0;
-    cancelled = false;
-    paused = false;
-    statusFilter = null;
-
-    let paths = getWordlist(wordlistKey);
-    if (customPaths.trim()) {
-      paths = [...new Set([...customPaths.split(/\r?\n/).map(p => p.trim()).filter(Boolean), ...paths])];
-    }
-    total = paths.length;
-    const collected: FuzzResult[] = [];
-
-    await runConcurrent(paths, async (path) => {
-      const cleanPath = path.replace(/^\/+/, '');
-      const r = await probeSmart(cleanPath);
-      if (r) collected.push(r);
-      scanned++;
-    }, { concurrency: $scanSettingsStore.concurrency, cancelled: () => cancelled, paused: () => paused });
-
-    // 去重（软 404 标记）+ 严重级别评估
-    markDuplicates(collected);
-    for (const r of collected) {
-      if (!r.severity) r.severity = gradeSeverity(r);
-    }
-    results = collected;
-    scanning = false;
-
-    if (cancelled) {
-      toastStore.show('扫描已取消', 'info');
-      return;
-    }
-
+  async function handleScan() {
     try {
-      await scanHistoryStore.addScan({ url: targetUrl, module: 'fuzz', findings: mapToFindings(results) });
-    } catch { /* store failure must not break scan */ }
-
-    const found = collected.filter(r => isFoundStatus(r.status)).length;
-    toastStore.show(`扫描完成，发现 ${found} 个有效路径（共 ${total}）`, found > 0 ? 'warning' : 'success');
+      const r = await controller.start({ targetUrl, wordlistKey, customPaths });
+      if (r.status === 'succeeded') {
+        const list = r.result ?? [];
+        try {
+          await scanHistoryStore.addScan({ url: targetUrl, module: 'fuzz', findings: mapToFindings(list) });
+        } catch { /* store failure must not break scan */ }
+        const found = list.filter(r => isFoundStatus(r.status)).length;
+        toastStore.show(`扫描完成，发现 ${found} 个有效路径（共 ${list.length}）`, found > 0 ? 'warning' : 'success');
+      } else if (r.status === 'cancelled') {
+        const scanned = results.length;
+        toastStore.show(scanned > 0 ? `扫描已取消（已扫描 ${scanned} 项）` : '扫描已取消', 'info');
+      }
+    } catch {
+      // failed：cs.error 驱动 ErrorState
+    }
   }
 
-  function cancel() { cancelled = true; paused = false; }
-
-  function togglePause() { paused = !paused; }
-
-  function exportResults() {
-    const rows = [['path', 'url', 'status', 'size', 'method']];
-    for (const r of filtered) rows.push([r.path, r.url, String(r.status), String(r.size), r.method]);
-    const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = 'fuzz-results.csv';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // —— 导出/复制序列化器（作用于当前筛选 filtered）——
+  function fuzzCsv(items: FuzzResult[]): string {
+    return toCsv([['path', 'url', 'status', 'size', 'method'], ...items.map(r => [r.path, r.url, r.status, r.size, r.method])]);
   }
-
-  function exportTxt() {
-    if (filtered.length === 0) return;
-    const found = filtered.filter(r => r.status > 0 && r.status !== 404);
-    const lines = [
-      '目录扫描报告',
-      '==================',
-      '目标: ' + targetUrl,
-      '字典: ' + wordlistKey,
-      '发现: ' + found.length,
-      '',
-    ];
+  function fuzzTxt(items: FuzzResult[]): string {
+    const found = items.filter(r => r.status > 0 && r.status !== 404);
+    const lines = ['目录扫描报告', '==================', '目标: ' + targetUrl, '字典: ' + wordlistKey, '发现: ' + found.length, ''];
     for (const e of found) {
       lines.push(`[${e.status}] ${e.path} (${e.size}B, ${e.time}ms${e.method === 'GET' ? ', GET' : ''})`);
       if (e.analysis?.title) lines.push('  Title: ' + e.analysis.title);
       if (e.analysis?.tags?.length) lines.push('  Tags: ' + e.analysis.tags.join(', '));
     }
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'fuzz-report.txt';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    toastStore.show('TXT 报告已导出', 'success');
+    return lines.join('\n');
   }
-
-  function copyMarkdown() {
-    if (filtered.length === 0) {
-      toastStore.show('没有可复制的结果', 'warning');
-      return;
-    }
-    const found = filtered.filter(r => r.status > 0 && r.status !== 404);
-    if (found.length === 0) {
-      toastStore.show('没有有效结果', 'warning');
-      return;
-    }
-    const lines = ['| Path | Status | Size | Time |', '| --- | --- | --- | --- |'];
-    for (const e of found) {
-      lines.push(`| ${e.path} | ${e.status} | ${e.size} | ${e.time} |`);
-    }
-    navigator.clipboard.writeText(lines.join('\n'));
-    toastStore.show('已复制 Markdown 表格', 'success');
+  function fuzzMd(items: FuzzResult[]): string {
+    const found = items.filter(r => r.status > 0 && r.status !== 404);
+    return toMarkdownTable(['Path', 'Status', 'Size', 'Time'], found.map(e => [e.path, e.status, e.size, e.time]));
   }
-
-  function copyResults() {
-    if (filtered.length === 0) {
-      toastStore.show('没有可复制的结果', 'warning');
-      return;
-    }
-    const found = filtered.filter(r => r.status > 0 && r.status !== 404);
-    if (found.length === 0) {
-      toastStore.show('没有有效结果', 'warning');
-      return;
-    }
+  function fuzzCopyText(items: FuzzResult[]): string {
+    const found = items.filter(r => r.status > 0 && r.status !== 404);
     const lines = [`目录扫描 @ ${targetUrl}`, `字典: ${wordlistKey}`, `发现: ${found.length}`, ''];
-    for (const e of found) {
-      lines.push(`[${e.status}] ${e.path} (${e.size}B, ${e.time}ms)`);
-    }
-    navigator.clipboard.writeText(lines.join('\n'));
-    toastStore.show('已复制纯文本', 'success');
+    for (const e of found) lines.push(`[${e.status}] ${e.path} (${e.size}B, ${e.time}ms)`);
+    return lines.join('\n');
+  }
+  async function copyCurl() {
+    if (filtered.length === 0) { toastStore.show('没有可复制的结果', 'warning'); return; }
+    const found = filtered.filter(r => r.status > 0 && r.status !== 404);
+    if (found.length === 0) { toastStore.show('没有有效结果', 'warning'); return; }
+    const cmds = found.map(r => `curl -I -s "${r.url}"`).join('\n');
+    await copyText(cmds, `已复制 ${found.length} 条 cURL`);
   }
 
-  function copyCurl() {
-    if (filtered.length === 0) {
-      toastStore.show('没有可复制的结果', 'warning');
-      return;
-    }
-    const found = filtered.filter(r => r.status > 0 && r.status !== 404);
-    if (found.length === 0) {
-      toastStore.show('没有有效结果', 'warning');
-      return;
-    }
-    const cmds = found.map(r => `curl -I -s "${r.url}"`).join('\n');
-    navigator.clipboard.writeText(cmds);
-    toastStore.show('已复制 cURL 命令', 'success');
+  function setStatusFilter(code: number | null) {
+    query.filters = { ...query.filters, status: code == null ? [] : [String(code)] };
+  }
+  function resetQuery() {
+    query.search = '';
+    query.filters = {};
+    query.sort = { key: 'status', direction: 'desc' };
   }
 </script>
 
@@ -297,16 +259,14 @@
   <!-- 输入 -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <UrlInput bind:value={targetUrl} {scanning} buttonText="扫描" onscan={scan} />
-      {#if scanning}
-        <button class="btn btn-sm btn-danger shrink-0" onclick={cancel}>取消</button>
-        <button
-          class="btn btn-sm shrink-0"
-          class:btn-primary={paused}
-          onclick={togglePause}
-        >
-          {paused ? '继续' : '暂停'}
-        </button>
+      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="扫描" onscan={handleScan} />
+      {#if archiving}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
+        {#if cs.status === 'paused'}
+          <button class="btn btn-sm btn-primary shrink-0" onclick={() => controller.resume()}>继续</button>
+        {:else}
+          <button class="btn btn-sm shrink-0" onclick={() => controller.pause()} disabled={!cs.canPause}>暂停</button>
+        {/if}
       {/if}
     </div>
     <div class="flex items-center gap-2 text-xs">
@@ -321,7 +281,10 @@
       <summary class="cursor-pointer text-gray-400">自定义路径（每行一个，合并到字典）</summary>
       <textarea class="input w-full mt-1 font-mono" rows="3" placeholder="/admin&#10;/test&#10;/backup.zip" bind:value={customPaths}></textarea>
     </details>
-    <ScanProgress {scanned} {total} {scanning} label="目录扫描" />
+    <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="目录扫描" />
+    {#if cs.status === 'failed' && cs.error}
+      <ErrorState error={cs.error} onRetry={handleScan} />
+    {/if}
   </div>
 
   <!-- 工具栏 -->
@@ -329,33 +292,41 @@
     <!-- 状态码过滤 -->
     <div class="flex flex-wrap items-center gap-1.5 text-xs">
       <button
-        class="badge cursor-pointer {statusFilter === null ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-        onclick={() => statusFilter = null}
+        class="badge cursor-pointer {statusSel === '' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
+        aria-pressed={statusSel === ''}
+        onclick={() => setStatusFilter(null)}
       >
         有效
       </button>
       {#each uniqueStatusCodes as code}
         <button
-          class="badge cursor-pointer {statusFilter === code ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-          onclick={() => statusFilter = statusFilter === code ? null : code}
+          class="badge cursor-pointer {statusSel === String(code) ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
+          aria-pressed={statusSel === String(code)}
+          onclick={() => setStatusFilter(statusSel === String(code) ? null : code)}
         >
           {code}
         </button>
       {/each}
     </div>
-    <div class="flex items-center gap-2 text-xs">
-      <span>{filtered.length} 条</span>
-      <select class="input text-xs w-24 ml-auto" bind:value={sortBy}>
+    <ResultToolbar {query} total={results.length} shown={filtered.length} searchPlaceholder="搜索路径/标签...">
+      <select
+        class="input text-xs w-24"
+        value={query.sort.key}
+        onchange={(e) => { query.sort.key = e.currentTarget.value; }}
+        aria-label="排序"
+      >
         <option value="status">按状态码</option>
         <option value="size">按大小</option>
         <option value="time">按耗时</option>
       </select>
-      <button class="btn btn-sm" onclick={copyResults} title="复制纯文本">复制</button>
-      <button class="btn btn-sm" onclick={exportResults} title="导出 CSV">CSV</button>
-      <button class="btn btn-sm" onclick={exportTxt} title="导出 TXT">TXT</button>
-      <button class="btn btn-sm" onclick={copyMarkdown} title="复制 Markdown">MD</button>
-      <button class="btn btn-sm" onclick={copyCurl} title="复制 cURL">cURL</button>
-    </div>
+      <button class="btn btn-sm" onclick={copyCurl} title="复制 cURL 命令">cURL</button>
+      <ExportMenu
+        items={filtered}
+        module="fuzz"
+        serializers={{ csv: fuzzCsv, text: fuzzTxt, markdown: fuzzMd }}
+        copySerialize={fuzzCopyText}
+      />
+    </ResultToolbar>
   {/if}
 
   <!-- 结果 -->
@@ -379,9 +350,9 @@
         </div>
       {/each}
     </div>
-  {:else if !scanning && results.length === 0 && scanned > 0}
+  {:else if !archiving && results.length === 0 && cs.completed > 0}
     <EmptyState message="未发现有效路径" icon="🔍" />
-  {:else if !scanning}
+  {:else if !archiving && results.length === 0}
     <EmptyState
       message="选择字典，扫描目标站点的目录与敏感文件"
       hint="支持自定义路径，合并到所选字典中"

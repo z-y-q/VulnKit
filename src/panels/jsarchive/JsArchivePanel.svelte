@@ -1,11 +1,12 @@
 <script lang="ts">
-  // JS 归档面板 — 灵眸 v7.2
+  // JS 归档面板 — 灵眸 v7.3
   // 收集当前页面所有 JS（DOM script + preload + performance + inline）→ 按原始 URL 路径
   // 组织进 zip → 下载，供本地安全审计。
   //
   // 资源预算（P0-2）：单响应 PER_FETCH_MAX_BYTES + 整档累计 MAX_ARCHIVE_BYTES，
   //   超累计预算的剩余条目标记 skip，不发请求，避免扩展 OOM。
-  // 取消语义（P0-3）：显式状态机 + 各阶段边界检查，取消后绝不再触发下载/「成功」。
+  // 取消语义（P0-3 / §3.4）：统一 TaskController 状态机，取消通过 AbortSignal 传播；
+  //   各阶段边界检查 ctx.signal.aborted，取消后绝不触发 zipSync/下载/「成功」。
   // 压缩降级（P1-9）：zipSync 用 level 3，打包前 await tick() 让出主线程一次。
   import { tick } from 'svelte';
   import { sendMessage } from '@/lib/core/messaging';
@@ -14,6 +15,9 @@
   import { toastStore } from '@/stores/ui';
   import { zipSync, strToU8 } from 'fflate';
   import EmptyState from '@/components/scanner/EmptyState.svelte';
+  import ErrorState from '@/components/feedback/ErrorState.svelte';
+  import { downloadBlob } from '@/lib/actions/download';
+  import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
   import {
     urlToZipPath,
     dedupePaths,
@@ -36,37 +40,165 @@
   // 整个归档的累计字节预算：超过即跳过剩余抓取并标注，避免内存爆涨
   const MAX_ARCHIVE_BYTES = 100 * 1024 * 1024;
 
-  // 终端/进行中状态机：取消后不再误报「成功」
-  type Status = 'idle' | 'collecting' | 'fetching' | 'packaging' | 'completed' | 'cancelled' | 'failed';
+  type ArchiveInput = { pageUrl: string; includeInline: boolean };
+  type ArchiveOutput = { entries: ArchiveEntry[]; zipBlob?: Blob; totalBytes?: number };
 
   let pageUrl = $state('');
-  let status = $state<Status>('idle');
-  let phase = $state('');         // 当前阶段提示文案
-  let scanned = $state(0);
-  let total = $state(0);
   let currentFile = $state('');
   let entries = $state<ArchiveEntry[]>([]);
   let lastBytes = $state(0);      // 上次产物大小
   let collectedBytes = $state(0); // 已收集累计字节（预算追踪）
-
-  // 取消信号：true 后各阶段在边界处短路（非响应式，避免与 $state 触发额外渲染）
-  let cancelRequested = false;
-
-  // 选项
   let includeInline = $state(true);
 
-  // 进行中 / 终端态派生
-  let archiving = $derived(status === 'collecting' || status === 'fetching' || status === 'packaging');
-  let terminal = $derived(status === 'completed' || status === 'cancelled' || status === 'failed');
+  // —— TaskController 接管状态机（替代手写 status/cancelRequested）——
+  // adapter.run 是面板闭包：用 ctx.signal 取代 cancelRequested、ctx.reportProgress 取代
+  // phase/scanned/total 赋值；currentFile/entries/collectedBytes 等特有态直接写面板 $state。
+  const controller = createTaskController<ArchiveInput, ArchiveOutput>({
+    validate: (input) => {
+      if (!input.pageUrl) throw new Error('未识别到当前页面 URL');
+    },
+    run: async (input, ctx) => {
+      const resultList: ArchiveEntry[] = [];
+      const collected: { path: string; bytes: Uint8Array }[] = [];
+      collectedBytes = 0;
+      entries = []; currentFile = ''; lastBytes = 0;
+
+      // 1) 收集
+      ctx.reportProgress({ phase: '正在收集页面 JS...', completed: 0, total: 0 });
+      const { dom: domUrls, preload: preloadUrls, performance: perfUrls, inline } = await gatherFromPage();
+      if (ctx.signal.aborted) return finishCancelled(resultList);
+
+      // 按来源置信度合并去重（first-seen-wins 记录来源），统一解析为绝对 URL
+      const urlSource = new Map<string, ArchiveSource>();
+      const addAll = (list: string[], src: ArchiveSource) => {
+        for (const raw of list) {
+          try {
+            const abs = new URL(raw, input.pageUrl).href;
+            if (!urlSource.has(abs)) urlSource.set(abs, src);
+          } catch { /* ignore */ }
+        }
+      };
+      addAll(domUrls, 'dom');
+      addAll(preloadUrls, 'preload');
+      addAll(perfUrls, 'performance');
+
+      const urls = [...urlSource.entries()]
+        .filter(([u]) => isArchiveableScript(u))
+        .slice(0, MAX_SCRIPTS);
+
+      const pathInputs: { key: string; path: string }[] = [];
+      for (const [u] of urls) {
+        const p = urlToZipPath(u);
+        if (p) pathInputs.push({ key: u, path: p });
+      }
+      const inlineSlices = input.includeInline
+        ? inline.slice(0, MAX_INLINE).map((t, i) => ({ text: t, idx: i }))
+        : [];
+
+      const pathMap = dedupePaths(pathInputs);
+      const inlinePaths = dedupePaths(
+        inlineSlices.map(s => ({ key: `__inline_${s.idx}`, path: `_inline/inline-${String(s.idx + 1).padStart(3, '0')}.js` })),
+      );
+
+      ctx.reportProgress({ total: pathMap.size + inlineSlices.length });
+
+      // 2) 抓取远程 JS（并发限流）
+      ctx.reportProgress({ phase: `抓取远程 JS (0/${pathMap.size})` });
+      let scanned = 0;
+      await runConcurrent([...pathMap.entries()], async ([url, path]) => {
+        if (ctx.signal.aborted) return;
+        currentFile = path;
+        const src = urlSource.get(url);
+        if (collectedBytes >= MAX_ARCHIVE_BYTES) {
+          resultList.push({ url, path, size: 0, status: 'skip', note: '总预算超限', kind: 'http', source: src });
+          scanned++;
+          ctx.reportProgress({ completed: scanned });
+          return;
+        }
+        try {
+          const res = await sendMessage({
+            type: 'FETCH_URL', url, timeout: FETCH_TIMEOUT, maxBytes: PER_FETCH_MAX_BYTES,
+          }) as FetchResult<string>;
+          if (res.success) {
+            if (res.data != null) {
+              const bytes = strToU8(res.data);
+              collectedBytes += bytes.length;
+              collected.push({ path, bytes });
+              resultList.push({ url, path, size: bytes.length, status: 'ok', kind: 'http', source: src });
+            } else {
+              resultList.push({ url, path, size: 0, status: 'fail', note: '空响应', kind: 'http', source: src });
+            }
+          } else {
+            const note = res.code === 'TOO_LARGE'
+              ? `响应过大（>${Math.round(PER_FETCH_MAX_BYTES / 1024 / 1024)}MB）`
+              : res.error || '抓取失败';
+            resultList.push({ url, path, size: 0, status: 'fail', note, kind: 'http', source: src });
+          }
+        } catch (e: any) {
+          resultList.push({ url, path, size: 0, status: 'fail', note: String(e?.message || e), kind: 'http', source: src });
+        } finally {
+          scanned++;
+          ctx.reportProgress({ completed: scanned, phase: `抓取远程 JS (${scanned}/${pathMap.size})` });
+        }
+      }, { concurrency: 6, cancelled: () => ctx.signal.aborted });
+
+      if (ctx.signal.aborted) return finishCancelled(resultList);
+
+      // 3) 内联脚本
+      for (const s of inlineSlices) {
+        if (ctx.signal.aborted) break;
+        const path = inlinePaths.get(`__inline_${s.idx}`)!;
+        if (collectedBytes >= MAX_ARCHIVE_BYTES) {
+          resultList.push({ url: '', path, size: 0, status: 'skip', note: '总预算超限', kind: 'inline', source: 'inline' });
+          continue;
+        }
+        const text = s.text.slice(0, MAX_INLINE_BYTES);
+        const bytes = strToU8(text);
+        collectedBytes += bytes.length;
+        collected.push({ path, bytes });
+        resultList.push({
+          url: '', path, size: bytes.length, status: 'ok', kind: 'inline', source: 'inline',
+          note: s.text.length > MAX_INLINE_BYTES ? '已截断' : undefined,
+        });
+      }
+      if (ctx.signal.aborted) return finishCancelled(resultList);
+
+      if (collected.length === 0) {
+        throw new Error('未抓取到任何 JS 内容');
+      }
+
+      // 4) 打包 zip —— 先让出主线程一帧，降低大体积打包对 UI 的阻塞
+      ctx.reportProgress({ phase: '正在打包 zip...' });
+      await tick();
+      const tree: Record<string, Uint8Array> = {};
+      for (const { path, bytes } of collected.sort((a, b) => a.path.localeCompare(b.path))) {
+        tree[path] = bytes;
+      }
+      const fetchedAt = Date.now();
+      tree['MANIFEST.txt'] = strToU8(buildManifest(resultList, input.pageUrl, fetchedAt));
+      tree['README.txt'] = strToU8(buildReadme(input.pageUrl, fetchedAt));
+
+      const zipped = zipSync(tree, { level: 3 });
+      const blob = new Blob([zipped], { type: 'application/zip' });
+      entries = resultList.sort((a, b) => a.path.localeCompare(b.path));
+      ctx.reportProgress({ phase: `完成：${collected.length} 个文件，zip ${(zipped.length / 1024).toFixed(1)} KB` });
+      return { entries: resultList, zipBlob: blob, totalBytes: zipped.length };
+    },
+  });
+
+  // 订阅 controller.state 到本地 $state（模板 reactive 使用）
+  let cs = $state<TaskState>({ ...IDLE });
+  $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
+
+  let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
+  let okCount = $derived(entries.filter(e => e.status === 'ok').length);
+  let failCount = $derived(entries.filter(e => e.status === 'fail').length);
+  let skipCount = $derived(entries.filter(e => e.status === 'skip').length);
+  let progress = $derived(cs.total && cs.total > 0 ? Math.round((cs.completed / cs.total) * 100) : 0);
 
   $effect(() => {
     getActiveTabUrl().then(u => { if (u) pageUrl = u; });
   });
-
-  let okCount = $derived(entries.filter(e => e.status === 'ok').length);
-  let failCount = $derived(entries.filter(e => e.status === 'fail').length);
-  let skipCount = $derived(entries.filter(e => e.status === 'skip').length);
-  let progress = $derived(total > 0 ? Math.round((scanned / total) * 100) : 0);
 
   /** 在页面 MAIN world 收集所有脚本 URL（按来源分组）+ 内联脚本内容 */
   async function gatherFromPage(): Promise<{
@@ -79,19 +211,16 @@
       const preloadUrls: string[] = [];
       const perfUrls: string[] = [];
       const inline: string[] = [];
-      // 1) DOM script[src]：高置信，HTML 语义上就是脚本
       try {
         document.querySelectorAll('script[src]').forEach(function (s: any) {
           if (s.src) domUrls.push(s.src);
         });
       } catch { /* ignore */ }
-      // 2) preload / modulepreload link：高置信
       try {
         document
           .querySelectorAll('link[rel="preload"][as="script"], link[rel="modulepreload"]')
           .forEach(function (l: any) { if (l.href) preloadUrls.push(l.href); });
       } catch { /* ignore */ }
-      // 3) performance 资源：仅收 script/link 发起的，或带 .js 后缀的（排除图片/字体/CSS）
       try {
         for (const e of performance.getEntriesByType('resource')) {
           const n = (e as any).name || '';
@@ -101,7 +230,6 @@
           }
         }
       } catch { /* ignore */ }
-      // 4) 内联脚本
       try {
         document.querySelectorAll('script:not([src])').forEach(function (s: any) {
           const t = (s.textContent || '').trim();
@@ -113,179 +241,28 @@
     return dom || { dom: [], preload: [], performance: [], inline: [] };
   }
 
-  /** 主流程：收集 → 抓取 → 打包 → 下载 */
-  async function archiveAll() {
-    if (archiving) return;
-    if (!pageUrl) { toastStore.show('未识别到当前页面 URL', 'warning'); return; }
-
-    // 重置状态机
-    cancelRequested = false;
-    status = 'collecting';
-    entries = []; scanned = 0; total = 0; currentFile = ''; lastBytes = 0; collectedBytes = 0;
-    phase = '正在收集页面 JS...';
-
-    const resultList: ArchiveEntry[] = [];
-    const collected: { path: string; bytes: Uint8Array }[] = [];
-
-    try {
-      const { dom: domUrls, preload: preloadUrls, performance: perfUrls, inline } = await gatherFromPage();
-      if (cancelRequested) return finishCancelled(resultList);
-
-      // 按来源置信度合并去重（first-seen-wins 记录来源），统一解析为绝对 URL
-      const urlSource = new Map<string, ArchiveSource>();
-      const addAll = (list: string[], src: ArchiveSource) => {
-        for (const raw of list) {
-          try {
-            const abs = new URL(raw, pageUrl).href;
-            if (!urlSource.has(abs)) urlSource.set(abs, src);
-          } catch { /* ignore */ }
-        }
-      };
-      addAll(domUrls, 'dom');
-      addAll(preloadUrls, 'preload');
-      addAll(perfUrls, 'performance');
-
-      // 过滤（来源置信度放宽版，覆盖 extensionless / query-only chunk）+ 截断
-      const urls = [...urlSource.entries()]
-        .filter(([u]) => isArchiveableScript(u))
-        .slice(0, MAX_SCRIPTS);
-
-      // 计算 zip 路径（URL 类）
-      const pathInputs: { key: string; path: string }[] = [];
-      for (const [u] of urls) {
-        const p = urlToZipPath(u);
-        if (p) pathInputs.push({ key: u, path: p });
-      }
-      const inlineSlices = includeInline
-        ? inline.slice(0, MAX_INLINE).map((t, i) => ({ text: t, idx: i }))
-        : [];
-
-      // zip 路径分配
-      const pathMap = dedupePaths(pathInputs);
-      // inline 用独立命名空间 _inline/inline-001.js
-      const inlinePaths = dedupePaths(
-        inlineSlices.map(s => ({ key: `__inline_${s.idx}`, path: `_inline/inline-${String(s.idx + 1).padStart(3, '0')}.js` })),
-      );
-
-      total = pathMap.size + inlineSlices.length;
-
-      // 1) 抓取远程 JS（并发限流）
-      status = 'fetching';
-      phase = `抓取远程 JS (0/${pathMap.size})`;
-      await runConcurrent([...pathMap.entries()], async ([url, path]) => {
-        if (cancelRequested) return;
-        currentFile = path;
-        const src = urlSource.get(url);
-        // 预算已超限 → 标记跳过，不再发请求
-        if (collectedBytes >= MAX_ARCHIVE_BYTES) {
-          resultList.push({ url, path, size: 0, status: 'skip', note: '总预算超限', kind: 'http', source: src });
-          return;
-        }
-        try {
-          const res = await sendMessage({
-            type: 'FETCH_URL',
-            url,
-            timeout: FETCH_TIMEOUT,
-            maxBytes: PER_FETCH_MAX_BYTES,
-          }) as FetchResult<string>;
-          // 用 if/else 收窄联合类型：success 为 true 时 res 为 FetchOk
-          if (res.success) {
-            if (res.data != null) {
-              const bytes = strToU8(res.data);
-              collectedBytes += bytes.length;
-              collected.push({ path, bytes });
-              resultList.push({ url, path, size: bytes.length, status: 'ok', kind: 'http', source: src });
-            } else {
-              resultList.push({ url, path, size: 0, status: 'fail', note: '空响应', kind: 'http', source: src });
-            }
-          } else {
-            // TOO_LARGE 给更明确提示，其余直接回传 error
-            const note = res.code === 'TOO_LARGE'
-              ? `响应过大（>${Math.round(PER_FETCH_MAX_BYTES / 1024 / 1024)}MB）`
-              : res.error || '抓取失败';
-            resultList.push({ url, path, size: 0, status: 'fail', note, kind: 'http', source: src });
-          }
-        } catch (e: any) {
-          resultList.push({ url, path, size: 0, status: 'fail', note: String(e?.message || e), kind: 'http', source: src });
-        } finally {
-          scanned++;
-          phase = `抓取远程 JS (${scanned}/${pathMap.size})`;
-        }
-      }, { concurrency: 6, cancelled: () => cancelRequested });
-
-      if (cancelRequested) return finishCancelled(resultList);
-
-      // 2) 内联脚本
-      for (const s of inlineSlices) {
-        if (cancelRequested) break;
-        const path = inlinePaths.get(`__inline_${s.idx}`)!;
-        if (collectedBytes >= MAX_ARCHIVE_BYTES) {
-          resultList.push({ url: '', path, size: 0, status: 'skip', note: '总预算超限', kind: 'inline', source: 'inline' });
-          scanned++;
-          continue;
-        }
-        const text = s.text.slice(0, MAX_INLINE_BYTES);
-        const bytes = strToU8(text);
-        collectedBytes += bytes.length;
-        collected.push({ path, bytes });
-        resultList.push({
-          url: '', path, size: bytes.length, status: 'ok', kind: 'inline', source: 'inline',
-          note: s.text.length > MAX_INLINE_BYTES ? '已截断' : undefined,
-        });
-        scanned++;
-      }
-
-      if (cancelRequested) return finishCancelled(resultList);
-
-      if (collected.length === 0) {
-        phase = '';
-        status = 'failed';
-        toastStore.show('未抓取到任何 JS 内容', 'warning');
-        entries = resultList;
-        return;
-      }
-
-      // 3) 打包 zip —— 先让出主线程一帧，降低大体积打包对 UI 的阻塞
-      status = 'packaging';
-      phase = '正在打包 zip...';
-      await tick();
-      const tree: Record<string, Uint8Array> = {};
-      // 按路径排序写入（更友好的归档结构）
-      for (const { path, bytes } of collected.sort((a, b) => a.path.localeCompare(b.path))) {
-        tree[path] = bytes;
-      }
-      const fetchedAt = Date.now();
-      tree['MANIFEST.txt'] = strToU8(buildManifest(resultList, pageUrl, fetchedAt));
-      // 简明 README
-      tree['README.txt'] = strToU8(buildReadme(pageUrl, fetchedAt));
-
-      // level 3：压缩比与耗时折中，避免在主线程长压一个超大 zip
-      const zipped = zipSync(tree, { level: 3 });
-      lastBytes = zipped.length;
-
-      // 4) 下载
-      const blob = new Blob([zipped], { type: 'application/zip' });
-      downloadBlob(blob, zipFilename(pageUrl));
-      entries = resultList.sort((a, b) => a.path.localeCompare(b.path));
-      status = 'completed';
-      phase = `完成：${collected.length} 个文件，zip ${(zipped.length / 1024).toFixed(1)} KB`;
-      toastStore.show(`已打包 ${collected.length} 个 JS`, 'success');
-    } catch (e: any) {
-      status = 'failed';
-      phase = `失败: ${e?.message || e}`;
-      toastStore.show('打包失败: ' + (e?.message || e), 'error');
-    } finally {
-      currentFile = '';
-    }
+  /** 取消收尾：落已收集清单并返回（controller 将置 cancelled 终态，绝不 zipSync/下载/成功 toast） */
+  function finishCancelled(resultList: ArchiveEntry[]): ArchiveOutput {
+    entries = resultList.sort((a, b) => a.path.localeCompare(b.path));
+    currentFile = '';
+    return { entries: resultList };
   }
 
-  /** 取消收尾：落已收集清单，置 cancelled 终态，绝不触发下载或「成功」提示。 */
-  function finishCancelled(resultList: ArchiveEntry[]) {
-    entries = resultList.sort((a, b) => a.path.localeCompare(b.path));
-    phase = `已取消（${scanned}/${total}）`;
-    status = 'cancelled';
-    currentFile = '';
-    toastStore.show('已取消', 'warning');
+  async function handleStart() {
+    try {
+      const r = await controller.start({ pageUrl, includeInline });
+      if (r.status === 'succeeded' && r.result?.zipBlob) {
+        downloadBlob(r.result.zipBlob, zipFilename(pageUrl));
+        lastBytes = r.result.totalBytes ?? 0;
+        const ok = r.result.entries.filter(e => e.status === 'ok').length;
+        toastStore.show(`已打包 ${ok} 个 JS`, 'success');
+      } else if (r.status === 'cancelled') {
+        if (r.result?.entries) entries = r.result.entries;
+        toastStore.show('已取消', 'warning');
+      }
+    } catch {
+      // failed：controller.state.error 已设；UI 由 cs.status==='failed' 渲染 ErrorState
+    }
   }
 
   function buildReadme(pageUrl: string, fetchedAt: number): string {
@@ -311,16 +288,6 @@
       return `lingmou-js-${Date.now()}.zip`;
     }
   }
-
-  function downloadBlob(blob: Blob, filename: string) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
-    // 延迟回收：给浏览器留出启动下载的时间，避免过早 revoke 导致下载失败
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  function stop() { cancelRequested = true; }
 
   function statusColor(s: ArchiveEntry['status']): string {
     return s === 'ok' ? 'text-green-600 dark:text-green-400'
@@ -350,30 +317,30 @@
     </div>
 
     <div class="flex gap-2">
-      <button class="btn btn-sm btn-primary flex-1" disabled={archiving || !pageUrl} onclick={archiveAll}>
+      <button class="btn btn-sm btn-primary flex-1" disabled={archiving || !pageUrl} onclick={handleStart}>
         {archiving ? '打包中...' : '📦 打包下载全部 JS'}
       </button>
       {#if archiving}
-        <button class="btn btn-sm btn-ghost" onclick={stop}>停止</button>
+        <button class="btn btn-sm btn-ghost" onclick={() => controller.cancel()}>停止</button>
       {/if}
     </div>
 
-    <!-- 终端状态徽标（取消/失败时清晰反馈，不与「成功」混淆） -->
-    {#if status === 'cancelled'}
+    <!-- 终端状态徽标 / 错误恢复（取消/失败时清晰反馈，不与「成功」混淆） -->
+    {#if cs.status === 'cancelled'}
       <div class="text-xs text-amber-600 dark:text-amber-400">⚠ 已取消，未生成下载</div>
-    {:else if status === 'failed'}
-      <div class="text-xs text-red-500">✕ 打包失败（详见下方）</div>
+    {:else if cs.status === 'failed' && cs.error}
+      <ErrorState error={cs.error} onRetry={handleStart} />
     {/if}
   </div>
 
   <!-- 进度 -->
-  {#if archiving || phase}
+  {#if archiving || cs.phase}
     <div class="card p-3 space-y-2">
       <div class="flex items-center justify-between text-xs">
-        <span class="text-gray-600 dark:text-gray-300">{phase}</span>
-        {#if total > 0}<span class="text-gray-400 font-mono">{scanned}/{total}</span>{/if}
+        <span class="text-gray-600 dark:text-gray-300">{cs.phase}</span>
+        {#if cs.total && cs.total > 0}<span class="text-gray-400 font-mono">{cs.completed}/{cs.total}</span>{/if}
       </div>
-      {#if total > 0}
+      {#if cs.total && cs.total > 0}
         <div class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div class="h-full bg-primary transition-all" style="width:{progress}%"></div>
         </div>
@@ -419,7 +386,7 @@
         </table>
       </div>
     </div>
-  {:else if status === 'idle'}
+  {:else if cs.status === 'idle'}
     <EmptyState message="点击「打包下载全部 JS」归档当前页面脚本" />
   {/if}
 </div>

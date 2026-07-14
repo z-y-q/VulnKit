@@ -36,6 +36,20 @@ import { vi } from 'vitest';
   },
 } as any;
 
+// jsdom 未实现 matchMedia（stores/ui.ts themeStore 初始化用到）
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  (window as any).matchMedia = (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  });
+}
+
 // Mock TextEncoder/TextDecoder
 if (typeof TextEncoder === 'undefined') {
   (globalThis as any).TextEncoder = class {
