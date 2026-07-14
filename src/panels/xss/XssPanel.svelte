@@ -13,6 +13,9 @@
   import ScanProgress from '@/components/scanner/ScanProgress.svelte';
   import SeverityBadge from '@/components/scanner/SeverityBadge.svelte';
   import { copyText as clipboardCopy } from '@/lib/actions/clipboard';
+  import ResultToolbar from '@/components/results/ResultToolbar.svelte';
+  import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
   import { downloadText, buildFilename } from '@/lib/actions/download';
   import { toCsv } from '@/lib/actions/serializers';
   import type { ProbeResult } from '@/lib/types/messaging';
@@ -60,8 +63,7 @@
   let scanned = $state(0);
   let total = $state(0);
   let findings = $state<XssFinding[]>([]);
-  let sortBy = $state<'severity' | 'param' | 'context'>('severity');
-  let filter = $state<'all' | 'vuln'>('all');
+  let query = $state<ResultQuery>({ search: '', filters: {}, sort: { key: 'severity', direction: 'asc' } });
   let customPayload = $state('');
   let useCustom = $state(false);
   let useHarvest = $state(true);
@@ -90,19 +92,35 @@
     });
   });
 
-  // ===== 派生：结果 =====
-  let filteredFindings = $derived.by(() => {
-    let list = findings;
-    if (filter === 'vuln') list = list.filter(f => f.reflected && !f.sanitized);
-    return [...list].sort((a, b) => {
-      if (sortBy === 'param') return a.param.localeCompare(b.param);
-      if (sortBy === 'context') return a.context.localeCompare(b.context);
-      return compareSeverity(a.severity, b.severity);
-    });
-  });
+  // ===== 派生：结果（统一 ResultAdapter，供 ResultToolbar/ExportMenu 消费）=====
+  const xssAdapter: ResultAdapter<XssFinding> = {
+    apply(items, q) {
+      let list = items;
+      if (q.filters.scope?.includes('vuln')) list = list.filter((f) => f.reflected && !f.sanitized);
+      const kw = q.search.trim().toLowerCase();
+      if (kw) list = list.filter((f) => xssAdapter.getSearchText(f).toLowerCase().includes(kw));
+      return [...list].sort((a, b) => {
+        if (q.sort.key === 'param') return a.param.localeCompare(b.param);
+        if (q.sort.key === 'context') return a.context.localeCompare(b.context);
+        return compareSeverity(a.severity, b.severity);
+      });
+    },
+    getSearchText(f) {
+      return `${f.param} ${f.payload} ${f.context} ${f.evidence ?? ''}`;
+    },
+    getId(f) {
+      return f.param + f.payload + f.context;
+    },
+  };
 
-  let vulnCount = $derived(findings.filter(f => f.reflected && !f.sanitized).length);
-  let reflectedCount = $derived(findings.filter(f => f.reflected).length);
+  let filteredFindings = $derived(xssAdapter.apply(findings, query));
+  let vulnOnly = $derived(query.filters.scope?.includes('vuln') ?? false);
+  function toggleVuln() {
+    query.filters = vulnOnly ? {} : { scope: ['vuln'] };
+  }
+
+  let vulnCount = $derived(findings.filter((f) => f.reflected && !f.sanitized).length);
+  let reflectedCount = $derived(findings.filter((f) => f.reflected).length);
 
   // ===== 派生：注入点视图 =====
   let filteredPoints = $derived.by(() => {
@@ -661,23 +679,29 @@
     toastStore.show('注入点 CSV 已导出', 'success');
   }
 
-  function exportFindingsCsv() {
-    if (findings.length === 0) { toastStore.show('无扫描结果', 'warning'); return; }
-    const rows: string[][] = [['Severity', 'Param', 'Method', 'URL', 'Payload', 'Context', 'Reflected', 'Sanitized']];
-    for (const f of findings) {
-      rows.push([f.severity, f.param, '', targetUrl, f.payload, f.context, String(f.reflected), String(f.sanitized)]);
-    }
-    downloadText(toCsv(rows), buildFilename('xss-findings', 'csv'), 'text/csv');
-    toastStore.show('结果 CSV 已导出', 'success');
+  // —— 导出/复制序列化器（作用于当前筛选 filteredFindings，展示/导出同源 §6.1）——
+  function xssCsv(items: XssFinding[]): string {
+    return toCsv([
+      ['Severity', 'Param', 'URL', 'Payload', 'Context', 'Reflected', 'Sanitized'],
+      ...items.map((f) => [f.severity, f.param, targetUrl, f.payload, f.context, String(f.reflected), String(f.sanitized)]),
+    ]);
   }
-
-  function copyMarkdown() {
-    if (findings.length === 0) { toastStore.show('无扫描结果', 'warning'); return; }
-    const header = '| URL | Parameter | Context | Severity | Payload |\n|---|---|---|---|---|';
-    const body = findings.map(f =>
-      `| ${targetUrl} | ${f.param} | ${f.context} | ${f.severity} | \`${f.payload.replace(/\|/g, '\\|')}\` |`,
-    ).join('\n');
-    copyText(`# XSS Findings\n\n${header}\n${body}`, 'Markdown 已复制');
+  function xssMd(items: XssFinding[]): string {
+    const header = '| URL | Parameter | Context | Severity | Payload |';
+    const sep = '|---|---|---|---|---|';
+    const body = items
+      .map((f) => `| ${targetUrl} | ${f.param} | ${f.context} | ${f.severity} | \`${f.payload.replace(/\|/g, '\\|')}\` |`)
+      .join('\n');
+    return `# XSS Findings\n\n${header}\n${sep}\n${body}`;
+  }
+  function xssText(items: XssFinding[]): string {
+    const lines = [`XSS Findings @ ${targetUrl}`, `发现: ${items.length}`, ''];
+    for (const f of items) {
+      lines.push(`[${f.severity}] ${f.param} (${f.context})`);
+      lines.push(`  Payload: ${f.payload}`);
+      if (f.evidence) lines.push(`  Evidence: ${f.evidence}`);
+    }
+    return lines.join('\n');
   }
 
   function copyAllUrls() {
@@ -950,28 +974,31 @@ ${cards}
     {/if}
   </div>
 
-  <!-- 统计 -->
+  <!-- 工具栏：ResultToolbar 包裹 漏洞筛选 / 排序 / PoC·Console / 导出 -->
   {#if findings.length > 0}
-    <div class="flex gap-2 text-xs flex-wrap">
+    <ResultToolbar {query} total={findings.length} shown={filteredFindings.length} searchPlaceholder="搜索参数/payload...">
       <button
-        class="badge {filter === 'all' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-        onclick={() => (filter = 'all')}>全部 {findings.length}</button>
-      <button
-        class="badge {filter === 'vuln' ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
-        onclick={() => (filter = 'vuln')}>漏洞 {vulnCount}</button>
+        class="badge cursor-pointer {vulnOnly ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
+        aria-pressed={vulnOnly}
+        onclick={toggleVuln}
+      >
+        漏洞 {vulnCount}
+      </button>
       <span class="badge bg-blue-500 text-white">反射 {reflectedCount}</span>
-      <select class="input text-xs ml-auto w-24" bind:value={sortBy}>
+      <select
+        class="input text-xs w-24"
+        value={query.sort.key}
+        onchange={(e) => { query.sort.key = (e.currentTarget as HTMLSelectElement).value; }}
+        aria-label="排序"
+      >
         <option value="severity">按严重性</option>
         <option value="param">按参数</option>
         <option value="context">按上下文</option>
       </select>
-    </div>
-    <div class="flex gap-1 flex-wrap">
-      <button class="btn btn-xs btn-danger" onclick={generatePoc}>📄 PoC HTML</button>
-      <button class="btn btn-xs" onclick={exportFindingsCsv}>导出 CSV</button>
-      <button class="btn btn-xs" onclick={copyMarkdown}>Markdown</button>
-      <button class="btn btn-xs" onclick={sendToConsole}>发送 Console</button>
-    </div>
+      <button class="btn btn-xs btn-danger" onclick={generatePoc}>📄 PoC</button>
+      <button class="btn btn-xs" onclick={sendToConsole}>Console</button>
+      <ExportMenu items={filteredFindings} module="xss" serializers={{ csv: xssCsv, markdown: xssMd, text: xssText }} />
+    </ResultToolbar>
   {/if}
 
   <!-- 结果 -->
