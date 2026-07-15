@@ -1,7 +1,7 @@
 /**
  * 面板动态加载器
  * 每个面板按需 import()，side-panel 切换时才拉取对应 chunk，
- * 避免首屏一次性加载全部 35 个面板组件。
+ * 避免首屏一次性加载全部 36 个面板组件。
  *
  * key 必须与 registry.ts 中 panelMeta 的 id 一一对应；
  * index.ts 会在启动时校验每个 meta.id 都有对应 loader，缺失即抛错。
@@ -19,6 +19,7 @@ export const panelLoaders: Record<string, PanelLoader> = {
 
   // ===== 扫描 (Scan) =====
   xssscan: () => import('./xss/XssPanel.svelte'),
+  sqliscan: () => import('./sqli/SqliPanel.svelte'),
   cors: () => import('./cors/CorsPanel.svelte'),
   headers: () => import('./headers/HeadersPanel.svelte'),
   waf: () => import('./waf/WafPanel.svelte'),

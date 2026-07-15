@@ -117,6 +117,18 @@ export const panelMeta: PanelMeta[] = [
     supportsAutoRun: true,
   },
   {
+    id: 'sqliscan',
+    label: 'SQLi扫描',
+    icon: '💉',
+    category: 'scan',
+    categoryLabel: '扫描',
+    catColor: '#e74c3c',
+    aliases: ['sqli', 'sql注入', 'sql', 'sqlinjection'],
+    keywords: ['sqli', 'sql', '注入', '报错', '数据库', '盲注', 'injection'],
+    capabilities: ['target-url', 'copy', 'export', 'detail', 'history'],
+    supportsAutoRun: true,
+  },
+  {
     id: 'cors',
     label: 'CORS检测',
     icon: '🔗',
