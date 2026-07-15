@@ -303,9 +303,8 @@
                   class="btn btn-xs shrink-0"
                   onclick={(e) => {
                     e.stopPropagation();
-                    activeCategory === 'reverse_shell' && item.payload.includes('{ip}')
-                      ? copyReverseShell(item.payload)
-                      : copyPayload(item.payload);
+                    if (activeCategory === 'reverse_shell' && item.payload.includes('{ip}')) copyReverseShell(item.payload);
+                    else copyPayload(item.payload);
                   }}
                 >
                   复制

@@ -3,7 +3,7 @@
 // 通过 execInTab(tabId, PHASE1_MAIN_WORLD_FN, { world: 'MAIN' }) 直接注入执行
 // 结果直接 return（不走 postMessage / bridge 链路）
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 export const PHASE1_MAIN_WORLD_FN = function () {
   const modules: any[] = [];
   let hasWebpack = false;

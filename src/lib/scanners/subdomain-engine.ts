@@ -511,7 +511,7 @@ export function parseDnsRecords(text: string, rootDomain: string): string[] {
   const hostRe = /[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+/gi;
   let m: RegExpExecArray | null;
   while ((m = hostRe.exec(text.toLowerCase())) !== null) {
-    let host = m[0].replace(/\.$/, ''); // 去尾点
+    const host = m[0].replace(/\.$/, ''); // 去尾点
     if (host.endsWith(root) && host !== root) found.add(host);
   }
   return [...found];

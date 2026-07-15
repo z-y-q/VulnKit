@@ -65,7 +65,7 @@ export function parseRulesYaml(text: string): HaeGroup[] {
         };
         // 预校验正则合法性
         try { new RegExp(rule.f_regex); } catch (e: any) {
-          throw new Error(`规则「${rule.name}」f_regex 非法: ${e.message}`);
+          throw new Error(`规则「${rule.name}」f_regex 非法: ${e.message}`, { cause: e });
         }
         return rule;
       }),

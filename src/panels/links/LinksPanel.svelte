@@ -116,7 +116,7 @@
 
   // --- DOM extraction function (runs in MAIN world, cannot reference closures) ---
   function extractLinksFromPage() {
-    // eslint-disable-next-line no-restricted-globals
+     
     const pageUrl = location.href;
     const pageDomain = location.hostname;
     const pageOrigin = location.origin;

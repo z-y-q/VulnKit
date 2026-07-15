@@ -32,9 +32,8 @@ jobs:
       - name: Type check
         run: pnpm run check
 
-      # lint 暂未接入：eslint 尚未安装，待补充 flat config 后启用
-      # - name: Lint
-      #   run: pnpm run lint
+      - name: Lint
+        run: pnpm run lint
 
       - name: Test + coverage
         run: pnpm test:coverage
