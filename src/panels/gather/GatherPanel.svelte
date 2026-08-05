@@ -476,7 +476,7 @@
   {/if}
 
   {#if totalCount === 0 && !collecting}
-    <div class="card p-4 text-center text-xs text-gray-400">
+    <div class="card p-4 text-center text-xs text-gray-500">
       点击「收集当前页面」开始信息收集
     </div>
   {:else if totalCount > 0}
@@ -529,7 +529,7 @@
       <div class="card p-3">
         <div class="text-xs font-medium mb-2 text-gray-500">技术栈指纹（{filteredTech.length}）</div>
         {#if filteredTech.length === 0}
-          <div class="text-xs text-gray-400">未检测到</div>
+          <div class="text-xs text-gray-500">未检测到</div>
         {:else}
           <div class="space-y-1 max-h-64 overflow-y-auto">
             {#each filteredTech as f (`${f.name}:${f.value}`)}
@@ -551,7 +551,7 @@
       <div class="card p-3">
         <div class="text-xs font-medium mb-2 text-gray-500">外链资源（{filteredResources.length}）</div>
         {#if filteredResources.length === 0}
-          <div class="text-xs text-gray-400">未发现</div>
+          <div class="text-xs text-gray-500">未发现</div>
         {:else}
           <div class="space-y-1 max-h-64 overflow-y-auto">
             {#each filteredResources as f (`${f.name}:${f.value}`)}
@@ -595,7 +595,7 @@
       <div class="card p-3">
         <div class="text-xs font-medium mb-2 text-gray-500">HaE 规则命中（{haeFindings.length}）</div>
         {#if haeFindings.length === 0}
-          <div class="text-xs text-gray-400">未命中 HaE 规则</div>
+          <div class="text-xs text-gray-500">未命中 HaE 规则</div>
         {:else}
           <div class="space-y-1 max-h-64 overflow-y-auto">
             {#each haeFindings as m}

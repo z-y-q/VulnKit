@@ -196,7 +196,7 @@
         <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
-    <div class="text-xs text-gray-400">
+    <div class="text-xs text-gray-500">
       {REDIRECT_PAYLOADS.length} 个参数 × {PROTOCOL_VARIANTS.length} 个协议变体 = {REDIRECT_PAYLOADS.length * PROTOCOL_VARIANTS.length} 个测试
     </div>
     <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="重定向检测" />
@@ -206,7 +206,7 @@
   {#if results.length > 0}
     <ResultToolbar {query} total={results.length} shown={filtered.length} searchPlaceholder="搜索参数/URL...">
       <button
-        class="badge cursor-pointer {vulnOnly ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}"
+        class="badge cursor-pointer {vulnOnly ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-500'}"
         aria-pressed={vulnOnly}
         onclick={toggleVuln}
       >
@@ -222,7 +222,7 @@
       {#each filtered as r (r.url)}
         <div class="card p-2.5 space-y-1">
           <div class="flex items-center gap-2">
-            <span class="badge text-xs {r.status === 'vulnerable' ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}">
+            <span class="badge text-xs {r.status === 'vulnerable' ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-500'}">
               {r.status === 'vulnerable' ? '漏洞' : '安全'}
             </span>
             <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{r.param}</span>

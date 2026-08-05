@@ -414,7 +414,7 @@
         <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
-    <div class="flex items-center gap-2 text-xs text-gray-400">
+    <div class="flex items-center gap-2 text-xs text-gray-500">
       <span>词表: {SUBDOMAIN_WORDLIST.length} 条</span>
       <span>·</span>
       <span>并发: {$scanSettingsStore.concurrency}</span>
@@ -475,7 +475,7 @@
               {/if}
             </div>
             {#if r.ips.length > 0}
-              <div class="text-xs text-gray-400 truncate">{r.ips.join(', ')}</div>
+              <div class="text-xs text-gray-500 truncate">{r.ips.join(', ')}</div>
             {/if}
             {#if r.cname}
               <div class="text-xs text-blue-500 dark:text-blue-400 truncate">
@@ -487,7 +487,7 @@
             {r.records.length}
           </span>
           <button
-            class="ml-auto text-xs text-gray-400 hover:text-primary shrink-0"
+            class="ml-auto text-xs text-gray-500 hover:text-primary shrink-0"
             onclick={() => copyRow(r)}
           >
             复制

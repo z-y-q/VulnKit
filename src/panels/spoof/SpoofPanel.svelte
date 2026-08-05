@@ -264,7 +264,7 @@
             onclick={() => selectUa(p.value)}
           >
             <div class="text-xs font-medium">{p.label}</div>
-            <div class="text-xs text-gray-400 font-mono truncate">{p.value}</div>
+            <div class="text-xs text-gray-500 font-mono truncate">{p.value}</div>
           </button>
         {/each}
       </div>
@@ -369,7 +369,7 @@
       </div>
     {/if}
 
-    <div class="text-xs text-gray-400">当前域名 {cookieList.length} 个 Cookie</div>
+    <div class="text-xs text-gray-500">当前域名 {cookieList.length} 个 Cookie</div>
     <div class="space-y-1 max-h-80 overflow-y-auto">
       {#each filteredCookies as c (c.name + c.domain + c.path)}
         <div class="card p-2 text-xs">
@@ -377,11 +377,11 @@
             <span class="font-mono font-medium flex-1 truncate" title={c.value}>{c.name}</span>
             {#if c.secure}<span class="badge text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">S</span>{/if}
             {#if c.httpOnly}<span class="badge text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">H</span>{/if}
-            <button class="text-xs text-gray-400 hover:text-primary" onclick={() => openEditCookie(c)}>编辑</button>
+            <button class="text-xs text-gray-500 hover:text-primary" onclick={() => openEditCookie(c)}>编辑</button>
             <button class="text-xs text-red-400 hover:text-red-600" onclick={() => deleteCookie(c)}>删除</button>
           </div>
           <div class="font-mono text-gray-500 truncate">{c.value}</div>
-          <div class="text-gray-400">{c.domain}{c.path}</div>
+          <div class="text-gray-500">{c.domain}{c.path}</div>
         </div>
       {/each}
     </div>

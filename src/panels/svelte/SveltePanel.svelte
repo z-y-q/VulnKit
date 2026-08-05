@@ -78,7 +78,7 @@
         {scanning ? '检测中...' : '检测 Svelte'}
       </button>
     </div>
-    <div class="text-xs text-gray-400">
+    <div class="text-xs text-gray-500">
       检测当前页面是否使用 Svelte 框架，识别版本、组件和路由模式
     </div>
   </div>
@@ -95,7 +95,7 @@
     <div class="card p-3 text-center space-y-1">
       <div class="text-2xl">&#128270;</div>
       <div class="text-sm">未检测到 Svelte</div>
-      <div class="text-xs text-gray-400">当前页面未发现 Svelte/SvelteKit 框架特征</div>
+      <div class="text-xs text-gray-500">当前页面未发现 Svelte/SvelteKit 框架特征</div>
     </div>
   {/if}
 
@@ -163,7 +163,7 @@
         <div class="space-y-1">
           <div class="text-xs text-gray-500">检测信号</div>
           {#each result.signals as sig}
-            <div class="text-xs font-mono text-gray-600 dark:text-gray-400">{sig}</div>
+            <div class="text-xs font-mono text-gray-600 dark:text-gray-500">{sig}</div>
           {/each}
         </div>
       {/if}

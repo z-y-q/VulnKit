@@ -267,7 +267,7 @@
       {/if}
     </div>
     {#if archiving}
-      <div class="text-xs text-gray-400">{cs.phase || '扫描中...'}</div>
+      <div class="text-xs text-gray-500">{cs.phase || '扫描中...'}</div>
     {/if}
   </div>
 
@@ -306,7 +306,7 @@
     <div class="space-y-3">
       {#each groupedResults as group (group.category)}
         <div class="space-y-1.5">
-          <div class="text-xs font-medium text-gray-400 px-1">
+          <div class="text-xs font-medium text-gray-500 px-1">
             {group.label}
             <span class="badge text-xs bg-gray-200 dark:bg-gray-700 ml-1">{group.items.length}</span>
           </div>

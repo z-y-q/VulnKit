@@ -332,7 +332,7 @@
         <input type="checkbox" bind:checked={useDynamic} disabled={archiving} class="accent-blue-500" />
         <span>动态混淆 Origin</span>
       </label>
-      <span class="text-gray-500 dark:text-gray-400 shrink-0">方法:</span>
+      <span class="text-gray-500 dark:text-gray-500 shrink-0">方法:</span>
       {#each ['GET', 'OPTIONS', 'POST', 'PUT', 'DELETE'] as m}
         <button
           type="button"
@@ -345,7 +345,7 @@
         </button>
       {/each}
     </div>
-    <div class="text-xs text-gray-500 dark:text-gray-400">
+    <div class="text-xs text-gray-500 dark:text-gray-500">
       端点: {DEFAULT_CORS_ENDPOINTS.length} · Origin: {ORIGIN_VARIANTS.length}{useDynamic ? '+动态' : ''}
     </div>
     <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="CORS 探测" />
@@ -357,7 +357,7 @@
       <button
         class="badge cursor-pointer transition-all duration-[var(--vk-dur-fast)] ease-[var(--vk-ease)] active:scale-[0.96] {vulnOnly
           ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60'
-          : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}"
+          : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-500'}"
         aria-pressed={vulnOnly}
         onclick={toggleVuln}
       >
@@ -403,7 +403,7 @@
         >
           <div class="flex items-center gap-2">
             <SeverityBadge severity={issue.severity} />
-            <span class="text-xs text-gray-500 dark:text-gray-400">{issue.endpoint.label}</span>
+            <span class="text-xs text-gray-500 dark:text-gray-500">{issue.endpoint.label}</span>
             <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{issue.method}</span>
             {#if issue.statusCode}
               <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{issue.statusCode}</span>
@@ -426,7 +426,7 @@
             </div>
           {/if}
           <div class="text-xs font-mono text-gray-600 dark:text-gray-300 break-all">{issue.url}</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400">Origin: {issue.origin.value}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-500">Origin: {issue.origin.value}</div>
           {#if issue.acao}
             <div class="text-xs">
               ACAO: <span class="font-mono text-blue-600 dark:text-blue-400">{issue.acao}</span>
@@ -468,7 +468,7 @@
       {#if i.severity === 'critical' || i.severity === 'danger'}
         <div class="flex items-center gap-2">
           <button class="btn btn-xs btn-primary" onclick={() => verifyCredential(i)}>验证凭证反射</button>
-          <span class="text-xs text-gray-500 dark:text-gray-400">omit 模式重探，确认是否无视凭证盲目反射</span>
+          <span class="text-xs text-gray-500 dark:text-gray-500">omit 模式重探，确认是否无视凭证盲目反射</span>
         </div>
       {/if}
       {#if verifiedMap[i.url + i.method + i.origin.value]}

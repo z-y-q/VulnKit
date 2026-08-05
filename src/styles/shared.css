@@ -18,10 +18,13 @@
   --vk-bg-soft: #f8fafc;
   --vk-bg-sunken: #f1f5f9;
   --vk-text: #1f2937;
-  --vk-text-muted: #6b7280;
+  --vk-text-muted: #4b5563;
   --vk-border: #e5e7eb;
   --vk-primary: #4a90e2;
   --vk-primary-strong: #357abd;
+  /* 主操作锚点：舒服的近黑（亮色黑底白字 / 暗色白底黑字），非品牌蓝 */
+  --vk-btn: #1d1d1f;
+  --vk-btn-fg: #ffffff;
   --vk-danger: #ef4444;
   --vk-success: #10b981;
   --vk-warning: #f59e0b;
@@ -54,6 +57,9 @@
   --vk-border: #334155;
   --vk-primary: #4a90e2;
   --vk-primary-strong: #357abd;
+  /* 暗色：主操作锚点反转为白底黑字（黑按钮在深底上不可见） */
+  --vk-btn: #f3f4f6;
+  --vk-btn-fg: #1d1d1f;
   --vk-danger: #ef4444;
   --vk-success: #10b981;
   --vk-warning: #f59e0b;

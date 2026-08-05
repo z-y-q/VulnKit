@@ -568,9 +568,9 @@
 
   <!-- 结果列表 -->
   {#if loading && results.length === 0}
-    <div class="text-xs text-gray-400 text-center py-4">{cs.phase || '正在审计...'}</div>
+    <div class="text-xs text-gray-500 text-center py-4">{cs.phase || '正在审计...'}</div>
   {:else if results.length === 0}
-    <div class="text-xs text-gray-400 text-center py-4">{statusText || '点击刷新开始审计'}</div>
+    <div class="text-xs text-gray-500 text-center py-4">{statusText || '点击刷新开始审计'}</div>
   {:else}
     <div class="space-y-2">
       {#each displayResults() as r (r.cookie.name + r.cookie.domain)}
@@ -580,7 +580,7 @@
             <div class="flex items-center gap-2 min-w-0">
               <span class="w-2 h-2 rounded-full shrink-0 {sevDotClass(r.maxSev)}"></span>
               <span class="text-sm font-medium truncate">{r.cookie.name}</span>
-              <span class="text-xs text-gray-400 truncate">{r.cookie.domain}</span>
+              <span class="text-xs text-gray-500 truncate">{r.cookie.domain}</span>
             </div>
             <div class="flex gap-1 shrink-0">
               <button class="btn btn-xs" title="复制值" onclick={() => copyValue(r.cookie.value)}>复制</button>
@@ -590,7 +590,7 @@
           </div>
 
           <!-- 值截断 -->
-          <div class="text-xs font-mono text-gray-400 truncate">{truncate(r.cookie.value, 60)}</div>
+          <div class="text-xs font-mono text-gray-500 truncate">{truncate(r.cookie.value, 60)}</div>
 
           <!-- 标志徽章 -->
           <div class="flex gap-1 flex-wrap">
@@ -603,7 +603,7 @@
             <span class="text-xs px-1.5 py-0.5 rounded {flagClass(!!(r.cookie.sameSite && r.cookie.sameSite !== 'unspecified'))}">
               SameSite: {r.cookie.sameSite || '未设置'}
             </span>
-            <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+            <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-500">
               Path: {r.cookie.path || '/'}
             </span>
           </div>
@@ -619,7 +619,7 @@
                       {issue.text}
                     </span>
                     {#if issue.fix}
-                      <div class="text-gray-400 dark:text-gray-500">{issue.fix}</div>
+                      <div class="text-gray-500 dark:text-gray-500">{issue.fix}</div>
                     {/if}
                   </div>
                 </div>
@@ -630,7 +630,7 @@
       {/each}
 
       {#if displayResults().length === 0 && results.length > 0}
-        <div class="text-xs text-gray-400 text-center py-2">无匹配结果</div>
+        <div class="text-xs text-gray-500 text-center py-2">无匹配结果</div>
       {/if}
     </div>
   {/if}
@@ -642,7 +642,7 @@
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-4 space-y-3">
       <div class="flex items-center justify-between">
         <span class="text-sm font-bold">{editing ? '编辑 Cookie' : '新增 Cookie'}</span>
-        <button class="text-gray-400 hover:text-gray-600" onclick={() => (editorOpen = false)}>✕</button>
+        <button class="text-gray-500 hover:text-gray-600" onclick={() => (editorOpen = false)}>✕</button>
       </div>
       <div class="space-y-2">
         <div>
@@ -690,9 +690,9 @@
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-4 space-y-3">
       <div class="flex items-center justify-between">
         <span class="text-sm font-bold">批量导入 Cookie</span>
-        <button class="text-gray-400 hover:text-gray-600" onclick={() => (importOpen = false)}>✕</button>
+        <button class="text-gray-500 hover:text-gray-600" onclick={() => (importOpen = false)}>✕</button>
       </div>
-      <p class="text-xs text-gray-400">支持 <code class="font-mono">name=value; name2=value2</code> 格式，或每行一个。导入到当前域名。</p>
+      <p class="text-xs text-gray-500">支持 <code class="font-mono">name=value; name2=value2</code> 格式，或每行一个。导入到当前域名。</p>
       <textarea class="input text-xs font-mono" rows="6" placeholder="session_id=abc123; token=eyJhbGc..." bind:value={importText}></textarea>
       <div class="flex justify-end gap-2">
         <button class="btn btn-sm btn-ghost" onclick={() => (importOpen = false)}>取消</button>

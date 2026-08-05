@@ -49,6 +49,6 @@
   {#if error}
     <p id={errId} class="text-xs text-red-500 dark:text-red-400">{error}</p>
   {:else if hint}
-    <p id={hintId} class="text-xs text-gray-400">{hint}</p>
+    <p id={hintId} class="text-xs text-gray-500">{hint}</p>
   {/if}
 </div>

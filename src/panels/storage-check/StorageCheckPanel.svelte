@@ -509,7 +509,7 @@
   <!-- 未扫描提示 -->
   {#if !scanned && !scanning}
     <div class="card p-3">
-      <div class="text-sm text-gray-400">点击「检查存储」扫描当前页面的 localStorage、sessionStorage、Cookie、IndexedDB 及全局变量</div>
+      <div class="text-sm text-gray-500">点击「检查存储」扫描当前页面的 localStorage、sessionStorage、Cookie、IndexedDB 及全局变量</div>
     </div>
   {/if}
 
@@ -606,12 +606,12 @@
                   </div>
                 {/each}
               {:else}
-                <div class="ml-3 text-xs text-gray-400">无 object store</div>
+                <div class="ml-3 text-xs text-gray-500">无 object store</div>
               {/if}
             </div>
           {/each}
         {:else}
-          <div class="text-sm text-gray-400">{idbInfo?.error ? `错误: ${idbInfo.error}` : '未发现 IndexedDB 数据库'}</div>
+          <div class="text-sm text-gray-500">{idbInfo?.error ? `错误: ${idbInfo.error}` : '未发现 IndexedDB 数据库'}</div>
         {/if}
       </div>
     {/if}
@@ -622,7 +622,7 @@
   <div class="space-y-1">
     {#if items.length === 0}
       <div class="card p-3">
-        <div class="text-sm text-gray-400">{filter === 'sensitive' ? '无匹配的敏感数据' : '存储为空'}</div>
+        <div class="text-sm text-gray-500">{filter === 'sensitive' ? '无匹配的敏感数据' : '存储为空'}</div>
       </div>
     {:else}
       {#each items as item (`${storageType}:${item.key}`)}

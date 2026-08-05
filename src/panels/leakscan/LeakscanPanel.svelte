@@ -161,7 +161,7 @@
     <div class="flex gap-1">
       <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="深度扫描" onscan={handleScan} />
     </div>
-    <div class="text-xs text-gray-500 dark:text-gray-400">
+    <div class="text-xs text-gray-500 dark:text-gray-500">
       采集 DOM / localStorage / sessionStorage / 全局变量 / 外部 JS，运行 90 条泄露规则引擎（含熵值/Luhn/占位符校验降误报）。
     </div>
     {#if archiving}
@@ -184,7 +184,7 @@
     >
       <ExportMenu items={filtered} module="leakscan" serializers={{ json: leakJson, markdown: leakMd, text: leakText }} />
     </FilterBar>
-    <div class="text-xs text-gray-500 dark:text-gray-400 px-1">
+    <div class="text-xs text-gray-500 dark:text-gray-500 px-1">
       来源大小：DOM {(sources.dom / 1024).toFixed(1)}KB · 存储 {(sources.storage / 1024).toFixed(1)}KB · JS {(sources.js / 1024).toFixed(1)}KB
     </div>
   {/if}

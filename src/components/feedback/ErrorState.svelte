@@ -39,8 +39,8 @@
       <p class="text-xs text-gray-600 dark:text-gray-300 mt-0.5 break-words">{error.message}</p>
       {#if error.cause}
         <details class="mt-1">
-          <summary class="text-xs text-gray-400 cursor-pointer select-none">诊断信息</summary>
-          <pre class="text-xs text-gray-500 dark:text-gray-400 mt-1 whitespace-pre-wrap break-all">{error.cause}</pre>
+          <summary class="text-xs text-gray-500 cursor-pointer select-none">诊断信息</summary>
+          <pre class="text-xs text-gray-500 dark:text-gray-500 mt-1 whitespace-pre-wrap break-all">{error.cause}</pre>
         </details>
       {/if}
     </div>

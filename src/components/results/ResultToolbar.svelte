@@ -38,7 +38,7 @@
 </script>
 
 <div class="flex flex-wrap items-center gap-2 text-xs">
-  <span class="text-gray-500 dark:text-gray-400 shrink-0">
+  <span class="text-gray-500 dark:text-gray-500 shrink-0">
     发现 <b class="text-gray-700 dark:text-gray-200">{total}</b>
     {#if shown !== total}· 显示 <b class="text-gray-700 dark:text-gray-200">{shown}</b>{/if}
   </span>

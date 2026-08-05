@@ -10,7 +10,7 @@
     const STATUS_META: Record<TaskRecordStatus, { icon: string; cls: string; text: string }> = {
     succeeded: { icon: '✓', cls: 'text-green-500 dark:text-green-400', text: '成功' },
     partial: { icon: '◐', cls: 'text-yellow-500 dark:text-yellow-400', text: '部分' },
-    cancelled: { icon: '⊘', cls: 'text-gray-400 dark:text-gray-500', text: '已取消' },
+    cancelled: { icon: '⊘', cls: 'text-gray-500 dark:text-gray-500', text: '已取消' },
     failed: { icon: '✗', cls: 'text-red-500 dark:text-red-400', text: '失败' },
   };
 
@@ -42,7 +42,7 @@
       role="menu"
       aria-label="最近任务列表"
     >
-      <div class="flex items-center justify-between px-2 py-1 text-[11px] text-gray-400 border-b border-gray-100 dark:border-gray-700">
+      <div class="flex items-center justify-between px-2 py-1 text-[11px] text-gray-500 border-b border-gray-100 dark:border-gray-700">
         <span>最近任务（{records.length}）</span>
         <button
           type="button"
@@ -65,9 +65,9 @@
           <span class={meta.cls} aria-hidden="true">{meta.icon}</span>
           <span class="flex-1 truncate text-gray-700 dark:text-gray-200">{rec.label}</span>
           {#if rec.summary}
-            <span class="text-gray-400 truncate max-w-24">{rec.summary}</span>
+            <span class="text-gray-500 truncate max-w-24">{rec.summary}</span>
           {/if}
-          <span class="text-gray-400 tabular-nums shrink-0">{fmtTime(rec.finishedAt)}</span>
+          <span class="text-gray-500 tabular-nums shrink-0">{fmtTime(rec.finishedAt)}</span>
         </button>
       {/each}
     </div>

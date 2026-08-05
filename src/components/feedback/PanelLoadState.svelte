@@ -4,7 +4,7 @@
   let { label, icon = '' }: { label: string; icon?: string } = $props();
 </script>
 
-<div class="flex flex-col items-center justify-center py-12 text-gray-400" role="status" aria-live="polite">
+<div class="flex flex-col items-center justify-center py-12 text-gray-500" role="status" aria-live="polite">
   {#if icon}
     <div class="text-3xl mb-3 animate-pulse" aria-hidden="true">{icon}</div>
   {/if}

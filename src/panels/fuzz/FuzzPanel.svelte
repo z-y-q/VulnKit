@@ -155,7 +155,7 @@
     if (s >= 200 && s < 300) return 'text-green-600 dark:text-green-400';
     if (s >= 300 && s < 400) return 'text-blue-600 dark:text-blue-400';
     if (s === 401 || s === 403 || s === 405) return 'text-yellow-600 dark:text-yellow-400';
-    if (s === 404) return 'text-gray-400';
+    if (s === 404) return 'text-gray-500';
     if (s >= 500) return 'text-red-600 dark:text-red-400';
     return 'text-gray-500';
   }
@@ -267,7 +267,7 @@
       {/if}
     </div>
     <div class="flex items-center gap-2 text-xs">
-      <span class="text-gray-400">字典:</span>
+      <span class="text-gray-500">字典:</span>
       <select class="input text-xs flex-1" bind:value={wordlistKey}>
         {#each wordlistKeys as k}
           <option value={k}>{k} ({getWordlist(k).length})</option>
@@ -275,7 +275,7 @@
       </select>
     </div>
     <details class="text-xs">
-      <summary class="cursor-pointer text-gray-400">自定义路径（每行一个，合并到字典）</summary>
+      <summary class="cursor-pointer text-gray-500">自定义路径（每行一个，合并到字典）</summary>
       <textarea class="input w-full mt-1 font-mono" rows="3" placeholder="/admin&#10;/test&#10;/backup.zip" bind:value={customPaths}></textarea>
     </details>
     <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="目录扫描" />
@@ -342,8 +342,8 @@
               </div>
             {/if}
           </div>
-          <span class="text-xs text-gray-400 shrink-0">{r.size}B</span>
-          <span class="text-xs text-gray-400 shrink-0">{r.time}ms</span>
+          <span class="text-xs text-gray-500 shrink-0">{r.size}B</span>
+          <span class="text-xs text-gray-500 shrink-0">{r.time}ms</span>
         </div>
       {/each}
     </div>

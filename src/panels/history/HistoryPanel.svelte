@@ -49,7 +49,7 @@
       case 'high': return 'text-orange-500 dark:text-orange-400';
       case 'medium': return 'text-yellow-500 dark:text-yellow-400';
       case 'low': return 'text-blue-500 dark:text-blue-400';
-      default: return 'text-gray-400 dark:text-gray-500';
+      default: return 'text-gray-500 dark:text-gray-500';
     }
   }
 
@@ -108,7 +108,7 @@
       </select>
     </div>
     {#if entries.length > 0}
-      <div class="flex items-center justify-between text-xs text-gray-400">
+      <div class="flex items-center justify-between text-xs text-gray-500">
         <span>共 {filtered.length} 条记录</span>
         <button class="btn btn-sm text-xs text-red-500 dark:text-red-400" onclick={clearAll}>
           清空全部
@@ -134,7 +134,7 @@
             >
               <span class="badge text-xs shrink-0">{entry.moduleName || MODULE_LABELS[entry.module] || entry.module}</span>
               <span class="text-xs text-gray-600 dark:text-gray-300 truncate flex-1">{entry.domain}</span>
-              <span class="text-xs text-gray-400 shrink-0">{formatTime(entry.timestamp)}</span>
+              <span class="text-xs text-gray-500 shrink-0">{formatTime(entry.timestamp)}</span>
 
               <!-- 严重程度徽标 -->
               <span class="flex items-center gap-1 shrink-0 text-xs">
@@ -151,15 +151,15 @@
                   <span class="text-blue-500 dark:text-blue-400 font-bold">L{entry.summary.low}</span>
                 {/if}
                 {#if entry.summary.info > 0}
-                  <span class="text-gray-400 font-bold">I{entry.summary.info}</span>
+                  <span class="text-gray-500 font-bold">I{entry.summary.info}</span>
                 {/if}
                 {#if entry.summary.total === 0}
                   <span class="text-green-500 dark:text-green-400">无风险</span>
                 {/if}
               </span>
 
-              <span class="text-xs text-gray-400 shrink-0">{entry.summary.total}条</span>
-              <span class="text-gray-400 text-xs shrink-0" aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
+              <span class="text-xs text-gray-500 shrink-0">{entry.summary.total}条</span>
+              <span class="text-gray-500 text-xs shrink-0" aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
             </button>
 
             <!-- 操作区：与展开按钮分离的兄弟按钮 -->
@@ -202,23 +202,23 @@
                   </span>
                   <span class="flex-1 text-gray-700 dark:text-gray-200">{f.title || '未知'}</span>
                   {#if f.detail}
-                    <span class="text-gray-400 truncate max-w-48">{f.detail}</span>
+                    <span class="text-gray-500 truncate max-w-48">{f.detail}</span>
                   {/if}
                 </div>
               {/each}
             </div>
           {:else if isExpanded}
-            <div class="text-xs text-gray-400 pl-2">无发现</div>
+            <div class="text-xs text-gray-500 pl-2">无发现</div>
           {/if}
         </div>
       {/each}
     </div>
   {:else if entries.length === 0}
-    <div class="text-center text-gray-400 text-sm py-8">
+    <div class="text-center text-gray-500 text-sm py-8">
       暂无历史记录
     </div>
   {:else}
-    <div class="text-center text-gray-400 text-sm py-8">
+    <div class="text-center text-gray-500 text-sm py-8">
       没有匹配的记录
     </div>
   {/if}

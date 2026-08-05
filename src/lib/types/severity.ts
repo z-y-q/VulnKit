@@ -24,14 +24,14 @@ export const SEVERITY_LABELS: Record<Severity, string> = {
   info: '信息',
 };
 
-/** UnoCSS 淡彩描边类（Apple 风格：浅底 + 同色文字 + 1px ring；暗色相应加深）。
+/** UnoCSS 淡彩底色类（Apple 风格：柔色底 + 同色文字，无描边——避免满屏细线「嗡嗡声」）。
  *  单一真相源 —— 所有扫描面板的严重级别徽章都从这里取色。 */
 export const SEVERITY_COLORS: Record<Severity, string> = {
-  critical: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60',
-  high: 'bg-red-50 text-red-600 ring-1 ring-inset ring-red-200 dark:bg-red-900/25 dark:text-red-300 dark:ring-red-800/50',
-  medium: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800/60',
-  low: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800/60',
-  info: 'bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200 dark:bg-slate-700/40 dark:text-slate-300 dark:ring-slate-600/60',
+  critical: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  high: 'bg-red-100 text-red-600 dark:bg-red-900/35 dark:text-red-300',
+  medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  low: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  info: 'bg-slate-200 text-slate-700 dark:bg-slate-700/50 dark:text-slate-300',
 };
 
 /** 兼容别名（部分引擎用 danger/warning/safe 等非标准级别）→ 标准 Severity */

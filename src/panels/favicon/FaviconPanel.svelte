@@ -234,7 +234,7 @@
             onerror={() => (imgError = true)}
           />
         {:else}
-          <div class="w-12 h-12 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-400 text-lg">
+          <div class="w-12 h-12 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-500 text-lg">
             ?
           </div>
         {/if}
@@ -245,7 +245,7 @@
 
     <!-- Hash 结果 -->
     <div class="card p-3 space-y-2">
-      <div class="text-xs font-medium">MMH3 Hash <span class="text-gray-400 font-normal">(Shodan/FOFA)</span></div>
+      <div class="text-xs font-medium">MMH3 Hash <span class="text-gray-500 font-normal">(Shodan/FOFA)</span></div>
       <div class="flex items-center gap-2">
         <code class="text-sm font-mono flex-1 break-all">{hashValue}</code>
         <button class="btn btn-sm text-xs" onclick={copyHash}>复制</button>
@@ -284,7 +284,7 @@
 
       <!-- Shodan -->
       <div class="space-y-1">
-        <div class="text-xs text-gray-400">Shodan</div>
+        <div class="text-xs text-gray-500">Shodan</div>
         <div class="flex items-center gap-2">
           <code class="text-xs font-mono flex-1 break-all">{shodanQuery}</code>
           <button class="btn btn-sm text-xs" onclick={copyShodanQuery}>复制</button>
@@ -294,7 +294,7 @@
 
       <!-- FOFA -->
       <div class="space-y-1">
-        <div class="text-xs text-gray-400">FOFA</div>
+        <div class="text-xs text-gray-500">FOFA</div>
         <div class="flex items-center gap-2">
           <code class="text-xs font-mono flex-1 break-all">{fofaQuery}</code>
           <button class="btn btn-sm text-xs" onclick={copyFofaQuery}>复制</button>
@@ -305,7 +305,7 @@
       <!-- ZoomEye -->
       {#if md5Hex}
         <div class="space-y-1">
-          <div class="text-xs text-gray-400">ZoomEye</div>
+          <div class="text-xs text-gray-500">ZoomEye</div>
           <div class="flex items-center gap-2">
             <code class="text-xs font-mono flex-1 break-all">icon_hash:{md5Hex}</code>
             <button class="btn btn-sm text-xs" onclick={() => { navigator.clipboard.writeText(`icon_hash:${md5Hex}`); toastStore.show('已复制 ZoomEye 查询', 'success'); }}>复制</button>
@@ -320,7 +320,7 @@
   {#if !extracting && hashValue === null && statusText && statusText.includes('失败')}
     <div class="card p-3 text-center space-y-1">
       <div class="text-sm">图标获取失败</div>
-      <div class="text-xs text-gray-400">
+      <div class="text-xs text-gray-500">
         目标站点可能没有 favicon，或网络请求被阻止
       </div>
     </div>

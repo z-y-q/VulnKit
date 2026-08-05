@@ -63,7 +63,7 @@
       </button>
     {/if}
     {#if s.elapsedMs > 0}
-      <span class="text-xs text-gray-400 ml-auto tabular-nums">{(s.elapsedMs / 1000).toFixed(1)}s</span>
+      <span class="text-xs text-gray-500 ml-auto tabular-nums">{(s.elapsedMs / 1000).toFixed(1)}s</span>
     {/if}
   </div>
   {#if showProgress}

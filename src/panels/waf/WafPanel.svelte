@@ -325,7 +325,7 @@
   function severityColor(s: string): string {
     if (s === 'high') return 'text-red-500 dark:text-red-400';
     if (s === 'medium') return 'text-yellow-500 dark:text-yellow-400';
-    return 'text-gray-400 dark:text-gray-500';
+    return 'text-gray-500 dark:text-gray-500';
   }
 </script>
 
@@ -382,18 +382,18 @@
               [{severityLabel(d.severity)}]
             </span>
             <span class="text-sm font-medium">{d.name}</span>
-            <span class="text-xs text-gray-400">置信度: {confidenceLabel(d.confidence)}</span>
+            <span class="text-xs text-gray-500">置信度: {confidenceLabel(d.confidence)}</span>
           </div>
           <div class="space-y-0.5">
             {#each d.evidence as e}
               <div class="text-xs font-mono">
-                <span class="text-gray-400">[{e.type}]</span>
+                <span class="text-gray-500">[{e.type}]</span>
                 <code class="text-xs ml-1 break-all">{e.value}</code>
               </div>
             {/each}
           </div>
           {#if d.probe}
-            <div class="text-xs text-gray-400">探测来源: {d.probe}</div>
+            <div class="text-xs text-gray-500">探测来源: {d.probe}</div>
           {/if}
         </div>
       {/each}
@@ -405,10 +405,10 @@
     <div class="card p-3 text-center space-y-1">
       <div class="text-2xl">&#128274;</div>
       <div class="text-sm">未检测到 WAF</div>
-      <div class="text-xs text-gray-400">
+      <div class="text-xs text-gray-500">
         目标站点可能没有部署 WAF，或使用了自定义规则
       </div>
-      <div class="text-xs text-gray-400">
+      <div class="text-xs text-gray-500">
         提示: 探测请求已通过后台发送(不带 Cookie)，如仍无法检测，可尝试手动访问恶意路径
       </div>
     </div>
@@ -421,7 +421,7 @@
       <div class="overflow-x-auto">
         <table class="w-full text-xs">
           <thead>
-            <tr class="text-left text-gray-400 border-b border-gray-200 dark:border-gray-700">
+            <tr class="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
               <th class="py-1 pr-2 font-normal">Header</th>
               <th class="py-1 font-normal">Value</th>
             </tr>

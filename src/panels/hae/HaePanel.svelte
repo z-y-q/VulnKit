@@ -69,7 +69,7 @@
         <button class="btn btn-xs btn-primary" onclick={runMatch}>匹配规则</button>
       </div>
     </div>
-    <div class="text-xs text-gray-400">{groups.length} 个规则组 · {totalRules} 条规则（指纹/凭证/敏感信息高亮提取）</div>
+    <div class="text-xs text-gray-500">{groups.length} 个规则组 · {totalRules} 条规则（指纹/凭证/敏感信息高亮提取）</div>
     <textarea class="input font-mono text-xs" rows="5" placeholder="粘贴响应体/页面 HTML，或点「采集当前页」自动填入..." aria-label="响应体" bind:value={inputText}></textarea>
   </div>
 
@@ -99,14 +99,14 @@
             </div>
             <div class="text-xs font-mono text-gray-600 dark:text-gray-300 break-all bg-gray-50 dark:bg-gray-900 px-1.5 py-0.5 rounded mt-0.5">{m.value}</div>
           </div>
-          <button class="text-xs text-gray-400 hover:text-primary shrink-0" onclick={() => copyValue(m.value)}>复制</button>
+          <button class="text-xs text-gray-500 hover:text-primary shrink-0" onclick={() => copyValue(m.value)}>复制</button>
         </div>
       {/each}
     </div>
   {:else if inputText}
-    <div class="text-xs text-gray-400 text-center py-4">点击「匹配规则」提取敏感信息</div>
+    <div class="text-xs text-gray-500 text-center py-4">点击「匹配规则」提取敏感信息</div>
   {:else}
-    <div class="text-center text-xs text-gray-400 py-8">
+    <div class="text-center text-xs text-gray-500 py-8">
       <div class="text-3xl mb-2">🎨</div>
       粘贴文本或采集页面，用 HaE 规则提取指纹/凭证
     </div>

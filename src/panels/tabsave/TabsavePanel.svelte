@@ -82,7 +82,7 @@
 <div class="space-y-3">
   <div class="card p-3 space-y-2">
     <div class="text-sm font-medium">标签页收集</div>
-    <div class="text-xs text-gray-400">收集浏览器标签页 URL，过滤 chrome:/about: 内部页，去重后可复制/导出/重开。</div>
+    <div class="text-xs text-gray-500">收集浏览器标签页 URL，过滤 chrome:/about: 内部页，去重后可复制/导出/重开。</div>
     <div class="flex gap-1 flex-wrap">
       <button class="btn btn-sm btn-primary" onclick={grabAllTabs} disabled={collecting}>收集当前窗口</button>
       <button class="btn btn-sm" onclick={grabAllWindows} disabled={collecting}>收集全部窗口</button>
@@ -94,7 +94,7 @@
       {/if}
     </div>
     {#if savedTabs.length > 0}
-      <div class="text-xs text-gray-400">共 {savedTabs.length} 个标签页</div>
+      <div class="text-xs text-gray-500">共 {savedTabs.length} 个标签页</div>
     {/if}
   </div>
 
@@ -108,7 +108,7 @@
       {/each}
     </div>
   {:else}
-    <div class="text-center text-xs text-gray-400 py-8">
+    <div class="text-center text-xs text-gray-500 py-8">
       <div class="text-3xl mb-2">📑</div>
       点击「收集当前窗口」开始
     </div>

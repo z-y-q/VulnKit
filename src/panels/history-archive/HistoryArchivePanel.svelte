@@ -86,7 +86,7 @@
     const n = parseInt(s, 10);
     if (n >= 200 && n < 300) return 'text-green-600 dark:text-green-400';
     if (n >= 300 && n < 400) return 'text-blue-600 dark:text-blue-400';
-    if (n === 404) return 'text-gray-400';
+    if (n === 404) return 'text-gray-500';
     if (n >= 400) return 'text-red-500';
     return 'text-gray-500';
   }
@@ -150,7 +150,7 @@
       <UrlInput bind:value={targetUrl} buttonText="查询历史" onscan={query} />
     </div>
     <div class="flex items-center gap-2 text-xs flex-wrap">
-      <span class="text-gray-400">匹配:</span>
+      <span class="text-gray-500">匹配:</span>
       <select class="input text-xs w-24" bind:value={matchType}>
         <option value="domain">整个域名</option>
         <option value="host">单主机</option>
@@ -162,7 +162,7 @@
       <input class="input text-xs w-20" placeholder="to(年)" bind:value={toYear} />
       <input class="input text-xs w-20" placeholder="类型(php/asp)" bind:value={typeFilter} />
     </div>
-    <div class="text-xs text-gray-400">通过 CDX API 查询 Wayback Machine 历史快照，发现已下线页面/旧接口/敏感文件存档</div>
+    <div class="text-xs text-gray-500">通过 CDX API 查询 Wayback Machine 历史快照，发现已下线页面/旧接口/敏感文件存档</div>
   </div>
 
   {#if results.length > 0}
@@ -177,7 +177,7 @@
     <div class="card p-2 space-y-0.5 max-h-[28rem] overflow-y-auto">
       {#each results as r (r.timestamp + r.url)}
         <div class="text-xs py-1 border-b border-gray-100 dark:border-gray-800 last:border-0 flex items-center gap-2">
-          <span class="font-mono text-gray-400 shrink-0">{fmtTs(r.timestamp)}</span>
+          <span class="font-mono text-gray-500 shrink-0">{fmtTs(r.timestamp)}</span>
           <span class="font-mono shrink-0 w-10 {statusClass(r.status)}">{r.status}</span>
           <a href={snapshotUrl(r.timestamp, r.url)} target="_blank" class="font-mono text-blue-500 hover:underline truncate flex-1" title={r.url}>{r.url}</a>
         </div>

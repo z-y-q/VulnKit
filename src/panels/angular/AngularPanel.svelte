@@ -275,7 +275,7 @@
       <!-- 框架变体 -->
       {#if detectResult.variant}
         <div class="flex items-center gap-2 text-xs">
-          <span class="text-gray-400 w-16 shrink-0">变体</span>
+          <span class="text-gray-500 w-16 shrink-0">变体</span>
           <span class="badge badge-info">{detectResult.variant}</span>
         </div>
       {/if}
@@ -283,7 +283,7 @@
       <!-- 版本 -->
       {#if detectResult.version}
         <div class="flex items-center gap-2 text-xs">
-          <span class="text-gray-400 w-16 shrink-0">版本</span>
+          <span class="text-gray-500 w-16 shrink-0">版本</span>
           <span class="font-mono">{detectResult.version}</span>
         </div>
       {/if}
@@ -291,7 +291,7 @@
       <!-- 运行模式 -->
       {#if detectResult.mode}
         <div class="flex items-center gap-2 text-xs">
-          <span class="text-gray-400 w-16 shrink-0">模式</span>
+          <span class="text-gray-500 w-16 shrink-0">模式</span>
           <span class="badge {modeBadgeColor(detectResult.mode)}">{detectResult.mode}</span>
         </div>
       {/if}
@@ -299,7 +299,7 @@
       <!-- 模块/组件 -->
       {#if detectResult.modules?.length > 0}
         <div class="text-xs">
-          <span class="text-gray-400">{detectResult.variant === 'Angular' ? '组件/模块' : '模块'} ({detectResult.modules.length})</span>
+          <span class="text-gray-500">{detectResult.variant === 'Angular' ? '组件/模块' : '模块'} ({detectResult.modules.length})</span>
           <div class="flex flex-wrap gap-1 mt-1">
             {#each detectResult.modules as m}
               <span class="badge badge-outline text-xs">{m}</span>
@@ -311,7 +311,7 @@
       <!-- 路由 -->
       {#if detectResult.routes?.length > 0}
         <div class="text-xs">
-          <span class="text-gray-400">路由 ({detectResult.routes.length})</span>
+          <span class="text-gray-500">路由 ({detectResult.routes.length})</span>
           <div class="space-y-0.5 mt-1">
             {#each detectResult.routes as r}
               <div class="font-mono text-xs">{r}</div>
@@ -323,7 +323,7 @@
       <!-- 检测信号 -->
       {#if detectResult.signals?.length > 0}
         <div class="text-xs">
-          <span class="text-gray-400">检测信号</span>
+          <span class="text-gray-500">检测信号</span>
           <div class="space-y-0.5 mt-1">
             {#each detectResult.signals as s}
               <div class="text-xs">{s}</div>
@@ -381,7 +381,7 @@
     <!-- Store 标签页 -->
     {#if activeSubTab === 'store'}
       {#if filteredStoreKeys.length === 0 && (!storeResult.signals || storeResult.signals.length === 0)}
-        <div class="card p-3 text-center text-xs text-gray-400">未发现 NgRx Store / Signal</div>
+        <div class="card p-3 text-center text-xs text-gray-500">未发现 NgRx Store / Signal</div>
       {:else}
         <!-- Store 列表 -->
         {#each filteredStoreKeys as storeId}
@@ -397,8 +397,8 @@
               <div class="space-y-0.5 overflow-x-auto">
                 {#each rows as row}
                   <div class="flex items-baseline gap-1 text-xs" style="padding-left: {row.depth * 16}px">
-                    <span class="font-mono text-gray-600 dark:text-gray-400 w-32 shrink-0 truncate">{row.key}</span>
-                    <span class="text-gray-400 w-12 shrink-0">{row.type}</span>
+                    <span class="font-mono text-gray-600 dark:text-gray-500 w-32 shrink-0 truncate">{row.key}</span>
+                    <span class="text-gray-500 w-12 shrink-0">{row.type}</span>
                     <span class="font-mono break-all flex-1 {row.sensitive ? 'text-red-500 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}">{row.valuePreview}</span>
                   </div>
                 {/each}
@@ -430,7 +430,7 @@
     <!-- 路由标签页 -->
     {#if activeSubTab === 'routes'}
       {#if !storeResult.routes || storeResult.routes.length === 0}
-        <div class="card p-3 text-center text-xs text-gray-400">未发现路由</div>
+        <div class="card p-3 text-center text-xs text-gray-500">未发现路由</div>
       {:else}
         <div class="space-y-1">
           {#each storeResult.routes as r}
@@ -448,7 +448,7 @@
                 {/each}
               {/if}
               {#if r.source}
-                <span class="text-gray-400 text-xs">{r.source}</span>
+                <span class="text-gray-500 text-xs">{r.source}</span>
               {/if}
             </div>
           {/each}
@@ -462,7 +462,7 @@
     <!-- API 端点标签页 -->
     {#if activeSubTab === 'api'}
       {#if !storeResult.apiEndpoints || storeResult.apiEndpoints.length === 0}
-        <div class="card p-3 text-center text-xs text-gray-400">未发现 API 端点</div>
+        <div class="card p-3 text-center text-xs text-gray-500">未发现 API 端点</div>
       {:else}
         <div class="space-y-0.5">
           {#each storeResult.apiEndpoints as ep}

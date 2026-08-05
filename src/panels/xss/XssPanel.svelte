@@ -953,13 +953,13 @@ ${cards}
         {/if}
         {#if capturedAjax.length > 0}
           <span class="badge bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800/60">已捕获 {capturedAjax.length} 请求</span>
-          <button class="text-xs text-gray-400 hover:text-primary ml-auto" onclick={clearIntercept}>清除</button>
+          <button class="text-xs text-gray-500 hover:text-primary ml-auto" onclick={clearIntercept}>清除</button>
         {/if}
       </div>
       {#if interceptMsg}
         <div class="text-blue-600 dark:text-blue-400">{interceptMsg}</div>
       {:else}
-        <div class="text-gray-400">hook XHR/fetch，捕获 SPA 动态 API 的 URL/JSON body 参数</div>
+        <div class="text-gray-500">hook XHR/fetch，捕获 SPA 动态 API 的 URL/JSON body 参数</div>
       {/if}
     </div>
 
@@ -971,7 +971,7 @@ ${cards}
         bind:value={customPayload}
       ></textarea>
     {:else}
-      <div class="text-xs text-gray-400">自动提取注入点，使用反射探针 + 上下文 payload 并发检测</div>
+      <div class="text-xs text-gray-500">自动提取注入点，使用反射探针 + 上下文 payload 并发检测</div>
     {/if}
 
     <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="XSS 检测" />
@@ -980,7 +980,7 @@ ${cards}
   <!-- 注入点管理 -->
   <div class="card p-3 space-y-2">
     <div class="flex items-center justify-between">
-      <div class="text-sm font-medium">注入点管理 <span class="text-xs text-gray-400">({points.length > 0 ? points.filter(p => p.selected).length + '/' + points.length : '未采集'})</span></div>
+      <div class="text-sm font-medium">注入点管理 <span class="text-xs text-gray-500">({points.length > 0 ? points.filter(p => p.selected).length + '/' + points.length : '未采集'})</span></div>
       <div class="flex gap-1">
         <button class="btn btn-sm btn-primary" onclick={harvestPoints} disabled={archiving}>采集注入点</button>
         <button class="btn btn-sm" onclick={copyAllUrls} disabled={points.length === 0}>复制 URL</button>
@@ -1021,9 +1021,9 @@ ${cards}
             <span class="badge text-xs shrink-0 {SOURCE_CLASS[p.source]}">{SOURCE_LABEL[p.source]}</span>
             <span class="badge text-xs shrink-0 {p.method === 'POST' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' : 'bg-gray-100 dark:bg-gray-700'}">{p.method}</span>
             <span class="font-mono text-red-500 dark:text-red-400 shrink-0">{p.param}</span>
-            <span class="text-gray-400 truncate flex-1" title={p.url}>{p.url}</span>
+            <span class="text-gray-500 truncate flex-1" title={p.url}>{p.url}</span>
             <button
-              class="text-gray-400 hover:text-primary shrink-0"
+              class="text-gray-500 hover:text-primary shrink-0"
               onclick={() => copyText(p.method === 'GET' ? buildTestUrl(p.url, p.param, REFLECTION_PROBE) : p.url, '已复制')}
               title="复制测试 URL"
             >📋</button>
@@ -1037,16 +1037,16 @@ ${cards}
           <div class="space-y-0.5 max-h-32 overflow-y-auto">
             {#each verifyResults as r (r.url + r.param)}
               <div class="text-xs flex items-center gap-2">
-                <span class="badge text-xs shrink-0 {r.reflected ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}">{r.reflected ? '反射' : '未反射'}</span>
+                <span class="badge text-xs shrink-0 {r.reflected ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-500'}">{r.reflected ? '反射' : '未反射'}</span>
                 <span class="font-mono text-red-500 dark:text-red-400 shrink-0">{r.param}</span>
-                <span class="text-gray-400 truncate" title={r.url}>{r.url}</span>
+                <span class="text-gray-500 truncate" title={r.url}>{r.url}</span>
               </div>
             {/each}
           </div>
         </div>
       {/if}
     {:else}
-      <div class="text-xs text-gray-400">点击「采集注入点」从当前 URL、页面链接/表单、AJAX 捕获中提取注入点</div>
+      <div class="text-xs text-gray-500">点击「采集注入点」从当前 URL、页面链接/表单、AJAX 捕获中提取注入点</div>
     {/if}
   </div>
 
@@ -1054,7 +1054,7 @@ ${cards}
   {#if findings.length > 0}
     <ResultToolbar {query} total={findings.length} shown={filteredFindings.length} searchPlaceholder="搜索参数/payload...">
       <button
-        class="badge cursor-pointer {vulnOnly ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}"
+        class="badge cursor-pointer {vulnOnly ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-500'}"
         aria-pressed={vulnOnly}
         onclick={toggleVuln}
       >
@@ -1102,17 +1102,17 @@ ${cards}
             {#if f.sanitized}
               <span class="badge text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">已净化</span>
             {/if}
-            <button class="ml-auto text-xs text-gray-400 hover:text-primary" onclick={() => copyFinding(f)}>复制</button>
+            <button class="ml-auto text-xs text-gray-500 hover:text-primary" onclick={() => copyFinding(f)}>复制</button>
           </div>
           <div class="text-xs font-mono text-gray-600 dark:text-gray-300 break-all max-h-16 overflow-hidden">{f.payload}</div>
           {#if f.evidence}
-            <div class="text-xs text-gray-400 break-all max-h-10 overflow-hidden font-mono">{f.evidence}</div>
+            <div class="text-xs text-gray-500 break-all max-h-10 overflow-hidden font-mono">{f.evidence}</div>
           {/if}
         </div>
       {/each}
     </div>
   {:else if !archiving && findings.length === 0 && cs.completed > 0}
-    <div class="text-center text-gray-400 text-sm py-8">未发现 XSS 漏洞</div>
+    <div class="text-center text-gray-500 text-sm py-8">未发现 XSS 漏洞</div>
   {/if}
 
   <!-- DOM Sink 分析 -->
@@ -1126,7 +1126,7 @@ ${cards}
         <button class="btn btn-sm" onclick={clearSinks} disabled={sinks.length === 0}>清空</button>
       </div>
     </div>
-    <div class="text-xs text-gray-400">扫描页面内联脚本/外部脚本/事件属性/javascript: 链接中的危险 Sink（innerHTML/eval/document.write 等），评分 + 推荐上下文 payload</div>
+    <div class="text-xs text-gray-500">扫描页面内联脚本/外部脚本/事件属性/javascript: 链接中的危险 Sink（innerHTML/eval/document.write 等），评分 + 推荐上下文 payload</div>
 
     {#if sinks.length > 0}
       <div class="space-y-1.5 max-h-80 overflow-y-auto">
@@ -1146,7 +1146,7 @@ ${cards}
             <div class="text-xs font-mono text-gray-600 dark:text-gray-300 break-all max-h-14 overflow-hidden">{s.code}</div>
             {#if s.recommended.length > 0}
               <div class="flex items-center gap-1 flex-wrap">
-                <span class="text-xs text-gray-400">推荐:</span>
+                <span class="text-xs text-gray-500">推荐:</span>
                 {#each s.recommended as rec}
                   <button
                     class="badge text-xs font-mono bg-yellow-50 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 hover:bg-yellow-100 cursor-pointer"
@@ -1159,7 +1159,7 @@ ${cards}
         {/each}
       </div>
     {:else if !sinkLoading}
-      <div class="text-xs text-gray-400 text-center py-4">点击「分析 DOM 汇点」检测 DOM XSS 危险 sink</div>
+      <div class="text-xs text-gray-500 text-center py-4">点击「分析 DOM 汇点」检测 DOM XSS 危险 sink</div>
     {/if}
   </div>
 
@@ -1181,7 +1181,7 @@ ${cards}
   />
 
   {#if !archiving && findings.length === 0 && cs.completed === 0 && sinks.length === 0}
-    <div class="text-center text-gray-400 text-sm py-4">
+    <div class="text-center text-gray-500 text-sm py-4">
       输入目标 URL → 采集注入点 → 检测反射；或直接「分析 DOM 汇点」
     </div>
   {/if}

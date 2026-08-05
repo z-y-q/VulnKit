@@ -358,7 +358,7 @@
         <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
-    <div class="text-xs text-gray-400">
+    <div class="text-xs text-gray-500">
       报错注入：URL 参数 + 表单字段 × {SQLI_ERROR_PAYLOADS.length} payload，基线对比防误报
     </div>
     <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={scanning} phase={cs.phase} label="SQLi 探测" />
@@ -411,11 +411,11 @@
           </div>
           <div class="text-xs font-mono text-gray-600 dark:text-gray-300 break-all">{f.url}</div>
           <div class="text-xs">
-            <span class="text-gray-400">Payload:</span>
+            <span class="text-gray-500">Payload:</span>
             <code class="font-mono break-all text-red-600 dark:text-red-400">{f.payload}</code>
           </div>
           {#if f.evidence}
-            <div class="text-xs text-gray-500 dark:text-gray-400 break-all bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded">
+            <div class="text-xs text-gray-500 dark:text-gray-500 break-all bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded">
               {f.evidence}
             </div>
           {/if}

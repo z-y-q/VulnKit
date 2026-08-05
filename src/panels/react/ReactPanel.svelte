@@ -260,7 +260,7 @@
         </button>
       </div>
       {#if allRoutes.length === 0}
-        <div class="text-xs text-gray-400">暂无路由。请先「检测 React」或「探索 State」。</div>
+        <div class="text-xs text-gray-500">暂无路由。请先「检测 React」或「探索 State」。</div>
       {:else}
         <div class="space-y-0.5 max-h-96 overflow-y-auto">
           {#each allRoutes as r (r.path + r.source)}
@@ -330,7 +330,7 @@
         <div class="space-y-1 text-xs mt-2">
           <div class="flex items-center gap-2">
             <span class="text-gray-500">组件树</span>
-            <span class="text-gray-400">({detectResult.components.length})</span>
+            <span class="text-gray-500">({detectResult.components.length})</span>
           </div>
           <div class="flex gap-1 flex-wrap">
             {#each detectResult.components as c}
@@ -345,7 +345,7 @@
         <div class="space-y-1 text-xs mt-2">
           <div class="text-gray-500 mb-1">检测信号</div>
           {#each detectResult.signals as s}
-            <div class="text-gray-600 dark:text-gray-400">{s}</div>
+            <div class="text-gray-600 dark:text-gray-500">{s}</div>
           {/each}
         </div>
       {/if}
@@ -419,8 +419,8 @@
                     class="flex items-baseline gap-1 py-0.5 border-b border-gray-100 dark:border-gray-800"
                     style="padding-left: {row.depth * 16}px"
                   >
-                    <span class="font-mono text-gray-600 dark:text-gray-400 w-32 shrink-0 truncate">{row.key}</span>
-                    <span class="text-gray-400 w-12 shrink-0">{row.type}</span>
+                    <span class="font-mono text-gray-600 dark:text-gray-500 w-32 shrink-0 truncate">{row.key}</span>
+                    <span class="text-gray-500 w-12 shrink-0">{row.type}</span>
                     <span class="font-mono break-all flex-1 {row.sensitive ? 'text-red-500 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}">{row.valuePreview}</span>
                     {#if row.sensitive}
                       <span class="text-red-500 dark:text-red-400 text-[10px] shrink-0">SENSITIVE</span>
@@ -438,7 +438,7 @@
         <div class="space-y-1 text-xs mt-2">
           <div class="flex items-center gap-2">
             <span class="font-medium">API 端点</span>
-            <span class="text-gray-400">({storeResult.apiEndpoints.length})</span>
+            <span class="text-gray-500">({storeResult.apiEndpoints.length})</span>
           </div>
           <div class="space-y-0.5 max-h-60 overflow-y-auto">
             {#each storeResult.apiEndpoints as ep}

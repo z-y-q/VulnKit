@@ -52,7 +52,7 @@
         </div>
       {/if}
     </div>
-    <div class="text-xs text-gray-400 flex justify-between gap-2">
+    <div class="text-xs text-gray-500 flex justify-between gap-2">
       <span class="truncate">{phase ?? label ?? '进度'}</span>
       <span class="shrink-0 tabular-nums">
         {#if determinate}{scanned} / {total} · {pct}%{:else}{scanned} 项{/if}

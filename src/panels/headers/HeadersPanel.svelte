@@ -229,7 +229,7 @@
       {/if}
     </div>
     {#if archiving}
-      <div class="text-xs text-gray-400">{cs.phase || '扫描中...'}</div>
+      <div class="text-xs text-gray-500">{cs.phase || '扫描中...'}</div>
     {/if}
   </div>
 
@@ -271,7 +271,7 @@
           <!-- 签名 -->
           {#if result.serverSignatures.length > 0}
             <div class="text-xs">
-              <span class="text-gray-400">服务器:</span>
+              <span class="text-gray-500">服务器:</span>
               {#each result.serverSignatures as sig}
                 <span class="badge text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 ml-1">{sig}</span>
               {/each}
@@ -279,7 +279,7 @@
           {/if}
           {#if result.frameworkSignatures.length > 0}
             <div class="text-xs">
-              <span class="text-gray-400">框架:</span>
+              <span class="text-gray-500">框架:</span>
               {#each result.frameworkSignatures as sig}
                 <span class="badge text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 ml-1">{sig}</span>
               {/each}
@@ -321,9 +321,9 @@
             <SeverityBadge severity={issue.severity} />
             <div class="min-w-0">
               <span class="font-mono text-gray-700 dark:text-gray-200">{issue.header}</span>
-              <span class="text-gray-500 dark:text-gray-400 ml-1">{issue.message}</span>
+              <span class="text-gray-500 dark:text-gray-500 ml-1">{issue.message}</span>
               {#if issue.recommendation}
-                <div class="text-gray-400 dark:text-gray-500 mt-0.5">建议: {issue.recommendation}</div>
+                <div class="text-gray-500 dark:text-gray-500 mt-0.5">建议: {issue.recommendation}</div>
               {/if}
             </div>
           </div>
@@ -339,7 +339,7 @@
         {@const items = groupedResults[cat]}
         {#if items && items.length > 0}
           <div class="space-y-1">
-            <div class="text-xs font-medium text-gray-400 px-1">{CATEGORY_LABELS[cat] || cat}</div>
+            <div class="text-xs font-medium text-gray-500 px-1">{CATEGORY_LABELS[cat] || cat}</div>
             {#each items as r (r.name)}
               <div class="card p-2.5 space-y-1">
                 <div class="flex items-center gap-2">
@@ -347,11 +347,11 @@
                     {r.status === 'pass' ? '通过' : r.status === 'warn' ? '警告' : '缺失'}
                   </span>
                   <span class="text-xs font-medium">{r.name}</span>
-                  <span class="text-xs text-gray-400 ml-auto">w={r.weight}</span>
+                  <span class="text-xs text-gray-500 ml-auto">w={r.weight}</span>
                 </div>
                 <div class="text-xs font-mono text-gray-600 dark:text-gray-300 break-all truncate">{r.detail || '-'}</div>
                 {#if r.recommendation}
-                  <div class="text-xs text-gray-400 dark:text-gray-500">建议: {r.recommendation}</div>
+                  <div class="text-xs text-gray-500 dark:text-gray-500">建议: {r.recommendation}</div>
                 {/if}
               </div>
             {/each}
@@ -374,7 +374,7 @@
   <!-- 信息泄露 -->
   {#if result && result.infoLeaks.length > 0}
     <div class="space-y-1">
-      <div class="text-xs font-medium text-gray-400 px-1">信息泄露</div>
+      <div class="text-xs font-medium text-gray-500 px-1">信息泄露</div>
       {#each result.infoLeaks as leak (leak.name)}
         <div class="card p-2.5 space-y-1 border-l-2 border-yellow-500">
           <div class="flex items-center gap-2">
@@ -382,7 +382,7 @@
             <span class="text-xs font-medium">{leak.name}</span>
           </div>
           <div class="text-xs font-mono text-gray-600 dark:text-gray-300 break-all">{leak.detail}</div>
-          <div class="text-xs text-gray-400 dark:text-gray-500">{leak.message}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-500">{leak.message}</div>
         </div>
       {/each}
     </div>
@@ -391,7 +391,7 @@
   <!-- Cookie 安全 -->
   {#if result && result.cookieFindings.length > 0}
     <div class="space-y-1">
-      <div class="text-xs font-medium text-gray-400 px-1">Cookie 安全</div>
+      <div class="text-xs font-medium text-gray-500 px-1">Cookie 安全</div>
       {#each result.cookieFindings as cf (cf.name)}
         <div class="card p-2.5 space-y-1">
           <div class="flex items-center gap-2">
@@ -420,7 +420,7 @@
   <!-- CSP 深度分析 -->
   {#if result && result.cspDeep && (result.cspDeep.bypasses.length > 0 || result.cspDeep.missingCritical.length > 0)}
     <div class="space-y-1">
-      <div class="text-xs font-medium text-gray-400 px-1">CSP 深度分析</div>
+      <div class="text-xs font-medium text-gray-500 px-1">CSP 深度分析</div>
 
       {#if result.cspDeep.bypasses.length > 0}
         {#each result.cspDeep.bypasses as bp (bp.type)}
@@ -429,7 +429,7 @@
               <SeverityBadge severity={bp.severity} />
               <span class="text-xs font-mono">{bp.type}</span>
             </div>
-            <div class="text-xs text-gray-400 dark:text-gray-500">{bp.description}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-500">{bp.description}</div>
           </div>
         {/each}
       {/if}
@@ -441,13 +441,13 @@
               <SeverityBadge severity={mc.severity} />
               <span class="text-xs font-mono">{mc.directive}</span>
             </div>
-            <div class="text-xs text-gray-400 dark:text-gray-500">{mc.impact}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-500">{mc.impact}</div>
           </div>
         {/each}
       {/if}
 
       {#if result.cspDeep.summary}
-        <div class="text-xs text-gray-400 px-1">摘要: {result.cspDeep.summary}</div>
+        <div class="text-xs text-gray-500 px-1">摘要: {result.cspDeep.summary}</div>
       {/if}
     </div>
   {/if}

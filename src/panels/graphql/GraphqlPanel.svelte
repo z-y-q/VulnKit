@@ -302,7 +302,7 @@
     </div>
     <div class="flex items-center gap-2 text-xs">
       <input class="input text-xs flex-1" placeholder="自定义路径，如 /api/gateway" bind:value={customPath} />
-      <span class="text-gray-400 shrink-0">端点: {COMMON_GRAPHQL_PATHS.length}</span>
+      <span class="text-gray-500 shrink-0">端点: {COMMON_GRAPHQL_PATHS.length}</span>
     </div>
     <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="GraphQL 安全测试" />
   </div>
@@ -327,11 +327,11 @@
   {#if schemaInfo}
     <div class="card p-3 space-y-2">
       <button class="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 w-full" onclick={() => (showSchema = !showSchema)}>
-        <span class="text-gray-400">{showSchema ? '▼' : '▶'}</span>
+        <span class="text-gray-500">{showSchema ? '▼' : '▶'}</span>
         Schema 概览
       </button>
       {#if showSchema}
-        <div class="flex gap-3 text-xs text-gray-500 dark:text-gray-400">
+        <div class="flex gap-3 text-xs text-gray-500 dark:text-gray-500">
           <span>类型: {schemaInfo.totalTypes}</span>
           <span>Query: {schemaInfo.queries.length}</span>
           <span>Mutation: {schemaInfo.mutations.length}</span>
@@ -339,7 +339,7 @@
         </div>
         {#if schemaInfo.queries.length > 0}
           <div class="space-y-1">
-            <div class="text-xs text-gray-400">Queries</div>
+            <div class="text-xs text-gray-500">Queries</div>
             <div class="flex flex-wrap gap-1">
               {#each schemaInfo.queries as q}
                 <span class="badge text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">{q}</span>
@@ -349,7 +349,7 @@
         {/if}
         {#if schemaInfo.mutations.length > 0}
           <div class="space-y-1">
-            <div class="text-xs text-gray-400">Mutations</div>
+            <div class="text-xs text-gray-500">Mutations</div>
             <div class="flex flex-wrap gap-1">
               {#each schemaInfo.mutations as m}
                 <span class="badge text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">{m}</span>
@@ -359,7 +359,7 @@
         {/if}
         {#if schemaInfo.subscriptions.length > 0}
           <div class="space-y-1">
-            <div class="text-xs text-gray-400">Subscriptions</div>
+            <div class="text-xs text-gray-500">Subscriptions</div>
             <div class="flex flex-wrap gap-1">
               {#each schemaInfo.subscriptions as s}
                 <span class="badge text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">{s}</span>
@@ -375,7 +375,7 @@
   {#if findings.length > 0}
     <ResultToolbar {query} total={findings.length} shown={sortedFindings.length} searchPlaceholder="搜索测试/详情...">
       <button
-        class="badge cursor-pointer {vulnOnly ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}"
+        class="badge cursor-pointer {vulnOnly ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-500'}"
         aria-pressed={vulnOnly}
         onclick={toggleVuln}
       >
@@ -401,8 +401,8 @@
         <div class="card p-2.5 space-y-1">
           <div class="flex items-center gap-2">
             <SeverityBadge severity={f.severity} />
-            <span class="text-xs text-gray-500 dark:text-gray-400">{f.test}</span>
-            <button class="ml-auto text-xs text-gray-400 hover:text-primary" onclick={() => copyFinding(f)}>复制</button>
+            <span class="text-xs text-gray-500 dark:text-gray-500">{f.test}</span>
+            <button class="ml-auto text-xs text-gray-500 hover:text-primary" onclick={() => copyFinding(f)}>复制</button>
           </div>
           <div class="text-xs text-gray-700 dark:text-gray-300">{f.detail}</div>
           {#if f.evidence}

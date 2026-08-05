@@ -206,7 +206,7 @@
   <!-- 待加载 URL 队列（来自信息收集等面板） -->
   {#if pendingUrls.length > 0}
     <div class="card p-2 space-y-1">
-      <div class="text-xs text-gray-400">待加载队列 ({pendingUrls.length})</div>
+      <div class="text-xs text-gray-500">待加载队列 ({pendingUrls.length})</div>
       <div class="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
         {#each pendingUrls as u2 (u2)}
           <button
@@ -215,7 +215,7 @@
             onclick={() => { url = u2; fetchSource(); }}
           >{u2.replace(/^https?:\/\//, '')}</button>
         {/each}
-        <button class="badge text-xs bg-gray-100 dark:bg-gray-800 text-gray-400" onclick={() => pendingUrls = []}>清除</button>
+        <button class="badge text-xs bg-gray-100 dark:bg-gray-800 text-gray-500" onclick={() => pendingUrls = []}>清除</button>
       </div>
     </div>
   {/if}
@@ -229,7 +229,7 @@
           placeholder="搜索源码..."
           bind:value={searchText}
         />
-        <label class="flex items-center gap-1 text-xs text-gray-400 cursor-pointer shrink-0">
+        <label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer shrink-0">
           <input type="checkbox" bind:checked={showLineNumbers} />
           <span>行号</span>
         </label>
@@ -237,7 +237,7 @@
         <button class="btn btn-sm text-xs" onclick={downloadHtml}>下载</button>
       </div>
       {#if searchText.trim()}
-        <div class="text-xs text-gray-400">
+        <div class="text-xs text-gray-500">
           匹配 {matchCount} 行
         </div>
       {/if}
@@ -255,9 +255,9 @@
       <div class="overflow-auto max-h-96 text-xs font-mono bg-gray-50 dark:bg-gray-900">
         <pre class="p-2 leading-5 whitespace-pre-wrap break-all">{#each renderLines as line, i (i)}
           {#if highlightMatch(line, i)}
-            <mark class="bg-yellow-200 dark:bg-yellow-900 rounded px-0.5">{#if showLineNumbers}<span class="text-gray-400 select-none mr-2 inline-block w-8 text-right">{i + 1}</span>{/if}{line}</mark>
+            <mark class="bg-yellow-200 dark:bg-yellow-900 rounded px-0.5">{#if showLineNumbers}<span class="text-gray-500 select-none mr-2 inline-block w-8 text-right">{i + 1}</span>{/if}{line}</mark>
           {:else}
-            {#if showLineNumbers}<span class="text-gray-400 select-none mr-2 inline-block w-8 text-right">{i + 1}</span>{/if}{line}
+            {#if showLineNumbers}<span class="text-gray-500 select-none mr-2 inline-block w-8 text-right">{i + 1}</span>{/if}{line}
           {/if}
 {/each}</pre>
       </div>
@@ -270,7 +270,7 @@
 
         {#if scriptSrcs.length > 0}
           <div class="space-y-0.5">
-            <div class="text-xs text-gray-400 font-medium">
+            <div class="text-xs text-gray-500 font-medium">
               Scripts ({scriptSrcs.length})
             </div>
             {#each scriptSrcs as src}
@@ -283,7 +283,7 @@
 
         {#if linkHrefs.length > 0}
           <div class="space-y-0.5">
-            <div class="text-xs text-gray-400 font-medium">
+            <div class="text-xs text-gray-500 font-medium">
               Stylesheets ({linkHrefs.length})
             </div>
             {#each linkHrefs as href}
@@ -296,7 +296,7 @@
       </div>
     {/if}
   {:else if !loading}
-    <div class="text-center text-gray-400 text-sm py-8">
+    <div class="text-center text-gray-500 text-sm py-8">
       输入目标 URL，点击「获取源码」查看页面 HTML 源代码
     </div>
   {/if}

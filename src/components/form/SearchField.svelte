@@ -42,7 +42,7 @@
 
 <div class={`relative ${cls}`}>
   <svg
-    class="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+    class="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
     fill="none"
     viewBox="0 0 24 24"
     stroke="currentColor"

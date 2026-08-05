@@ -314,7 +314,7 @@
           <span class="badge text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">外部: {typeCounts['external'] || 0}</span>
         {/if}
         {#if uniqueDomains > 1}
-          <span class="text-gray-400">域名: {uniqueDomains}</span>
+          <span class="text-gray-500">域名: {uniqueDomains}</span>
         {/if}
       </div>
 
@@ -354,18 +354,18 @@
           <span class="badge text-xs shrink-0 {TAG_COLORS[link.tag || ''] || ''}">{link.tag || '?'}</span>
           <span class="badge text-xs shrink-0
             {link.type === 'external' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' : ''}
-            {link.type === 'internal' ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' : ''}
+            {link.type === 'internal' ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-500' : ''}
             {link.type === 'mailto' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : ''}
-            {link.type === 'relative' ? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' : ''}
+            {link.type === 'relative' ? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500' : ''}
           ">{link.type}</span>
           <div class="flex-1 min-w-0">
             <div class="text-xs font-mono text-gray-700 dark:text-gray-200 break-all">{link.href}</div>
             {#if link.domain}
-              <div class="text-xs text-gray-400 truncate mt-0.5">
+              <div class="text-xs text-gray-500 truncate mt-0.5">
                 {link.domain}{link.text ? ` - ${link.text}` : ''}
               </div>
             {:else if link.text}
-              <div class="text-xs text-gray-400 truncate mt-0.5">{link.text}</div>
+              <div class="text-xs text-gray-500 truncate mt-0.5">{link.text}</div>
             {/if}
           </div>
           <button class="btn btn-sm text-xs shrink-0" onclick={() => copyOne(link.href)}>复制</button>
@@ -373,10 +373,10 @@
       {/each}
     </div>
   {:else if !loading && totalCount === 0}
-    <div class="text-center text-gray-400 text-sm py-8">
+    <div class="text-center text-gray-500 text-sm py-8">
       点击「提取链接」获取当前页面所有链接、图片、脚本等资源
     </div>
   {:else if !loading && totalCount > 0}
-    <div class="text-center text-gray-400 text-sm py-8">没有匹配的链接</div>
+    <div class="text-center text-gray-500 text-sm py-8">没有匹配的链接</div>
   {/if}
 </div>

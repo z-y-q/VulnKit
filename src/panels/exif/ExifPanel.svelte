@@ -286,7 +286,7 @@
         </button>
       </div>
       {#if pageImages.length > 0}
-        <div class="text-xs text-gray-400">找到 {pageImages.length} 张图片（点击查看 EXIF）</div>
+        <div class="text-xs text-gray-500">找到 {pageImages.length} 张图片（点击查看 EXIF）</div>
         <div class="space-y-1 max-h-60 overflow-y-auto">
           {#each pageImages as img}
             <button
@@ -297,15 +297,15 @@
               <div class="flex-1 min-w-0">
                 <div class="text-xs truncate">{img.alt || img.src.split('/').pop()}</div>
                 {#if img.w}
-                  <div class="text-xs text-gray-400">{img.w} x {img.h}</div>
+                  <div class="text-xs text-gray-500">{img.w} x {img.h}</div>
                 {/if}
               </div>
-              <div class="text-xs text-gray-400 truncate max-w-48">{img.src}</div>
+              <div class="text-xs text-gray-500 truncate max-w-48">{img.src}</div>
             </button>
           {/each}
         </div>
       {:else if !scanningPage}
-        <div class="text-xs text-gray-400">点击「扫描」查找页面中的图片</div>
+        <div class="text-xs text-gray-500">点击「扫描」查找页面中的图片</div>
       {/if}
     </div>
   {/if}
@@ -313,14 +313,14 @@
   <!-- 加载状态 -->
   {#if loading}
     <div class="card p-3">
-      <div class="text-sm text-gray-400">{statusMsg || '处理中...'}</div>
+      <div class="text-sm text-gray-500">{statusMsg || '处理中...'}</div>
     </div>
   {/if}
 
   <!-- 错误/空状态 -->
   {#if statusMsg && !loading}
     <div class="card p-3">
-      <div class="text-sm text-gray-400">{statusMsg}</div>
+      <div class="text-sm text-gray-500">{statusMsg}</div>
     </div>
   {/if}
 

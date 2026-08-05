@@ -271,7 +271,7 @@
                   title="点击复制"
                 >
                   {#if item.name}
-                    <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-0.5">
+                    <div class="text-xs font-medium text-gray-600 dark:text-gray-500 mb-0.5">
                       {item.name}
                       {#if item.tags}
                         {#each item.tags as tag}
@@ -284,7 +284,7 @@
                     class="block text-xs font-mono break-all whitespace-pre-wrap text-gray-800 dark:text-gray-200 select-all"
                   >{item.payload}</code>
                   {#if item.desc}
-                    <div class="text-xs text-gray-400 mt-1">{item.desc}</div>
+                    <div class="text-xs text-gray-500 mt-1">{item.desc}</div>
                   {/if}
                 </div>
                 <button
@@ -307,7 +307,7 @@
 
   <!-- 空状态 -->
   {#if Object.keys(filteredData()).length === 0}
-    <div class="text-xs text-gray-400 text-center py-6">
+    <div class="text-xs text-gray-500 text-center py-6">
       {searchText ? '没有匹配的 payload' : '该分类暂无数据'}
     </div>
   {/if}

@@ -305,7 +305,7 @@
 
   function statusColor(s: ArchiveEntry['status']): string {
     return s === 'ok' ? 'text-green-600 dark:text-green-400'
-      : s === 'fail' ? 'text-red-500' : 'text-gray-400';
+      : s === 'fail' ? 'text-red-500' : 'text-gray-500';
   }
 </script>
 
@@ -318,7 +318,7 @@
     </div>
 
     {#if pageUrl}
-      <div class="text-xs text-gray-400 font-mono truncate" title={pageUrl}>📍 {pageUrl}</div>
+      <div class="text-xs text-gray-500 font-mono truncate" title={pageUrl}>📍 {pageUrl}</div>
     {/if}
 
     <!-- 选项 -->
@@ -327,7 +327,7 @@
         <input type="checkbox" class="accent-blue-500" bind:checked={includeInline} />
         含内联脚本
       </label>
-      <span class="text-gray-400">上限 {MAX_SCRIPTS} 个 JS / {MAX_INLINE} 条内联</span>
+      <span class="text-gray-500">上限 {MAX_SCRIPTS} 个 JS / {MAX_INLINE} 条内联</span>
     </div>
 
     <div class="flex gap-2">
@@ -352,7 +352,7 @@
     <div class="card p-3 space-y-2">
       <div class="flex items-center justify-between text-xs">
         <span class="text-gray-600 dark:text-gray-300">{cs.phase}</span>
-        {#if cs.total && cs.total > 0}<span class="text-gray-400 font-mono">{cs.completed}/{cs.total}</span>{/if}
+        {#if cs.total && cs.total > 0}<span class="text-gray-500 font-mono">{cs.completed}/{cs.total}</span>{/if}
       </div>
       {#if cs.total && cs.total > 0}
         <div class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -360,7 +360,7 @@
         </div>
       {/if}
       {#if currentFile}
-        <div class="text-[11px] text-gray-400 font-mono truncate" title={currentFile}>{currentFile}</div>
+        <div class="text-[11px] text-gray-500 font-mono truncate" title={currentFile}>{currentFile}</div>
       {/if}
     </div>
   {/if}
@@ -373,8 +373,8 @@
       {#if skipCount > 0}
         <span class="badge bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">跳过 {skipCount}</span>
       {/if}
-      {#if lastBytes}<span class="text-gray-400">zip {(lastBytes / 1024).toFixed(1)} KB</span>{/if}
-      {#if collectedBytes > 0}<span class="text-gray-400">已收集 {(collectedBytes / 1024).toFixed(1)} KB</span>{/if}
+      {#if lastBytes}<span class="text-gray-500">zip {(lastBytes / 1024).toFixed(1)} KB</span>{/if}
+      {#if collectedBytes > 0}<span class="text-gray-500">已收集 {(collectedBytes / 1024).toFixed(1)} KB</span>{/if}
       <span class="ml-auto"></span>
       <ExportMenu items={entries} module="jsarchive" serializers={{ json: jsarchiveJson, csv: jsarchiveCsv, text: jsarchiveText }} />
     </div>

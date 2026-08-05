@@ -176,7 +176,7 @@
 
     <!-- 统计 -->
     {#if urls.length > 0}
-      <div class="flex items-center gap-2 text-xs text-gray-400">
+      <div class="flex items-center gap-2 text-xs text-gray-500">
         <span>
           已识别 <b class="text-gray-600 dark:text-gray-200">{uniqueUrls.length}</b> 个 URL
         </span>
@@ -193,7 +193,7 @@
     {/if}
 
     {#if opening}
-      <div class="text-xs text-gray-500 dark:text-gray-400">
+      <div class="text-xs text-gray-500 dark:text-gray-500">
         {cs.phase} · 成功 {cs.succeeded} · 失败 {cs.failed}
       </div>
     {/if}
@@ -202,7 +202,7 @@
   <!-- 选项 -->
   <div class="card p-3 space-y-2">
     <div class="flex items-center gap-2 text-xs">
-      <span class="text-gray-400 shrink-0">打开间隔:</span>
+      <span class="text-gray-500 shrink-0">打开间隔:</span>
       <input
         type="number"
         class="input text-xs w-24"
@@ -212,8 +212,8 @@
         bind:value={delay}
         disabled={opening}
       />
-      <span class="text-gray-400">ms</span>
-      <span class="text-gray-400 ml-auto">
+      <span class="text-gray-500">ms</span>
+      <span class="text-gray-500 ml-auto">
         {delay === 0 ? '无间隔' : `${delay}ms/个`}
       </span>
     </div>
@@ -262,7 +262,7 @@
 
   <!-- 空状态 -->
   {#if urls.length === 0 && !opening}
-    <div class="text-center text-gray-400 text-sm py-6">
+    <div class="text-center text-gray-500 text-sm py-6">
       粘贴多个 URL，点击「全部打开」批量在新标签页中打开
     </div>
   {/if}

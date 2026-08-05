@@ -134,7 +134,7 @@
     <div class="card p-3 space-y-2">
       <div class="flex items-center gap-2 flex-wrap">
         <span class="text-sm font-medium">总览</span>
-        <span class="text-xs text-gray-400">
+        <span class="text-xs text-gray-500">
           {queryEntries.length} 次扫描 / {queryFindings.length} 项发现
         </span>
       </div>
@@ -149,7 +149,7 @@
       </div>
 
       <!-- 域名统计 -->
-      <div class="text-xs text-gray-400">
+      <div class="text-xs text-gray-500">
         涉及域名: {domains.length > 0 ? domains.join(', ') : '无'}
       </div>
     </div>
@@ -157,7 +157,7 @@
     <div class="card p-6 text-center space-y-2">
       <div class="text-2xl">📋</div>
       <div class="text-sm text-gray-500">暂无扫描记录</div>
-      <div class="text-xs text-gray-400">运行各扫描模块后，发现将自动汇总到此处</div>
+      <div class="text-xs text-gray-500">运行各扫描模块后，发现将自动汇总到此处</div>
     </div>
   {/if}
 
@@ -218,7 +218,7 @@
                 <div class="text-xs text-gray-500">{f.detail}</div>
               {/if}
               {#if f.url}
-                <div class="text-xs font-mono text-gray-400 break-all truncate">{f.url}</div>
+                <div class="text-xs font-mono text-gray-500 break-all truncate">{f.url}</div>
               {/if}
             </div>
           {/each}
@@ -226,7 +226,7 @@
       </div>
     {/each}
   {:else if !loading && entries.length > 0 && queryEntries.length === 0}
-    <div class="card p-4 text-center text-sm text-gray-400">
+    <div class="card p-4 text-center text-sm text-gray-500">
       当前筛选条件下无结果
     </div>
   {/if}

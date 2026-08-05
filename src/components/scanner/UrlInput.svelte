@@ -128,7 +128,7 @@
               aria-label={t.url}
               onmousedown={(e: MouseEvent) => { e.preventDefault(); pick(t.url); }}
             >
-              <span class="text-gray-400 mr-1">{t.domain}</span>{t.url}
+              <span class="text-gray-500 mr-1">{t.domain}</span>{t.url}
             </button>
           {/each}
         </div>

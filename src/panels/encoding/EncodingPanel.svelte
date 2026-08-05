@@ -253,7 +253,7 @@
         {#if output}<button class="text-xs text-primary hover:underline" onclick={copyOutput}>复制</button>{/if}
       </div>
       <div class="input font-mono text-xs min-h-12 whitespace-pre-wrap break-all bg-gray-50 dark:bg-gray-900 py-2 px-3">
-        {output || '<span class="text-gray-500 dark:text-gray-400">等待输入...</span>'}
+        {output || '<span class="text-gray-500 dark:text-gray-500">等待输入...</span>'}
       </div>
     </div>
    </div>
@@ -322,7 +322,7 @@
         <pre class="input font-mono text-xs whitespace-pre-wrap break-all bg-gray-50 dark:bg-gray-900 py-2 px-3 max-h-60 overflow-auto">{JSON.stringify(decoded.payload, null, 2)}</pre>
       </div>
     {:else if !jwtError}
-      <div class="text-xs text-gray-500 dark:text-gray-400 text-center py-4">粘贴 JWT 后自动解析</div>
+      <div class="text-xs text-gray-500 dark:text-gray-500 text-center py-4">粘贴 JWT 后自动解析</div>
     {/if}
    </div>
 
@@ -450,7 +450,7 @@
           <label class="flex flex-col gap-0.5">私钥 PEM（解密）
             <textarea class="input text-xs font-mono" rows="2" bind:value={pRsa.privateKeyPem} placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>
           </label>
-          <div class="text-gray-400">RSA-OAEP + SHA-256，输出 Base64</div>
+          <div class="text-gray-500">RSA-OAEP + SHA-256，输出 Base64</div>
         </div>
       {:else if cryptoAlgo === 'hash'}
         <div class="grid grid-cols-2 gap-2 text-xs">
@@ -480,12 +480,12 @@
             <label class="flex flex-col gap-0.5">Cost（成本因子 4-31，越大越慢越安全）
               <input type="number" min="4" max="31" class="input text-xs font-mono" bind:value={pBcrypt.cost} />
             </label>
-            <div class="text-gray-400">对输入口令生成 Bcrypt 哈希（$2a$ 格式）</div>
+            <div class="text-gray-500">对输入口令生成 Bcrypt 哈希（$2a$ 格式）</div>
           {:else}
             <label class="flex flex-col gap-0.5">Bcrypt 哈希
               <input class="input text-xs font-mono" bind:value={pBcrypt.hash} placeholder="$2a$10$...." />
             </label>
-            <div class="text-gray-400">验证输入口令是否匹配该哈希</div>
+            <div class="text-gray-500">验证输入口令是否匹配该哈希</div>
           {/if}
         </div>
       {/if}
@@ -513,7 +513,7 @@
         {#if cryptoOutput && !cryptoOutput.startsWith('⚠️')}<button class="text-xs text-primary hover:underline" onclick={copyCryptoOutput}>复制</button>{/if}
       </div>
       <div class="input font-mono text-xs min-h-12 whitespace-pre-wrap break-all bg-gray-50 dark:bg-gray-900 py-2 px-3">
-        {cryptoOutput || '<span class="text-gray-500 dark:text-gray-400">等待操作...</span>'}
+        {cryptoOutput || '<span class="text-gray-500 dark:text-gray-500">等待操作...</span>'}
       </div>
     </div>
    </div>

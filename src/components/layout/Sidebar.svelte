@@ -141,7 +141,7 @@
     {#if onToggleIconMode}
       <button
         type="button"
-        class="shrink-0 h-9 flex items-center justify-center border-t border-gray-200/50 dark:border-gray-700/30 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/60 dark:hover:bg-gray-800/40"
+        class="shrink-0 h-9 flex items-center justify-center border-t border-gray-200/50 dark:border-gray-700/30 text-gray-500 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/60 dark:hover:bg-gray-800/40"
         aria-label="展开侧栏"
         title="展开侧栏"
         onclick={onToggleIconMode}
@@ -173,13 +173,13 @@
         <!-- 搜索结果（扁平） -->
         {#if searchResults.length}
           <div class="p-1.5 space-y-0.5" role="listbox" aria-label="搜索结果">
-            <div class="px-2 py-1 text-[10px] text-gray-400 dark:text-gray-500">匹配 {searchResults.length} 个工具</div>
+            <div class="px-2 py-1 text-[10px] text-gray-500 dark:text-gray-500">匹配 {searchResults.length} 个工具</div>
             {#each searchResults as panel, i (panel.id)}
               {@render panelRow(panel, false, i)}
             {/each}
           </div>
         {:else}
-          <div class="px-4 py-8 text-center text-xs text-gray-400 dark:text-gray-500">
+          <div class="px-4 py-8 text-center text-xs text-gray-500 dark:text-gray-500">
             <div class="text-2xl mb-2" aria-hidden="true">🔍</div>
             未找到匹配「{query}」的工具
           </div>
@@ -188,7 +188,7 @@
         <!-- 最近使用 -->
         {#if recentVisible.length}
           <div class="border-b border-gray-200/40 dark:border-gray-700/20">
-            <div class="px-3 pt-2 pb-1 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">最近</div>
+            <div class="px-3 pt-2 pb-1 text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest">最近</div>
             <div class="pb-1 px-1.5 space-y-0.5">
               {#each recentVisible as id (id)}
                 {@const panel = panelById(id)}
@@ -201,7 +201,7 @@
         <!-- 收藏 -->
         {#if favoriteVisible.length}
           <div class="border-b border-gray-200/40 dark:border-gray-700/20">
-            <div class="px-3 pt-2 pb-1 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-1">
+            <div class="px-3 pt-2 pb-1 text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-1">
               <svg class="w-2.5 h-2.5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
               收藏
             </div>
@@ -219,7 +219,7 @@
           <div class="border-b border-gray-200/40 dark:border-gray-700/20">
             <button
               type="button"
-              class="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
+              class="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
               aria-expanded={!collapsedCats[catId]}
               aria-controls="sb-cat-{catId}"
               onclick={() => sidebarStateStore.toggleCat(catId)}
@@ -242,7 +242,7 @@
     {#if onToggleIconMode}
       <button
         type="button"
-        class="shrink-0 flex items-center justify-center gap-1.5 py-1.5 border-t border-gray-200/50 dark:border-gray-700/30 text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/60 dark:hover:bg-gray-800/40 transition-colors"
+        class="shrink-0 flex items-center justify-center gap-1.5 py-1.5 border-t border-gray-200/50 dark:border-gray-700/30 text-[10px] text-gray-500 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/60 dark:hover:bg-gray-800/40 transition-colors"
         aria-label="折叠侧栏为图标栏"
         title="折叠侧栏"
         onclick={onToggleIconMode}
@@ -272,7 +272,7 @@
       type="button"
       class="flex-1 min-w-0 flex items-center gap-2 pl-3 pr-1 py-1.5 text-[13px] text-left {activePanel === panel.id
         ? 'text-gray-900 dark:text-gray-100 font-semibold'
-        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}"
+        : 'text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
       aria-current={activePanel === panel.id ? 'page' : undefined}
       title={idx >= 1 && idx <= 8 ? `{panel.label} (Alt+${idx})` : panel.label}
       onclick={() => select(panel.id)}

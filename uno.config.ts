@@ -18,7 +18,7 @@ export default defineConfig({
   shortcuts: {
     // ===== 按钮 =====
     'btn': 'px-3.5 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-all duration-[var(--vk-dur)] ease-[var(--vk-ease)] disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] shadow-sm',
-    'btn-primary': 'btn bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-md hover:shadow-lg',
+    'btn-primary': 'btn bg-[var(--vk-btn)] text-[var(--vk-btn-fg)] hover:opacity-90 shadow-md hover:shadow-lg',
     'btn-danger': 'btn bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 shadow-md hover:shadow-lg',
     'btn-success': 'btn bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-md hover:shadow-lg',
     'btn-ghost': 'btn bg-transparent text-current hover:bg-gray-100/80 dark:hover:bg-gray-700/50',

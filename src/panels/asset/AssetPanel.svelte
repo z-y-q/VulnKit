@@ -320,7 +320,7 @@
     </div>
     <!-- 多平台测绘入口（无需 API Key，浏览器直开；ZoomEye 语法可能需调整） -->
     <div class="flex items-center gap-1 text-xs flex-wrap">
-      <span class="text-gray-400">其他平台:</span>
+      <span class="text-gray-500">其他平台:</span>
       {#each ASSET_ENGINES as eng}
         <a
           href={eng.build(query)}
@@ -347,7 +347,7 @@
         placeholder="过滤结果..."
         bind:value={searchFilter}
       />
-      <span class="text-gray-400 shrink-0">{filtered.length} 条</span>
+      <span class="text-gray-500 shrink-0">{filtered.length} 条</span>
       <button class="btn btn-sm shrink-0" onclick={copyIpList}>复制 IP</button>
       <button class="btn btn-sm shrink-0" onclick={exportCsv}>导出 CSV</button>
       <button class="btn btn-sm shrink-0" onclick={exportJson}>导出 JSON</button>

@@ -747,7 +747,7 @@
               已检测 ({detectResult.routerInfo?.mode || '?'} 模式)
             </span>
           {:else}
-            <span class="text-gray-400">未检测到</span>
+            <span class="text-gray-500">未检测到</span>
           {/if}
         </div>
         {#if detectResult.routerInfo}
@@ -761,7 +761,7 @@
           {#if detectResult.store}
             <span class="badge badge-warn">已检测</span>
           {:else}
-            <span class="text-gray-400">未检测到</span>
+            <span class="text-gray-500">未检测到</span>
           {/if}
         </div>
       </div>
@@ -836,7 +836,7 @@
                 一键跳转
               </button>
             </div>
-            <div class="text-xs text-gray-400">绕过守卫 + 导航 + 3 秒后自动恢复（不影响现有守卫状态）</div>
+            <div class="text-xs text-gray-500">绕过守卫 + 导航 + 3 秒后自动恢复（不影响现有守卫状态）</div>
           </div>
         {/if}
 
@@ -848,7 +848,7 @@
               placeholder="过滤路由..."
               bind:value={routeFilter}
             />
-            <span class="text-xs text-gray-400 whitespace-nowrap">
+            <span class="text-xs text-gray-500 whitespace-nowrap">
               {detectResult.routes.length} 条
             </span>
           </div>
@@ -871,7 +871,7 @@
   <!-- 权限拦截层（vue-perm）-->
   <div class="card p-3 space-y-2">
     <div class="flex items-center justify-between">
-      <div class="text-sm font-medium">权限拦截 <span class="text-xs text-gray-400 font-normal">（拦截菜单/角色 API → 分类 → 变换 → 覆盖）</span></div>
+      <div class="text-sm font-medium">权限拦截 <span class="text-xs text-gray-500 font-normal">（拦截菜单/角色 API → 分类 → 变换 → 覆盖）</span></div>
       {#if !permActive}
         <button class="btn btn-sm btn-danger" onclick={startPermIntercept}>🪝 启动拦截</button>
       {:else}
@@ -880,7 +880,7 @@
     </div>
 
     {#if permCaptures.length > 0}
-      <div class="text-xs text-gray-400">捕获 {permCaptures.length} 条（菜单/角色/权限 API + Store 读取）</div>
+      <div class="text-xs text-gray-500">捕获 {permCaptures.length} 条（菜单/角色/权限 API + Store 读取）</div>
       <div class="space-y-1 max-h-40 overflow-y-auto">
         {#each permCaptures as cap, idx}
           {@const cls = classifyPermType(cap.data)}
@@ -890,14 +890,14 @@
           >
             <span class="badge text-xs shrink-0 {cap.type === 'menu' ? 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800/60' : cap.type === 'role' ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800/60' : 'bg-gray-500 text-white'}">{cap.type}</span>
             <span class="font-mono truncate flex-1 {cls.cssClass}" title={cap.url}>{cap.url}</span>
-            <span class="text-gray-400 shrink-0">{(cap.size / 1024).toFixed(1)}KB</span>
+            <span class="text-gray-500 shrink-0">{(cap.size / 1024).toFixed(1)}KB</span>
           </button>
         {/each}
       </div>
     {:else if permActive}
-      <div class="text-xs text-gray-400">拦截中... 请操作页面触发菜单 API，或刷新页面</div>
+      <div class="text-xs text-gray-500">拦截中... 请操作页面触发菜单 API，或刷新页面</div>
     {:else}
-      <div class="text-xs text-gray-400">启动后自动 hook XHR/fetch，捕获 /getRouters、/getMenu、/getUserInfo 等响应</div>
+      <div class="text-xs text-gray-500">启动后自动 hook XHR/fetch，捕获 /getRouters、/getMenu、/getUserInfo 等响应</div>
     {/if}
 
     {#if permSelected >= 0 && permCaptures[permSelected]}
@@ -934,14 +934,14 @@
       <div class="flex gap-1">
         <button class="btn btn-sm btn-primary flex-1" onclick={applyPermOverride}>⚡ 应用覆盖（拦截器 + Store + 缓存）</button>
       </div>
-      <div class="text-xs text-gray-400">编辑 JSON 后点「应用覆盖」，再刷新页面或点击菜单验证是否生效</div>
+      <div class="text-xs text-gray-500">编辑 JSON 后点「应用覆盖」，再刷新页面或点击菜单验证是否生效</div>
     {/if}
   </div>
 
   <!-- 路由对比 + 自动遍历（vue-compare）-->
   <div class="card p-3 space-y-2">
     <div class="flex items-center justify-between">
-      <div class="text-sm font-medium">路由对比 <span class="text-xs text-gray-400 font-normal">（发现菜单未显示的隐藏路由）</span></div>
+      <div class="text-sm font-medium">路由对比 <span class="text-xs text-gray-500 font-normal">（发现菜单未显示的隐藏路由）</span></div>
       <div class="flex gap-1 items-center">
         <button class="btn btn-xs btn-primary" onclick={compareRoutesAndMenu}>对比</button>
         {#if !traverseActive}
@@ -949,19 +949,19 @@
         {:else}
           <button class="btn btn-xs btn-danger" onclick={stopTraverse}>停止</button>
         {/if}
-        <label class="text-xs text-gray-400 flex items-center gap-1" title="每条路由间隔毫秒数">间隔
+        <label class="text-xs text-gray-500 flex items-center gap-1" title="每条路由间隔毫秒数">间隔
           <input type="number" class="input text-xs w-16" min="500" max="10000" step="500" bind:value={traverseDelay} />
           ms
         </label>
       </div>
     </div>
     {#if hiddenRoutes.length > 0 || visibleRoutes.length > 0}
-      <div class="text-xs text-gray-400">路由 {hiddenRoutes.length + visibleRoutes.length} 条 · 隐藏 <span class="text-red-500">{hiddenRoutes.length}</span> · 已显示 {visibleRoutes.length}</div>
+      <div class="text-xs text-gray-500">路由 {hiddenRoutes.length + visibleRoutes.length} 条 · 隐藏 <span class="text-red-500">{hiddenRoutes.length}</span> · 已显示 {visibleRoutes.length}</div>
       {#if hiddenRoutes.length > 0}
         <button class="btn btn-xs btn-danger w-full" onclick={injectHiddenToEditor}>注入 {hiddenRoutes.length} 条隐藏路由到权限编辑器</button>
         <div class="space-y-0.5 max-h-32 overflow-y-auto">
           {#each hiddenRoutes as r}
-            <div class="text-xs"><span class="text-red-500">[隐]</span> <span class="font-mono">{r.path}</span> {#if r.name}<span class="text-gray-400">{r.name}</span>{/if}</div>
+            <div class="text-xs"><span class="text-red-500">[隐]</span> <span class="font-mono">{r.path}</span> {#if r.name}<span class="text-gray-500">{r.name}</span>{/if}</div>
           {/each}
         </div>
       {/if}
@@ -974,20 +974,20 @@
         </div>
       {/if}
     {:else}
-      <div class="text-xs text-gray-400">点击「对比」找出路由存在但菜单未显示的隐藏路由（需先检测 Vue + 启动权限拦截捕获菜单）</div>
+      <div class="text-xs text-gray-500">点击「对比」找出路由存在但菜单未显示的隐藏路由（需先检测 Vue + 启动权限拦截捕获菜单）</div>
     {/if}
   </div>
 
   <!-- JS 搜索（vue-jssearch）-->
   <div class="card p-3 space-y-2">
-    <div class="text-sm font-medium">JS 源码搜索 <span class="text-xs text-gray-400 font-normal">（搜索菜单/路由定义，提取路径）</span></div>
+    <div class="text-sm font-medium">JS 源码搜索 <span class="text-xs text-gray-500 font-normal">（搜索菜单/路由定义，提取路径）</span></div>
     <div class="flex gap-1">
       <input class="input text-xs flex-1" placeholder="关键词（如 menu / routes / 业务名）" bind:value={jsKeyword} onkeydown={(e) => e.key === 'Enter' && searchJs()} />
       <button class="btn btn-xs btn-primary" onclick={() => searchJs()} disabled={jsSearching}>{jsSearching ? '...' : '搜索'}</button>
       <button class="btn btn-xs" onclick={autoSearchZeroOpen} disabled={jsSearching} title="自动搜索 menu→routes→URL关键词，用于 zero-open">自动</button>
     </div>
     {#if jsMatches.length > 0}
-      <div class="text-xs text-gray-400">{jsMatches.length} 处匹配 · 提取 {jsFoundPaths.length} 条路径</div>
+      <div class="text-xs text-gray-500">{jsMatches.length} 处匹配 · 提取 {jsFoundPaths.length} 条路径</div>
       {#if jsFoundPaths.length > 0}
         <button class="btn btn-xs btn-danger w-full" onclick={injectJsPathsToEditor}>注入 {jsFoundPaths.length} 条 JS 路径到权限编辑器</button>
       {/if}
@@ -1088,8 +1088,8 @@
                       class="flex items-baseline gap-1 py-0.5 border-b border-gray-100 dark:border-gray-800"
                       style="padding-left: {row.depth * 16}px"
                     >
-                      <span class="font-mono text-gray-600 dark:text-gray-400 w-32 shrink-0 truncate">{row.key}</span>
-                      <span class="text-gray-400 w-12 shrink-0">{row.type}</span>
+                      <span class="font-mono text-gray-600 dark:text-gray-500 w-32 shrink-0 truncate">{row.key}</span>
+                      <span class="text-gray-500 w-12 shrink-0">{row.type}</span>
                       <span class="font-mono break-all flex-1 {row.sensitive ? 'text-red-500 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}">{row.valuePreview}</span>
                       {#if row.sensitive}
                         <span class="text-red-500 dark:text-red-400 text-[10px] shrink-0">SENSITIVE</span>
@@ -1132,7 +1132,7 @@
             {#each storeResult.directives as dir}
               <div class="flex items-center gap-2">
                 <span class="font-mono">{dir.name}</span>
-                <span class="text-gray-400">{dir.count} 次</span>
+                <span class="text-gray-500">{dir.count} 次</span>
                 {#if dir.examples?.length > 0}
                   <span class="text-gray-500 truncate">{dir.examples[0]}</span>
                 {/if}

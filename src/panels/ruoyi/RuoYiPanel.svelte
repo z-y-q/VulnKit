@@ -616,7 +616,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
     if (severity === 'critical') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
     if (severity === 'high') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
     if (severity === 'medium') return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
-    return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400';
+    return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-500';
   }
 
   // ===== Findings 导出 =====
@@ -675,7 +675,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
   <!-- 框架检测 + 云端探测 -->
   <div class="card p-3 space-y-2">
     <div class="flex items-center justify-between">
-      <div class="text-sm font-medium">框架检测 <span class="text-xs text-gray-400 font-normal">（30+ 特征维度）</span></div>
+      <div class="text-sm font-medium">框架检测 <span class="text-xs text-gray-500 font-normal">（30+ 特征维度）</span></div>
       <div class="flex gap-1">
         <button class="btn btn-sm btn-primary" onclick={detectRuoYi} disabled={detecting}>{detecting ? '检测中...' : '检测'}</button>
         <button class="btn btn-sm" onclick={scanJsRoutes} disabled={scanningJs}>{scanningJs ? '扫描中...' : 'JS扫路由'}</button>
@@ -705,7 +705,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
       <div class="text-xs font-medium text-amber-600 dark:text-amber-400">Gateway 路由（{gatewayRoutes.length}）</div>
       <div class="space-y-0.5 max-h-32 overflow-y-auto">
         {#each gatewayRoutes.slice(0, 30) as gr}
-          <div class="text-xs font-mono truncate"><span class="text-green-600 dark:text-green-400">{gr.uri}</span> <span class="text-gray-400">{gr.predicate}</span></div>
+          <div class="text-xs font-mono truncate"><span class="text-green-600 dark:text-green-400">{gr.uri}</span> <span class="text-gray-500">{gr.predicate}</span></div>
         {/each}
       </div>
     {/if}
@@ -732,7 +732,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
               <div class="text-xs font-mono flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full {inst.healthy ? 'bg-green-500' : 'bg-red-500'}"></span>
                 <span class="text-gray-700 dark:text-gray-300">{inst.ip}:{inst.port}</span>
-                <span class="text-gray-400">{inst.healthy ? 'healthy' : 'unhealthy'}</span>
+                <span class="text-gray-500">{inst.healthy ? 'healthy' : 'unhealthy'}</span>
               </div>
             {/each}
           </div>
@@ -772,7 +772,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
       <div class="text-xs font-medium text-blue-600 dark:text-blue-400">JS 扫描路由（{jsDiscoveredRoutes.length}）</div>
       <div class="space-y-0.5 max-h-32 overflow-y-auto">
         {#each jsDiscoveredRoutes.slice(0, 40) as jr}
-          <div class="text-xs font-mono"><span class="text-gray-400">{jr.source}</span> <span class="text-blue-600 dark:text-blue-400">{jr.path}</span></div>
+          <div class="text-xs font-mono"><span class="text-gray-500">{jr.source}</span> <span class="text-blue-600 dark:text-blue-400">{jr.path}</span></div>
         {/each}
       </div>
     {/if}
@@ -788,7 +788,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
           <div class="text-xs font-mono flex items-center gap-2">
             <span class="badge bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 w-8 shrink-0 text-center">{mr.status}</span>
             <span class="truncate text-green-700 dark:text-green-400">{mr.path}</span>
-            {#if mr.title}<span class="text-gray-400 shrink-0">{mr.title}</span>{/if}
+            {#if mr.title}<span class="text-gray-500 shrink-0">{mr.title}</span>{/if}
           </div>
         {/each}
       </div>
@@ -903,7 +903,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
               <details open style="margin-left: {depth * 12}px;">
                 <summary class="cursor-pointer text-gray-700 dark:text-gray-300 select-none">
                   <span class="text-blue-500">📁 /{node.name}</span>
-                  {#if node.leaf}<span class="text-gray-400 ml-1">({node.leaf})</span>{/if}
+                  {#if node.leaf}<span class="text-gray-500 ml-1">({node.leaf})</span>{/if}
                 </summary>
                 {#each node.children as child}
                   {@render renderNode(child, depth + 1)}
@@ -912,7 +912,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
             {:else}
               <div style="margin-left: {(depth + 1) * 12}px;" class="text-green-600 dark:text-green-400">
                 /{node.name}
-                {#if node.leaf}<span class="text-gray-400 ml-1">({node.leaf})</span>{/if}
+                {#if node.leaf}<span class="text-gray-500 ml-1">({node.leaf})</span>{/if}
               </div>
             {/if}
           {/snippet}
@@ -930,7 +930,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
               </span>
               <span class="text-xs font-mono flex-1 break-all">{route.path}</span>
               {#if route.title}
-                <span class="text-xs text-gray-400">{route.title}</span>
+                <span class="text-xs text-gray-500">{route.title}</span>
               {/if}
             </div>
           {/each}
@@ -943,7 +943,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
       </div>
     {:else if hookActive}
       <div class="card p-3 text-center">
-        <div class="text-xs text-gray-400">
+        <div class="text-xs text-gray-500">
           刷新目标页面或浏览功能以捕获路由
         </div>
       </div>
@@ -966,7 +966,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
             onclick={() => (apiStatusFilter = key as typeof apiStatusFilter)}
           >{label}</button>
         {/each}
-        <span class="text-xs text-gray-400 ml-auto self-center">{filteredRequests.length} / {totalRequests}</span>
+        <span class="text-xs text-gray-500 ml-auto self-center">{filteredRequests.length} / {totalRequests}</span>
       </div>
     </div>
     <div class="space-y-1">
@@ -979,13 +979,13 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
             {req.status || '-'}
           </span>
           <span class="font-mono flex-1 break-all truncate">{req.url}</span>
-          <span class="text-gray-400 shrink-0">{req.time}</span>
+          <span class="text-gray-500 shrink-0">{req.time}</span>
         </div>
       {/each}
     </div>
   {:else if activeSubTab === 'api' && hookActive}
     <div class="card p-3 text-center">
-      <div class="text-xs text-gray-400">
+      <div class="text-xs text-gray-500">
         等待 API 请求捕获...
       </div>
     </div>
@@ -1017,7 +1017,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
             </div>
             <div class="text-xs font-medium">{cve.title}</div>
             <div class="text-xs text-gray-500">{cve.description}</div>
-            <div class="text-xs text-gray-400">
+            <div class="text-xs text-gray-500">
               影响版本: {cve.affected.join(', ')}
             </div>
             {#if cve.refs && cve.refs.length > 0}
@@ -1039,7 +1039,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
       {:else}
         <div class="card p-3 text-center">
           <div class="text-sm">未找到已知 CVE</div>
-          <div class="text-xs text-gray-400 mt-1">
+          <div class="text-xs text-gray-500 mt-1">
             未检测到版本信息或该版本暂无已知漏洞
           </div>
         </div>
@@ -1051,7 +1051,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
   {#if !hookActive && totalEvents === 0}
     <div class="card p-3 text-center space-y-1">
       <div class="text-sm">RuoYi 路由分析</div>
-      <div class="text-xs text-gray-400">
+      <div class="text-xs text-gray-500">
         注册 Hook 后将自动捕获 RuoYi 框架的动态路由、API 请求等流量数据，
         并匹配已知 CVE 漏洞库进行安全评估。
       </div>

@@ -745,7 +745,7 @@
     <UrlInput bind:value={targetUrl} scanning={phase === 'detecting' || scanning2} buttonText="检测" scanningText="检测中..." onscan={detect} />
 
     {#if detectResult}
-      <div class="text-xs text-gray-400 flex flex-wrap items-center gap-1">
+      <div class="text-xs text-gray-500 flex flex-wrap items-center gap-1">
         {#if detectResult.tool}
           <span class="badge bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
             {detectResult.tool.toUpperCase()}
@@ -754,7 +754,7 @@
             <span class="badge bg-gray-200 dark:bg-gray-700">v{detectResult.version}</span>
           {/if}
         {:else}
-          <span class="text-gray-400">未识别构建工具</span>
+          <span class="text-gray-500">未识别构建工具</span>
         {/if}
         <span>{bundleUrls.length} 个 Bundle</span>
         {#if wpSnapshot?.hasWebpack}
@@ -861,14 +861,14 @@
                 <button class="text-xs text-gray-500 hover:text-primary" onclick={() => downloadAllSource(r)} title="下载全部源码">⬇</button>
                 <button class="text-xs text-gray-500 hover:text-primary" onclick={() => copyAllPaths(r)} title="复制所有路径">📋</button>
               {/if}
-              <button class="text-xs text-gray-400 hover:text-primary" onclick={() => copyResult(r)}>复制</button>
+              <button class="text-xs text-gray-500 hover:text-primary" onclick={() => copyResult(r)}>复制</button>
             </div>
           </div>
           <div class="text-xs font-mono text-gray-600 dark:text-gray-300 truncate" title={r.bundleUrl}>
             {shortUrl(r.bundleUrl)}
           </div>
           {#if r.mapUrl}
-            <div class="text-xs font-mono text-gray-400 truncate" title={r.mapUrl}>
+            <div class="text-xs font-mono text-gray-500 truncate" title={r.mapUrl}>
               .map: {shortUrl(r.mapUrl)}
             </div>
           {/if}
@@ -929,14 +929,14 @@
           <div class="flex-1 overflow-y-auto p-2 space-y-0.5">
             {#each viewerFiles as f (f.path)}
               <div class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer group" onclick={() => viewFile(f)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); viewFile(f); } }} role="button" tabindex="0">
-                <span class="text-gray-400 text-xs">📄</span>
+                <span class="text-gray-500 text-xs">📄</span>
                 <span class="text-xs font-mono text-gray-700 dark:text-gray-300 truncate flex-1">{f.path}</span>
-                <span class="text-[10px] text-gray-400 shrink-0">{(f.content.length / 1024).toFixed(1)}KB</span>
-                <button class="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-primary shrink-0" onclick={(e) => { e.stopPropagation(); downloadFile(f); }}>⬇</button>
+                <span class="text-[10px] text-gray-500 shrink-0">{(f.content.length / 1024).toFixed(1)}KB</span>
+                <button class="opacity-0 group-hover:opacity-100 text-xs text-gray-500 hover:text-primary shrink-0" onclick={(e) => { e.stopPropagation(); downloadFile(f); }}>⬇</button>
               </div>
             {/each}
             {#if viewerFiles.length === 0}
-              <div class="text-center text-xs text-gray-400 py-8">无匹配文件</div>
+              <div class="text-center text-xs text-gray-500 py-8">无匹配文件</div>
             {/if}
           </div>
         </div>

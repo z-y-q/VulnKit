@@ -37,7 +37,7 @@
     />
     <button
       type="button"
-      class="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1"
+      class="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 px-1"
       onclick={() => (visible = !visible)}
       aria-label={visible ? '隐藏密钥' : '显示密钥'}
       aria-pressed={visible}
@@ -46,5 +46,5 @@
       {visible ? '🙈' : '👁'}
     </button>
   </div>
-  {#if hint}<p class="text-xs text-gray-400">{hint}</p>{/if}
+  {#if hint}<p class="text-xs text-gray-500">{hint}</p>{/if}
 </div>

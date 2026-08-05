@@ -92,7 +92,7 @@
           </div>
           {#each cardCols as col (col.key)}
             <div class="flex justify-between gap-2">
-              <span class="text-gray-400 shrink-0">{col.header}</span>
+              <span class="text-gray-500 shrink-0">{col.header}</span>
               <span class="text-right truncate min-w-0">{@render cell(col, row)}</span>
             </div>
           {/each}
@@ -122,7 +122,7 @@
     </div>
   {/if}
   {#if pagi && pagi.totalPages > 1}
-    <div class="flex items-center justify-between gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
+    <div class="flex items-center justify-between gap-2 mt-2 text-xs text-gray-500 dark:text-gray-500">
       <span>共 {rows.length} 条，第 {pagi.start + 1}-{pagi.end} 条</span>
       <div class="flex items-center gap-1">
         <select class="input !py-0.5 !text-xs" aria-label="每页条数" bind:value={pageSize} onchange={() => { page = 1; }}>

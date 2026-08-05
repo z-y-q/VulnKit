@@ -352,11 +352,11 @@
           </div>
         {/each}
         {#if scannedCount > 0}
-          <div class="text-xs text-gray-400">已扫描 {scannedCount} 个外部 JS 文件</div>
+          <div class="text-xs text-gray-500">已扫描 {scannedCount} 个外部 JS 文件</div>
         {/if}
       </div>
     {:else if !scanning}
-      <div class="text-xs text-gray-400">点击「扫描反调试」检测页面中的反调试手段</div>
+      <div class="text-xs text-gray-500">点击「扫描反调试」检测页面中的反调试手段</div>
     {/if}
   </div>
 
@@ -374,7 +374,7 @@
         {#if uncopyLog.captureListeners}<div>✓ 注册 <b>{uncopyLog.captureListeners}</b> 种 capture 事件拦截</div>{/if}
       </div>
     {:else}
-      <div class="text-xs text-gray-400">移除禁选/禁右键/禁复制等限制</div>
+      <div class="text-xs text-gray-500">移除禁选/禁右键/禁复制等限制</div>
     {/if}
   </div>
 </div>
