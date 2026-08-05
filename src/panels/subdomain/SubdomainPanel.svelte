@@ -422,30 +422,12 @@
 
     <!-- 枚举方法开关 -->
     <div class="flex flex-wrap items-center gap-1.5 text-xs">
-      <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useCT} disabled={archiving} class="accent-blue-500" />
-        <span class="text-gray-600 dark:text-gray-300">证书透明 (crt.sh)</span>
-      </label>
-      <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useCertspotter} disabled={archiving} class="accent-blue-500" />
-        <span class="text-gray-600 dark:text-gray-300">CertSpotter</span>
-      </label>
-      <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useDnsRec} disabled={archiving} class="accent-blue-500" />
-        <span class="text-gray-600 dark:text-gray-300">DNS NS/MX</span>
-      </label>
-      <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useWayback} disabled={archiving} class="accent-blue-500" />
-        <span class="text-gray-600 dark:text-gray-300">Wayback 历史</span>
-      </label>
-      <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={usePage} disabled={archiving} class="accent-blue-500" />
-        <span class="text-gray-600 dark:text-gray-300">页面链接</span>
-      </label>
-      <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useBrute} disabled={archiving} class="accent-blue-500" />
-        <span class="text-gray-600 dark:text-gray-300">DNS 暴力</span>
-      </label>
+      <button type="button" class={useCT ? 'chip-active' : 'chip-inactive'} aria-pressed={useCT} disabled={archiving} onclick={() => { useCT = !useCT; }}>证书透明 (crt.sh)</button>
+      <button type="button" class={useCertspotter ? 'chip-active' : 'chip-inactive'} aria-pressed={useCertspotter} disabled={archiving} onclick={() => { useCertspotter = !useCertspotter; }}>CertSpotter</button>
+      <button type="button" class={useDnsRec ? 'chip-active' : 'chip-inactive'} aria-pressed={useDnsRec} disabled={archiving} onclick={() => { useDnsRec = !useDnsRec; }}>DNS NS/MX</button>
+      <button type="button" class={useWayback ? 'chip-active' : 'chip-inactive'} aria-pressed={useWayback} disabled={archiving} onclick={() => { useWayback = !useWayback; }}>Wayback 历史</button>
+      <button type="button" class={usePage ? 'chip-active' : 'chip-inactive'} aria-pressed={usePage} disabled={archiving} onclick={() => { usePage = !usePage; }}>页面链接</button>
+      <button type="button" class={useBrute ? 'chip-active' : 'chip-inactive'} aria-pressed={useBrute} disabled={archiving} onclick={() => { useBrute = !useBrute; }}>DNS 暴力</button>
     </div>
 
     {#if wildcardDetected}
@@ -460,7 +442,7 @@
   <!-- 工具栏：ResultToolbar 包裹 搜索 / 排序 / 导出 -->
   {#if results.length > 0}
     <ResultToolbar {query} total={results.length} shown={filteredResults.length} searchPlaceholder="搜索子域名...">
-      <span class="badge bg-green-500 text-white">存活 {stats.alive}</span>
+      <span class="badge bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800/60">存活 {stats.alive}</span>
       <span class="badge bg-gray-200 dark:bg-gray-700">总计 {stats.total}</span>
       <select
         class="input text-xs w-20"

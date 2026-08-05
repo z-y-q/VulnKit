@@ -888,7 +888,7 @@
             class="w-full text-left flex items-center gap-2 px-2 py-1 rounded text-xs {permSelected === idx ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}"
             onclick={() => selectPerm(idx)}
           >
-            <span class="badge text-xs shrink-0 {cap.type === 'menu' ? 'bg-blue-500 text-white' : cap.type === 'role' ? 'bg-amber-500 text-white' : 'bg-gray-500 text-white'}">{cap.type}</span>
+            <span class="badge text-xs shrink-0 {cap.type === 'menu' ? 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800/60' : cap.type === 'role' ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800/60' : 'bg-gray-500 text-white'}">{cap.type}</span>
             <span class="font-mono truncate flex-1 {cls.cssClass}" title={cap.url}>{cap.url}</span>
             <span class="text-gray-400 shrink-0">{(cap.size / 1024).toFixed(1)}KB</span>
           </button>

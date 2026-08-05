@@ -240,10 +240,10 @@
   </div>
 
   <!-- 子标签 -->
-  <div class="flex gap-1">
+  <div class="seg">
     {#each [{ id: 'detect', label: '检测' }, { id: 'store', label: 'Store' }, { id: 'routes', label: `路由${allRoutes.length ? ' (' + allRoutes.length + ')' : ''}` }] as t}
       <button
-        class="btn btn-sm {activeTab === t.id ? 'bg-primary text-white' : 'btn-ghost'}"
+        class={activeTab === t.id ? 'seg-btn-active' : 'seg-btn-inactive'}
         onclick={() => (activeTab = t.id as typeof activeTab)}
       >{t.label}</button>
     {/each}

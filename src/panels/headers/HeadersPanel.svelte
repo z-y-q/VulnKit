@@ -165,9 +165,9 @@
 
   let gradeColor = $derived.by(() => {
     const score = result?.score ?? 0;
-    if (score >= 75) return 'bg-green-500 text-white';
-    if (score >= 50) return 'bg-yellow-500 text-white';
-    return 'bg-red-500 text-white';
+    if (score >= 75) return 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800/60';
+    if (score >= 50) return 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800/60';
+    return 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60';
   });
 
   // 映射 HeaderAnalysisResult → ScanFinding[]

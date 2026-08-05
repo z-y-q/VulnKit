@@ -791,9 +791,9 @@
       ]}
       onchange={(k) => (filter = k as 'all' | 'vuln')}
     >
-      <span class="badge bg-green-500 text-white">Map {mapCount}</span>
+      <span class="badge bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800/60">Map {mapCount}</span>
       <span class="badge bg-orange-500 text-white">泄露 {leakCount}</span>
-      <span class="badge bg-blue-500 text-white">源文件 {totalSources}</span>
+      <span class="badge bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800/60">源文件 {totalSources}</span>
       <button class="btn btn-sm" onclick={exportResults}>导出 CSV</button>
       <button class="btn btn-sm" onclick={exportEndpoints}>导出 JSON</button>
       <button class="btn btn-sm" onclick={exportModulesJson} title="导出全部模块路径为 JSON">模块 JSON</button>

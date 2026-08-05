@@ -314,7 +314,7 @@
       {#each endpoints as ep (ep.path)}
         <div class="flex items-center gap-2">
           <span class="text-xs font-mono text-gray-700 dark:text-gray-200 break-all">{ep.path}</span>
-          <span class="badge text-xs {ep.introspection ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}">
+          <span class="badge text-xs {ep.introspection ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800/60'}">
             {ep.introspection ? 'Introspection 开启' : 'Introspection 关闭'}
           </span>
           <span class="badge text-xs bg-gray-200 dark:bg-gray-700">HTTP {ep.status}</span>
@@ -375,7 +375,7 @@
   {#if findings.length > 0}
     <ResultToolbar {query} total={findings.length} shown={sortedFindings.length} searchPlaceholder="搜索测试/详情...">
       <button
-        class="badge cursor-pointer {vulnOnly ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
+        class="badge cursor-pointer {vulnOnly ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}"
         aria-pressed={vulnOnly}
         onclick={toggleVuln}
       >

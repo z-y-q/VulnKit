@@ -688,7 +688,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
 
     {#if detectedVariant && detectedVariant !== 'unknown'}
       <div class="flex items-center gap-2 text-xs">
-        <span class="badge bg-blue-500 text-white">{detectedVariant}</span>
+        <span class="badge bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800/60">{detectedVariant}</span>
         {#if detectedVersion}<span class="badge bg-gray-200 dark:bg-gray-700">{detectedVersion}</span>{/if}
       </div>
     {/if}
@@ -715,7 +715,7 @@ ${nacosServices.length > 0 ? `<h2>☁️ Nacos 服务（${nacosServices.length}�
       <div class="flex flex-wrap gap-1">
         {#each nacosServices as ns}
           <button
-            class="badge text-xs cursor-pointer {nacosInstances[ns] ? 'bg-red-500 text-white' : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'}"
+            class="badge text-xs cursor-pointer {nacosInstances[ns] ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'}"
             onclick={() => fetchNacosInstances(ns)}
             disabled={nacosLoading === ns}
           >

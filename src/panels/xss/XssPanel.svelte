@@ -928,18 +928,9 @@ ${cards}
     </div>
 
     <div class="flex items-center gap-3 text-xs flex-wrap">
-      <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useHarvest} disabled={archiving} class="accent-blue-500" />
-        <span>DOM 收割</span>
-      </label>
-      <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={usePost} disabled={archiving} class="accent-blue-500" />
-        <span>测试 POST</span>
-      </label>
-      <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={useCustom} disabled={archiving} class="accent-blue-500" />
-        <span>自定义 Payload</span>
-      </label>
+      <button type="button" class={useHarvest ? 'chip-active' : 'chip-inactive'} aria-pressed={useHarvest} disabled={archiving} onclick={() => { useHarvest = !useHarvest; }}>DOM 收割</button>
+      <button type="button" class={usePost ? 'chip-active' : 'chip-inactive'} aria-pressed={usePost} disabled={archiving} onclick={() => { usePost = !usePost; }}>测试 POST</button>
+      <button type="button" class={useCustom ? 'chip-active' : 'chip-inactive'} aria-pressed={useCustom} disabled={archiving} onclick={() => { useCustom = !useCustom; }}>自定义 Payload</button>
       <label class="flex items-center gap-1 cursor-pointer">
         <span class="text-gray-500">编码</span>
         <select class="input text-xs w-24 py-0.5" bind:value={encoding} disabled={archiving}>
@@ -961,7 +952,7 @@ ${cards}
           <button class="btn btn-xs btn-danger" disabled>拦截中...</button>
         {/if}
         {#if capturedAjax.length > 0}
-          <span class="badge bg-blue-500 text-white">已捕获 {capturedAjax.length} 请求</span>
+          <span class="badge bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800/60">已捕获 {capturedAjax.length} 请求</span>
           <button class="text-xs text-gray-400 hover:text-primary ml-auto" onclick={clearIntercept}>清除</button>
         {/if}
       </div>
@@ -1046,7 +1037,7 @@ ${cards}
           <div class="space-y-0.5 max-h-32 overflow-y-auto">
             {#each verifyResults as r (r.url + r.param)}
               <div class="text-xs flex items-center gap-2">
-                <span class="badge text-xs shrink-0 {r.reflected ? 'bg-red-500 text-white' : 'bg-gray-300 dark:bg-gray-700'}">{r.reflected ? '反射' : '未反射'}</span>
+                <span class="badge text-xs shrink-0 {r.reflected ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}">{r.reflected ? '反射' : '未反射'}</span>
                 <span class="font-mono text-red-500 dark:text-red-400 shrink-0">{r.param}</span>
                 <span class="text-gray-400 truncate" title={r.url}>{r.url}</span>
               </div>
@@ -1063,13 +1054,13 @@ ${cards}
   {#if findings.length > 0}
     <ResultToolbar {query} total={findings.length} shown={filteredFindings.length} searchPlaceholder="搜索参数/payload...">
       <button
-        class="badge cursor-pointer {vulnOnly ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}"
+        class="badge cursor-pointer {vulnOnly ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}"
         aria-pressed={vulnOnly}
         onclick={toggleVuln}
       >
         漏洞 {vulnCount}
       </button>
-      <span class="badge bg-blue-500 text-white">反射 {reflectedCount}</span>
+      <span class="badge bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800/60">反射 {reflectedCount}</span>
       <select
         class="input text-xs w-24"
         value={query.sort.key}

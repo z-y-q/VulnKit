@@ -664,8 +664,8 @@
           </div>
         </div>
         <div class="flex gap-2 flex-wrap text-xs">
-          <label class="flex items-center gap-1"><input type="checkbox" bind:checked={form.secure} class="accent-blue-500" /> Secure</label>
-          <label class="flex items-center gap-1"><input type="checkbox" bind:checked={form.httpOnly} class="accent-blue-500" /> HttpOnly</label>
+          <button type="button" class={form.secure ? 'chip-active' : 'chip-inactive'} aria-pressed={form.secure} onclick={() => { form.secure = !form.secure; }}>Secure</button>
+          <button type="button" class={form.httpOnly ? 'chip-active' : 'chip-inactive'} aria-pressed={form.httpOnly} onclick={() => { form.httpOnly = !form.httpOnly; }}>HttpOnly</button>
           <label class="flex items-center gap-1">SameSite:
             <select class="input text-xs w-24" bind:value={form.sameSite}>
               <option value="unspecified">默认</option>

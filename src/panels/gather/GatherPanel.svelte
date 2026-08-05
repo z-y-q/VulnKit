@@ -507,7 +507,7 @@
     {/if}
 
     <!-- 分类标签 -->
-    <div class="flex gap-1">
+    <div class="seg">
       {#each [
         { id: 'tech' as Category, label: '技术栈', count: filteredTech.length },
         { id: 'resources' as Category, label: '资源', count: filteredResources.length },
@@ -515,7 +515,7 @@
         { id: 'hae' as Category, label: 'HaE', count: haeFindings.length },
       ] as cat}
         <button
-          class="btn btn-sm {activeCategory === cat.id ? 'bg-primary text-white' : 'btn-ghost'}"
+          class={activeCategory === cat.id ? 'seg-btn-active' : 'seg-btn-inactive'}
           onclick={() => (activeCategory = cat.id)}
         >
           {cat.label}

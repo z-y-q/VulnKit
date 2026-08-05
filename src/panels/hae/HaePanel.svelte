@@ -76,7 +76,7 @@
   {#if matches.length > 0}
     <div class="flex items-center gap-2 text-xs flex-wrap">
       <span>共 {matches.length} 处</span>
-      {#if sensitiveCount > 0}<span class="badge bg-red-500 text-white">敏感 {sensitiveCount}</span>{/if}
+      {#if sensitiveCount > 0}<span class="badge bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60">敏感 {sensitiveCount}</span>{/if}
       <select class="input text-xs w-32 ml-auto" aria-label="分组筛选" bind:value={groupFilter}>
         <option value="all">全部分组</option>
         {#each groups as g}<option value={g}>{g}</option>{/each}

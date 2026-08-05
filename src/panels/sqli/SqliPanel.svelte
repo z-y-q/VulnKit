@@ -367,7 +367,7 @@
   <!-- 工具栏 -->
   {#if findings.length > 0}
     <ResultToolbar {query} total={findings.length} shown={filtered.length} searchPlaceholder="搜索参数/payload/DB...">
-      <span class="badge bg-red-500 text-white">命中 {findings.length}</span>
+      <span class="badge bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60">命中 {findings.length}</span>
       <select
         class="input text-xs w-24"
         value={query.sort.key}
