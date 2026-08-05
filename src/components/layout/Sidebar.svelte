@@ -188,7 +188,7 @@
         <!-- 最近使用 -->
         {#if recentVisible.length}
           <div class="border-b border-gray-200/40 dark:border-gray-700/20">
-            <div class="px-3 pt-2 pb-1 text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest">最近</div>
+            <div class="px-3 pt-2 pb-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500">最近</div>
             <div class="pb-1 px-1.5 space-y-0.5">
               {#each recentVisible as id (id)}
                 {@const panel = panelById(id)}
@@ -201,7 +201,7 @@
         <!-- 收藏 -->
         {#if favoriteVisible.length}
           <div class="border-b border-gray-200/40 dark:border-gray-700/20">
-            <div class="px-3 pt-2 pb-1 text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-1">
+            <div class="px-3 pt-2 pb-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500 flex items-center gap-1">
               <svg class="w-2.5 h-2.5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
               收藏
             </div>
@@ -219,7 +219,7 @@
           <div class="border-b border-gray-200/40 dark:border-gray-700/20">
             <button
               type="button"
-              class="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
+              class="w-full flex items-center justify-between px-3 py-2 text-[11px] font-semibold text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
               aria-expanded={!collapsedCats[catId]}
               aria-controls="sb-cat-{catId}"
               onclick={() => sidebarStateStore.toggleCat(catId)}
@@ -228,7 +228,7 @@
               <svg class="w-3 h-3 transition-transform duration-200 {collapsedCats[catId] ? '' : 'rotate-90'}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg>
             </button>
             {#if !collapsedCats[catId]}
-              <div id="sb-cat-{catId}" class="pb-1 px-1.5 space-y-0.5">
+              <div id="sb-cat-{catId}" class="pb-1.5 px-1.5 space-y-1">
                 {#each cat.panels as panel (panel.id)}
                   {@render panelRow(panel, true)}
                 {/each}
