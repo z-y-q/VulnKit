@@ -9,7 +9,7 @@
 
 <div class="text-center text-gray-400 py-10">
   {#if icon}
-    <div class="text-4xl mb-2">{icon}</div>
+    <div class="inline-flex items-center justify-center w-14 h-14 mb-2 rounded-full bg-gray-100 dark:bg-gray-800 text-3xl">{icon}</div>
   {/if}
   <div class="text-sm">{message}</div>
   {#if hint}

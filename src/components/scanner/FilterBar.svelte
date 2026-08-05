@@ -26,7 +26,7 @@
   <div class="flex gap-2 text-xs items-center flex-wrap">
     {#each options as opt (opt.key)}
       <button
-        class="badge cursor-pointer transition-colors {active === opt.key ? opt.color : 'bg-gray-200 dark:bg-gray-700'}"
+        class="badge cursor-pointer transition-all duration-[var(--vk-dur-fast)] ease-[var(--vk-ease)] active:scale-[0.96] {active === opt.key ? opt.color : 'bg-gray-200 dark:bg-gray-700'}"
         onclick={() => onchange?.(opt.key)}
       >
         {opt.label} {opt.count}

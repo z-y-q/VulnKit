@@ -33,7 +33,7 @@
 
 <div class="card border border-red-300 dark:border-red-800 p-3 space-y-2" role="alert">
   <div class="flex items-start gap-2">
-    <span class="text-red-500 dark:text-red-400 shrink-0" aria-hidden="true">⚠</span>
+    <span class="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/40 text-red-500 dark:text-red-300 text-sm font-bold" aria-hidden="true">⚠</span>
     <div class="min-w-0 flex-1">
       <p class="font-semibold text-sm text-gray-800 dark:text-gray-100">{error.title}</p>
       <p class="text-xs text-gray-600 dark:text-gray-300 mt-0.5 break-words">{error.message}</p>

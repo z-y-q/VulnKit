@@ -389,7 +389,8 @@
     <div class="space-y-2">
       {#each filtered as f, i (f.url + f.param + f.method + f.payload)}
         <div
-          class="card p-2.5 space-y-1.5 cursor-pointer hover:border-primary transition-colors"
+          class="card p-2.5 space-y-1.5 cursor-pointer hover:border-primary transition-colors vk-pop-in"
+          style="animation-delay: {Math.min(i, 12) * 30}ms"
           role="button"
           tabindex="0"
           aria-label="查看 SQLi 详情"

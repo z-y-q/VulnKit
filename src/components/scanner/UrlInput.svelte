@@ -10,6 +10,7 @@
   import { recentTargetsStore } from '@/stores/recent-targets';
   import { analysisContextStore } from '@/stores/analysis-context';
   import { activePanelStore } from '@/stores/ui';
+  import { menuPop } from '@/lib/ui/motion';
 
   let {
     value = $bindable(''),
@@ -113,14 +114,15 @@
       {#if recordTarget && showRecent && candidates.length}
         <div
           id={`${uid}-listbox`}
-          class="absolute z-30 top-full left-0 right-0 mt-0.5 max-h-56 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg"
+          class="absolute z-30 top-full left-0 right-0 mt-0.5 max-h-56 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-[var(--vk-shadow-lg)]"
           role="listbox"
           aria-label="最近目标"
+          transition:menuPop
         >
           {#each candidates as t (t.url)}
             <button
               type="button"
-              class="block w-full text-left px-2 py-1 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/30 font-mono truncate"
+              class="block w-full text-left px-2 py-1 text-xs hover:bg-primary/10 dark:hover:bg-primary/20 font-mono truncate"
               role="option"
               aria-selected="false"
               aria-label={t.url}

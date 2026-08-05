@@ -345,7 +345,7 @@
         </label>
       {/each}
     </div>
-    <div class="text-xs text-gray-400">
+    <div class="text-xs text-gray-500 dark:text-gray-400">
       端点: {DEFAULT_CORS_ENDPOINTS.length} · Origin: {ORIGIN_VARIANTS.length}{useDynamic ? '+动态' : ''}
     </div>
     <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={archiving} phase={cs.phase} label="CORS 探测" />
@@ -388,7 +388,8 @@
     <div class="space-y-2">
       {#each filteredIssues as issue, i (issue.url + issue.method + issue.origin.value)}
         <div
-          class="card p-2.5 space-y-1.5 cursor-pointer hover:border-primary transition-colors"
+          class="card p-2.5 space-y-1.5 cursor-pointer hover:border-primary transition-colors vk-pop-in"
+          style="animation-delay: {Math.min(i, 12) * 30}ms"
           role="button"
           tabindex="0"
           aria-label="查看 CORS 详情"
@@ -402,7 +403,7 @@
         >
           <div class="flex items-center gap-2">
             <SeverityBadge severity={issue.severity} />
-            <span class="text-xs text-gray-400">{issue.endpoint.label}</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">{issue.endpoint.label}</span>
             <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{issue.method}</span>
             {#if issue.statusCode}
               <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{issue.statusCode}</span>
@@ -425,7 +426,7 @@
             </div>
           {/if}
           <div class="text-xs font-mono text-gray-600 dark:text-gray-300 break-all">{issue.url}</div>
-          <div class="text-xs text-gray-400">Origin: {issue.origin.value}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">Origin: {issue.origin.value}</div>
           {#if issue.acao}
             <div class="text-xs">
               ACAO: <span class="font-mono text-blue-600 dark:text-blue-400">{issue.acao}</span>
@@ -467,7 +468,7 @@
       {#if i.severity === 'critical' || i.severity === 'danger'}
         <div class="flex items-center gap-2">
           <button class="btn btn-xs btn-primary" onclick={() => verifyCredential(i)}>验证凭证反射</button>
-          <span class="text-xs text-gray-400">omit 模式重探，确认是否无视凭证盲目反射</span>
+          <span class="text-xs text-gray-500 dark:text-gray-400">omit 模式重探，确认是否无视凭证盲目反射</span>
         </div>
       {/if}
       {#if verifiedMap[i.url + i.method + i.origin.value]}

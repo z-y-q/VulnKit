@@ -69,10 +69,10 @@
     <span class="ml-0.5" aria-hidden="true">▾</span>
   </summary>
   {#if !empty}
-    <div class="absolute right-0 mt-1 z-20 card p-1 min-w-[10rem] shadow-lg space-y-0.5">
-      <button class="menu-btn" onclick={doCopy}>复制当前 {count} 项</button>
+    <div class="absolute right-0 mt-1 z-20 card p-1 min-w-[10rem] shadow-[var(--vk-shadow-lg)] space-y-0.5 export-dropdown">
+      <button class="menu-btn hover:bg-gray-100 dark:hover:bg-gray-700" onclick={doCopy}>复制当前 {count} 项</button>
       {#each formats as f (f)}
-        <button class="menu-btn" onclick={() => doExport(f)}>导出 {EXTS[f].toUpperCase()}</button>
+        <button class="menu-btn hover:bg-gray-100 dark:hover:bg-gray-700" onclick={() => doExport(f)}>导出 {EXTS[f].toUpperCase()}</button>
       {/each}
     </div>
   {/if}
@@ -96,11 +96,17 @@
     color: inherit;
     background: transparent;
     border: none;
+    cursor: pointer;
+    transition: background-color var(--vk-dur-fast) var(--vk-ease);
   }
-  .menu-btn:hover {
-    background: rgba(0, 0, 0, 0.06);
+  /* 打开时浮层从右上缩放展开（§12 物质化）；关闭由 <details> 即时隐藏。
+   * reduced-motion 由 shared.css 全局规则清零 animation-duration。 */
+  .export-menu[open] .export-dropdown {
+    transform-origin: top right;
+    animation: export-pop var(--vk-dur-fast) var(--vk-ease-out);
   }
-  :global(.dark) .menu-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
+  @keyframes export-pop {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
   }
 </style>

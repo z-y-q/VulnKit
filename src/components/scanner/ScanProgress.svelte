@@ -43,11 +43,13 @@
     aria-valuenow={determinate ? scanned : undefined}
     aria-label={phase ?? label ?? '扫描进度'}
   >
-    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 overflow-hidden">
       {#if determinate}
-        <div class="bg-primary h-full transition-all duration-150" style="width:{pct}%"></div>
+        <div class="bg-primary h-full rounded-full transition-[width] duration-[var(--vk-dur)] ease-[var(--vk-ease)]" style="width:{pct}%"></div>
       {:else}
-        <div class="bg-primary/60 h-full w-full animate-pulse rounded-full"></div>
+        <div class="relative h-full w-full">
+          <div class="absolute inset-y-0 left-0 w-1/3 rounded-full bg-primary/70" style="animation: vk-progress-slide 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;"></div>
+        </div>
       {/if}
     </div>
     <div class="text-xs text-gray-400 flex justify-between gap-2">

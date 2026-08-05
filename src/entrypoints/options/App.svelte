@@ -506,7 +506,7 @@
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
   <!-- Header -->
-  <header class="sticky top-0 z-20 bg-white/90 dark:bg-gray-800/90 backdrop-blur border-b border-gray-200 dark:border-gray-700">
+  <header class="sticky top-0 z-20 bg-white/90 dark:bg-gray-800/90 backdrop-blur border-b border-gray-200 dark:border-gray-700 shadow-[var(--vk-shadow-sm)]">
     <div class="max-w-5xl mx-auto px-5 py-3 flex items-center justify-between">
       <div>
         <h1 class="text-lg font-bold text-primary">灵眸 v{version}</h1>

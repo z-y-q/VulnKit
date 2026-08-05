@@ -102,7 +102,7 @@
   {:else}
     <div class="overflow-x-auto {scrollClass}">
       <table class={tableClass} style="min-width: {minPx}px; table-layout: auto;">
-        <thead class="sticky top-0 bg-white dark:bg-gray-800 z-10">
+        <thead class="sticky top-0 bg-white/85 dark:bg-gray-800/85 backdrop-blur-md z-10 shadow-[var(--vk-shadow-sm)]">
           <tr class="border-b border-gray-200 dark:border-gray-700">
             {#each visibleCols as col (col.key)}
               <th class="text-left px-3 py-1.5 font-medium text-gray-500 whitespace-nowrap">{col.header}</th>

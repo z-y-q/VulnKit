@@ -30,7 +30,7 @@
 </script>
 
 <div class="flex flex-col items-center justify-center py-10 text-center px-4" role="alert">
-  <div class="text-4xl mb-3" aria-hidden="true">⚠️</div>
+  <div class="inline-flex items-center justify-center w-14 h-14 mb-3 rounded-full bg-red-100 dark:bg-red-900/40 text-3xl" aria-hidden="true">⚠️</div>
   <div class="text-sm font-medium text-gray-700 dark:text-gray-200">「{label}」加载失败</div>
   <div class="text-xs text-gray-400 dark:text-gray-500 mt-1 max-w-xs break-all">{err.message}</div>
   <div class="flex flex-wrap gap-2 mt-4 justify-center">
