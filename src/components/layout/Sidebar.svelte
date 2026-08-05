@@ -224,11 +224,7 @@
               aria-controls="sb-cat-{catId}"
               onclick={() => sidebarStateStore.toggleCat(catId)}
             >
-              <span class="flex items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full" style="background: {cat.color}"></span>
-                {cat.label}
-                <span class="font-normal opacity-50">({cat.panels.length})</span>
-              </span>
+              <span>{cat.label} <span class="font-normal opacity-50">({cat.panels.length})</span></span>
               <svg class="w-3 h-3 transition-transform duration-200 {collapsedCats[catId] ? '' : 'rotate-90'}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg>
             </button>
             {#if !collapsedCats[catId]}
@@ -297,13 +293,13 @@
       {/if}
       <button
         type="button"
-        class="p-1 rounded text-xs leading-none transition-colors {isFav(panel.id) ? 'text-amber-400' : 'text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:!text-amber-400 hover:!opacity-100'}"
+        class="p-1 rounded transition-colors {isFav(panel.id) ? 'text-amber-400 opacity-70 hover:opacity-100' : 'text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:!text-amber-400 hover:!opacity-100'}"
         aria-pressed={isFav(panel.id)}
         aria-label={isFav(panel.id) ? `取消收藏 ${panel.label}` : `收藏 ${panel.label}`}
         title={isFav(panel.id) ? '取消收藏' : '收藏'}
         onclick={(e) => toggleFav(panel.id, e)}
       >
-        {#if isFav(panel.id)}★{:else}☆{/if}
+        <svg class="w-3 h-3" viewBox="0 0 24 24" fill={isFav(panel.id) ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
       </button>
     </div>
   </div>
