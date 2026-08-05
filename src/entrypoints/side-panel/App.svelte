@@ -169,7 +169,7 @@
           catColor={currentPanel.catColor}
         />
         <ContextBanner />
-        <div class="flex-1 overflow-y-auto p-3.5">
+        <div class="flex-1 overflow-y-auto p-4">
           {#key `${activePanel}-${loadNonce}`}
             <div class="vk-fade-in">
               {#await currentPanel.load()}

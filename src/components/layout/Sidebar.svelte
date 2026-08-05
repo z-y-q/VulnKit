@@ -225,9 +225,9 @@
               onclick={() => sidebarStateStore.toggleCat(catId)}
             >
               <span class="flex items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full shadow-sm" style="background: {cat.color}; box-shadow: 0 0 6px {cat.color}40"></span>
+                <span class="w-1.5 h-1.5 rounded-full" style="background: {cat.color}"></span>
                 {cat.label}
-                <span class="font-normal opacity-60">({cat.panels.length})</span>
+                <span class="font-normal opacity-50">({cat.panels.length})</span>
               </span>
               <svg class="w-3 h-3 transition-transform duration-200 {collapsedCats[catId] ? '' : 'rotate-90'}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg>
             </button>
@@ -261,15 +261,15 @@
 {#snippet panelRow(panel: PanelConfig, withShortcut: boolean, optionIdx: number = -1)}
   {@const idx = withShortcut ? shortcutIdx(panel) : 0}
   <div
-    class="group relative flex items-center rounded-lg transition-all duration-200 {activePanel === panel.id
-      ? 'bg-white dark:bg-gray-800/80 shadow-sm vk-glass'
-      : 'hover:bg-white/60 dark:hover:bg-gray-800/40'}{optionIdx >= 0 && optionIdx === activeIdx ? ' ring-2 ring-blue-400/50 bg-blue-50 dark:bg-blue-900/20' : ''}"
+    class="group relative flex items-center rounded-lg transition-colors duration-200 {activePanel === panel.id
+      ? 'bg-gray-100/80 dark:bg-gray-800/60'
+      : 'hover:bg-gray-100/60 dark:hover:bg-gray-800/40'}{optionIdx >= 0 && optionIdx === activeIdx ? ' ring-2 ring-blue-400/50 bg-blue-50 dark:bg-blue-900/20' : ''}"
     role={optionIdx >= 0 ? 'option' : undefined}
     id={optionIdx >= 0 ? `sb-opt-${panel.id}` : undefined}
     aria-selected={optionIdx >= 0 ? optionIdx === activeIdx : undefined}
   >
     {#if activePanel === panel.id}
-      <span class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full" style="background: {panel.catColor}; box-shadow: 0 0 8px {panel.catColor}60"></span>
+      <span class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full" style="background: {panel.catColor}"></span>
     {/if}
     <!-- 主点击区（切换面板） -->
     <button
@@ -283,9 +283,6 @@
     >
       <PanelIcon id={panel.id} fallback={panel.icon} class="w-[18px] h-[18px] shrink-0 transition-transform duration-200 {activePanel === panel.id ? 'scale-110' : 'group-hover:scale-110'}" />
       <span class="truncate flex-1">
-        {#if idx >= 1 && idx <= 8}
-          <span class="text-[9px] font-mono mr-1 px-0.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-gray-400 dark:text-gray-500 group-hover:bg-gray-300 dark:group-hover:bg-gray-600">{idx}</span>
-        {/if}
         {panel.label}
       </span>
     </button>
