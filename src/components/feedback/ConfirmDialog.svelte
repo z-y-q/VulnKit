@@ -3,6 +3,7 @@
   // role="dialog" aria-modal，默认焦点「取消」，Escape 关闭，焦点陷阱，遮罩点击关闭，焦点恢复。
   // 全 scoped style 不依赖 UnoCSS，保证任意入口可用。
   import { confirmStore } from '@/stores/confirm';
+  import { popTransition, scrimFade } from '@/lib/ui/motion';
 
   let req = $derived($confirmStore);
 
@@ -73,6 +74,7 @@
     aria-label="点击遮罩关闭对话框"
     onclick={onOverlayClick}
     onkeydown={onOverlayKeydown}
+    transition:scrimFade
   >
     <div
       bind:this={dialogRef}
@@ -81,6 +83,7 @@
       aria-modal="true"
       aria-labelledby="vk-confirm-title"
       aria-describedby="vk-confirm-msg"
+      transition:popTransition
     >
       <h3 id="vk-confirm-title" class="vk-confirm-title">
         {#if req.variant === 'danger'}<span aria-hidden="true">⚠️</span> {/if}{req.title}
@@ -113,11 +116,6 @@
     align-items: center;
     justify-content: center;
     padding: 16px;
-    animation: vk-confirm-fade 0.15s ease;
-  }
-  @keyframes vk-confirm-fade {
-    from { opacity: 0; }
-    to { opacity: 1; }
   }
   .vk-confirm-dialog {
     width: 100%;
@@ -125,17 +123,13 @@
     background: #fff;
     color: #1f2937;
     border-radius: 14px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    /* §12 —— 分层阴影 + 顶部受光高光边（主题感知 token） */
+    box-shadow: var(--vk-glass-highlight), var(--vk-shadow-xl);
     padding: 18px 20px 16px;
-    animation: vk-confirm-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   }
   :global(.dark) .vk-confirm-dialog {
     background: #1e293b;
     color: #e2e8f0;
-  }
-  @keyframes vk-confirm-pop {
-    from { opacity: 0; transform: translateY(8px) scale(0.97); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
   }
   .vk-confirm-title {
     margin: 0 0 8px;
@@ -201,10 +195,5 @@
   .vk-confirm-ok.is-danger:hover {
     background: #dc2626;
   }
-  @media (prefers-reduced-motion: reduce) {
-    .vk-confirm-overlay,
-    .vk-confirm-dialog {
-      animation: none;
-    }
-  }
+  /* reduced-motion 由 @/lib/ui/motion 的 transition 构造器统一降级（duration: 0） */
 </style>

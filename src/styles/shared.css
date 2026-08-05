@@ -26,6 +26,22 @@
   --vk-success: #10b981;
   --vk-warning: #f59e0b;
   --vk-ring: rgba(74, 144, 226, 0.4);
+
+  /* 动效节奏（Apple Design §4 —— 临界阻尼近似；非手势动效用 cubic-bezier 近似弹簧） */
+  --vk-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --vk-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --vk-dur-fast: 0.15s;
+  --vk-dur: 0.22s;
+
+  /* 分层阴影（§12 —— 多层 box-shadow 比单阴影更「物理」，传达层级） */
+  --vk-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --vk-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.1), 0 2px 4px rgba(15, 23, 42, 0.06);
+  --vk-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08);
+  --vk-shadow-xl: 0 24px 60px rgba(15, 23, 42, 0.24), 0 8px 24px rgba(15, 23, 42, 0.12);
+
+  /* 玻璃「顶部受光高光边」（§12 —— 让材质读作真实物体） */
+  --vk-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+
   color-scheme: light;
 }
 
@@ -42,6 +58,14 @@
   --vk-success: #10b981;
   --vk-warning: #f59e0b;
   --vk-ring: rgba(74, 144, 226, 0.5);
+
+  /* 暗色：阴影更深、玻璃高光边更克制（深底上白线不宜过亮） */
+  --vk-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --vk-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --vk-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.35);
+  --vk-shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.65), 0 8px 24px rgba(0, 0, 0, 0.4);
+  --vk-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
   color-scheme: dark;
 }
 
@@ -51,15 +75,47 @@ body {
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC',
     'Microsoft YaHei', sans-serif;
+  /* §15 —— 让字形随字号变化（系统字体内置光学尺寸表） */
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+/* §14 —— 主题切换平滑过渡，避免亮/暗亮度硬跳（reduced-motion 下由全局规则自动清零） */
+body {
+  transition: background-color 0.3s var(--vk-ease), color 0.3s var(--vk-ease);
+}
+
+/* §15 —— 显示级排版：大字负字距 + 紧行距（字号越大字距越收紧） */
+.vk-text-display {
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
 /* 全局焦点环（§8.2.4）：键盘可见，鼠标点击不抢焦 */
 :focus-visible {
   outline: 2px solid var(--vk-primary);
   outline-offset: 2px;
+}
+
+/* 屏幕阅读器专用（视觉隐藏，语义保留）—— 各入口共享 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 不定态进度游动段（ScanProgress indeterminate）—— 替代 animate-pulse 的「加载」感，读作「进行中」 */
+@keyframes vk-progress-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
 }
 
 /* 尊重动效偏好（§7.3）：覆盖所有过渡/动画，不只 .vk-* */
@@ -71,5 +127,29 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* §14 —— 透明度降级：关闭毛玻璃、半透明面提为实底，保证文字可读性
+ * 强制无障碍模式用 !important 以覆盖 UnoCSS 生成顺序，与上方 reduced-motion 同策略 */
+@media (prefers-reduced-transparency: reduce) {
+  .vk-glass,
+  .card,
+  .card-glass {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: var(--vk-bg) !important;
+  }
+}
+
+/* §14 —— 增强对比：近实底 + 明确描边（用户显式选择最高对比） */
+@media (prefers-contrast: more) {
+  .vk-glass,
+  .card,
+  .card-glass {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: var(--vk-bg) !important;
+    border: 1px solid var(--vk-text) !important;
   }
 }

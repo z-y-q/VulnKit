@@ -73,7 +73,7 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 .vk-fade-in {
-  animation: vk-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: vk-fade-in var(--vk-dur) var(--vk-ease-out);
 }
 
 /* 结果项逐个弹出 */
@@ -82,16 +82,7 @@ body {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .vk-pop-in {
-  animation: vk-pop-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* Toast 右侧滑入 */
-@keyframes vk-slide-in {
-  from { opacity: 0; transform: translateX(24px) scale(0.95); }
-  to   { opacity: 1; transform: translateX(0) scale(1); }
-}
-.vk-slide-in {
-  animation: vk-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: vk-pop-in var(--vk-dur) var(--vk-ease-out) both;
 }
 
 /* 柔和脉动（扫描进行中） */

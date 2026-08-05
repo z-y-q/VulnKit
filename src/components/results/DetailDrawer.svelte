@@ -10,6 +10,7 @@
   import { copyText } from '@/lib/actions/clipboard';
   import { analysisContextStore } from '@/stores/analysis-context';
   import { severityTone, type DetailField, type DetailHandoffAction } from './detail-drawer-utils';
+  import { sheetTransition, scrimFade } from '@/lib/ui/motion';
 
   let {
     items,
@@ -151,6 +152,7 @@
     aria-label="点击遮罩关闭详情"
     onclick={onOverlayClick}
     onkeydown={onOverlayKeydown}
+    transition:scrimFade
   >
     <div
       bind:this={dialogRef}
@@ -158,6 +160,7 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="dd-title"
+      transition:sheetTransition
     >
       <!-- 头部 -->
       <div class="dd-header">
@@ -237,11 +240,6 @@
     backdrop-filter: blur(2px);
     display: flex;
     justify-content: flex-end;
-    animation: dd-fade 0.15s ease;
-  }
-  @keyframes dd-fade {
-    from { opacity: 0; }
-    to { opacity: 1; }
   }
   .dd-dialog {
     width: 100%;
@@ -249,19 +247,15 @@
     height: 100%;
     background: #fff;
     color: #1f2937;
-    box-shadow: -10px 0 40px rgba(0, 0, 0, 0.2);
+    /* §12 —— 分层阴影 + 顶部受光高光边，读作真实物体（主题感知 token） */
+    box-shadow: var(--vk-glass-highlight), var(--vk-shadow-xl);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: dd-slide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   }
   :global(.dark) .dd-dialog {
     background: #1e293b;
     color: #e2e8f0;
-  }
-  @keyframes dd-slide {
-    from { transform: translateX(24px); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
   }
   .dd-header {
     display: flex;
@@ -487,10 +481,5 @@
   :global(.dark) .dd-copyall:hover { background: #2563eb; }
   .dd-copyall:focus-visible { outline: 2px solid #4a90e2; outline-offset: 2px; }
 
-  @media (prefers-reduced-motion: reduce) {
-    .dd-overlay,
-    .dd-dialog {
-      animation: none;
-    }
-  }
+  /* reduced-motion 由 @/lib/ui/motion 的 transition 构造器统一降级（duration: 0） */
 </style>

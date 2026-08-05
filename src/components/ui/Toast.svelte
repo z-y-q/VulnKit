@@ -4,6 +4,8 @@
   // - 明确关闭按钮（键盘可达），不再用整块 div onclick；
   // - 去掉 hover:scale（高密度浮层不用位移动效）。
   import { toastStore, type ToastItem } from '@/stores/ui';
+  import { toastFly } from '@/lib/ui/motion';
+  import { flip } from 'svelte/animate';
 
   let toasts = $derived($toastStore);
 
@@ -30,9 +32,11 @@
   <div class="fixed top-4 right-4 z-50 flex flex-col gap-2.5 pointer-events-none" role="region" aria-label="通知">
     {#each toasts as toast (toast.id)}
       <div
-        class="vk-slide-in pointer-events-auto flex items-center gap-2 pl-3.5 pr-1.5 py-2.5 rounded-xl shadow-lg text-sm text-white max-w-xs vk-glass"
+        class="pointer-events-auto flex items-center gap-2 pl-3.5 pr-1.5 py-2.5 rounded-xl shadow-lg text-sm text-white max-w-xs vk-glass"
         style="background: {gradients[toast.type]}"
         role={toast.type === 'error' ? 'alert' : 'status'}
+        transition:toastFly
+        animate:flip={{ duration: 200 }}
       >
         <span class="text-white/80" aria-hidden="true">{icons[toast.type]}</span>
         <span class="font-medium flex-1">{toast.message}</span>
