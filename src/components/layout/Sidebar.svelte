@@ -270,7 +270,7 @@
     <!-- 主点击区（切换面板） -->
     <button
       type="button"
-      class="flex-1 min-w-0 flex items-center gap-2 pl-3 pr-1 py-1.5 text-[13px] text-left {activePanel === panel.id
+      class="flex-1 min-w-0 flex items-center gap-2 pl-3 pr-6 py-1.5 text-[13px] text-left {activePanel === panel.id
         ? 'text-gray-900 dark:text-gray-100 font-semibold'
         : 'text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
       aria-current={activePanel === panel.id ? 'page' : undefined}
@@ -282,25 +282,23 @@
         {panel.label}
       </span>
     </button>
-    <!-- 右侧操作区（与主点击区分离，避免嵌套交互） -->
-    <div class="flex items-center pr-1 shrink-0">
-      {#if panel.id === 'sniff' && sniffBadge.items.length > 0}
-        <span class="flex gap-0.5 mr-0.5" title="最近嗅探: {sniffBadge.items.map((i) => i.name + (i.version ? ' v' + i.version : '')).join(', ')}">
-          {#each sniffBadge.items.slice(0, 2) as item}
-            <span class="text-[9px] font-mono px-1 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300 leading-tight">{item.name}{#if item.version}{item.version}{/if}</span>
-          {/each}
-        </span>
-      {/if}
-      <button
-        type="button"
-        class="p-1 rounded transition-colors {isFav(panel.id) ? 'text-amber-400 opacity-70 hover:opacity-100' : 'text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:!text-amber-400 hover:!opacity-100'}"
-        aria-pressed={isFav(panel.id)}
-        aria-label={isFav(panel.id) ? `取消收藏 ${panel.label}` : `收藏 ${panel.label}`}
-        title={isFav(panel.id) ? '取消收藏' : '收藏'}
-        onclick={(e) => toggleFav(panel.id, e)}
-      >
-        <svg class="w-3 h-3" viewBox="0 0 24 24" fill={isFav(panel.id) ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-      </button>
-    </div>
+    {#if panel.id === 'sniff' && sniffBadge.items.length > 0}
+      <span class="shrink-0 flex gap-0.5 mr-1" title="最近嗅探: {sniffBadge.items.map((i) => i.name + (i.version ? ' v' + i.version : '')).join(', ')}">
+        {#each sniffBadge.items.slice(0, 2) as item}
+          <span class="text-[9px] font-mono px-1 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300 leading-tight">{item.name}{#if item.version}{item.version}{/if}</span>
+        {/each}
+      </span>
+    {/if}
+    <!-- 收藏：仅悬停浮现；已收藏项已在顶部「收藏」区聚合，行内不留常驻星标（展开态不再满屏星） -->
+    <button
+      type="button"
+      class="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-colors {isFav(panel.id) ? 'text-amber-400 hover:text-amber-500' : 'text-gray-400 dark:text-gray-500 hover:text-amber-400'}"
+      aria-pressed={isFav(panel.id)}
+      aria-label={isFav(panel.id) ? `取消收藏 ${panel.label}` : `收藏 ${panel.label}`}
+      title={isFav(panel.id) ? '取消收藏' : '收藏'}
+      onclick={(e) => toggleFav(panel.id, e)}
+    >
+      <svg class="w-3 h-3" viewBox="0 0 24 24" fill={isFav(panel.id) ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+    </button>
   </div>
 {/snippet}
