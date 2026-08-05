@@ -327,22 +327,22 @@
         <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
-    <div class="flex items-center gap-3 text-xs flex-wrap">
+    <div class="flex items-center gap-2 text-xs flex-wrap">
       <label class="flex items-center gap-1 cursor-pointer">
         <input type="checkbox" bind:checked={useDynamic} disabled={archiving} class="accent-blue-500" />
         <span>动态混淆 Origin</span>
       </label>
-      <span class="text-gray-400 shrink-0">方法:</span>
+      <span class="text-gray-500 dark:text-gray-400 shrink-0">方法:</span>
       {#each ['GET', 'OPTIONS', 'POST', 'PUT', 'DELETE'] as m}
-        <label class="flex items-center gap-0.5 cursor-pointer">
-          <input
-            type="checkbox"
-            bind:checked={methods[m as keyof typeof methods]}
-            disabled={archiving}
-            class="accent-blue-500"
-          />
-          <span class="text-gray-600 dark:text-gray-300">{m}</span>
-        </label>
+        <button
+          type="button"
+          class={methods[m as keyof typeof methods] ? 'chip-active' : 'chip-inactive'}
+          aria-pressed={methods[m as keyof typeof methods]}
+          disabled={archiving}
+          onclick={() => (methods[m as keyof typeof methods] = !methods[m as keyof typeof methods])}
+        >
+          {m}
+        </button>
       {/each}
     </div>
     <div class="text-xs text-gray-500 dark:text-gray-400">
@@ -355,15 +355,15 @@
   {#if issues.length > 0}
     <ResultToolbar {query} total={issues.length} shown={filteredIssues.length} searchPlaceholder="搜索 URL/端点/ACAO...">
       <button
-        class="badge cursor-pointer {vulnOnly
-          ? 'bg-red-500 text-white'
-          : 'bg-gray-200 dark:bg-gray-700'}"
+        class="badge cursor-pointer transition-all duration-[var(--vk-dur-fast)] ease-[var(--vk-ease)] active:scale-[0.96] {vulnOnly
+          ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60'
+          : 'bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400'}"
         aria-pressed={vulnOnly}
         onclick={toggleVuln}
       >
         仅风险 {vulnCount}
       </button>
-      <span class="badge bg-green-500 text-white">安全 {safeCount}</span>
+      <span class="badge bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800/60">安全 {safeCount}</span>
       <select
         class="input text-xs w-24"
         value={query.sort.key}

@@ -55,6 +55,11 @@ export default defineConfig({
     'seg-btn': 'px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-all duration-[var(--vk-dur-fast)] ease-[var(--vk-ease)] active:scale-[0.97]',
     'seg-btn-active': 'seg-btn bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm',
     'seg-btn-inactive': 'seg-btn text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200',
+
+    // ===== 多选 chip（与 seg 配对：seg=互斥，chip=多选；描边胶囊，激活实心） =====
+    'chip': 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium cursor-pointer transition-all duration-[var(--vk-dur-fast)] ease-[var(--vk-ease)] active:scale-[0.96] border disabled:opacity-40 disabled:cursor-not-allowed',
+    'chip-active': 'chip bg-primary text-white border-transparent',
+    'chip-inactive': 'chip text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600/60 bg-white/50 dark:bg-gray-800/40 hover:border-gray-300 dark:hover:border-gray-500',
   },
   theme: {
     colors: {
