@@ -239,9 +239,9 @@
 </script>
 
 <div class="space-y-3">
-  <div class="flex gap-1">
+  <div class="seg">
     {#each [{ id: 'ua', label: 'UA 伪造' }, { id: 'headers', label: '请求头伪造' }, { id: 'cookies', label: 'Cookie 管理' }] as t}
-      <button class="btn btn-sm {tab === t.id ? 'bg-primary text-white' : 'btn-ghost'}" onclick={() => (tab = t.id as Tab)}>{t.label}</button>
+      <button class={tab === t.id ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => (tab = t.id as Tab)}>{t.label}</button>
     {/each}
   </div>
 
@@ -250,9 +250,9 @@
       <div class="text-xs text-green-500">✅ UA 伪造已启用</div>
     {/if}
 
-    <div class="flex gap-1 flex-wrap">
-      {#each [{ id: 'mobile', label: '📱 手机' }, { id: 'desktop', label: '🖥️ 桌面' }, { id: 'brand', label: '🤖 爬虫' }, { id: 'custom', label: '✏️ 自定义' }] as c}
-        <button class="btn btn-xs {uaCategory === c.id ? 'bg-primary text-white' : 'btn-ghost'}" onclick={() => (uaCategory = c.id as UaCategory)}>{c.label}</button>
+    <div class="seg">
+      {#each [{ id: 'mobile', label: '手机' }, { id: 'desktop', label: '桌面' }, { id: 'brand', label: '爬虫' }, { id: 'custom', label: '自定义' }] as c}
+        <button class={uaCategory === c.id ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => (uaCategory = c.id as UaCategory)}>{c.label}</button>
       {/each}
     </div>
 

@@ -232,11 +232,11 @@
 <div class="space-y-3">
   <!-- 引擎选择 + API Key 配置 -->
   <div class="card p-3 space-y-2">
-    <!-- 引擎切换 -->
-    <div class="flex gap-0.5">
+    <!-- 引擎切换（分段控件） -->
+    <div class="seg w-full">
       {#each (['zoomeye', 'fofa', 'shodan'] as Engine[]) as eng}
         <button
-          class="btn btn-sm flex-1 {engine === eng ? 'bg-primary text-white' : 'btn-ghost'}"
+          class="flex-1 text-center {engine === eng ? 'seg-btn-active' : 'seg-btn-inactive'}"
           onclick={() => { engine = eng; results = []; statusText = ''; }}
         >
           {ENGINE_LABEL[eng]}
@@ -290,15 +290,15 @@
     <div class="flex gap-1">
       <!-- 模式切换（仅 ZoomEye） -->
       {#if engine === 'zoomeye'}
-        <div class="flex gap-0.5">
+        <div class="seg">
           <button
-            class="btn btn-sm {mode === 'host' ? 'bg-primary text-white' : 'btn-ghost'}"
+            class={mode === 'host' ? 'seg-btn-active' : 'seg-btn-inactive'}
             onclick={() => { mode = 'host'; }}
           >
             Host
           </button>
           <button
-            class="btn btn-sm {mode === 'web' ? 'bg-primary text-white' : 'btn-ghost'}"
+            class={mode === 'web' ? 'seg-btn-active' : 'seg-btn-inactive'}
             onclick={() => { mode = 'web'; }}
           >
             Web

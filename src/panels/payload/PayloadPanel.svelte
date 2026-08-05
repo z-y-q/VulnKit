@@ -179,11 +179,11 @@
 </script>
 
 <div class="space-y-3">
-  <!-- 顶部统计 -->
+  <!-- 顶部统计（兼分类切换） -->
   <div class="flex flex-wrap gap-1 text-xs">
     {#each categories as cat}
       <button
-        class="badge cursor-pointer {activeCategory === cat.key ? 'badge-primary' : 'opacity-70 hover:opacity-100'}"
+        class="badge cursor-pointer transition-all duration-[var(--vk-dur-fast)] ease-[var(--vk-ease)] active:scale-[0.96] {activeCategory === cat.key ? 'bg-primary text-white' : 'opacity-60 hover:opacity-100'}"
         onclick={() => (activeCategory = cat.key)}
       >
         {cat.icon} {cat.label} <span class="ml-1 font-mono">{stats[cat.key]}</span>
@@ -194,18 +194,6 @@
 
   <!-- 搜索框 -->
   <input class="input text-xs font-mono" placeholder="搜索 payload / 分类名..." aria-label="搜索 payload" bind:value={searchText} />
-
-  <!-- 分类 Tab 切换 -->
-  <div class="flex gap-1 flex-wrap">
-    {#each categories as cat}
-      <button
-        class="btn btn-sm {activeCategory === cat.key ? 'bg-primary text-white' : 'btn-ghost'}"
-        onclick={() => (activeCategory = cat.key)}
-      >
-        {cat.icon} {cat.label}
-      </button>
-    {/each}
-  </div>
 
   <!-- SQLi 配置区 -->
   {#if activeCategory === 'sqli'}
