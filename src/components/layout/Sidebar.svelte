@@ -6,6 +6,7 @@
   import { panels, type PanelConfig } from '@/panels';
   import { panelMatches } from '@/panels/registry';
   import SearchField from '@/components/form/SearchField.svelte';
+  import PanelIcon from '@/components/ui/PanelIcon.svelte';
   import { sniffBadgeStore } from '@/stores/sniff-badge';
   import { panelLayoutStore, applyLayout } from '@/stores/panel-layout';
   import { sidebarStateStore } from '@/stores/sidebar-state';
@@ -112,7 +113,7 @@
 <aside
   class="shrink-0 bg-gray-50/80 dark:bg-slate-900/60 border-r border-gray-200/50 dark:border-gray-700/30 vk-glass flex flex-col {iconMode
     ? 'w-12'
-    : 'w-44'} transition-[width] duration-200"
+    : 'w-44'} transition-[width] duration-200 ease-[var(--vk-ease)]"
   aria-label="工具导航"
 >
   {#if iconMode}
@@ -130,7 +131,7 @@
           title={panel.label}
           onclick={() => select(panel.id)}
         >
-          <span class="grayscale-0">{panel.icon}</span>
+          <PanelIcon id={panel.id} fallback={panel.icon} class="w-5 h-5" />
           {#if isFav(panel.id)}
             <span class="absolute text-[7px] text-amber-400 ml-3 -mt-3">●</span>
           {/if}
@@ -280,7 +281,7 @@
       title={idx >= 1 && idx <= 8 ? `{panel.label} (Alt+${idx})` : panel.label}
       onclick={() => select(panel.id)}
     >
-      <span class="text-[15px] w-5 text-center transition-transform duration-200 {activePanel === panel.id ? 'scale-110' : 'group-hover:scale-110'}">{panel.icon}</span>
+      <PanelIcon id={panel.id} fallback={panel.icon} class="w-[18px] h-[18px] shrink-0 transition-transform duration-200 {activePanel === panel.id ? 'scale-110' : 'group-hover:scale-110'}" />
       <span class="truncate flex-1">
         {#if idx >= 1 && idx <= 8}
           <span class="text-[9px] font-mono mr-1 px-0.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-gray-400 dark:text-gray-500 group-hover:bg-gray-300 dark:group-hover:bg-gray-600">{idx}</span>

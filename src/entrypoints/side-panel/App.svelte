@@ -163,6 +163,7 @@
         <PanelHeader
           title={currentPanel.label}
           icon={currentPanel.icon}
+          id={currentPanel.id}
           category={currentPanel.category}
           categoryLabel={currentPanel.categoryLabel}
           catColor={currentPanel.catColor}

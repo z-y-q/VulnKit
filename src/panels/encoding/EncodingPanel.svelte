@@ -208,11 +208,11 @@
 </script>
 
 <div class="space-y-3">
-  <!-- 子视图切换 -->
-  <div class="flex gap-1">
+  <!-- 子视图切换（分段控件） -->
+  <div class="seg">
     {#each [{ id: 'classic', label: '经典编码' }, { id: 'jwt', label: 'JWT 解析' }, { id: 'crypto', label: '加密解密' }] as v}
       <button
-        class="btn btn-sm {view === v.id ? 'bg-primary text-white' : 'btn-ghost'}"
+        class={view === v.id ? 'seg-btn-active' : 'seg-btn-inactive'}
         onclick={() => (view = v.id as View)}
       >
         {v.label}
@@ -221,6 +221,7 @@
   </div>
 
   {#if view === 'classic'}
+   <div class="card p-3 space-y-3">
     <!-- 编码类型 -->
     <div class="flex gap-1 flex-wrap">
       {#each [{ id: 'base64', label: 'Base64' }, { id: 'url', label: 'URL' }, { id: 'html', label: 'HTML' }, { id: 'hex', label: 'Hex' }] as t}
@@ -233,30 +234,34 @@
       {/each}
     </div>
 
-    <div class="flex gap-1">
-      <button class="btn btn-sm {mode === 'encode' ? 'bg-primary text-white' : 'btn-ghost'}" onclick={() => (mode = 'encode')}>编码</button>
-      <button class="btn btn-sm {mode === 'decode' ? 'bg-primary text-white' : 'btn-ghost'}" onclick={() => (mode = 'decode')}>解码</button>
-      <button class="btn btn-sm btn-ghost ml-auto" onclick={swap} title="输入输出互换">⇅</button>
+    <div class="flex items-center justify-between gap-2">
+      <div class="seg">
+        <button class={mode === 'encode' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => (mode = 'encode')}>编码</button>
+        <button class={mode === 'decode' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => (mode = 'decode')}>解码</button>
+      </div>
+      <button class="btn btn-sm btn-ghost" onclick={swap} title="输入输出互换">⇅ 互换</button>
     </div>
 
     <div>
-      <label for="enc-input" class="block text-xs text-gray-500 mb-1">输入</label>
+      <label for="enc-input" class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">输入</label>
       <textarea id="enc-input" class="input font-mono text-xs" rows="3" placeholder="输入需要编码/解码的内容..." bind:value={input}></textarea>
     </div>
 
     <div>
       <div class="flex items-center justify-between mb-1">
-        <span class="text-xs text-gray-500">输出</span>
+        <span class="text-xs font-medium text-gray-600 dark:text-gray-300">输出</span>
         {#if output}<button class="text-xs text-primary hover:underline" onclick={copyOutput}>复制</button>{/if}
       </div>
       <div class="input font-mono text-xs min-h-12 whitespace-pre-wrap break-all bg-gray-50 dark:bg-gray-900 py-2 px-3">
-        {output || '<span class="text-gray-400">等待输入...</span>'}
+        {output || '<span class="text-gray-500 dark:text-gray-400">等待输入...</span>'}
       </div>
     </div>
+   </div>
 
   {:else if view === 'jwt'}
+   <div class="card p-3 space-y-3">
     <div>
-      <label for="enc-jwt" class="block text-xs text-gray-500 mb-1">JWT Token</label>
+      <label for="enc-jwt" class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">JWT Token</label>
       <textarea id="enc-jwt" class="input font-mono text-xs" rows="3" placeholder="粘贴 JWT（eyJ...）" bind:value={jwtInput}></textarea>
     </div>
 
@@ -266,15 +271,15 @@
 
     {#if decoded}
       <!-- 算法 -->
-      <div class="card p-2">
-        <div class="text-xs text-gray-500 mb-1">Header / 算法</div>
+      <div class="card-flat p-3">
+        <div class="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Header / 算法</div>
         <div class="font-mono text-xs break-all">{decoded.header.alg} · {decoded.header.typ || 'JWT'}</div>
       </div>
 
       <!-- 安全发现 -->
       {#if decoded.findings.length > 0}
-        <div class="card p-2 space-y-1">
-          <div class="text-xs text-gray-500">安全发现（{decoded.findings.length}）</div>
+        <div class="card-flat p-3 space-y-1">
+          <div class="text-xs font-medium text-gray-600 dark:text-gray-300">安全发现（{decoded.findings.length}）</div>
           {#each decoded.findings as f}
             <div class="text-xs">
               <span class="font-semibold {severityClass(f.severity)}">[{f.severity.toUpperCase()}]</span>
@@ -285,8 +290,8 @@
       {/if}
 
       <!-- 签名验证 -->
-      <div class="card p-2 space-y-2">
-        <div class="text-xs text-gray-500">签名验证（HMAC / RSA / ECDSA）</div>
+      <div class="card-flat p-3 space-y-2">
+        <div class="text-xs font-medium text-gray-600 dark:text-gray-300">签名验证（HMAC / RSA / ECDSA）</div>
         <input
           class="input text-xs font-mono"
           placeholder={(decoded?.header.alg || '').startsWith('HS') ? 'HMAC 密钥' : 'RSA / EC PEM 公钥'}
@@ -313,14 +318,16 @@
 
       <!-- Payload -->
       <div>
-        <div class="text-xs text-gray-500 mb-1">Payload</div>
+        <div class="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Payload</div>
         <pre class="input font-mono text-xs whitespace-pre-wrap break-all bg-gray-50 dark:bg-gray-900 py-2 px-3 max-h-60 overflow-auto">{JSON.stringify(decoded.payload, null, 2)}</pre>
       </div>
     {:else if !jwtError}
-      <div class="text-xs text-gray-400 text-center py-4">粘贴 JWT 后自动解析</div>
+      <div class="text-xs text-gray-500 dark:text-gray-400 text-center py-4">粘贴 JWT 后自动解析</div>
     {/if}
+   </div>
 
   {:else}
+   <div class="card p-3 space-y-3">
     <!-- 加密算法选择 -->
     <div class="flex gap-1 flex-wrap">
       {#each CRYPTO_ALGOS as a}
@@ -335,14 +342,14 @@
 
     <!-- 加密/解密模式（Hash 除外） -->
     {#if cryptoAlgo !== 'hash'}
-      <div class="flex gap-1">
-        <button class="btn btn-sm {cryptoMode === 'encrypt' ? 'bg-primary text-white' : 'btn-ghost'}" onclick={() => (cryptoMode = 'encrypt')}>加密</button>
-        <button class="btn btn-sm {cryptoMode === 'decrypt' ? 'bg-primary text-white' : 'btn-ghost'}" onclick={() => (cryptoMode = 'decrypt')}>解密</button>
+      <div class="seg">
+        <button class={cryptoMode === 'encrypt' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => (cryptoMode = 'encrypt')}>加密</button>
+        <button class={cryptoMode === 'decrypt' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => (cryptoMode = 'decrypt')}>解密</button>
       </div>
     {/if}
 
     <!-- 各算法参数 -->
-    <div class="card p-2 space-y-2">
+    <div class="card-flat p-3 space-y-2">
       {#if cryptoAlgo === 'aes'}
         <div class="grid grid-cols-2 gap-2 text-xs">
           <label class="flex flex-col gap-0.5">模式
@@ -490,7 +497,7 @@
 
     <!-- 输入 -->
     <div>
-      <label for="enc-crypto-input" class="block text-xs text-gray-500 mb-1">输入</label>
+      <label for="enc-crypto-input" class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">输入</label>
       <textarea id="enc-crypto-input" class="input font-mono text-xs" rows="3" placeholder={cryptoAlgo === 'hash' ? '输入待哈希内容' : '输入明文/密文'} bind:value={cryptoInput}></textarea>
     </div>
 
@@ -502,12 +509,13 @@
     <!-- 输出 -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <span class="text-xs text-gray-500">输出</span>
+        <span class="text-xs font-medium text-gray-600 dark:text-gray-300">输出</span>
         {#if cryptoOutput && !cryptoOutput.startsWith('⚠️')}<button class="text-xs text-primary hover:underline" onclick={copyCryptoOutput}>复制</button>{/if}
       </div>
       <div class="input font-mono text-xs min-h-12 whitespace-pre-wrap break-all bg-gray-50 dark:bg-gray-900 py-2 px-3">
-        {cryptoOutput || '<span class="text-gray-400">等待操作...</span>'}
+        {cryptoOutput || '<span class="text-gray-500 dark:text-gray-400">等待操作...</span>'}
       </div>
     </div>
+   </div>
   {/if}
 </div>
