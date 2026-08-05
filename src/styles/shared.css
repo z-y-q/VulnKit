@@ -105,6 +105,12 @@ body {
   outline-offset: 2px;
 }
 
+/* 暗色可读性：gray-500/600 在深底上对比仅约 3:1（看不清），暗色统一提亮到 gray-400（≈7:1，达 AA）。
+ * 仅 .dark 作用域，亮色不受影响。UnoCSS 把 dark 变体与 flat 工具合并选择器且后加载，
+ * 同特异性下会赢，故此处用 !important 强制（与 reduced-motion 同属无障碍强制覆盖）。 */
+.dark .text-gray-500 { color: #9ca3af !important; }
+.dark .text-gray-600 { color: #9ca3af !important; }
+
 /* 屏幕阅读器专用（视觉隐藏，语义保留）—— 各入口共享 */
 .sr-only {
   position: absolute;

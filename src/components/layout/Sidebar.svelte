@@ -188,7 +188,7 @@
         <!-- 最近使用 -->
         {#if recentVisible.length}
           <div class="border-b border-gray-200/40 dark:border-gray-700/20">
-            <div class="px-3 pt-2 pb-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500">最近</div>
+            <div class="px-3 pt-2 pb-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400">最近</div>
             <div class="pb-1 px-1.5 space-y-0.5">
               {#each recentVisible as id (id)}
                 {@const panel = panelById(id)}
@@ -201,7 +201,7 @@
         <!-- 收藏 -->
         {#if favoriteVisible.length}
           <div class="border-b border-gray-200/40 dark:border-gray-700/20">
-            <div class="px-3 pt-2 pb-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500 flex items-center gap-1">
+            <div class="px-3 pt-2 pb-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1">
               <svg class="w-2.5 h-2.5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
               收藏
             </div>
@@ -219,7 +219,7 @@
           <div class="border-b border-gray-200/40 dark:border-gray-700/20">
             <button
               type="button"
-              class="w-full flex items-center justify-between px-3 py-2 text-[11px] font-semibold text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
+              class="w-full flex items-center justify-between px-3 py-2 text-[11px] font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
               aria-expanded={!collapsedCats[catId]}
               aria-controls="sb-cat-{catId}"
               onclick={() => sidebarStateStore.toggleCat(catId)}
@@ -292,7 +292,7 @@
     <!-- 收藏：仅悬停浮现；已收藏项已在顶部「收藏」区聚合，行内不留常驻星标（展开态不再满屏星） -->
     <button
       type="button"
-      class="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-colors {isFav(panel.id) ? 'text-amber-400 hover:text-amber-500' : 'text-gray-400 dark:text-gray-500 hover:text-amber-400'}"
+      class="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-colors {isFav(panel.id) ? 'text-amber-400 hover:text-amber-500' : 'text-gray-500 dark:text-gray-400 hover:text-amber-400'}"
       aria-pressed={isFav(panel.id)}
       aria-label={isFav(panel.id) ? `取消收藏 ${panel.label}` : `收藏 ${panel.label}`}
       title={isFav(panel.id) ? '取消收藏' : '收藏'}
