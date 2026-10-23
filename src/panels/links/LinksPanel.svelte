@@ -14,6 +14,7 @@
     buildCsv,
     type ExtractedLink,
   } from '@/lib/scanners/links-engine';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
 
   // --- State ---
   let loading = $state(false);
@@ -373,10 +374,11 @@
       {/each}
     </div>
   {:else if !loading && totalCount === 0}
-    <div class="text-center text-gray-500 text-sm py-8">
-      点击「提取链接」获取当前页面所有链接、图片、脚本等资源
-    </div>
+    <EmptyState
+      message="点击「提取链接」获取当前页面所有链接、图片、脚本等资源"
+      icon="🔗"
+    />
   {:else if !loading && totalCount > 0}
-    <div class="text-center text-gray-500 text-sm py-8">没有匹配的链接</div>
+    <EmptyState message="没有匹配的链接" icon="🔍" />
   {/if}
 </div>

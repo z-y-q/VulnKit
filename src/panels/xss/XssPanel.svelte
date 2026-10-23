@@ -19,6 +19,7 @@
   import { type ResultAdapter, type ResultQuery } from '@/lib/results/result-adapter';
   import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
   import { abortableDelay } from '@/lib/tasks/abortable-delay';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
   import DetailDrawer from '@/components/results/DetailDrawer.svelte';
   import type { DetailField, DetailHandoffAction } from '@/components/results/detail-drawer-utils';
   import { downloadText, buildFilename } from '@/lib/actions/download';
@@ -1112,7 +1113,7 @@ ${cards}
       {/each}
     </div>
   {:else if !archiving && findings.length === 0 && cs.completed > 0}
-    <div class="text-center text-gray-500 text-sm py-8">未发现 XSS 漏洞</div>
+    <EmptyState message="未发现 XSS 漏洞" icon="✅" />
   {/if}
 
   <!-- DOM Sink 分析 -->
@@ -1181,8 +1182,9 @@ ${cards}
   />
 
   {#if !archiving && findings.length === 0 && cs.completed === 0 && sinks.length === 0}
-    <div class="text-center text-gray-500 text-sm py-4">
-      输入目标 URL → 采集注入点 → 检测反射；或直接「分析 DOM 汇点」
-    </div>
+    <EmptyState
+      message="输入目标 URL → 采集注入点 → 检测反射；或直接「分析 DOM 汇点」"
+      icon="🔍"
+    />
   {/if}
 </div>

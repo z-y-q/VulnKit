@@ -10,6 +10,7 @@
   import { extractScriptSrcs, extractLinkHrefs, formatSize } from '@/lib/source/source-utils';
   import { sourceLoaderStateStore } from '@/stores/source-loader-state';
   import { get } from 'svelte/store';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
 
   // —— 大文件保护 ——
   // 抓取上限：交给 background 夹紧；超过返回 TOO_LARGE，避免一次性拉超大源码。
@@ -305,9 +306,10 @@
       </div>
     {/if}
   {:else if !loading}
-    <div class="text-center text-gray-500 text-sm py-8">
-      输入目标 URL，点击「获取源码」查看页面 HTML 源代码
-    </div>
+    <EmptyState
+      message="输入目标 URL，点击「获取源码」查看页面 HTML 源代码"
+      icon="📄"
+    />
   {/if}
 
   <!-- 加载中 -->

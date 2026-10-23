@@ -8,6 +8,7 @@
   import ExportMenu from '@/components/results/ExportMenu.svelte';
   import { haeStateStore } from '@/stores/hae-state';
   import { get } from 'svelte/store';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
 
   // —— 状态（storage-backed）——
   let st = $state(get(haeStateStore));
@@ -114,9 +115,9 @@
   {:else if inputText}
     <div class="text-xs text-gray-500 text-center py-4">点击「匹配规则」提取敏感信息</div>
   {:else}
-    <div class="text-center text-xs text-gray-500 py-8">
-      <div class="text-3xl mb-2">🎨</div>
-      粘贴文本或采集页面，用 HaE 规则提取指纹/凭证
-    </div>
+    <EmptyState
+      message="粘贴文本或采集页面，用 HaE 规则提取指纹/凭证"
+      icon="🎨"
+    />
   {/if}
 </div>

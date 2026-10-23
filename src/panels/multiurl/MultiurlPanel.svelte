@@ -10,6 +10,7 @@
   import { copyText } from '@/lib/actions/clipboard';
   import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
   import { abortableDelay } from '@/lib/tasks/abortable-delay';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
 
   let rawText = $state('');
   let delay = $state(0);
@@ -262,8 +263,9 @@
 
   <!-- 空状态 -->
   {#if urls.length === 0 && !opening}
-    <div class="text-center text-gray-500 text-sm py-6">
-      粘贴多个 URL，点击「全部打开」批量在新标签页中打开
-    </div>
+    <EmptyState
+      message="粘贴多个 URL，点击「全部打开」批量在新标签页中打开"
+      icon="🔗"
+    />
   {/if}
 </div>

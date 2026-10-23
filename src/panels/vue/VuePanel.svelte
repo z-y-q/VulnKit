@@ -252,8 +252,39 @@
           for (const key in state) if (/menu|permission|nav|route|sidebar/i.test(key) && (Array.isArray(state[key]) || (typeof state[key] === 'object' && state[key] !== null))) tryAdd(state[key], `pinia://${id}/${key}`);
         });
       }
-      const allEls = document.querySelectorAll('*');
-      for (let i = 0; i < allEls.length; i++) { const el = allEls[i] as any; if (el.__vue__) { const vm = el.__vue__.$root || el.__vue__; if (vm.$store && vm.$store.state) { for (const key in vm.$store.state) if (/menu|permission|nav|route|sidebar/i.test(key)) tryAdd(vm.$store.state[key], `vuex://state/${key}`); } break; } }
+      // §12.1：优化 Vuex 查找 — 先尝试常见 Vue 根元素，避免全 DOM 扫描
+      let found = false;
+      const vueRoots = ['#app', '[data-v-app]', '[id^="app"]', '#root', '#application', '#main'];
+      for (const sel of vueRoots) {
+        const root = document.querySelector(sel) as any;
+        if (root && root.__vue__) {
+          const vm = root.__vue__.$root || root.__vue__;
+          if (vm.$store && vm.$store.state) {
+            for (const key in vm.$store.state) if (/menu|permission|nav|route|sidebar/i.test(key)) tryAdd(vm.$store.state[key], `vuex://state/${key}`);
+          }
+          found = true;
+          break;
+        }
+      }
+      // 仅在常见根元素未找到时才全量扫描（批次缩小到 100 节点，减少单次阻塞）
+      if (!found) {
+        const allEls = document.querySelectorAll('*');
+        const batchSize = 100;
+        for (let i = 0; i < allEls.length && !found; i += batchSize) {
+          const end = Math.min(i + batchSize, allEls.length);
+          for (let j = i; j < end; j++) {
+            const el = allEls[j] as any;
+            if (el.__vue__) {
+              const vm = el.__vue__.$root || el.__vue__;
+              if (vm.$store && vm.$store.state) {
+                for (const key in vm.$store.state) if (/menu|permission|nav|route|sidebar/i.test(key)) tryAdd(vm.$store.state[key], `vuex://state/${key}`);
+              }
+              found = true;
+              break;
+            }
+          }
+        }
+      }
       const prefixes = ['menu', 'permission', 'routes', 'nav', 'sidebar'];
       for (let s = 0; s < localStorage.length; s++) { const k = localStorage.key(s); if (k) { for (const p of prefixes) if (k.toLowerCase().indexOf(p) !== -1) { try { tryAdd(JSON.parse(localStorage.getItem(k) || ''), `localStorage://${k}`); } catch (e) { /* */ } break; } } }
     }, { world: 'MAIN', args: [MENU_KEYWORDS] });

@@ -936,7 +936,7 @@
               </div>
             {/each}
             {#if viewerFiles.length === 0}
-              <div class="text-center text-xs text-gray-500 py-8">无匹配文件</div>
+              <EmptyState message="无匹配文件" icon="🔍" />
             {/if}
           </div>
         </div>

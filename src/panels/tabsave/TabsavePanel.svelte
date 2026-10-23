@@ -4,6 +4,7 @@
   // 对齐 v5 vk-tabsave.js。
   import { toastStore } from '@/stores/ui';
   import { downloadBlob } from '@/lib/actions/download';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
 
   let savedTabs = $state<{ url: string; title: string }[]>([]);
   let collecting = $state(false);
@@ -108,9 +109,9 @@
       {/each}
     </div>
   {:else}
-    <div class="text-center text-xs text-gray-500 py-8">
-      <div class="text-3xl mb-2">📑</div>
-      点击「收集当前窗口」开始
-    </div>
+    <EmptyState
+      message="点击「收集当前窗口」开始"
+      icon="📑"
+    />
   {/if}
 </div>

@@ -4,6 +4,7 @@
   import { scanHistoryStore, MODULE_LABELS, SEV_ORDER, type ScanHistoryEntry, type ScanSeverity } from '@/stores/scan-history';
   import { toastStore } from '@/stores/ui';
   import { analysisContextStore } from '@/stores/analysis-context';
+  import EmptyState from '@/components/scanner/EmptyState.svelte';
 
   let entries = $derived($scanHistoryStore);
   let filterDomain = $state('');
@@ -214,12 +215,8 @@
       {/each}
     </div>
   {:else if entries.length === 0}
-    <div class="text-center text-gray-500 text-sm py-8">
-      暂无历史记录
-    </div>
+    <EmptyState message="暂无历史记录" icon="📋" />
   {:else}
-    <div class="text-center text-gray-500 text-sm py-8">
-      没有匹配的记录
-    </div>
+    <EmptyState message="没有匹配的记录" icon="🔍" />
   {/if}
 </div>
