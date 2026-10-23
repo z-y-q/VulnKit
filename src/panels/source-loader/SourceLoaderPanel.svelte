@@ -8,6 +8,8 @@
   import { analysisContextStore } from '@/stores/analysis-context';
   import type { FetchResult } from '@/lib/types/messaging';
   import { extractScriptSrcs, extractLinkHrefs, formatSize } from '@/lib/source/source-utils';
+  import { sourceLoaderStateStore } from '@/stores/source-loader-state';
+  import { get } from 'svelte/store';
 
   // —— 大文件保护 ——
   // 抓取上限：交给 background 夹紧；超过返回 TOO_LARGE，避免一次性拉超大源码。
@@ -18,33 +20,37 @@
   // 搜索防抖：连续输入时只在前一次输入停顿 200ms 后扫一次全文。
   const SEARCH_DEBOUNCE_MS = 200;
 
-  let url = $state('');
+  // —— 状态（storage-backed）——
+  let st = $state(get(sourceLoaderStateStore));
+  $effect(() => sourceLoaderStateStore.subscribe(v => { st = v; }));
+
+  let url = $derived(st.url);
+  let source = $derived(st.source);
+  let searchText = $derived(st.searchText);
+  let showLineNumbers = $derived(st.showLineNumbers);
+  let pendingUrls = $derived(st.pendingUrls);
+
+  // —— 局部状态（不需要持久化）——
   let loading = $state(false);
-  let source = $state('');
   let statusText = $state('');
-  let searchText = $state('');
-  let showLineNumbers = $state(true);
   let scriptSrcs = $state<string[]>([]);
   let linkHrefs = $state<string[]>([]);
-  // 来自其他面板（如信息收集）发送的待加载 URL 队列
-  let pendingUrls = $state<string[]>([]);
 
   // 自动填充当前页 URL
   $effect(() => {
     getActiveTabUrl().then(u => {
-      if (u) url = u;
+      if (u) sourceLoaderStateStore.update(s => ({ ...s, url: u }));
     });
   });
 
-  // 消费跨面板 handoff（统一 analysisContextStore，替代旧 lingmou:source-pending）
+  // §8.1：消费跨面板 handoff（只消费 text key，不整体清空 context）
   $effect(() => {
-    analysisContextStore.consume('source-loader').then((c) => {
-      const text = c?.payload.text;
-      if (!text) return;
-      pendingUrls = text.split('\n').map(s => s.trim()).filter(Boolean);
-      if (pendingUrls.length) {
-        url = pendingUrls[0];
-        toastStore.show(`已载入 ${pendingUrls.length} 个待加载 URL，点击加载`, 'info');
+    analysisContextStore.consumePayload('source-loader', 'text').then((v) => {
+      if (!v) return;
+      const urls = v.split('\n').map(s => s.trim()).filter(Boolean);
+      if (urls.length) {
+        sourceLoaderStateStore.update(s => ({ ...s, pendingUrls: urls, url: urls[0] }));
+        toastStore.show(`已载入 ${urls.length} 个待加载 URL，点击加载`, 'info');
       }
     }).catch(() => { /* ignore */ });
   });
@@ -100,10 +106,8 @@
     }
 
     loading = true;
-    source = '';
+    sourceLoaderStateStore.update(s => ({ ...s, source: '', searchText: '' }));
     statusText = '加载中...';
-    searchText = '';
-    debouncedSearch = '';
 
     try {
       const res = await sendMessage({
@@ -114,20 +118,20 @@
       }) as FetchResult<string>;
 
       if (!res.success) {
-        source = '';
-        // 区分超限与其他错误，给更明确提示
         const msg = res.code === 'TOO_LARGE'
           ? `源码过大（超过 ${Math.round(MAX_SOURCE_BYTES / 1024 / 1024)}MB），已中止`
           : res.error;
         statusText = `加载失败: ${msg}`;
         toastStore.show(`加载失败: ${msg}`, 'error');
       } else {
-        source = res.data;
-        statusText = `加载完成 — ${formatSize(sourceSize)}${truncated ? `（仅渲染前 ${MAX_RENDER_LINES} 行）` : ''}`;
-        toastStore.show(`源码加载完成，共 ${lineCount} 行`, 'success');
+        sourceLoaderStateStore.update(s => ({ ...s, source: res.data }));
+        const sz = new Blob([res.data]).size;
+        const lines = res.data.split('\n').length;
+        const truncated = lines > MAX_RENDER_LINES;
+        statusText = `加载完成 — ${formatSize(sz)}${truncated ? `（仅渲染前 ${MAX_RENDER_LINES} 行）` : ''}`;
+        toastStore.show(`源码加载完成，共 ${lines} 行`, 'success');
       }
     } catch (err: any) {
-      source = '';
       statusText = `请求失败: ${err.message || '未知错误'}`;
       toastStore.show(`请求失败: ${err.message || '未知错误'}`, 'error');
     } finally {
@@ -165,9 +169,12 @@
   }
 
   function reset() {
-    source = '';
+    sourceLoaderStateStore.update(s => ({
+      ...s,
+      source: '',
+      searchText: '',
+    }));
     statusText = '';
-    searchText = '';
     scriptSrcs = [];
     linkHrefs = [];
   }
@@ -180,9 +187,10 @@
       <input
         class="input text-xs font-mono flex-1"
         placeholder="https://target.example.com"
-        bind:value={url}
+        value={url}
+        oninput={(e) => sourceLoaderStateStore.update(s => ({ ...s, url: e.currentTarget.value }))}
       />
-      <button class="btn btn-sm btn-ghost text-xs" onclick={() => getActiveTabUrl().then(u => { if (u) url = u; })}>
+      <button class="btn btn-sm btn-ghost text-xs" onclick={() => getActiveTabUrl().then(u => { if (u) sourceLoaderStateStore.update(s => ({ ...s, url: u })); })}>
         自动填充
       </button>
     </div>
@@ -212,10 +220,10 @@
           <button
             class="badge text-xs cursor-pointer font-mono truncate max-w-[16rem] {u2 === url ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}"
             title={u2}
-            onclick={() => { url = u2; fetchSource(); }}
+            onclick={() => { sourceLoaderStateStore.update(s => ({ ...s, url: u2 })); fetchSource(); }}
           >{u2.replace(/^https?:\/\//, '')}</button>
         {/each}
-        <button class="badge text-xs bg-gray-100 dark:bg-gray-800 text-gray-500" onclick={() => pendingUrls = []}>清除</button>
+        <button class="badge text-xs bg-gray-100 dark:bg-gray-800 text-gray-500" onclick={() => sourceLoaderStateStore.update(s => ({ ...s, pendingUrls: [] }))}>清除</button>
       </div>
     </div>
   {/if}
@@ -227,10 +235,11 @@
         <input
           class="input text-xs flex-1"
           placeholder="搜索源码..."
-          bind:value={searchText}
+          value={searchText}
+          oninput={(e) => sourceLoaderStateStore.update(s => ({ ...s, searchText: e.currentTarget.value }))}
         />
         <label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer shrink-0">
-          <input type="checkbox" bind:checked={showLineNumbers} />
+          <input type="checkbox" checked={showLineNumbers} onchange={(e) => sourceLoaderStateStore.update(s => ({ ...s, showLineNumbers: e.currentTarget.checked }))} />
           <span>行号</span>
         </label>
         <button class="btn btn-sm text-xs" onclick={copySource}>复制</button>

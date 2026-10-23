@@ -71,10 +71,10 @@
   let opening = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
   let lastFailedUrls = $state<string[]>([]);
 
-  // 消费跨面板 handoff（统一 analysisContextStore，替代旧 lingmou:multiurl-pending）
+  // §8.1：消费跨面板 handoff（只消费 text key，不整体清空 context）
   $effect(() => {
-    analysisContextStore.consume('multiurl').then((c) => {
-      if (c?.payload.text) rawText = c.payload.text;
+    analysisContextStore.consumePayload('multiurl', 'text').then((v) => {
+      if (v) rawText = v;
     }).catch(() => { /* ignore */ });
   });
 

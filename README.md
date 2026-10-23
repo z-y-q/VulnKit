@@ -3,7 +3,7 @@
 <p align="center">浏览器原生 Web 安全测试辅助套件 · Chrome / Firefox · MV3</p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-7.2.0-blue">
+  <img alt="version" src="https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/z-y-q/VulnKit/main/package.json&query=$.version&label=version&color=blue">
   <img alt="wxt" src="https://img.shields.io/badge/WXT-0.20-purple">
   <img alt="svelte" src="https://img.shields.io/badge/Svelte-5-ff3e00">
   <img alt="ts" src="https://img.shields.io/badge/TypeScript-5.9-3178c6">

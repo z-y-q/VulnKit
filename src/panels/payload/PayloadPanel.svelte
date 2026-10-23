@@ -3,6 +3,8 @@
   // XSS / SQLi / LFI / 反弹Shell / Webshell / 命令参考
   import { toastStore } from '@/stores/ui';
   import payloadsData from '@/lib/data/payloads.json';
+  import { payloadStateStore } from '@/stores/payload-state';
+  import { get } from 'svelte/store';
 
   // —— 类型 ——
   type CategoryKey = 'xss' | 'sqli' | 'lfi' | 'reverse_shell' | 'webshell' | 'cmdref';
@@ -21,14 +23,17 @@
 
   const allPayloads = payloadsData as Record<CategoryKey, SubCategoryMap>;
 
-  // —— 状态 ——
-  let activeCategory = $state<CategoryKey>('xss');
-  let searchText = $state('');
-  let expandedSubs = $state<Record<string, boolean>>({});
-  let sqliColumns = $state(3);
-  let sqliTable = $state('users');
-  let revIp = $state('');
-  let revPort = $state('4444');
+  // —— 状态（storage-backed）——
+  let st = $state(get(payloadStateStore));
+  $effect(() => payloadStateStore.subscribe(v => { st = v; }));
+
+  let activeCategory = $derived(st.activeCategory);
+  let searchText = $derived(st.searchText);
+  let expandedSubs = $derived(st.expandedSubs);
+  let sqliColumns = $derived(st.sqliColumns);
+  let sqliTable = $derived(st.sqliTable);
+  let revIp = $derived(st.revIp);
+  let revPort = $derived(st.revPort);
 
   // —— SQLi 动态构建 ——
   function sqliColsExpr(expr: string, slot: number, n: number): string {
@@ -137,8 +142,10 @@
 
   // —— 操作 ——
   function toggleSub(subName: string) {
-    expandedSubs[subName] = !expandedSubs[subName];
-    expandedSubs = { ...expandedSubs };
+    payloadStateStore.update(s => ({
+      ...s,
+      expandedSubs: { ...s.expandedSubs, [subName]: !s.expandedSubs[subName] }
+    }));
   }
 
   function expandAll() {
@@ -147,11 +154,11 @@
     for (const key of Object.keys(data)) {
       next[key] = true;
     }
-    expandedSubs = next;
+    payloadStateStore.update(s => ({ ...s, expandedSubs: next }));
   }
 
   function collapseAll() {
-    expandedSubs = {};
+    payloadStateStore.update(s => ({ ...s, expandedSubs: {} }));
   }
 
   async function copyPayload(text: string) {
@@ -184,7 +191,7 @@
     {#each categories as cat}
       <button
         class="badge cursor-pointer transition-all duration-[var(--vk-dur-fast)] ease-[var(--vk-ease)] active:scale-[0.96] {activeCategory === cat.key ? 'bg-primary text-white' : 'opacity-60 hover:opacity-100'}"
-        onclick={() => (activeCategory = cat.key)}
+        onclick={() => payloadStateStore.update(s => ({ ...s, activeCategory: cat.key }))}
       >
         {cat.icon} {cat.label} <span class="ml-1 font-mono">{stats[cat.key]}</span>
       </button>
@@ -193,7 +200,7 @@
   </div>
 
   <!-- 搜索框 -->
-  <input class="input text-xs font-mono" placeholder="搜索 payload / 分类名..." aria-label="搜索 payload" bind:value={searchText} />
+  <input class="input text-xs font-mono" placeholder="搜索 payload / 分类名..." aria-label="搜索 payload" value={searchText} oninput={(e) => payloadStateStore.update(s => ({ ...s, searchText: e.currentTarget.value }))} />
 
   <!-- SQLi 配置区 -->
   {#if activeCategory === 'sqli'}
@@ -208,12 +215,13 @@
             type="number"
             min="1"
             max="10"
-            bind:value={sqliColumns}
+            value={sqliColumns}
+            oninput={(e) => payloadStateStore.update(s => ({ ...s, sqliColumns: parseInt(e.currentTarget.value) || 1 }))}
           />
         </div>
         <div class="flex-1">
           <label for="payload-sqli-table" class="block text-xs text-gray-500 mb-1">目标表名</label>
-          <input id="payload-sqli-table" class="input text-xs font-mono" placeholder="users" bind:value={sqliTable} />
+          <input id="payload-sqli-table" class="input text-xs font-mono" placeholder="users" value={sqliTable} oninput={(e) => payloadStateStore.update(s => ({ ...s, sqliTable: e.currentTarget.value }))} />
         </div>
       </div>
     </div>
@@ -226,11 +234,11 @@
       <div class="flex gap-2 items-end">
         <div class="flex-1">
           <label for="payload-rev-ip" class="block text-xs text-gray-500 mb-1">监听 IP</label>
-          <input id="payload-rev-ip" class="input text-xs font-mono" placeholder="10.0.0.1" bind:value={revIp} />
+          <input id="payload-rev-ip" class="input text-xs font-mono" placeholder="10.0.0.1" value={revIp} oninput={(e) => payloadStateStore.update(s => ({ ...s, revIp: e.currentTarget.value }))} />
         </div>
         <div class="w-24">
           <label for="payload-rev-port" class="block text-xs text-gray-500 mb-1">端口</label>
-          <input id="payload-rev-port" class="input text-xs font-mono text-center" placeholder="4444" bind:value={revPort} />
+          <input id="payload-rev-port" class="input text-xs font-mono text-center" placeholder="4444" value={revPort} oninput={(e) => payloadStateStore.update(s => ({ ...s, revPort: e.currentTarget.value }))} />
         </div>
       </div>
     </div>

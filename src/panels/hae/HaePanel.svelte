@@ -6,11 +6,17 @@
   import { matchAllRules, HAE_COLOR_CLASS, DEFAULT_HAE_GROUPS, type HaeMatch } from '@/lib/scanners/hae-engine';
   import { copyText } from '@/lib/actions/clipboard';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
+  import { haeStateStore } from '@/stores/hae-state';
+  import { get } from 'svelte/store';
 
-  let inputText = $state('');
-  let matches = $state<HaeMatch[]>([]);
-  let groupFilter = $state('all');
-  let onlySensitive = $state(false);
+  // —— 状态（storage-backed）——
+  let st = $state(get(haeStateStore));
+  $effect(() => haeStateStore.subscribe(v => { st = v; }));
+
+  let inputText = $derived(st.inputText);
+  let matches = $derived(st.matches);
+  let groupFilter = $derived(st.groupFilter);
+  let onlySensitive = $derived(st.onlySensitive);
 
   let groups = $derived(DEFAULT_HAE_GROUPS.map(g => g.group));
   let totalRules = $derived(DEFAULT_HAE_GROUPS.reduce((n, g) => n + g.rules.filter(r => r.loaded).length, 0));
@@ -25,8 +31,10 @@
 
   function runMatch() {
     if (!inputText.trim()) { toastStore.show('请输入待匹配文本', 'warning'); return; }
-    matches = matchAllRules(inputText);
-    toastStore.show(`匹配 ${matches.length} 处（${sensitiveCount} 敏感）`, matches.length ? 'success' : 'info');
+    const result = matchAllRules(inputText);
+    haeStateStore.update(s => ({ ...s, matches: result }));
+    const sensitiveCount = result.filter(m => m.sensitive).length;
+    toastStore.show(`匹配 ${result.length} 处（${sensitiveCount} 敏感）`, result.length ? 'success' : 'info');
   }
 
   async function collectPage() {
@@ -36,7 +44,7 @@
       return document.documentElement.outerHTML;
     });
     if (html) {
-      inputText = html;
+      haeStateStore.update(s => ({ ...s, inputText: html }));
       toastStore.show(`已采集页面 HTML（${(html.length / 1024).toFixed(1)}KB）`, 'success');
     } else {
       toastStore.show('采集失败', 'error');
@@ -70,19 +78,19 @@
       </div>
     </div>
     <div class="text-xs text-gray-500">{groups.length} 个规则组 · {totalRules} 条规则（指纹/凭证/敏感信息高亮提取）</div>
-    <textarea class="input font-mono text-xs" rows="5" placeholder="粘贴响应体/页面 HTML，或点「采集当前页」自动填入..." aria-label="响应体" bind:value={inputText}></textarea>
+    <textarea class="input font-mono text-xs" rows="5" placeholder="粘贴响应体/页面 HTML，或点「采集当前页」自动填入..." aria-label="响应体" value={inputText} oninput={(e) => haeStateStore.update(s => ({ ...s, inputText: e.currentTarget.value }))}></textarea>
   </div>
 
   {#if matches.length > 0}
     <div class="flex items-center gap-2 text-xs flex-wrap">
       <span>共 {matches.length} 处</span>
       {#if sensitiveCount > 0}<span class="badge bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60">敏感 {sensitiveCount}</span>{/if}
-      <select class="input text-xs w-32 ml-auto" aria-label="分组筛选" bind:value={groupFilter}>
+      <select class="input text-xs w-32 ml-auto" aria-label="分组筛选" value={groupFilter} onchange={(e) => haeStateStore.update(s => ({ ...s, groupFilter: e.currentTarget.value }))}>
         <option value="all">全部分组</option>
         {#each groups as g}<option value={g}>{g}</option>{/each}
       </select>
       <label class="flex items-center gap-1 cursor-pointer">
-        <input type="checkbox" bind:checked={onlySensitive} class="accent-blue-500" />
+        <input type="checkbox" checked={onlySensitive} onchange={(e) => haeStateStore.update(s => ({ ...s, onlySensitive: e.currentTarget.checked }))} class="accent-blue-500" />
         <span>仅敏感</span>
       </label>
       <ExportMenu items={filtered} module="hae" serializers={{ json: haeJson, text: haeText }} />

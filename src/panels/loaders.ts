@@ -5,11 +5,57 @@
  *
  * key 必须与 registry.ts 中 panelMeta 的 id 一一对应；
  * index.ts 会在启动时校验每个 meta.id 都有对应 loader，缺失即抛错。
+ *
+ * §7.1：Promise 缓存避免重复 import；失败时删除 cache 允许重试；
+ * 可选预加载入口供 Sidebar hover/idle 时预热。
  */
 import type { Component } from 'svelte';
 
 type PanelLoader = () => Promise<{ default: Component }>;
 
+// Promise 缓存：成功则复用，失败则删除允许重试
+const loaderCache = new Map<string, Promise<{ default: Component }>>();
+
+/**
+ * 加载面板组件（带缓存）
+ * @param id 面板 id（registry.ts 中的 meta.id）
+ * @returns 组件模块 Promise
+ */
+export function loadPanel(id: string): Promise<{ default: Component }> {
+  const cached = loaderCache.get(id);
+  if (cached) return cached;
+
+  const loader = panelLoaders[id];
+  if (!loader) {
+    const err = new Error(`Panel loader not found: ${id}`);
+    return Promise.reject(err);
+  }
+
+  const promise = loader().catch((err) => {
+    // 失败时删除缓存，允许下次重试（网络恢复/chunk 重新部署等场景）
+    loaderCache.delete(id);
+    throw err;
+  });
+
+  loaderCache.set(id, promise);
+  return promise;
+}
+
+/**
+ * 预加载面板（可选，供 Sidebar hover/idle 时预热）
+ * @param ids 要预加载的面板 id 列表
+ */
+export function preloadPanels(ids: string[]): void {
+  for (const id of ids) {
+    if (!loaderCache.has(id) && panelLoaders[id]) {
+      loadPanel(id).catch(() => { /* 预加载失败静默，不影响实际切换时重试 */ });
+    }
+  }
+}
+
+/**
+ * 原始 loader 映射表（仅供 loadPanel 内部调用 + index.ts 启动校验）
+ */
 export const panelLoaders: Record<string, PanelLoader> = {
   // ===== 侦察 (Recon) =====
   favicon: () => import('./favicon/FaviconPanel.svelte'),

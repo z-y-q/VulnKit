@@ -3,8 +3,10 @@
   // 搜索 / 最近 / 收藏 / 分类（折叠持久化）/ iconMode 图标栏。
   // 行点击区与收藏星标分离（不嵌套 button，§6.2/§8）；当前项 aria-current；
   // 折叠分类 aria-expanded+aria-controls；icon-only 按钮均带 aria-label。
+  // §7.1：hover 时预加载面板 chunk，空闲时预加载高频面板。
   import { panels, type PanelConfig } from '@/panels';
   import { panelMatches } from '@/panels/registry';
+  import { preloadPanels } from '@/panels/loaders';
   import SearchField from '@/components/form/SearchField.svelte';
   import PanelIcon from '@/components/ui/PanelIcon.svelte';
   import { sniffBadgeStore } from '@/stores/sniff-badge';
@@ -91,6 +93,25 @@
   function select(id: string) {
     onselect(id);
   }
+
+  // §7.1：hover 预加载面板 chunk（防抖 150ms，避免快速划过时浪费）
+  let preloadTimer: ReturnType<typeof setTimeout> | undefined;
+  function onPanelHover(id: string) {
+    if (preloadTimer) clearTimeout(preloadTimer);
+    preloadTimer = setTimeout(() => { preloadPanels([id]); }, 150);
+  }
+  function onPanelLeave() {
+    if (preloadTimer) { clearTimeout(preloadTimer); preloadTimer = undefined; }
+  }
+
+  // 空闲时预加载高频面板（最近使用 + 收藏）
+  $effect(() => {
+    const idleId = requestIdleCallback(() => {
+      const highFreq = [...new Set([...recent.slice(0, 3), ...favorites.slice(0, 3)])];
+      preloadPanels(highFreq);
+    }, { timeout: 3000 });
+    return () => cancelIdleCallback(idleId);
+  });
 
   // §11.2：combobox 键盘导航（方向键移动高亮、Enter 选中；Escape 清空由 SearchField 处理）
   let activeIdx = $state(-1);
@@ -276,6 +297,8 @@
       aria-current={activePanel === panel.id ? 'page' : undefined}
       title={idx >= 1 && idx <= 8 ? `{panel.label} (Alt+${idx})` : panel.label}
       onclick={() => select(panel.id)}
+      onmouseenter={() => onPanelHover(panel.id)}
+      onmouseleave={onPanelLeave}
     >
       <PanelIcon id={panel.id} fallback={panel.icon} class="w-[18px] h-[18px] shrink-0 transition-transform duration-200 {activePanel === panel.id ? 'scale-110' : 'group-hover:scale-110'}" />
       <span class="truncate flex-1">

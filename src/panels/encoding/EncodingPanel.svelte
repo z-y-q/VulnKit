@@ -1,44 +1,57 @@
 <script lang="ts">
-  // 编码工具面板
-  // 三个子视图：经典编码（Base64/URL/HTML/Hex）、JWT 解析、加密解密（占位）
+  // 编码工具面板 — §7.2 面板重挂载策略（状态持久化）
+  // 三个子视图：经典编码（Base64/URL/HTML/Hex）、JWT 解析、加密解密
+  // 状态由 encodingStateStore 托管，切换面板后可恢复（昂贵的 RSA 密钥、长文本不丢失）
   import { encodingTools } from '@/lib/crypto/encoding';
   import { decode as decodeJwt, verifySignature, forgeNoneToken, type DecodedJwt, type JwtVerifyResult } from '@/lib/crypto/jwt';
   import { toastStore } from '@/stores/ui';
+  import { encodingStateStore } from '@/stores/encoding-state';
   import { loadPrefs } from '@/lib/core/general-prefs';
   import { copyText } from '@/lib/actions/clipboard';
+  import { get } from 'svelte/store';
 
   type View = 'classic' | 'jwt' | 'crypto';
-  let view = $state<View>('classic');
-
-  // —— 经典编码 ——
   type EncType = 'base64' | 'url' | 'html' | 'hex';
-  let activeTab = $state<EncType>('base64');
 
-  // 从通用偏好读取默认编码 / 默认哈希（options 页可配）
+  // §7.2：从 store 读取持久化状态
+  let st = $state(get(encodingStateStore));
+  $effect(() => encodingStateStore.subscribe(v => { st = v; }));
+
+  // 本地响应式别名（指向 store 状态）
+  let view = $derived(st.view);
+  let activeTab = $derived(st.activeTab);
+  let mode = $derived(st.mode);
+  let input = $derived(st.input);
+  let output = $derived(st.output);
+
+  // 从通用偏好读取默认编码 / 默认哈希（options 页可配，仅首次或 store 为空时应用）
   $effect(() => {
     loadPrefs().then(p => {
-      activeTab = p.defaultEncoding as EncType;
-      const hashMap: Record<string, HashAlgo> = { 'SHA-256': 'sha256', 'SHA-1': 'sha1', MD5: 'md5' };
-      if (hashMap[p.defaultHash]) pHash.algo = hashMap[p.defaultHash];
+      if (!st.input && !st.jwtInput && !st.cryptoInput) {
+        // 仅在 store 全空（首次打开）时应用偏好
+        encodingStateStore.update(s => ({ ...s, activeTab: p.defaultEncoding as EncType }));
+        const hashMap: Record<string, HashAlgo> = { 'SHA-256': 'sha256', 'SHA-1': 'sha1', MD5: 'md5' };
+        if (hashMap[p.defaultHash]) {
+          encodingStateStore.update(s => ({ ...s, pHash: { ...s.pHash, algo: hashMap[p.defaultHash] } }));
+        }
+      }
     });
   });
-  let mode = $state<'encode' | 'decode'>('encode');
-  let input = $state('');
-  let output = $state('');
 
   function transform() {
     try {
       const tool = encodingTools[activeTab];
-      output = mode === 'encode' ? tool.encode(input) : tool.decode(input);
+      const result = mode === 'encode' ? tool.encode(input) : tool.decode(input);
+      encodingStateStore.update(s => ({ ...s, output: result }));
     } catch {
-      output = '⚠️ 编码/解码失败（输入无效）';
+      encodingStateStore.update(s => ({ ...s, output: '⚠️ 编码/解码失败（输入无效）' }));
     }
   }
 
   $effect(() => {
     // 依赖 input / activeTab / mode
     if (input) transform();
-    else output = '';
+    else encodingStateStore.update(s => ({ ...s, output: '' }));
   });
 
   function copyOutput() {
@@ -50,13 +63,12 @@
   }
 
   function swap() {
-    const tmp = input;
-    input = output;
-    output = tmp;
+    encodingStateStore.update(s => ({ ...s, input: s.output, output: s.input }));
   }
 
   // —— JWT 解析 ——
-  let jwtInput = $state('');
+  let jwtInput = $derived(st.jwtInput);
+  let jwtKey = $derived(st.jwtKey);
   let decoded = $state<DecodedJwt | null>(null);
   let jwtError = $state('');
 
@@ -87,7 +99,6 @@
   }
 
   // —— JWT 签名验证 ——
-  let jwtKey = $state('');
   let jwtVerify = $state<JwtVerifyResult | null>(null);
   let jwtVerifying = $state(false);
 
@@ -121,21 +132,21 @@
   } from '@/lib/crypto/crypto-engine';
 
   type CryptoAlgo = 'aes' | 'des' | 'rc4' | 'sm2' | 'sm4' | 'rsa' | 'hash' | 'bcrypt';
-  let cryptoAlgo = $state<CryptoAlgo>('aes');
-  let cryptoMode = $state<'encrypt' | 'decrypt'>('encrypt');
-  let cryptoInput = $state('');
-  let cryptoOutput = $state('');
+  let cryptoAlgo = $derived(st.cryptoAlgo);
+  let cryptoMode = $derived(st.cryptoMode);
+  let cryptoInput = $derived(st.cryptoInput);
+  let cryptoOutput = $derived(st.cryptoOutput);
   let cryptoBusy = $state(false);
 
-  // 各算法参数
-  let pAes = $state({ mode: 'CBC' as AesMode, keySize: 128 as 128 | 192 | 256, padding: 'Pkcs7' as AesPadding, key: '', iv: '' });
-  let pDes = $state({ mode: 'CBC' as 'CBC' | 'ECB', padding: 'Pkcs7' as AesPadding, key: '', iv: '', triple: false });
-  let pRc4 = $state({ key: '' });
-  let pSm2 = $state({ publicKey: '', privateKey: '', cipherMode: 1 as 0 | 1 });
-  let pSm4 = $state({ key: '', mode: 'ecb' as 'ecb' | 'cbc', iv: '', padding: true });
-  let pRsa = $state({ publicKeyPem: '', privateKeyPem: '' });
-  let pHash = $state({ algo: 'sha256' as HashAlgo, output: 'hex' as 'hex' | 'base64', hmac: false, hmacKey: '' });
-  let pBcrypt = $state({ cost: 10, hash: '' });
+  // 各算法参数（从 store 派生）
+  let pAes = $derived(st.pAes);
+  let pDes = $derived(st.pDes);
+  let pRc4 = $derived(st.pRc4);
+  let pSm2 = $derived(st.pSm2);
+  let pSm4 = $derived(st.pSm4);
+  let pRsa = $derived(st.pRsa);
+  let pHash = $derived(st.pHash);
+  let pBcrypt = $derived(st.pBcrypt);
 
   const ALGO_LABELS: Record<CryptoAlgo, string> = {
     aes: 'AES', des: 'DES/3DES', rc4: 'RC4', sm2: 'SM2', sm4: 'SM4', rsa: 'RSA', hash: 'Hash', bcrypt: 'Bcrypt',
@@ -156,7 +167,7 @@
       toastStore.show('请输入内容', 'warning'); return;
     }
     cryptoBusy = true;
-    cryptoOutput = '';
+    encodingStateStore.update(s => ({ ...s, cryptoOutput: '' }));
     try {
       let result = '';
       const m = cryptoMode;
@@ -177,10 +188,10 @@
           }
           break;
       }
-      cryptoOutput = result;
+      encodingStateStore.update(s => ({ ...s, cryptoOutput: result }));
       toastStore.show('操作完成', 'success');
     } catch (e: any) {
-      cryptoOutput = '⚠️ ' + (e.message || String(e));
+      encodingStateStore.update(s => ({ ...s, cryptoOutput: '⚠️ ' + (e.message || String(e)) }));
       toastStore.show(e.message || '操作失败', 'error');
     } finally {
       cryptoBusy = false;
@@ -191,8 +202,7 @@
     cryptoBusy = true;
     try {
       const kp = await rsaGenerateKeyPair(2048);
-      pRsa.publicKeyPem = kp.publicKeyPem;
-      pRsa.privateKeyPem = kp.privateKeyPem;
+      encodingStateStore.update(s => ({ ...s, pRsa: { publicKeyPem: kp.publicKeyPem, privateKeyPem: kp.privateKeyPem } }));
       toastStore.show('RSA 2048 位密钥对已生成', 'success');
     } catch (e: any) {
       toastStore.show('生成失败: ' + (e.message || ''), 'error');
@@ -213,7 +223,7 @@
     {#each [{ id: 'classic', label: '经典编码' }, { id: 'jwt', label: 'JWT 解析' }, { id: 'crypto', label: '加密解密' }] as v}
       <button
         class={view === v.id ? 'seg-btn-active' : 'seg-btn-inactive'}
-        onclick={() => (view = v.id as View)}
+        onclick={() => encodingStateStore.update(s => ({ ...s, view: v.id as View }))}
       >
         {v.label}
       </button>
@@ -227,7 +237,7 @@
       {#each [{ id: 'base64', label: 'Base64' }, { id: 'url', label: 'URL' }, { id: 'html', label: 'HTML' }, { id: 'hex', label: 'Hex' }] as t}
         <button
           class="btn btn-xs {activeTab === t.id ? 'bg-primary text-white' : 'btn-ghost'}"
-          onclick={() => (activeTab = t.id as EncType)}
+          onclick={() => encodingStateStore.update(s => ({ ...s, activeTab: t.id as EncType }))}
         >
           {t.label}
         </button>
@@ -236,15 +246,15 @@
 
     <div class="flex items-center justify-between gap-2">
       <div class="seg">
-        <button class={mode === 'encode' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => (mode = 'encode')}>编码</button>
-        <button class={mode === 'decode' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => (mode = 'decode')}>解码</button>
+        <button class={mode === 'encode' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => encodingStateStore.update(s => ({ ...s, mode: 'encode' }))}>编码</button>
+        <button class={mode === 'decode' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => encodingStateStore.update(s => ({ ...s, mode: 'decode' }))}>解码</button>
       </div>
       <button class="btn btn-sm btn-ghost" onclick={swap} title="输入输出互换">⇅ 互换</button>
     </div>
 
     <div>
       <label for="enc-input" class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">输入</label>
-      <textarea id="enc-input" class="input font-mono text-xs" rows="3" placeholder="输入需要编码/解码的内容..." bind:value={input}></textarea>
+      <textarea id="enc-input" class="input font-mono text-xs" rows="3" placeholder="输入需要编码/解码的内容..." value={input} oninput={(e) => encodingStateStore.update(s => ({ ...s, input: e.currentTarget.value }))}></textarea>
     </div>
 
     <div>
@@ -262,7 +272,7 @@
    <div class="card p-3 space-y-3">
     <div>
       <label for="enc-jwt" class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">JWT Token</label>
-      <textarea id="enc-jwt" class="input font-mono text-xs" rows="3" placeholder="粘贴 JWT（eyJ...）" bind:value={jwtInput}></textarea>
+      <textarea id="enc-jwt" class="input font-mono text-xs" rows="3" placeholder="粘贴 JWT（eyJ...）" value={jwtInput} oninput={(e) => encodingStateStore.update(s => ({ ...s, jwtInput: e.currentTarget.value }))}></textarea>
     </div>
 
     {#if jwtError}
@@ -295,7 +305,8 @@
         <input
           class="input text-xs font-mono"
           placeholder={(decoded?.header.alg || '').startsWith('HS') ? 'HMAC 密钥' : 'RSA / EC PEM 公钥'}
-          bind:value={jwtKey}
+          value={jwtKey}
+          oninput={(e) => encodingStateStore.update(s => ({ ...s, jwtKey: e.currentTarget.value }))}
         />
         <div class="flex gap-1">
           <button class="btn btn-xs btn-primary flex-1" onclick={doVerifyJwt} disabled={jwtVerifying}>
@@ -333,7 +344,7 @@
       {#each CRYPTO_ALGOS as a}
         <button
           class="btn btn-xs {cryptoAlgo === a ? 'bg-primary text-white' : 'btn-ghost'}"
-          onclick={() => (cryptoAlgo = a)}
+          onclick={() => encodingStateStore.update(s => ({ ...s, cryptoAlgo: a }))}
         >
           {ALGO_LABELS[a]}
         </button>
@@ -343,8 +354,8 @@
     <!-- 加密/解密模式（Hash 除外） -->
     {#if cryptoAlgo !== 'hash'}
       <div class="seg">
-        <button class={cryptoMode === 'encrypt' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => (cryptoMode = 'encrypt')}>加密</button>
-        <button class={cryptoMode === 'decrypt' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => (cryptoMode = 'decrypt')}>解密</button>
+        <button class={cryptoMode === 'encrypt' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => encodingStateStore.update(s => ({ ...s, cryptoMode: 'encrypt' }))}>加密</button>
+        <button class={cryptoMode === 'decrypt' ? 'seg-btn-active' : 'seg-btn-inactive'} onclick={() => encodingStateStore.update(s => ({ ...s, cryptoMode: 'decrypt' }))}>解密</button>
       </div>
     {/if}
 
@@ -353,68 +364,68 @@
       {#if cryptoAlgo === 'aes'}
         <div class="grid grid-cols-2 gap-2 text-xs">
           <label class="flex flex-col gap-0.5">模式
-            <select class="input text-xs" bind:value={pAes.mode}>
+            <select class="input text-xs" value={pAes.mode} onchange={(e) => encodingStateStore.update(s => ({ ...s, pAes: { ...s.pAes, mode: e.currentTarget.value as AesMode } }))}>
               {#each ['CBC', 'ECB', 'CFB', 'OFB', 'CTR'] as m}<option value={m}>{m}</option>{/each}
             </select>
           </label>
           <label class="flex flex-col gap-0.5">密钥长度
-            <select class="input text-xs" bind:value={pAes.keySize}>
+            <select class="input text-xs" value={pAes.keySize} onchange={(e) => encodingStateStore.update(s => ({ ...s, pAes: { ...s.pAes, keySize: Number(e.currentTarget.value) as 128|192|256 } }))}>
               <option value={128}>128</option><option value={192}>192</option><option value={256}>256</option>
             </select>
           </label>
           <label class="flex flex-col gap-0.5 col-span-2">填充
-            <select class="input text-xs" bind:value={pAes.padding}>
+            <select class="input text-xs" value={pAes.padding} onchange={(e) => encodingStateStore.update(s => ({ ...s, pAes: { ...s.pAes, padding: e.currentTarget.value as AesPadding } }))}>
               {#each ['Pkcs7', 'ZeroPadding', 'NoPadding', 'Iso97971'] as m}<option value={m}>{m}</option>{/each}
             </select>
           </label>
           <label class="flex flex-col gap-0.5 col-span-2">密钥（不足自动补 0，超出截断）
-            <input class="input text-xs font-mono" bind:value={pAes.key} placeholder="密钥" />
+            <input class="input text-xs font-mono" value={pAes.key} oninput={(e) => encodingStateStore.update(s => ({ ...s, pAes: { ...s.pAes, key: e.currentTarget.value } }))} placeholder="密钥" />
           </label>
           {#if pAes.mode !== 'ECB'}
             <label class="flex flex-col gap-0.5 col-span-2">IV（16 字节）
-              <input class="input text-xs font-mono" bind:value={pAes.iv} placeholder="IV" />
+              <input class="input text-xs font-mono" value={pAes.iv} oninput={(e) => encodingStateStore.update(s => ({ ...s, pAes: { ...s.pAes, iv: e.currentTarget.value } }))} placeholder="IV" />
             </label>
           {/if}
         </div>
       {:else if cryptoAlgo === 'des'}
         <div class="grid grid-cols-2 gap-2 text-xs">
           <label class="flex flex-col gap-0.5">模式
-            <select class="input text-xs" bind:value={pDes.mode}>
+            <select class="input text-xs" value={pDes.mode} onchange={(e) => encodingStateStore.update(s => ({ ...s, pDes: { ...s.pDes, mode: e.currentTarget.value as 'CBC'|'ECB' } }))}>
               <option value="CBC">CBC</option><option value="ECB">ECB</option>
             </select>
           </label>
           <label class="flex flex-col gap-0.5">填充
-            <select class="input text-xs" bind:value={pDes.padding}>
+            <select class="input text-xs" value={pDes.padding} onchange={(e) => encodingStateStore.update(s => ({ ...s, pDes: { ...s.pDes, padding: e.currentTarget.value as AesPadding } }))}>
               {#each ['Pkcs7', 'ZeroPadding', 'NoPadding', 'Iso97971'] as m}<option value={m}>{m}</option>{/each}
             </select>
           </label>
           <label class="flex items-center gap-1 col-span-2">
-            <input type="checkbox" bind:checked={pDes.triple} class="accent-blue-500" />
+            <input type="checkbox" checked={pDes.triple} onchange={(e) => encodingStateStore.update(s => ({ ...s, pDes: { ...s.pDes, triple: e.currentTarget.checked } }))} class="accent-blue-500" />
             <span>使用 3DES（Triple DES）</span>
           </label>
           <label class="flex flex-col gap-0.5 col-span-2">密钥（8 字节）
-            <input class="input text-xs font-mono" bind:value={pDes.key} placeholder="密钥" />
+            <input class="input text-xs font-mono" value={pDes.key} oninput={(e) => encodingStateStore.update(s => ({ ...s, pDes: { ...s.pDes, key: e.currentTarget.value } }))} placeholder="密钥" />
           </label>
           {#if pDes.mode !== 'ECB'}
             <label class="flex flex-col gap-0.5 col-span-2">IV（8 字节）
-              <input class="input text-xs font-mono" bind:value={pDes.iv} placeholder="IV" />
+              <input class="input text-xs font-mono" value={pDes.iv} oninput={(e) => encodingStateStore.update(s => ({ ...s, pDes: { ...s.pDes, iv: e.currentTarget.value } }))} placeholder="IV" />
             </label>
           {/if}
         </div>
       {:else if cryptoAlgo === 'rc4'}
         <label class="flex flex-col gap-0.5 text-xs">密钥
-          <input class="input text-xs font-mono" bind:value={pRc4.key} placeholder="RC4 密钥" />
+          <input class="input text-xs font-mono" value={pRc4.key} oninput={(e) => encodingStateStore.update(s => ({ ...s, pRc4: { key: e.currentTarget.value } }))} placeholder="RC4 密钥" />
         </label>
       {:else if cryptoAlgo === 'sm2'}
         <div class="grid grid-cols-2 gap-2 text-xs">
           <label class="flex flex-col gap-0.5 col-span-2">公钥（128/130 位十六进制，加密用）
-            <input class="input text-xs font-mono" bind:value={pSm2.publicKey} placeholder="04..." />
+            <input class="input text-xs font-mono" value={pSm2.publicKey} oninput={(e) => encodingStateStore.update(s => ({ ...s, pSm2: { ...s.pSm2, publicKey: e.currentTarget.value } }))} placeholder="04..." />
           </label>
           <label class="flex flex-col gap-0.5 col-span-2">私钥（64 位十六进制，解密用）
-            <input class="input text-xs font-mono" bind:value={pSm2.privateKey} placeholder="私钥" />
+            <input class="input text-xs font-mono" value={pSm2.privateKey} oninput={(e) => encodingStateStore.update(s => ({ ...s, pSm2: { ...s.pSm2, privateKey: e.currentTarget.value } }))} placeholder="私钥" />
           </label>
           <label class="flex flex-col gap-0.5">Cipher 模式
-            <select class="input text-xs" bind:value={pSm2.cipherMode}>
+            <select class="input text-xs" value={pSm2.cipherMode} onchange={(e) => encodingStateStore.update(s => ({ ...s, pSm2: { ...s.pSm2, cipherMode: Number(e.currentTarget.value) as 0|1 } }))}>
               <option value={1}>C1C2C3</option><option value={0}>C1C3C2</option>
             </select>
           </label>
@@ -422,20 +433,20 @@
       {:else if cryptoAlgo === 'sm4'}
         <div class="grid grid-cols-2 gap-2 text-xs">
           <label class="flex flex-col gap-0.5">模式
-            <select class="input text-xs" bind:value={pSm4.mode}>
+            <select class="input text-xs" value={pSm4.mode} onchange={(e) => encodingStateStore.update(s => ({ ...s, pSm4: { ...s.pSm4, mode: e.currentTarget.value as 'ecb'|'cbc' } }))}>
               <option value="ecb">ECB</option><option value="cbc">CBC</option>
             </select>
           </label>
           <label class="flex items-center gap-1">
-            <input type="checkbox" bind:checked={pSm4.padding} class="accent-blue-500" />
+            <input type="checkbox" checked={pSm4.padding} onchange={(e) => encodingStateStore.update(s => ({ ...s, pSm4: { ...s.pSm4, padding: e.currentTarget.checked } }))} class="accent-blue-500" />
             <span>PKCS#5 填充</span>
           </label>
           <label class="flex flex-col gap-0.5 col-span-2">密钥（16 字符）
-            <input class="input text-xs font-mono" bind:value={pSm4.key} placeholder="SM4 密钥" maxlength="16" />
+            <input class="input text-xs font-mono" value={pSm4.key} oninput={(e) => encodingStateStore.update(s => ({ ...s, pSm4: { ...s.pSm4, key: e.currentTarget.value } }))} placeholder="SM4 密钥" maxlength="16" />
           </label>
           {#if pSm4.mode === 'cbc'}
             <label class="flex flex-col gap-0.5 col-span-2">IV
-              <input class="input text-xs font-mono" bind:value={pSm4.iv} placeholder="IV" />
+              <input class="input text-xs font-mono" value={pSm4.iv} oninput={(e) => encodingStateStore.update(s => ({ ...s, pSm4: { ...s.pSm4, iv: e.currentTarget.value } }))} placeholder="IV" />
             </label>
           {/if}
         </div>
@@ -445,32 +456,32 @@
             {cryptoBusy ? '生成中...' : '生成 RSA 2048 密钥对'}
           </button>
           <label class="flex flex-col gap-0.5">公钥 PEM（加密）
-            <textarea class="input text-xs font-mono" rows="2" bind:value={pRsa.publicKeyPem} placeholder="-----BEGIN PUBLIC KEY-----..."></textarea>
+            <textarea class="input text-xs font-mono" rows="2" value={pRsa.publicKeyPem} oninput={(e) => encodingStateStore.update(s => ({ ...s, pRsa: { ...s.pRsa, publicKeyPem: e.currentTarget.value } }))} placeholder="-----BEGIN PUBLIC KEY-----..."></textarea>
           </label>
           <label class="flex flex-col gap-0.5">私钥 PEM（解密）
-            <textarea class="input text-xs font-mono" rows="2" bind:value={pRsa.privateKeyPem} placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>
+            <textarea class="input text-xs font-mono" rows="2" value={pRsa.privateKeyPem} oninput={(e) => encodingStateStore.update(s => ({ ...s, pRsa: { ...s.pRsa, privateKeyPem: e.currentTarget.value } }))} placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>
           </label>
           <div class="text-gray-500">RSA-OAEP + SHA-256，输出 Base64</div>
         </div>
       {:else if cryptoAlgo === 'hash'}
         <div class="grid grid-cols-2 gap-2 text-xs">
           <label class="flex flex-col gap-0.5">算法
-            <select class="input text-xs" bind:value={pHash.algo}>
+            <select class="input text-xs" value={pHash.algo} onchange={(e) => encodingStateStore.update(s => ({ ...s, pHash: { ...s.pHash, algo: e.currentTarget.value as HashAlgo } }))}>
               {#each ['md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512'] as a}<option value={a}>{a.toUpperCase()}</option>{/each}
             </select>
           </label>
           <label class="flex flex-col gap-0.5">输出
-            <select class="input text-xs" bind:value={pHash.output}>
+            <select class="input text-xs" value={pHash.output} onchange={(e) => encodingStateStore.update(s => ({ ...s, pHash: { ...s.pHash, output: e.currentTarget.value as 'hex'|'base64' } }))}>
               <option value="hex">Hex</option><option value="base64">Base64</option>
             </select>
           </label>
           <label class="flex items-center gap-1 col-span-2">
-            <input type="checkbox" bind:checked={pHash.hmac} class="accent-blue-500" />
+            <input type="checkbox" checked={pHash.hmac} onchange={(e) => encodingStateStore.update(s => ({ ...s, pHash: { ...s.pHash, hmac: e.currentTarget.checked } }))} class="accent-blue-500" />
             <span>HMAC</span>
           </label>
           {#if pHash.hmac}
             <label class="flex flex-col gap-0.5 col-span-2">HMAC 密钥
-              <input class="input text-xs font-mono" bind:value={pHash.hmacKey} placeholder="HMAC 密钥" />
+              <input class="input text-xs font-mono" value={pHash.hmacKey} oninput={(e) => encodingStateStore.update(s => ({ ...s, pHash: { ...s.pHash, hmacKey: e.currentTarget.value } }))} placeholder="HMAC 密钥" />
             </label>
           {/if}
         </div>
@@ -478,12 +489,12 @@
         <div class="space-y-2 text-xs">
           {#if cryptoMode === 'encrypt'}
             <label class="flex flex-col gap-0.5">Cost（成本因子 4-31，越大越慢越安全）
-              <input type="number" min="4" max="31" class="input text-xs font-mono" bind:value={pBcrypt.cost} />
+              <input type="number" min="4" max="31" class="input text-xs font-mono" value={pBcrypt.cost} oninput={(e) => encodingStateStore.update(s => ({ ...s, pBcrypt: { ...s.pBcrypt, cost: Number(e.currentTarget.value) } }))} />
             </label>
             <div class="text-gray-500">对输入口令生成 Bcrypt 哈希（$2a$ 格式）</div>
           {:else}
             <label class="flex flex-col gap-0.5">Bcrypt 哈希
-              <input class="input text-xs font-mono" bind:value={pBcrypt.hash} placeholder="$2a$10$...." />
+              <input class="input text-xs font-mono" value={pBcrypt.hash} oninput={(e) => encodingStateStore.update(s => ({ ...s, pBcrypt: { ...s.pBcrypt, hash: e.currentTarget.value } }))} placeholder="$2a$10$...." />
             </label>
             <div class="text-gray-500">验证输入口令是否匹配该哈希</div>
           {/if}
@@ -498,7 +509,7 @@
     <!-- 输入 -->
     <div>
       <label for="enc-crypto-input" class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">输入</label>
-      <textarea id="enc-crypto-input" class="input font-mono text-xs" rows="3" placeholder={cryptoAlgo === 'hash' ? '输入待哈希内容' : '输入明文/密文'} bind:value={cryptoInput}></textarea>
+      <textarea id="enc-crypto-input" class="input font-mono text-xs" rows="3" placeholder={cryptoAlgo === 'hash' ? '输入待哈希内容' : '输入明文/密文'} value={cryptoInput} oninput={(e) => encodingStateStore.update(s => ({ ...s, cryptoInput: e.currentTarget.value }))}></textarea>
     </div>
 
     <!-- 操作按钮 -->

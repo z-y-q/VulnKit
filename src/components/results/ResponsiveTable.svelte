@@ -80,6 +80,11 @@
     if (!primary) return '';
     return String((row as Record<string, unknown>)[primary.key] ?? '');
   }
+
+  // §11.3：分页状态摘要（辅助技术可读）
+  const paginationLabel = $derived(
+    pagi ? `第 ${pagi.start + 1} 至 ${pagi.end} 条，共 ${rows.length} 条` : `共 ${rows.length} 条`
+  );
 </script>
 
 <div bind:this={el} class="w-full">
@@ -100,8 +105,8 @@
       {/each}
     </div>
   {:else}
-    <div class="overflow-x-auto {scrollClass}">
-      <table class={tableClass} style="min-width: {minPx}px; table-layout: auto;">
+    <div class="overflow-x-auto {scrollClass}" role="region" aria-label="表格内容（可横向滚动）" tabindex="0">
+      <table class={tableClass} style="min-width: {minPx}px; table-layout: auto;" aria-label={paginationLabel}>
         <thead class="sticky top-0 bg-white/85 dark:bg-gray-800/85 backdrop-blur-md z-10 shadow-[var(--vk-shadow-sm)]">
           <tr class="border-b border-gray-200 dark:border-gray-700">
             {#each visibleCols as col (col.key)}
@@ -122,18 +127,18 @@
     </div>
   {/if}
   {#if pagi && pagi.totalPages > 1}
-    <div class="flex items-center justify-between gap-2 mt-2 text-xs text-gray-500 dark:text-gray-500">
-      <span>共 {rows.length} 条，第 {pagi.start + 1}-{pagi.end} 条</span>
+    <nav class="flex items-center justify-between gap-2 mt-2 text-xs text-gray-500 dark:text-gray-500" aria-label="表格分页">
+      <span aria-live="polite">共 {rows.length} 条，第 {pagi.start + 1}-{pagi.end} 条</span>
       <div class="flex items-center gap-1">
         <select class="input !py-0.5 !text-xs" aria-label="每页条数" bind:value={pageSize} onchange={() => { page = 1; }}>
           {#each pageSizeOpts as ps}
             <option value={ps}>{ps} / 页</option>
           {/each}
         </select>
-        <button type="button" class="btn btn-xs" disabled={pagi.safePage <= 1} onclick={() => (page = pagi!.safePage - 1)}>上一页</button>
-        <span>{pagi.safePage} / {pagi.totalPages}</span>
-        <button type="button" class="btn btn-xs" disabled={pagi.safePage >= pagi.totalPages} onclick={() => (page = pagi!.safePage + 1)}>下一页</button>
+        <button type="button" class="btn btn-xs" disabled={pagi.safePage <= 1} onclick={() => (page = pagi!.safePage - 1)} aria-label="上一页">上一页</button>
+        <span aria-current="page" aria-label="当前页">{pagi.safePage} / {pagi.totalPages}</span>
+        <button type="button" class="btn btn-xs" disabled={pagi.safePage >= pagi.totalPages} onclick={() => (page = pagi!.safePage + 1)} aria-label="下一页">下一页</button>
       </div>
-    </div>
+    </nav>
   {/if}
 </div>
