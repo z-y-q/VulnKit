@@ -468,7 +468,7 @@
       confirmLabel: '载入',
     });
     if (!ok) return;
-    haeText = defaultRulesToYaml();
+    haeText = await defaultRulesToYaml();
     haeDirty = true;
     toastStore.show('已载入默认规则到编辑区（需点击保存）', 'info');
   }
@@ -485,8 +485,9 @@
     haeDirty = false;
     toastStore.show('已清空自定义规则', 'success');
   }
-  function exportHae() {
-    const blob = new Blob([haeText || defaultRulesToYaml()], { type: 'text/yaml;charset=utf-8' });
+  async function exportHae() {
+    const content = haeText || (await defaultRulesToYaml());
+    const blob = new Blob([content], { type: 'text/yaml;charset=utf-8' });
     downloadBlob(blob, `hae-rules-${new Date().toISOString().slice(0, 10)}.yaml`);
   }
   function importHae(e: Event) {

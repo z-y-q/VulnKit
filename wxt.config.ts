@@ -1,5 +1,6 @@
 import { defineConfig } from 'wxt';
 import { readFileSync } from 'node:fs';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 // 版本号单一来源（§10.1）：从 package.json 读取，避免 manifest 与 package 两处人工同步
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8')) as { version: string };
@@ -8,6 +9,17 @@ const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 
 export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-svelte', '@wxt-dev/unocss'],
+  vite: () => ({
+    plugins: [
+      visualizer({
+        filename: '.output/stats.html',
+        open: false,
+        gzipSize: true,
+        brotliSize: true,
+        template: 'treemap', // sunburst/treemap/network
+      }),
+    ],
+  }),
   manifest: {
     name: '灵眸',
     description: '灵眸 - 编码解码、图标识别、资产测绘、信息收集、权限分析',

@@ -1,10 +1,8 @@
 /**
- * HAE 规则引擎
+ * HAE 规则引擎（构建优化 P1 — 动态加载规则 JSON）
  * HaE (Highlight and Extract) 风格的正则匹配引擎，对齐 v5 vk-hae-rules.js。
- * 加载 hae-default-rules.json，对文本应用 f_regex + s_regex 二次过滤 + format 模板格式化。
+ * 运行时从 /rules/hae-default-rules.json 动态加载规则，减少主 bundle 体积。
  */
-
-import HAE_RULES from '@/lib/data/hae-default-rules.json';
 
 export interface HaeRule {
   name: string;
@@ -31,8 +29,39 @@ export interface HaeMatch {
   sensitive: boolean;
 }
 
-/** 默认规则组（从 JSON 加载） */
-export const DEFAULT_HAE_GROUPS: HaeGroup[] = HAE_RULES as HaeGroup[];
+/** 默认规则组缓存（首次调用时从 JSON 加载） */
+let _defaultRulesCache: HaeGroup[] | null = null;
+
+/** 动态加载默认规则组（构建优化：从 bundle 移到运行时 fetch）*/
+async function loadDefaultRules(): Promise<HaeGroup[]> {
+  if (_defaultRulesCache) return _defaultRulesCache;
+
+  try {
+    const response = await fetch(browser.runtime.getURL('rules/hae-default-rules.json'));
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    _defaultRulesCache = (await response.json()) as HaeGroup[];
+    return _defaultRulesCache;
+  } catch (e) {
+    console.error('加载 HAE 默认规则失败，降级为空规则集:', e);
+    _defaultRulesCache = [];
+    return [];
+  }
+}
+
+/** 默认规则组（兼容同步访问场景 — 必须先调用 loadDefaultRules）*/
+export const DEFAULT_HAE_GROUPS: HaeGroup[] = [];
+
+/** 初始化默认规则（扩展启动时调用一次）*/
+export async function initDefaultRules(): Promise<void> {
+  const rules = await loadDefaultRules();
+  DEFAULT_HAE_GROUPS.length = 0;
+  DEFAULT_HAE_GROUPS.push(...rules);
+}
+
+/** 获取默认规则组（异步版本，确保规则已加载）*/
+export async function getDefaultRules(): Promise<HaeGroup[]> {
+  return await loadDefaultRules();
+}
 
 /** format 模板替换：{0} {1} → 捕获组 */
 function applyFormat(format: string, captures: string[]): string {

@@ -5,16 +5,17 @@
  */
 
 import * as yaml from 'js-yaml';
-import { DEFAULT_HAE_GROUPS, type HaeGroup, type HaeRule } from './hae-engine';
+import { getDefaultRules, type HaeGroup, type HaeRule } from './hae-engine';
 
 // 透传类型，便于 UI 层只从单一入口（hae-store）导入规则与类型。
 export type { HaeGroup, HaeRule };
 
 const STORAGE_KEY = 'haeCustomRules';
 
-/** 默认规则的 YAML 文本（选项页初始化 / 恢复默认用） */
-export function defaultRulesToYaml(): string {
-  return yaml.dump(DEFAULT_HAE_GROUPS, { lineWidth: -1 });
+/** 默认规则的 YAML 文本（选项页初始化 / 恢复默认用 — 构建优化 P1）*/
+export async function defaultRulesToYaml(): Promise<string> {
+  const rules = await getDefaultRules();
+  return yaml.dump(rules, { lineWidth: -1 });
 }
 
 /** 读取 storage 中的自定义规则 YAML 文本，无则返回空串 */
@@ -74,16 +75,17 @@ export function parseRulesYaml(text: string): HaeGroup[] {
 }
 
 /**
- * 加载合并后的规则组：默认规则 + 自定义规则（自定义追加在末尾）。
+ * 加载合并后的规则组：默认规则 + 自定义规则（自定义追加在末尾 — 构建优化 P1）
  * 自定义规则解析失败时降级为仅默认规则。
  */
 export async function loadMergedGroups(): Promise<HaeGroup[]> {
+  const defaultRules = await getDefaultRules();
   try {
     const text = await loadCustomRulesYaml();
-    if (!text.trim()) return DEFAULT_HAE_GROUPS;
+    if (!text.trim()) return defaultRules;
     const custom = parseRulesYaml(text);
-    return [...DEFAULT_HAE_GROUPS, ...custom];
+    return [...defaultRules, ...custom];
   } catch {
-    return DEFAULT_HAE_GROUPS;
+    return defaultRules;
   }
 }

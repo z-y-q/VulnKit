@@ -121,7 +121,7 @@
     copyText(forged, 'alg=none PoC 已复制（仅用于授权测试）');
   }
 
-  // —— 加密解密 ——
+  // —— 加密解密（动态导入优化 — 构建优化 P0）——
   import {
     aesEncrypt, aesDecrypt, desEncrypt, desDecrypt, rc4Encrypt, rc4Decrypt,
     sm2Encrypt, sm2Decrypt, sm4Encrypt, sm4Decrypt,
@@ -129,7 +129,7 @@
     bcryptHash, bcryptVerify,
     WEAK_ALGO_WARNINGS,
     type AesMode, type AesPadding, type HashAlgo,
-  } from '@/lib/crypto/crypto-engine';
+  } from '@/lib/crypto/crypto-loaders';
 
   type CryptoAlgo = 'aes' | 'des' | 'rc4' | 'sm2' | 'sm4' | 'rsa' | 'hash' | 'bcrypt';
   let cryptoAlgo = $derived(st.cryptoAlgo);
@@ -171,19 +171,20 @@
     try {
       let result = '';
       const m = cryptoMode;
+      // 所有加密函数现在都是异步的（动态导入优化）
       switch (cryptoAlgo) {
-        case 'aes': result = m === 'encrypt' ? aesEncrypt(cryptoInput, pAes) : aesDecrypt(cryptoInput, pAes); break;
-        case 'des': result = m === 'encrypt' ? desEncrypt(cryptoInput, pDes) : desDecrypt(cryptoInput, pDes); break;
-        case 'rc4': result = m === 'encrypt' ? rc4Encrypt(cryptoInput, pRc4.key) : rc4Decrypt(cryptoInput, pRc4.key); break;
-        case 'sm2': result = m === 'encrypt' ? sm2Encrypt(cryptoInput, pSm2) : sm2Decrypt(cryptoInput, pSm2); break;
-        case 'sm4': result = m === 'encrypt' ? sm4Encrypt(cryptoInput, pSm4) : sm4Decrypt(cryptoInput, pSm4); break;
+        case 'aes': result = m === 'encrypt' ? await aesEncrypt(cryptoInput, pAes) : await aesDecrypt(cryptoInput, pAes); break;
+        case 'des': result = m === 'encrypt' ? await desEncrypt(cryptoInput, pDes) : await desDecrypt(cryptoInput, pDes); break;
+        case 'rc4': result = m === 'encrypt' ? await rc4Encrypt(cryptoInput, pRc4.key) : await rc4Decrypt(cryptoInput, pRc4.key); break;
+        case 'sm2': result = m === 'encrypt' ? await sm2Encrypt(cryptoInput, pSm2) : await sm2Decrypt(cryptoInput, pSm2); break;
+        case 'sm4': result = m === 'encrypt' ? await sm4Encrypt(cryptoInput, pSm4) : await sm4Decrypt(cryptoInput, pSm4); break;
         case 'rsa': result = m === 'encrypt' ? await rsaEncrypt(cryptoInput, pRsa.publicKeyPem) : await rsaDecrypt(cryptoInput, pRsa.privateKeyPem); break;
-        case 'hash': result = computeHash(cryptoInput, pHash); break;
+        case 'hash': result = await computeHash(cryptoInput, pHash); break;
         case 'bcrypt':
           if (m === 'encrypt') {
-            result = bcryptHash(cryptoInput, pBcrypt.cost);
+            result = await bcryptHash(cryptoInput, pBcrypt.cost);
           } else {
-            const ok = bcryptVerify(cryptoInput, pBcrypt.hash || cryptoOutput);
+            const ok = await bcryptVerify(cryptoInput, pBcrypt.hash || cryptoOutput);
             result = ok ? '✔ 口令匹配哈希' : '✗ 口令不匹配';
           }
           break;
