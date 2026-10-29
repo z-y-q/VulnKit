@@ -105,6 +105,7 @@
       {/each}
     </div>
   {:else}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div class="overflow-x-auto {scrollClass}" role="region" aria-label="表格内容（可横向滚动）" tabindex="0">
       <table class={tableClass} style="min-width: {minPx}px; table-layout: auto;" aria-label={paginationLabel}>
         <thead class="sticky top-0 bg-white/85 dark:bg-gray-800/85 backdrop-blur-md z-10 shadow-[var(--vk-shadow-sm)]">

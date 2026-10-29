@@ -37,7 +37,7 @@ async function loadDefaultRules(): Promise<HaeGroup[]> {
   if (_defaultRulesCache) return _defaultRulesCache;
 
   try {
-    const response = await fetch(browser.runtime.getURL('rules/hae-default-rules.json'));
+    const response = await fetch(browser.runtime.getURL('/rules/hae-default-rules.json'));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     _defaultRulesCache = (await response.json()) as HaeGroup[];
     return _defaultRulesCache;

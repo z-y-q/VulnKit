@@ -95,7 +95,14 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
 
 let cryptoJsCache: typeof import('crypto-js') | null = null;
 let smCryptoCache: typeof import('sm-crypto') | null = null;
-let bcryptCache: typeof import('bcryptjs') | null = null;
+
+/** bcryptjs 3.x 的包类型存在缺陷（types 与 index 双入口不一致），按实际用到的最小接口声明 */
+interface BcryptModule {
+  genSaltSync(cost: number): string;
+  hashSync(password: string, salt: string): string;
+  compareSync(password: string, hash: string): boolean;
+}
+let bcryptCache: BcryptModule | null = null;
 
 async function loadCryptoJS() {
   if (!cryptoJsCache) {
@@ -112,10 +119,14 @@ async function loadSmCrypto() {
   return smCryptoCache;
 }
 
-async function loadBcrypt() {
+async function loadBcrypt(): Promise<BcryptModule> {
   if (!bcryptCache) {
-    const module = await import('bcryptjs');
-    bcryptCache = module.default;
+    const module: any = await import('bcryptjs');
+    const mod = module?.default ?? module;
+    if (!mod || typeof mod.genSaltSync !== 'function') {
+      throw new Error('bcryptjs 动态加载失败');
+    }
+    bcryptCache = mod as BcryptModule;
   }
   return bcryptCache;
 }

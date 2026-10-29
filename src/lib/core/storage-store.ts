@@ -54,8 +54,9 @@ export function createStore<T extends Record<string, any>>(
   // 监听其他页面/面板对同一 key 的修改，保持同步
   if (typeof browser !== 'undefined' && browser.storage?.onChanged) {
     browser.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes[key] && initialized) {
-        store.set({ ...defaultValue, ...changes[key].newValue });
+      const incoming = changes[key]?.newValue;
+      if (area === 'local' && incoming && typeof incoming === 'object' && initialized) {
+        store.set({ ...defaultValue, ...(incoming as T) });
       }
     });
   }

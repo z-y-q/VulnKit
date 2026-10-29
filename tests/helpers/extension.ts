@@ -1,4 +1,4 @@
-import { chromium, type BrowserContext, type Page } from '@playwright/test';
+import { chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
 import path from 'node:path';
 
 /**
@@ -13,7 +13,8 @@ import path from 'node:path';
 export interface ExtensionContext {
   context: BrowserContext;
   extensionId: string;
-  backgroundPage: Page;
+  /** 扩展的 background Service Worker（MV3 无 background page） */
+  backgroundWorker: Worker;
 }
 
 /**
@@ -42,10 +43,10 @@ export async function loadExtension(userDataDir?: string): Promise<ExtensionCont
     throw new Error('扩展 Service Worker 未加载');
   }
 
-  const backgroundPage = backgroundPages[0];
-  const extensionId = backgroundPage.url().split('/')[2];
+  const backgroundWorker = backgroundPages[0];
+  const extensionId = backgroundWorker.url().split('/')[2];
 
-  return { context, extensionId, backgroundPage };
+  return { context, extensionId, backgroundWorker };
 }
 
 /**
