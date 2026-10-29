@@ -36,11 +36,15 @@
     XSS_MARKERS,
     REFLECTION_PROBE,
     XSS_SORT_FNS,
+    classifyRuntimeSinks,
+    type RuntimeSinkEvent,
+    type RuntimeSinkRow,
     type XssFinding,
     type XssContext,
     type XssSeverity,
     type SinkMatch,
   } from '@/lib/scanners/xss-engine';
+  import { detectWafInResponse, looksLikeWafBlock } from '@/lib/scanners/waf-engine';
 
   // ===== 注入点（结构化，带来源/URL/method）=====
   type ParamSource = 'url' | 'link' | 'form' | 'ajax' | 'header';
@@ -473,6 +477,15 @@
       const r = res as ProbeResult;
       const body = r.body ?? '';
 
+      // WAF 联动：响应命中 WAF 签名或拦截状态码时标注（而非简单判「未反射」）
+      let wafNote: string | undefined;
+      const wafHits = detectWafInResponse(r.headers, r.body);
+      if (wafHits.length > 0) {
+        wafNote = `疑似 WAF 拦截（${wafHits.map((h) => h.name).join('/')}）`;
+      } else if (looksLikeWafBlock(r.status ?? 0, r.body)) {
+        wafNote = `疑似 WAF 拦截（HTTP ${r.status}）`;
+      }
+
       // marker：优先用金丝雀，否则用 payload 本身
       let marker = payload;
       for (const m of XSS_MARKERS) {
@@ -492,6 +505,7 @@
         sanitized,
         severity: sev,
         evidence: refl.found ? refl.surrounding : undefined,
+        wafNote,
       };
     } catch {
       return null;
@@ -744,6 +758,108 @@
   }
 
   function clearSinks() { sinks = []; }
+
+  // ===== DOM XSS 运行时验证（source→sink 可达性）=====
+  let runtimeActive = $state(false);
+  let runtimeLoading = $state(false);
+  let runtimeRows = $state<RuntimeSinkRow[]>([]);
+
+  /** MAIN world 安装 sink hook：innerHTML/outerHTML/document.write/eval/Function/字符串 setTimeout */
+  async function installRuntimeHook() {
+    const tab = await getActiveTab();
+    if (!tab?.id) { toastStore.show('无可用标签页', 'error'); return; }
+    const status = await execInTab<string>(tab.id, function () {
+      const w = window as any;
+      if (w.__vkJSSRuntime) return 'already';
+      const rt = (w.__vkJSSRuntime = { events: [] as any[] });
+      const rec = function (sink: string, value: unknown) {
+        try {
+          rt.events.push({
+            sink: sink,
+            value: String(value).slice(0, 300),
+            time: Date.now(),
+            stack: ((new Error().stack) || '').split('\n').slice(2, 4).join(' | ').slice(0, 200),
+          });
+          if (rt.events.length > 300) rt.events.shift();
+        } catch (e) { /* */ }
+      };
+      // innerHTML / outerHTML setter（定义在 Element.prototype）
+      if (w.Element && w.Element.prototype) {
+        ['innerHTML', 'outerHTML'].forEach(function (prop: string) {
+          const d = Object.getOwnPropertyDescriptor(w.Element.prototype, prop);
+          if (d && d.set) {
+            Object.defineProperty(w.Element.prototype, prop, {
+              configurable: true,
+              get: d.get,
+              set: function (this: any, v: string) { rec(prop, v); return d.set!.call(this, v); },
+            });
+          }
+        });
+      }
+      // document.write / writeln
+      ['write', 'writeln'].forEach(function (fn: string) {
+        const orig = (document as any)[fn].bind(document);
+        (document as any)[fn] = function (...args: any[]) { rec('document.' + fn, args.join('')); return orig(...args); };
+      });
+      // eval / Function / 字符串型 setTimeout
+      const origEval = w.eval;
+      w.eval = function (s: string) { if (typeof s === 'string') rec('eval', s); return origEval(s); };
+      const OrigFunction = w.Function;
+      const Wrapped = function (this: any, ...args: any[]) {
+        rec('Function', args.length ? args[args.length - 1] : '');
+        return OrigFunction.apply(this, args);
+      };
+      Wrapped.prototype = OrigFunction.prototype;
+      w.Function = Wrapped;
+      const origSetTimeout = w.setTimeout;
+      w.setTimeout = function (handler: any, ...rest: any[]) {
+        if (typeof handler === 'string') rec('setTimeout', handler);
+        return origSetTimeout(handler, ...rest);
+      };
+      return 'installed';
+    }, { world: 'MAIN' });
+    runtimeActive = true;
+    toastStore.show(status === 'already' ? 'Hook 已在监控中，操作页面后点「读取结果」' : 'Hook 已安装：操作页面（切参数/搜索/跳转）触发 sink，再点「读取结果」', 'success');
+  }
+
+  /** 读取事件并在页面侧收集来源值（URL 参数值/hash/referrer），分类判定可达性 */
+  async function readRuntimeEvents() {
+    const tab = await getActiveTab();
+    if (!tab?.id) { toastStore.show('无可用标签页', 'error'); return; }
+    runtimeLoading = true;
+    const data = await execInTab<{ events: RuntimeSinkEvent[]; sources: string[] } | null>(tab.id, function () {
+      const rt = (window as any).__vkJSSRuntime;
+      const events = rt ? rt.events.slice() : [];
+      const sources: string[] = [];
+      try {
+        new URLSearchParams(location.search).forEach(function (v: string) { if (v && v.length >= 4) sources.push(v); });
+      } catch (e) { /* */ }
+      if (location.hash && location.hash.length >= 4) sources.push(location.hash.slice(1));
+      if (document.referrer && document.referrer.length >= 4) sources.push(document.referrer);
+      return { events: events, sources: sources };
+    }, { world: 'MAIN' });
+    runtimeLoading = false;
+    if (!data) { toastStore.show('Hook 未安装，请先安装 Hook', 'warning'); return; }
+    runtimeRows = classifyRuntimeSinks(data.events || [], data.sources || []);
+    const confirmed = runtimeRows.filter((r) => r.confirmed).length;
+    toastStore.show(
+      confirmed > 0
+        ? `运行时确认 ${confirmed} 条 source→sink 流（共 ${runtimeRows.length} 次 sink 调用）`
+        : `共 ${runtimeRows.length} 次 sink 调用，未见 source→sink 直达`,
+      confirmed > 0 ? 'warning' : 'info',
+    );
+  }
+
+  async function clearRuntimeEvents() {
+    const tab = await getActiveTab();
+    if (!tab?.id) return;
+    await execInTab(tab.id, function () {
+      const rt = (window as any).__vkJSSRuntime;
+      if (rt) rt.events.length = 0;
+    }, { world: 'MAIN' });
+    runtimeRows = [];
+    toastStore.show('已清空运行时事件（Hook 保持监控）', 'info');
+  }
 
   // ===== 单条复制 =====
   async function copyFinding(f: XssFinding) {
@@ -1012,7 +1128,7 @@ ${cards}
     {#if points.length > 0}
       <!-- 来源筛选 + 搜索 + 排序 + 全选 -->
       <div class="flex items-center gap-2 text-xs flex-wrap">
-        {#each ['all', 'url', 'link', 'form', 'ajax'] as sf}
+        {#each ['all', 'url', 'link', 'form', 'ajax', 'header'] as sf}
           <button
             class="badge {pointFilter === sf ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}"
             onclick={() => (pointFilter = sf as ParamSource | 'all')}
@@ -1120,6 +1236,9 @@ ${cards}
             {#if f.sanitized}
               <span class="badge text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">已净化</span>
             {/if}
+            {#if f.wafNote}
+              <span class="badge text-xs bg-orange-100 text-orange-700 ring-1 ring-inset ring-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:ring-orange-800/60" title={f.wafNote}>🛡 WAF</span>
+            {/if}
             <button class="ml-auto text-xs text-gray-500 hover:text-primary" onclick={() => copyFinding(f)}>复制</button>
           </div>
           <div class="text-xs font-mono text-gray-600 dark:text-gray-300 break-all max-h-16 overflow-hidden">{f.payload}</div>
@@ -1179,6 +1298,39 @@ ${cards}
     {:else if !sinkLoading}
       <div class="text-xs text-gray-500 text-center py-4">点击「分析 DOM 汇点」检测 DOM XSS 危险 sink</div>
     {/if}
+
+    <!-- DOM XSS 运行时验证 -->
+    <div class="card p-2 space-y-1.5 text-xs">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-gray-500 shrink-0">运行时验证</span>
+        <button class="btn btn-xs btn-primary" onclick={installRuntimeHook} disabled={runtimeActive}>
+          {runtimeActive ? 'Hook 监控中' : '🪝 安装 Hook'}
+        </button>
+        <button class="btn btn-xs" onclick={readRuntimeEvents} disabled={runtimeLoading || !runtimeActive}>
+          {runtimeLoading ? '读取中...' : '读取结果'}
+        </button>
+        <button class="btn btn-xs" onclick={clearRuntimeEvents} disabled={!runtimeActive}>清空</button>
+      </div>
+      {#if runtimeRows.length > 0}
+        <div class="text-gray-500">
+          sink 调用 {runtimeRows.length} 次 · <span class="text-red-500">source→sink 可达 {runtimeRows.filter(r => r.confirmed).length} 条</span>
+        </div>
+        <div class="space-y-0.5 max-h-40 overflow-y-auto">
+          {#each runtimeRows as r, i (i)}
+            <div class="flex items-start gap-1.5 py-0.5 border-b border-gray-100 dark:border-gray-800">
+              <span class="badge text-[10px] shrink-0 {r.confirmed ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/60' : 'bg-gray-200 dark:bg-gray-700'}">
+                {r.confirmed ? '✓可达' : r.sink}
+              </span>
+              <span class="font-mono text-gray-600 dark:text-gray-400 shrink-0">{r.sink}</span>
+              <span class="font-mono break-all flex-1 truncate" title={r.value + (r.stack ? '\n' + r.stack : '')}>{r.value}</span>
+            </div>
+          {/each}
+        </div>
+        <div class="text-gray-500">✓可达 = sink 收到的值包含当前 URL 参数/hash/referrer 内容（真实 source→sink 流）；安装后请操作页面（切换参数/搜索/跳转）再读取</div>
+      {:else}
+        <div class="text-gray-500">hook innerHTML/outerHTML/document.write/eval/Function/字符串 setTimeout，运行时捕获真实 sink 调用并判定 source→sink 可达性</div>
+      {/if}
+    </div>
   </div>
 
   <!-- 详情抽屉 -->

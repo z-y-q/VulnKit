@@ -1,46 +1,16 @@
 <script lang="ts">
   // WAF 指纹检测面板
-  // 通过多路径探测 + 签名匹配识别目标 WAF 类型
+  // 通过多路径探测 + 签名匹配识别目标 WAF 类型（匹配核心在 lib/scanners/waf-engine.ts）
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { toastStore, autoRunStore } from '@/stores/ui';
   import type { ProbeResult } from '@/lib/types/messaging';
-  import wafSignaturesJson from '@/lib/data/waf-signatures.json';
+  import { analyzeResponse, type WafDetection } from '@/lib/scanners/waf-engine';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { confirmStore } from '@/stores/confirm';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
   import ErrorState from '@/components/feedback/ErrorState.svelte';
   import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
-
-  // —— 类型 ——
-  interface WafPattern {
-    __regexp__: boolean;
-    source: string;
-    flags: string;
-  }
-
-  interface WafSignature {
-    name: string;
-    severity: 'high' | 'medium' | 'low';
-    headerMatch: WafPattern[];
-    bodyMatch: WafPattern[];
-    cookieMatch: WafPattern[];
-  }
-
-  interface Evidence {
-    type: 'header' | 'body' | 'cookie';
-    value: string;
-  }
-
-  interface WafDetection {
-    name: string;
-    severity: string;
-    confidence: 'high' | 'medium' | 'low';
-    evidence: Evidence[];
-    probe?: string;
-  }
-
-  const SIGNATURES: WafSignature[] = wafSignaturesJson as WafSignature[];
 
   // 探测路径（与旧版保持一致）
   const PROBE_PATHS = [
@@ -87,7 +57,7 @@
         const result = await fetchProbe(probeUrl);
         if (result && result.headers) {
           probeHeaders = result.headers;
-          const found = analyzeResponse(result.headers, result.body, SIGNATURES);
+          const found = analyzeResponse(result.headers, result.body);
           for (const f of found) {
             const existing = detectedMap.get(f.name);
             if (existing) {
@@ -162,81 +132,7 @@
     }
   });
 
-  // —— 签名匹配核心逻辑（纯函数，逐条保留原匹配规则）——
-
-  /** 将 JSON 中的 WafPattern 还原为 RegExp 实例 */
-  function compilePattern(p: WafPattern): RegExp {
-    return new RegExp(p.source, p.flags);
-  }
-
-  /** 对文本执行多条模式匹配，返回命中的原文片段 */
-  function matchPatterns(text: string, patterns: WafPattern[]): string[] {
-    if (!text || patterns.length === 0) return [];
-    const hits: string[] = [];
-    for (let i = 0; i < patterns.length; i++) {
-      const re = compilePattern(patterns[i]);
-      const m = text.match(re);
-      if (m) hits.push(m[0]);
-    }
-    return hits;
-  }
-
-  /**
-   * 纯函数：输入响应头 / body / 签名库 → 匹配结果列表
-   * 逐条保留原版 headerMatch / bodyMatch / cookieMatch 规则
-   */
-  function analyzeResponse(
-    headers: Record<string, string> | undefined,
-    body: string | undefined,
-    signatures: WafSignature[],
-  ): WafDetection[] {
-    // 序列化 header 字符串（key: value 形式，方便正则整行匹配）
-    let headerStr = '';
-    if (headers) {
-      for (const k of Object.keys(headers)) {
-        const val = headers[k];
-        headerStr += `${k}: ${Array.isArray(val) ? (val as unknown as string[]).join('\n') : val}\n`;
-      }
-    }
-
-    // 提取 Set-Cookie 字段值
-    let cookieStr = '';
-    if (headers) {
-      const sc = headers['set-cookie'] || headers['Set-Cookie'] || '';
-      cookieStr = Array.isArray(sc) ? (sc as unknown as string[]).join('\n') : sc;
-    }
-
-    const bodyStr = typeof body === 'string' ? body : '';
-    const detected: WafDetection[] = [];
-
-    for (const sig of signatures) {
-      const evidence: Evidence[] = [];
-
-      // 匹配 header
-      for (const hit of matchPatterns(headerStr, sig.headerMatch)) {
-        evidence.push({ type: 'header', value: hit });
-      }
-      // 匹配 body
-      for (const hit of matchPatterns(bodyStr, sig.bodyMatch)) {
-        evidence.push({ type: 'body', value: hit });
-      }
-      // 匹配 cookie
-      for (const hit of matchPatterns(cookieStr, sig.cookieMatch)) {
-        evidence.push({ type: 'cookie', value: hit });
-      }
-
-      if (evidence.length > 0) {
-        detected.push({
-          name: sig.name,
-          severity: sig.severity,
-          confidence: evidence.length >= 3 ? 'high' : evidence.length >= 2 ? 'medium' : 'low',
-          evidence,
-        });
-      }
-    }
-
-    return detected;
-  }
+  // —— 扫描流程 ——（签名匹配核心在 lib/scanners/waf-engine.ts，模块级预编译）
 
   // —— 扫描流程 ——
 

@@ -20,6 +20,8 @@ export interface XssFinding {
   sanitized: boolean;
   severity: XssSeverity;
   evidence?: string;
+  /** WAF 联动标注：响应命中 WAF 签名或拦截状态码时填写（如「疑似 WAF 拦截（Cloudflare）」） */
+  wafNote?: string;
 }
 
 // ====== 常量 ======
@@ -415,6 +417,39 @@ export function analyzeSinkLine(
     score: baseScore,
     sanitizers,
   };
+}
+
+// ====== DOM XSS 运行时验证 ======
+
+/** MAIN world hook 采集到的一次 sink 调用 */
+export interface RuntimeSinkEvent {
+  sink: string;
+  value: string;
+  time: number;
+  stack?: string;
+}
+
+/** 分类结果行：confirmed = sink 值包含页面 URL 来源值（source→sink 可达） */
+export interface RuntimeSinkRow extends RuntimeSinkEvent {
+  confirmed: boolean;
+  sourceHit?: string;
+}
+
+/**
+ * 运行时 sink 事件分类 —— 判断哪些 sink 调用与页面来源值（URL 参数/hash/referrer）相关。
+ * sourceHit 匹配采用「来源值 ≥4 字符且为 sink 值子串」启发式，短值忽略防误报。
+ * 纯函数，confirmed 优先排序。
+ */
+export function classifyRuntimeSinks(
+  events: RuntimeSinkEvent[],
+  sourceValues: string[],
+): RuntimeSinkRow[] {
+  const sources = (sourceValues || []).filter((s) => typeof s === 'string' && s.length >= 4);
+  const rows = events.map((e) => {
+    const hit = sources.find((sv) => e.value && e.value.indexOf(sv) !== -1);
+    return { ...e, confirmed: hit !== undefined, sourceHit: hit };
+  });
+  return rows.sort((a, b) => Number(b.confirmed) - Number(a.confirmed) || b.time - a.time);
 }
 
 // ====== 排序工具 ======
