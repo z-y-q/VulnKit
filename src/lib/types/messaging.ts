@@ -47,6 +47,7 @@ export type ContentMessage =
   | { type: 'VK_ANGULAR_STORE_EXPLORE' }
   | { type: 'VK_PAGE_INSPECT'; action: string; timeout?: number }
   | { type: 'VK_VUE_ATTACK'; action: 'bypass' | 'disableAuth' | 'navigate' | 'jump' | 'restore'; target?: string; timeout?: number }
+  | { type: 'VK_REACT_ATTACK'; action: 'routes' | 'navigate' | 'jump' | 'restore'; target?: string; timeout?: number }
   | { type: 'CONTEXT_EXTRACT_LINKS' }
   | { type: 'VK_FINGERPRINT_DOM' };
 
@@ -114,4 +115,42 @@ export interface RuoYiHookEvent {
   event: string;
   augmented?: unknown;
   injected?: unknown;
+}
+
+// ====== React 攻击层响应（inject/react-attack.ts → UI）======
+export interface ReactAttackRoute {
+  path: string;
+  component: string;
+  source: string;
+  authKeys: string[];
+}
+export interface ReactMicroApp {
+  path: string;
+  microApp: string;
+}
+export interface ReactAttackResponse {
+  success: boolean;
+  error?: string;
+  /** navigate/jump 生效路径 */
+  path?: string;
+  /** 实际使用的导航器（data-router.navigate / umi.g_history / location.hash 等） */
+  via?: string;
+  /** routes：fiber 提取的路由行 */
+  routes?: ReactAttackRoute[];
+  /** routes：bundle 字面量兜底路径 */
+  bundlePaths?: string[];
+  /** routes：页面锚点（含 hash 路由链接）提取的路径 */
+  anchorPaths?: string[];
+  /** routes：qiankun 微应用清单 */
+  microApps?: ReactMicroApp[];
+  /** routes：umi 运行时信息 */
+  umi?: { version: string; historyMode: string; hasGlobalHistory: boolean };
+  /** routes：可用导航器列表 */
+  navigators?: string[];
+  /** routes：遍历的 fiber 节点数 */
+  fiberCount?: number;
+  /** jump：拦截到的登录重定向反弹次数 */
+  bounces?: number;
+  patched?: number;
+  watching?: boolean;
 }

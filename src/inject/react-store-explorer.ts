@@ -45,28 +45,71 @@
   }
 
   function getFiberRoot(): any {
-    const rootEl: any =
-      document.getElementById('root') ||
-      document.getElementById('app') ||
-      document.getElementById('__next');
-    if (!rootEl) return null;
-
-    const fiberKey: string | undefined = Object.keys(rootEl).find(function (k: string) {
-      return k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$');
-    });
-    if (!fiberKey) return null;
-
-    const fiberNode: any = (rootEl as any)[fiberKey];
-    if (!fiberNode) return null;
-
-    if (fiberNode.stateNode && fiberNode.stateNode._reactRootContainer) {
-      return fiberNode.stateNode._reactRootContainer._internalRoot;
+    // 修复：不限定固定 id（root/app/__next），root-master 等 umi/qiankun 容器也要能找到
+    const candidates: any[] = [];
+    const explicitIds = ['root', 'app', '__next', 'root-master', 'main', 'application'];
+    for (let ei = 0; ei < explicitIds.length; ei++) {
+      const el = document.getElementById(explicitIds[ei]);
+      if (el && candidates.indexOf(el) === -1) candidates.push(el);
     }
-    if (fiberNode.stateNode && fiberNode.stateNode._internalRoot) {
-      return fiberNode.stateNode._internalRoot;
+    const prefixSelectors = ['[id^="root"]', '[id^="app"]', '[data-reactroot]'];
+    for (let pi = 0; pi < prefixSelectors.length; pi++) {
+      const els = document.querySelectorAll(prefixSelectors[pi]);
+      for (let ei = 0; ei < els.length && ei < 10; ei++) {
+        if (candidates.indexOf(els[ei]) === -1) candidates.push(els[ei]);
+      }
     }
-    if (fiberNode._internalRoot) return fiberNode._internalRoot;
-    return fiberNode;
+    if (candidates.length === 0 && document.body) {
+      // 兜底：扫描 body 前两层子树找带 React 内部键的容器
+      const scan: Element[] = [document.body];
+      let sn = 0;
+      while (scan.length > 0 && sn < 300) {
+        const cur = scan.shift()!;
+        sn++;
+        Object.keys(cur).forEach(function (k: string) {
+          if (
+            (k.indexOf('__reactFiber$') === 0 ||
+              k.indexOf('__reactContainer$') === 0 ||
+              k.indexOf('__reactInternalInstance$') === 0) &&
+            candidates.indexOf(cur) === -1
+          ) {
+            candidates.push(cur);
+          }
+        });
+        for (let ci = 0; ci < cur.children.length; ci++) scan.push(cur.children[ci]);
+      }
+    }
+
+    for (const rootEl of candidates) {
+      const fiberKey: string | undefined = Object.keys(rootEl).find(function (k: string) {
+        return (
+          k.startsWith('__reactContainer$') ||
+          k.startsWith('__reactFiber$') ||
+          k.startsWith('__reactInternalInstance$')
+        );
+      });
+      if (!fiberKey) continue;
+
+      const fiberNode: any = (rootEl as any)[fiberKey];
+      if (!fiberNode) continue;
+
+      // 统一返回带 .current 的 FiberRoot（调用方用 fiberRoot.current 遍历）
+      // React 18 createRoot：容器键 __reactContainer$ 指向 HostRoot fiber，其 stateNode 即 FiberRoot
+      if (fiberKey.indexOf('__reactContainer$') === 0) {
+        if (fiberNode.stateNode && fiberNode.stateNode.current) return fiberNode.stateNode;
+        continue;
+      }
+      if (fiberNode.stateNode && fiberNode.stateNode._reactRootContainer) {
+        return fiberNode.stateNode._reactRootContainer._internalRoot;
+      }
+      if (fiberNode.stateNode && fiberNode.stateNode._internalRoot) {
+        return fiberNode.stateNode._internalRoot;
+      }
+      if (fiberNode._internalRoot) return fiberNode._internalRoot;
+      if (fiberNode.stateNode && fiberNode.stateNode.current) return fiberNode.stateNode;
+      return fiberNode;
+    }
+    return null;
   }
 
   function walkFiberForStore(fiber: any, depth: number): any {
@@ -111,7 +154,7 @@
     try {
       const fiberRoot: any = getFiberRoot();
       if (fiberRoot) {
-        const found: any = walkFiberForStore(fiberRoot.current, 0);
+        const found: any = walkFiberForStore(fiberRoot.current || fiberRoot, 0);
         if (found) stores.push({ name: 'fiber:ReduxProvider', store: found });
       }
     } catch (e: any) {
@@ -467,36 +510,75 @@
       errors.push('Next.js routes: ' + (e.message || String(e)));
     }
 
-    // React Router v6: walk fiber tree for Route components
+    // React Router: walk fiber tree for Route components / route configs
     try {
       const fiberRoot: any = getFiberRoot();
       if (fiberRoot) {
         const routePaths: Record<string, { path: string; source: string; hasElement?: boolean }> = {};
+
+        /** 父链路径拼接（与 lib/analyzers/react-analyzer.ts joinReactPath 一致） */
+        const joinPath = function (parent: string, segment: string, isIndex?: boolean): string {
+          if (isIndex || segment === undefined || segment === null || segment === '') return parent || '/';
+          const seg = String(segment);
+          if (seg.charAt(0) === '/') return seg;
+          if (seg === '*') return parent === '/' || parent === '' ? '*' : parent + '/*';
+          if (!parent || parent === '/') return '/' + seg;
+          return parent + '/' + seg;
+        };
+
+        /** 递归展开路由配置数组（含 children 嵌套，父链路径拼接） */
+        const walkRouteArray = function (list: any[], parent: string, source: string, depth: number): void {
+          if (!Array.isArray(list) || depth > 10 || Object.keys(routePaths).length > 400) return;
+          list.forEach(function (r: any) {
+            if (!r || typeof r !== 'object') return;
+            const seg = typeof r.path === 'string' ? r.path : '';
+            const isIndex = r.index === true || seg === '';
+            const full = joinPath(parent, seg, isIndex);
+            if (!routePaths[full]) routePaths[full] = { path: full, source: source };
+            if (Array.isArray(r.children)) walkRouteArray(r.children, full, source, depth + 1);
+          });
+        };
+
         function walkForRoutes(fiber: any, depth: number): void {
           if (!fiber || depth > 25) return;
           try {
-            if (
-              fiber.memoizedProps &&
-              fiber.memoizedProps.path &&
-              typeof fiber.memoizedProps.path === 'string'
-            ) {
-              const p: string = fiber.memoizedProps.path;
-              if (p.charAt(0) === '/' || p === '*') {
-                routePaths[p] = routePaths[p] || { path: p, source: 'React Router (fiber)' };
-                if (fiber.memoizedProps.element) routePaths[p].hasElement = true;
-              }
-            }
-            // React Router v6 data router: route objects in routeLoader
-            if (
-              fiber.memoizedProps &&
-              fiber.memoizedProps.routes &&
-              Array.isArray(fiber.memoizedProps.routes)
-            ) {
-              fiber.memoizedProps.routes.forEach(function (r: any) {
-                if (r && r.path) {
-                  routePaths[r.path] = { path: r.path, source: 'React Router data router' };
+            const props = fiber.memoizedProps;
+            if (props && typeof props === 'object') {
+              if (props.path && typeof props.path === 'string') {
+                const p: string = props.path;
+                if (p.charAt(0) === '/' || p === '*') {
+                  routePaths[p] = routePaths[p] || { path: p, source: 'React Router (fiber)' };
+                  if (props.element) routePaths[p].hasElement = true;
                 }
-              });
+              }
+              // 路由配置数组挂在 props 上（react-router-config / umi 等）——递归含 children
+              if (Array.isArray(props.routes)) {
+                walkRouteArray(props.routes, '', 'React Router data router', 0);
+              }
+              // react-router 6.4+ data router：RouterProvider 的 router prop
+              if (
+                props.router &&
+                typeof props.router === 'object' &&
+                Array.isArray(props.router.routes)
+              ) {
+                walkRouteArray(props.router.routes, '', 'React Router data router', 0);
+              }
+              // RouteContext：value.matches 携带已编译 route 记录
+              if (props.value && typeof props.value === 'object' && Array.isArray(props.value.matches)) {
+                props.value.matches.forEach(function (m: any) {
+                  const r = m && (m.route || m);
+                  if (r && typeof r.path === 'string' && !routePaths[r.path]) {
+                    routePaths[r.path] = { path: r.path, source: 'RouteContext' };
+                  }
+                });
+              }
+              // umi 微前端路由：{ path, microApp } 形状
+              if (typeof props.path === 'string' && props.microApp && typeof props.microApp === 'string') {
+                routePaths['microapp:' + props.microApp] = {
+                  path: props.path,
+                  source: 'micro-app: ' + props.microApp,
+                };
+              }
             }
           } catch (_) {
             /* skip */
@@ -504,7 +586,7 @@
           walkForRoutes(fiber.child, depth + 1);
           walkForRoutes(fiber.sibling, depth + 1);
         }
-        walkForRoutes(fiberRoot.current, 0);
+        walkForRoutes(fiberRoot.current || fiberRoot, 0);
         Object.values(routePaths).forEach(function (r: { path: string; source: string; hasElement?: boolean }) {
           if (
             !routes.some(function (existing: { path: string }) {
@@ -519,17 +601,28 @@
       errors.push('React Router routes: ' + (e.message || String(e)));
     }
 
-    // Anchor-based route discovery
+    // Anchor-based route discovery（含 hash 路由链接：移动 H5 底部导航全是 #/xxx）
     try {
       const anchorRoutes: Record<string, boolean> = {};
-      document.querySelectorAll('a[href^="/"]').forEach(function (a: Element) {
-        const href: string | null = a.getAttribute('href');
-        if (!href || href.length <= 1) return;
-        const clean: string = href.split('?')[0].split('#')[0];
-        if (clean.length > 1 && !anchorRoutes[clean]) {
+      const pushAnchor = function (raw: string | null | undefined): void {
+        if (!raw) return;
+        let clean: string;
+        if (raw.charAt(0) === '#') {
+          // hash 路由：#/home/detail → /home/detail
+          clean = raw.slice(1).split('?')[0];
+        } else {
+          clean = raw.split('?')[0].split('#')[0];
+        }
+        if (clean.length > 1 && clean.charAt(0) === '/' && !anchorRoutes[clean]) {
           anchorRoutes[clean] = true;
           routes.push({ path: clean, source: 'anchor href' });
         }
+      };
+      document.querySelectorAll('a[href^="/"]').forEach(function (a: Element) {
+        pushAnchor(a.getAttribute('href'));
+      });
+      document.querySelectorAll('a[href^="#/"]').forEach(function (a: Element) {
+        pushAnchor(a.getAttribute('href'));
       });
     } catch (_) {
       /* skip */
@@ -549,7 +642,7 @@
     try {
       const fiberRoot: any = getFiberRoot();
       if (fiberRoot) {
-        const store: any = walkFiberForStore(fiberRoot.current, 0);
+        const store: any = walkFiberForStore(fiberRoot.current || fiberRoot, 0);
         if (store && store.dispatch) {
           // Try to access the store's internal middleware chain
           const srcList: string[] = [];

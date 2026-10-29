@@ -8,6 +8,7 @@ import type {
   ProbeResult,
   DnsResolveResult,
   DomFingerprint,
+  ReactAttackResponse,
 } from '@/lib/types/messaging';
 
 // 消息类型 → 期望响应类型
@@ -43,6 +44,7 @@ export interface ContentResponseMap {
   VK_ANGULAR_STORE_EXPLORE: unknown;
   VK_PAGE_INSPECT: unknown;
   VK_VUE_ATTACK: { success: boolean; error?: string; guards?: Record<string, number>; disabledMeta?: number; path?: string };
+  VK_REACT_ATTACK: ReactAttackResponse;
   CONTEXT_EXTRACT_LINKS: { count: number };
   VK_FINGERPRINT_DOM: DomFingerprint;
 }

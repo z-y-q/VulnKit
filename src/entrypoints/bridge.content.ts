@@ -18,6 +18,7 @@ const reactStoreUrl = 'inject/react-store-explorer.js';
 const angularStoreUrl = 'inject/angular-store-explorer.js';
 const pageInspectUrl = 'inject/page-inspect.js';
 const vueAttackUrl = 'inject/vue-attack.js';
+const reactAttackUrl = 'inject/react-attack.js';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -156,6 +157,21 @@ export default defineContentScript({
       });
     }
 
+    // ====== React 攻击层（routes/navigate/jump/restore，带 action+target dataset） ======
+    function injectReactAttack(action: string, target: string, timeout: number): Promise<unknown> {
+      return injectTracked({
+        url: reactAttackUrl,
+        dataKey: '__vk_react_attack',
+        timeout,
+        fallback: { success: false, error: '注入超时（页面可能无 React Router）' },
+        loadError: { success: false, error: '脚本加载失败' },
+        setup: (s) => {
+          s.dataset.vkAction = action;
+          s.dataset.vkTarget = target || '';
+        },
+      });
+    }
+
     // ====== 同步：链接提取 ======
     function extractLinks(): { count: number } {
       const pageUrl = location.href;
@@ -241,6 +257,11 @@ export default defineContentScript({
 
       if (type === 'VK_VUE_ATTACK') {
         injectVueAttack(message.action || 'bypass', message.target || '', message.timeout || 4000).then(sendResponse);
+        return true;
+      }
+
+      if (type === 'VK_REACT_ATTACK') {
+        injectReactAttack(message.action || 'routes', message.target || '', message.timeout || 15000).then(sendResponse);
         return true;
       }
 

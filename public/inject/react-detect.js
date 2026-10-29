@@ -35,24 +35,65 @@
         }
     }
     // React Fiber on root element
-    const rootEl = document.getElementById('root') ||
-        document.getElementById('app') ||
-        document.getElementById('__next');
-    let fiberKey;
-    if (rootEl) {
-        fiberKey = Object.keys(rootEl).find(function (k) {
-            return k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$');
+    // 修复：不限定固定 id（root/app/__next），root-master 等 umi/qiankun 容器也要能找到
+    const candidateEls = [];
+    const explicitIds = ['root', 'app', '__next', 'root-master', 'main', 'application'];
+    for (let ei = 0; ei < explicitIds.length; ei++) {
+        const el = document.getElementById(explicitIds[ei]);
+        if (el && candidateEls.indexOf(el) === -1)
+            candidateEls.push(el);
+    }
+    const prefixSelectors = ['[id^="root"]', '[id^="app"]', '[data-reactroot]'];
+    for (let pi = 0; pi < prefixSelectors.length; pi++) {
+        document.querySelectorAll(prefixSelectors[pi]).forEach((el) => {
+            if (candidateEls.indexOf(el) === -1)
+                candidateEls.push(el);
         });
-        if (fiberKey) {
-            result.detected = true;
-            result.signals.push(`React Fiber (${fiberKey})`);
+    }
+    if (candidateEls.length === 0 && document.body) {
+        // 兜底：扫描 body 前两层子树找带 React 内部键的容器
+        const scan = [document.body];
+        let sn = 0;
+        while (scan.length > 0 && sn < 300) {
+            const cur = scan.shift();
+            sn++;
+            const keys = Object.keys(cur);
+            for (let ki = 0; ki < keys.length; ki++) {
+                const k = keys[ki];
+                if (k.indexOf('__reactFiber$') === 0 || k.indexOf('__reactContainer$') === 0 || k.indexOf('__reactInternalInstance$') === 0) {
+                    candidateEls.push(cur);
+                    break;
+                }
+            }
+            for (let ci = 0; ci < cur.children.length; ci++)
+                scan.push(cur.children[ci]);
         }
-        const propsKey = Object.keys(rootEl).find(function (k) {
-            return k.startsWith('__reactProps$');
+    }
+    let rootEl;
+    let fiberKey;
+    for (let ci = 0; ci < candidateEls.length && !rootEl; ci++) {
+        const keys = Object.keys(candidateEls[ci]);
+        const fk = keys.find(function (k) {
+            return k.startsWith('__reactFiber$') || k.startsWith('__reactContainer$') || k.startsWith('__reactInternalInstance$');
         });
-        if (propsKey) {
+        if (fk) {
+            rootEl = candidateEls[ci];
+            fiberKey = fk;
             result.detected = true;
-            result.signals.push('React Props');
+            result.signals.push(`React Fiber (${fk})`);
+        }
+    }
+    if (!rootEl) {
+        for (const el of candidateEls) {
+            const propsKey = Object.keys(el).find(function (k) {
+                return k.startsWith('__reactProps$');
+            });
+            if (propsKey) {
+                rootEl = el;
+                result.detected = true;
+                result.signals.push('React Props');
+                break;
+            }
         }
     }
     // Legacy React attributes
@@ -84,6 +125,16 @@
         result.metaframework = result.metaframework || 'Next.js';
         result.detected = true;
         result.signals.push('data-nextjs-route-announcer');
+    }
+    // umi（含 qiankun 微前端主/子应用）：window.g_umi 由 umi 运行时注入
+    const umiGlobal = window.g_umi;
+    if (umiGlobal && umiGlobal.version) {
+        result.metaframework = result.metaframework || `umi ${umiGlobal.version}`;
+        result.detected = true;
+        result.signals.push(`window.g_umi v${umiGlobal.version}`);
+    }
+    if (window.g_history && typeof window.g_history.push === 'function') {
+        result.signals.push('window.g_history (umi router)');
     }
     // React Router
     const scripts = Array.from(document.querySelectorAll('script[src]'));
@@ -229,16 +280,26 @@
     // React Router route detection via router context
     if (ReactGlobal && rootEl) {
         try {
-            const allAnchors = document.querySelectorAll('a[href^="/"]');
             const routeSet = {};
-            allAnchors.forEach(function (a) {
-                const href = a.getAttribute('href');
-                if (href && href.charAt(0) === '/' && href.length > 1 && !routeSet[href]) {
-                    const cleanPath = href.split('?')[0];
-                    if (cleanPath.length > 1 && !routeSet[cleanPath]) {
-                        routeSet[cleanPath] = true;
-                    }
+            const pushHref = function (href) {
+                if (!href)
+                    return;
+                let clean;
+                if (href.charAt(0) === '#') {
+                    clean = href.slice(1).split('?')[0]; // hash 路由链接 #/xxx → /xxx
                 }
+                else if (href.charAt(0) === '/') {
+                    clean = href.split('?')[0];
+                }
+                else {
+                    return;
+                }
+                if (clean.length > 1 && !routeSet[clean]) {
+                    routeSet[clean] = true;
+                }
+            };
+            document.querySelectorAll('a[href^="/"], a[href^="#/"]').forEach(function (a) {
+                pushHref(a.getAttribute('href'));
             });
             result.routes = result.routes.concat(Object.keys(routeSet)).slice(0, 50);
         }

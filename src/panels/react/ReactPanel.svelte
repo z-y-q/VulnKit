@@ -12,6 +12,7 @@
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
   import { copyText } from '@/lib/actions/clipboard';
+  import type { ReactAttackResponse } from '@/lib/types/messaging';
 
   // ===== 类型（与 inject/react-detect.ts 返回值对齐）=====
   interface ReactDetectResult {
@@ -55,26 +56,37 @@
   let currentUrl = $state('');
   // 子标签：检测 / Store / 路由
   let activeTab = $state<'detect' | 'store' | 'routes'>('detect');
+  // 路由攻击层状态
+  let attackResult = $state<ReactAttackResponse | null>(null);
+  let attackBusy = $state(false);
+  let jumpTarget = $state('');
 
-  /** 聚合所有来源的路由（detect 阶段 + store 探索阶段） */
+  /** 聚合所有来源的路由（detect + store 探索 + 攻击层深提取） */
   let allRoutes = $derived.by(() => {
     const out: { path: string; source: string; hasElement?: boolean }[] = [];
     const seen = new Set<string>();
+    const push = (path: string, source: string, hasElement?: boolean) => {
+      if (!path || seen.has(path)) return;
+      seen.add(path);
+      out.push({ path, source, hasElement });
+    };
     if (detectResult?.routes) {
-      for (const r of detectResult.routes) {
-        const key = r;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ path: r, source: 'detect' });
-      }
+      for (const r of detectResult.routes) push(r, 'detect');
     }
     if (storeResult?.routes) {
-      for (const r of storeResult.routes) {
-        const key = r.path;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ path: r.path, source: r.source || 'store', hasElement: r.hasElement });
-      }
+      for (const r of storeResult.routes) push(r.path, r.source || 'store', r.hasElement);
+    }
+    if (attackResult?.routes) {
+      for (const r of attackResult.routes) push(r.path, r.source, true);
+    }
+    if (attackResult?.bundlePaths) {
+      for (const p of attackResult.bundlePaths) push(p, 'bundle');
+    }
+    if (attackResult?.anchorPaths) {
+      for (const p of attackResult.anchorPaths) push(p, 'anchor');
+    }
+    if (attackResult?.microApps) {
+      for (const m of attackResult.microApps) push(m.path, 'micro-app: ' + m.microApp);
     }
     return out;
   });
@@ -145,6 +157,51 @@
       expandedStores.add(storeId);
     }
     expandedStores = new Set(expandedStores); // trigger reactivity
+  }
+
+  // ===== 路由攻击层：深提取 / 跳转 / 绕过跳转 / 还原 =====
+  async function extractRoutesDeep() {
+    attackBusy = true;
+    const r = await sendToContent({ type: 'VK_REACT_ATTACK', action: 'routes', timeout: 20000 });
+    attackBusy = false;
+    if (!r || !r.success) {
+      toastStore.show(`路由提取失败: ${r?.error || '无法连接内容脚本'}`, 'error');
+      return;
+    }
+    attackResult = r;
+    const total = (r.routes?.length || 0) + (r.bundlePaths?.length || 0);
+    const umiTag = r.umi?.version ? ` · umi ${r.umi.version}` : '';
+    toastStore.show(`提取 ${total} 条路由（fiber ${r.fiberCount ?? 0} 节点）${umiTag}`, 'success');
+    await saveFindings();
+  }
+
+  async function reactNavigate(path: string) {
+    if (!path) return;
+    const r = await sendToContent({ type: 'VK_REACT_ATTACK', action: 'navigate', target: path });
+    if (r?.success) {
+      toastStore.show(`已跳转 ${path}（${r.via}）`, 'success');
+    } else {
+      toastStore.show(`跳转失败: ${r?.error || '未知错误'}`, 'error');
+    }
+  }
+
+  async function reactJump(path: string) {
+    if (!path) return;
+    const r = await sendToContent({ type: 'VK_REACT_ATTACK', action: 'jump', target: path, timeout: 8000 });
+    if (r?.success) {
+      toastStore.show(`已跳转 ${path}（${r.via}，5 秒内吞掉登录重定向）`, 'success');
+    } else {
+      toastStore.show(`绕过跳转失败: ${r?.error || '未知错误'}`, 'error');
+    }
+  }
+
+  async function reactRestore() {
+    const r = await sendToContent({ type: 'VK_REACT_ATTACK', action: 'restore' });
+    if (r?.success) {
+      toastStore.show('已还原导航器', 'success');
+    } else {
+      toastStore.show(`还原失败: ${r?.error || '未知错误'}`, 'error');
+    }
   }
 
   // ===== 复制/导出 =====
@@ -254,13 +311,19 @@
     <div class="card p-3 space-y-2">
       <div class="flex items-center justify-between">
         <div class="text-sm font-medium">客户端路由</div>
-        <button class="btn btn-sm" disabled={allRoutes.length === 0}
-          onclick={() => copyText(allRoutes.map(r => r.path).join('\n'), `${allRoutes.length} 条路由`)}>
-          复制全部
-        </button>
+        <div class="flex gap-1 items-center">
+          <button class="btn btn-xs btn-primary" disabled={attackBusy} onclick={extractRoutesDeep}
+            title="fiber 路由表 + umi bundle 字面量 + 微应用清单深提取">
+            {attackBusy ? '提取中...' : '深提取'}
+          </button>
+          <button class="btn btn-sm" disabled={allRoutes.length === 0}
+            onclick={() => copyText(allRoutes.map(r => r.path).join('\n'), `${allRoutes.length} 条路由`)}>
+            复制全部
+          </button>
+        </div>
       </div>
       {#if allRoutes.length === 0}
-        <div class="text-xs text-gray-500">暂无路由。请先「检测 React」或「探索 State」。</div>
+        <div class="text-xs text-gray-500">暂无路由。请先「检测 React」，或点「深提取」跑 fiber + bundle 兜底通道。</div>
       {:else}
         <div class="space-y-0.5 max-h-96 overflow-y-auto">
           {#each allRoutes as r (r.path + r.source)}
@@ -268,10 +331,50 @@
               <span class="badge text-[10px] shrink-0 bg-gray-200 dark:bg-gray-700">{r.source}</span>
               <code class="font-mono break-all flex-1">{r.path}</code>
               {#if r.hasElement}<span class="badge text-[10px]">component</span>{/if}
+              <button class="btn btn-sm text-[10px] shrink-0" title="通过页面路由器跳转" onclick={() => reactNavigate(r.path)}>跳转</button>
+              <button class="btn btn-sm text-[10px] shrink-0" title="跳转 + 吞掉登录重定向（对抗鉴权踢回）" onclick={() => reactJump(r.path)}>绕过跳转</button>
               <button class="btn btn-sm text-[10px] shrink-0" onclick={() => copyText(r.path)}>复制</button>
             </div>
           {/each}
         </div>
+      {/if}
+    </div>
+
+    <!-- 路由攻击层 -->
+    <div class="card p-3 space-y-2">
+      <div class="flex items-center justify-between">
+        <div class="text-sm font-medium">路由跳转 / 鉴权绕过 <span class="text-xs text-gray-500 font-normal">（umi/React Router 运行时）</span></div>
+        <button class="btn btn-xs" onclick={reactRestore}>还原导航器</button>
+      </div>
+      <div class="flex gap-1">
+        <input class="input text-xs flex-1 font-mono" placeholder="/admin/users（输入目标路径）" bind:value={jumpTarget}
+          onkeydown={(e) => e.key === 'Enter' && reactJump(jumpTarget)} />
+        <button class="btn btn-xs" disabled={!jumpTarget} onclick={() => reactNavigate(jumpTarget)}>跳转</button>
+        <button class="btn btn-xs btn-danger" disabled={!jumpTarget} title="吞掉 login/403 重定向 + 反弹重推，对抗前端鉴权踢回" onclick={() => reactJump(jumpTarget)}>绕过跳转</button>
+      </div>
+      {#if attackResult}
+        <div class="flex gap-1 flex-wrap text-xs">
+          {#if attackResult.umi?.version}<span class="badge">umi {attackResult.umi.version}</span>{/if}
+          {#if attackResult.umi?.historyMode}<span class="badge">history: {attackResult.umi.historyMode}</span>{/if}
+          {#if attackResult.navigators}
+            {#each attackResult.navigators as nv}<span class="badge text-[10px]">{nv}</span>{/each}
+          {/if}
+        </div>
+        {#if attackResult.microApps && attackResult.microApps.length > 0}
+          <div class="text-xs text-gray-500">qiankun 微应用（{attackResult.microApps.length}）</div>
+          <div class="space-y-0.5 max-h-28 overflow-y-auto">
+            {#each attackResult.microApps as m}
+              <div class="flex items-center gap-1 text-xs">
+                <span class="badge text-[10px] shrink-0">{m.microApp}</span>
+                <code class="font-mono flex-1">{m.path}</code>
+                <button class="btn btn-sm text-[10px] shrink-0" onclick={() => reactJump(m.path)}>绕过跳转</button>
+              </div>
+            {/each}
+          </div>
+        {/if}
+        <div class="text-xs text-gray-500">绕过原理：跳转目标后 5 秒内拦截页面自身发往 login/403 的路由重定向并反弹重推；服务端鉴权不受影响</div>
+      {:else}
+        <div class="text-xs text-gray-500">先点上方「深提取」识别 umi 版本、可用导航器与 qiankun 微应用；普通 React 站点跳转走 fiber 里的 history/navigator。</div>
       {/if}
     </div>
   {/if}
