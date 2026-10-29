@@ -37,13 +37,13 @@
     // React Fiber on root element
     // 修复：不限定固定 id（root/app/__next），root-master 等 umi/qiankun 容器也要能找到
     const candidateEls = [];
-    const explicitIds = ['root', 'app', '__next', 'root-master', 'main', 'application'];
+    const explicitIds = ['root', 'app', '__next', 'root-master', 'main', 'mainContainer', 'application'];
     for (let ei = 0; ei < explicitIds.length; ei++) {
         const el = document.getElementById(explicitIds[ei]);
         if (el && candidateEls.indexOf(el) === -1)
             candidateEls.push(el);
     }
-    const prefixSelectors = ['[id^="root"]', '[id^="app"]', '[data-reactroot]'];
+    const prefixSelectors = ['[id^="root"]', '[id^="app"]', '[id^="main"]', '[data-reactroot]'];
     for (let pi = 0; pi < prefixSelectors.length; pi++) {
         document.querySelectorAll(prefixSelectors[pi]).forEach((el) => {
             if (candidateEls.indexOf(el) === -1)

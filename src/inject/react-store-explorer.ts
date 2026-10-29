@@ -44,15 +44,15 @@
     }
   }
 
-  function getFiberRoot(): any {
-    // 修复：不限定固定 id（root/app/__next），root-master 等 umi/qiankun 容器也要能找到
+  /** 疑似 React 根容器全集（显式 id → 前缀选择器 → body 前两层扫描兜底） */
+  function findReactContainerEls(): any[] {
     const candidates: any[] = [];
-    const explicitIds = ['root', 'app', '__next', 'root-master', 'main', 'application'];
+    const explicitIds = ['root', 'app', '__next', 'root-master', 'main', 'mainContainer', 'application'];
     for (let ei = 0; ei < explicitIds.length; ei++) {
       const el = document.getElementById(explicitIds[ei]);
       if (el && candidates.indexOf(el) === -1) candidates.push(el);
     }
-    const prefixSelectors = ['[id^="root"]', '[id^="app"]', '[data-reactroot]'];
+    const prefixSelectors = ['[id^="root"]', '[id^="app"]', '[id^="main"]', '[data-reactroot]'];
     for (let pi = 0; pi < prefixSelectors.length; pi++) {
       const els = document.querySelectorAll(prefixSelectors[pi]);
       for (let ei = 0; ei < els.length && ei < 10; ei++) {
@@ -79,8 +79,11 @@
         for (let ci = 0; ci < cur.children.length; ci++) scan.push(cur.children[ci]);
       }
     }
+    return candidates;
+  }
 
-    for (const rootEl of candidates) {
+  function getFiberRoot(): any {
+    for (const rootEl of findReactContainerEls()) {
       const fiberKey: string | undefined = Object.keys(rootEl).find(function (k: string) {
         return (
           k.startsWith('__reactContainer$') ||
@@ -282,27 +285,31 @@
 
     // Strategy 1: __JOTAI_DEFAULT_STORE__ / __JOTAI_STORE__ on Fiber nodes
     try {
-      const rootEl: any =
-        document.getElementById('__next') ||
-        document.getElementById('root') ||
-        document.getElementById('app') ||
-        document.body.firstElementChild;
-      if (rootEl && (rootEl as any)._reactRootContainer) {
-        const fiberKey: string | undefined = Object.keys((rootEl as any)._reactRootContainer).find(function (k: string) {
-          return k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$');
-        });
-        if (fiberKey) {
-          walkFiberForJotai((rootEl as any)._reactRootContainer[fiberKey], atoms, 0);
+      for (const rootEl of findReactContainerEls()) {
+        if ((rootEl as any)._reactRootContainer) {
+          const fiberKey: string | undefined = Object.keys((rootEl as any)._reactRootContainer).find(function (k: string) {
+            return k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$');
+          });
+          if (fiberKey) {
+            walkFiberForJotai((rootEl as any)._reactRootContainer[fiberKey], atoms, 0);
+          }
         }
-      }
-      // Also try React 18 createRoot pattern on __nextFiber
-      if (atoms.length === 0 && rootEl) {
-        const fiberKey2: string | undefined = Object.keys(rootEl).find(function (k: string) {
-          return k.startsWith('__nextFiber$');
-        });
-        if (fiberKey2) {
-          walkFiberForJotai((rootEl as any)[fiberKey2], atoms, 0);
+        // React 18 createRoot 模式：容器上直接挂 __reactContainer$ / __reactFiber$ / __nextFiber$
+        if (atoms.length === 0) {
+          const fiberKey2: string | undefined = Object.keys(rootEl).find(function (k: string) {
+            return (
+              k.startsWith('__reactContainer$') ||
+              k.startsWith('__reactFiber$') ||
+              k.startsWith('__nextFiber$') ||
+              k.startsWith('__reactInternalInstance$')
+            );
+          });
+          if (fiberKey2) {
+            const f: any = (rootEl as any)[fiberKey2];
+            walkFiberForJotai(f.stateNode && f.stateNode.current ? f.stateNode.current : f, atoms, 0);
+          }
         }
+        if (atoms.length > 0) break;
       }
     } catch (_) {
       /* skip */
@@ -437,25 +444,27 @@
     // Strategy 2: React fiber scan for Recoil_RecoilValue
     try {
       if (Object.keys(result).length === 0) {
-        const rootEl: any =
-          document.getElementById('__next') ||
-          document.getElementById('root') ||
-          document.getElementById('app') ||
-          document.body.firstElementChild;
-        if (rootEl) {
+        for (const rootEl of findReactContainerEls()) {
           const fiberKey: string | undefined = Object.keys(rootEl).find(function (k: string) {
-            return k.startsWith('__reactFiber$') || k.startsWith('__nextFiber$');
+            return (
+              k.startsWith('__reactContainer$') ||
+              k.startsWith('__reactFiber$') ||
+              k.startsWith('__nextFiber$') ||
+              k.startsWith('__reactInternalInstance$')
+            );
           });
-          if (fiberKey) {
-            const recoilAtoms: { name: string; value: any }[] = [];
-            walkFiberForRecoil((rootEl as any)[fiberKey], recoilAtoms, 0);
-            if (recoilAtoms.length > 0) {
-              const state2: Record<string, any> = {};
-              recoilAtoms.forEach(function (a: { name: string; value: any }) {
-                state2[a.name] = a.value;
-              });
-              result['recoil'] = { state: state2, type: 'recoil', atomCount: recoilAtoms.length };
-            }
+          if (!fiberKey) continue;
+          const f: any = (rootEl as any)[fiberKey];
+          const startFiber: any = f && f.stateNode && f.stateNode.current ? f.stateNode.current : f;
+          const recoilAtoms: { name: string; value: any }[] = [];
+          walkFiberForRecoil(startFiber, recoilAtoms, 0);
+          if (recoilAtoms.length > 0) {
+            const state2: Record<string, any> = {};
+            recoilAtoms.forEach(function (a: { name: string; value: any }) {
+              state2[a.name] = a.value;
+            });
+            result['recoil'] = { state: state2, type: 'recoil', atomCount: recoilAtoms.length };
+            break;
           }
         }
       }

@@ -46,10 +46,10 @@
             if (el && found.indexOf(el) === -1 && hasReactKey(el))
                 found.push(el);
         };
-        const explicit = ['root', 'app', '__next', 'root-master', 'main', 'application'];
+        const explicit = ['root', 'app', '__next', 'root-master', 'main', 'mainContainer', 'application'];
         for (let i = 0; i < explicit.length; i++)
             push(document.getElementById(explicit[i]));
-        const selectors = ['[id^="root"]', '[id^="app"]', '[data-reactroot]', '[data-react-portal]'];
+        const selectors = ['[id^="root"]', '[id^="app"]', '[id^="main"]', '[data-reactroot]', '[data-react-portal]'];
         for (let si = 0; si < selectors.length; si++) {
             const els = document.querySelectorAll(selectors[si]);
             for (let ei = 0; ei < els.length && ei < 10; ei++)

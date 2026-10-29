@@ -188,15 +188,19 @@
     result.modules = Object.keys(componentSet).slice(0, 30);
   }
 
-  // Route extraction
+  // Route extraction（含 hash 路由链接：#/xxx）
   const routeSet: Record<string, boolean> = {};
-  document.querySelectorAll('a[href^="/"]').forEach(function (a: Element) {
+  document.querySelectorAll('a[href^="/"], a[href^="#/"]').forEach(function (a: Element) {
     const href = a.getAttribute('href');
-    if (href && href.charAt(0) === '/' && href.length > 1) {
-      const cleanPath = href.split('?')[0].split('#')[0];
-      if (cleanPath.length > 1 && !routeSet[cleanPath]) {
-        routeSet[cleanPath] = true;
-      }
+    if (!href) return;
+    let cleanPath: string;
+    if (href.charAt(0) === '#') {
+      cleanPath = href.slice(1).split('?')[0];
+    } else {
+      cleanPath = href.split('?')[0].split('#')[0];
+    }
+    if (cleanPath.length > 1 && !routeSet[cleanPath]) {
+      routeSet[cleanPath] = true;
     }
   });
   if (document.querySelector('router-outlet, [router-outlet], app-router-outlet')) {

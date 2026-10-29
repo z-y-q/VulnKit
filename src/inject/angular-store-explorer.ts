@@ -218,17 +218,24 @@
       errors.push('Router DI: ' + (e.message || String(e)));
     }
 
-    // Method 2: Anchor-based fallback
+    // Method 2: Anchor-based fallback（含 hash 路由链接：#/xxx）
     try {
       const anchorRoutes: Record<string, boolean> = {};
-      document.querySelectorAll('a[href^="/"]').forEach(function (a: Element) {
-        const href: string | null = a.getAttribute('href');
-        if (!href || href.length <= 1) return;
-        const clean: string = href.split('?')[0].split('#')[0];
+      const pushAnchor = function (href: string | null): void {
+        if (!href) return;
+        let clean: string;
+        if (href.charAt(0) === '#') {
+          clean = href.slice(1).split('?')[0];
+        } else {
+          clean = href.split('?')[0].split('#')[0];
+        }
         if (clean.length > 1 && !anchorRoutes[clean]) {
           anchorRoutes[clean] = true;
           routes.push({ path: clean, source: 'anchor href' });
         }
+      };
+      document.querySelectorAll('a[href^="/"], a[href^="#/"]').forEach(function (a: Element) {
+        pushAnchor(a.getAttribute('href'));
       });
     } catch (_) { /* skip */ }
 
