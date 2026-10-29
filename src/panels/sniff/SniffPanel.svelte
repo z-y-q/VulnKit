@@ -28,7 +28,7 @@
   /** 框架名 → 对应分析面板 id（用于一键跳转）*/
   const FRAMEWORK_PANEL: Record<string, string> = {
     'Vue.js': 'vue', 'React': 'react', 'Angular': 'angular', 'Svelte': 'svelte',
-    'Next.js': 'vue', 'Nuxt.js': 'vue', '若依框架': 'ruoyi',
+    'Next.js': 'react', 'Nuxt.js': 'vue', '若依框架': 'ruoyi',
   };
   function jumpToFramework(name: string) {
     const id = FRAMEWORK_PANEL[name];

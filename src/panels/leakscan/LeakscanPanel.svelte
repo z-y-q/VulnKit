@@ -43,7 +43,7 @@
     let text = '';
     let dom = 0, storage = 0, js = 0;
 
-    // 1) DOM + localStorage/sessionStorage + 全局变量名（ISOLATED world）
+    // 1) DOM + localStorage/sessionStorage + 全局变量名（MAIN world：页面 JS 设置的全局只在页面上下文可见）
     if (tab?.id) {
       const collected = await execInTab<{ html: string; ls: string; ss: string; globals: string[] }>(
         tab.id,
@@ -58,6 +58,7 @@
           }
           return { html, ls, ss, globals };
         },
+        { world: 'MAIN' },
       );
       if (collected) {
         dom = collected.html.length;

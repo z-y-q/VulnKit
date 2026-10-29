@@ -1,8 +1,8 @@
 // 灵眸 - React Detection Inject Script
 (function () {
   'use strict';
-  if ((window as any).__VK_REACT_DETECT_DONE__) return;
-  (window as any).__VK_REACT_DETECT_DONE__ = true;
+  // 检测为只读操作，不做一次性守卫：守卫会让二次注入早退、不回执，
+  // bridge 端等到超时返回 null，面板误报「无法连接内容脚本」。
 
   const __vk_token = document.currentScript
     ? (document.currentScript as HTMLScriptElement).dataset.vkToken || ''

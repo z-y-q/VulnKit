@@ -246,42 +246,51 @@
       }
     });
 
+    const MAX_SCRIPTS = 8;
+    const PER_SCRIPT_BYTES = 3 * 1024 * 1024;
+    const PER_SCRIPT_MS = 6000; // 并行执行：总耗时上界 ≈ PER_SCRIPT_MS，不超 bridge 超时预算
+
     const paths = new Set<string>();
     const microApps: { path: string; microApp: string }[] = [];
     const microSeen = new Set<string>();
-    let scanned = 0;
 
-    for (const url of scripts.slice(0, 8)) {
-      if (scanned >= 8 * 1024 * 1024) break;
+    const fetchText = async function (url: string): Promise<string> {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), PER_SCRIPT_MS);
       try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 8000);
         const res = await fetch(url, { credentials: 'omit', signal: ctrl.signal });
-        clearTimeout(timer);
-        const text = await res.text();
-        scanned += text.length;
-
-        const pathRe = /path\s*:\s*"([^"\s]{1,120})"/g;
-        let m: RegExpExecArray | null;
-        while ((m = pathRe.exec(text)) !== null) {
-          if (isPlausibleRoutePath(m[1])) paths.add(m[1]);
-          if (paths.size >= 500) break;
-        }
-        const microRe = /path\s*:\s*"([^"\s]+)"\s*,\s*microApp\s*:\s*"([^"]+)"|microApp\s*:\s*"([^"]+)"\s*,\s*path\s*:\s*"([^"\s]+)"/g;
-        while ((m = microRe.exec(text)) !== null) {
-          const p = m[1] || m[4];
-          const app = m[2] || m[3];
-          if (!p || !app) continue;
-          const key = p + '|' + app;
-          if (!microSeen.has(key)) {
-            microSeen.add(key);
-            microApps.push({ path: p, microApp: app });
-          }
-          if (microApps.length >= 50) break;
-        }
+        return await res.text();
       } catch (e) {
-        /* 单个脚本失败跳过 */
+        return '';
+      } finally {
+        clearTimeout(timer);
       }
+    };
+
+    const texts = await Promise.all(scripts.slice(0, MAX_SCRIPTS).map(fetchText));
+    for (const text of texts) {
+      if (!text) continue;
+      const body = text.length > PER_SCRIPT_BYTES ? text.slice(0, PER_SCRIPT_BYTES) : text;
+
+      const pathRe = /path\s*:\s*"([^"\s]{1,120})"/g;
+      let m: RegExpExecArray | null;
+      while ((m = pathRe.exec(body)) !== null) {
+        if (isPlausibleRoutePath(m[1])) paths.add(m[1]);
+        if (paths.size >= 500) break;
+      }
+      const microRe = /path\s*:\s*"([^"\s]+)"\s*,\s*microApp\s*:\s*"([^"]+)"|microApp\s*:\s*"([^"]+)"\s*,\s*path\s*:\s*"([^"\s]+)"/g;
+      while ((m = microRe.exec(body)) !== null) {
+        const p = m[1] || m[4];
+        const app = m[2] || m[3];
+        if (!p || !app) continue;
+        const key = p + '|' + app;
+        if (!microSeen.has(key)) {
+          microSeen.add(key);
+          microApps.push({ path: p, microApp: app });
+        }
+        if (microApps.length >= 50) break;
+      }
+      if (paths.size >= 500 && microApps.length >= 50) break;
     }
     return { paths: Array.from(paths).sort(), microApps, scripts: scripts.length };
   }
@@ -396,8 +405,10 @@
     w[BACKUP_KEY] = w[BACKUP_KEY] || {};
     let patched = 0;
     const swallow = (raw: string): boolean => {
-      // 目标是登录类路径且非我们想去的路径 → 吞掉
-      return LOGIN_REDIRECT_RE.test(raw || '') && raw !== keepPath;
+      if (!raw) return false;
+      // 只对路径部分判定：query/hash 里出现 login（如 ?next=/login）不应被误吞
+      const pathOnly = raw.split('?')[0].split('#')[0];
+      return LOGIN_REDIRECT_RE.test(pathOnly) && raw !== keepPath;
     };
     if (w.g_history && !w.g_history.__vk_patched__) {
       const g = w.g_history;

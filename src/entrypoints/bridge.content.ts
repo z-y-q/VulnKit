@@ -39,6 +39,7 @@ export default defineContentScript({
     const pending = new Map<string, Pending>();
 
     let vueDetecting = false;
+    let vueDetectInFlight: Promise<unknown> | null = null;
 
     /** 清理某 token 的待办（成功回执、超时、加载失败共用）。 */
     function settle(token: string, withResult: (p: Pending) => void) {
@@ -46,7 +47,10 @@ export default defineContentScript({
       if (!p) return;
       pending.delete(token);
       clearTimeout(p.timer);
-      if (p.dataKey === '__vk_detect') vueDetecting = false;
+      if (p.dataKey === '__vk_detect') {
+        vueDetecting = false;
+        vueDetectInFlight = null;
+      }
       withResult(p);
     }
 
@@ -94,11 +98,13 @@ export default defineContentScript({
       setup?: (script: HTMLScriptElement) => void;
     }): Promise<unknown> {
       const { url, dataKey, timeout, fallback = null, loadError = fallback, setup } = opts;
-      // Vue detect 全局单飞：并发探测只跑一次
-      if (dataKey === '__vk_detect' && vueDetecting) return Promise.resolve(null);
+      // Vue detect 全局单飞：并发探测共享在飞结果（返回 null 会让面板误报「无法连接」）
+      if (dataKey === '__vk_detect' && vueDetecting && vueDetectInFlight) {
+        return vueDetectInFlight;
+      }
       if (dataKey === '__vk_detect') vueDetecting = true;
 
-      return new Promise((resolve) => {
+      const request = new Promise((resolve) => {
         const token = GEN_TOKEN();
         const timer = setTimeout(() => settle(token, () => resolve(fallback)), timeout);
         pending.set(token, {
@@ -118,6 +124,8 @@ export default defineContentScript({
         };
         (document.head || document.documentElement).appendChild(script);
       });
+      if (dataKey === '__vk_detect') vueDetectInFlight = request;
+      return request;
     }
 
     // ====== 注入消息 → { url, dataKey, timeout } ======
