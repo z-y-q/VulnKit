@@ -639,6 +639,15 @@
           "source": "_astro\\/",
           "flags": "i"
         }
+      },
+      {
+        "source": "meta",
+        "type": "regex",
+        "value": {
+          "__regexp__": true,
+          "source": "generator.*astro",
+          "flags": "i"
+        }
       }
     ]
   },
@@ -1097,39 +1106,6 @@
         "value": {
           "__regexp__": true,
           "source": "solid-js|solid\\/",
-          "flags": "i"
-        }
-      }
-    ]
-  },
-  {
-    "name": "Astro",
-    "category": "框架",
-    "matchers": [
-      {
-        "source": "body",
-        "type": "regex",
-        "value": {
-          "__regexp__": true,
-          "source": "astro-island|data-astro",
-          "flags": "i"
-        }
-      },
-      {
-        "source": "scriptSrc",
-        "type": "regex",
-        "value": {
-          "__regexp__": true,
-          "source": "_astro\\/",
-          "flags": "i"
-        }
-      },
-      {
-        "source": "meta",
-        "type": "regex",
-        "value": {
-          "__regexp__": true,
-          "source": "generator.*astro",
           "flags": "i"
         }
       }
@@ -2809,6 +2785,227 @@
           "flags": "im"
         }
       }
+    ]
+  },
+  {
+    "name": "Discuz!",
+    "category": "CMS",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "Powered by Discuz!|Discuz! X[0-9.]+", "flags": "i" } },
+      { "source": "cookies", "type": "regex", "value": { "__regexp__": true, "source": "_saltkey|_sid", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "DedeCMS 织梦",
+    "category": "CMS",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "Powered by DedeCMS|dedecms", "flags": "i" } },
+      { "source": "scriptSrc", "type": "regex", "value": { "__regexp__": true, "source": "/dede/|dedecms", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "帝国 EmpireCMS",
+    "category": "CMS",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "Powered by EmpireCMS|EmpireCMS", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "PHPCMS",
+    "category": "CMS",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "Powered by PHPCMS|phpcms", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Z-Blog",
+    "category": "CMS",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "Powered By [Zz]-[Bb]log", "flags": "i" } },
+      { "source": "meta", "type": "regex", "value": { "__regexp__": true, "source": "generator.*z-blog", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "ThinkCMF",
+    "category": "CMS",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "ThinkCMF", "flags": "i" } },
+      { "source": "cookies", "type": "regex", "value": { "__regexp__": true, "source": "thinkcmf", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Fastadmin",
+    "category": "CMS",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "fast-admin|fastadmin", "flags": "i" } },
+      { "source": "scriptSrc", "type": "regex", "value": { "__regexp__": true, "source": "fastadmin", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Qwik",
+    "category": "JS 框架",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "q:container=\"(?:resumable|static)\"", "flags": "i" } },
+      { "source": "scriptSrc", "type": "regex", "value": { "__regexp__": true, "source": "qwik", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Lit",
+    "category": "JS 框架",
+    "matchers": [
+      { "source": "globals", "type": "equals", "value": "litElementVersions" },
+      { "source": "globals", "type": "equals", "value": "litHtmlVersions" }
+    ]
+  },
+  {
+    "name": "Preact",
+    "category": "JS 框架",
+    "matchers": [
+      { "source": "globals", "type": "equals", "value": "__PREACT_DEVTOOLS__" },
+      { "source": "scriptSrc", "type": "regex", "value": { "__regexp__": true, "source": "preact(?:\\.min)?\\.js|preact/hooks", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "htmx",
+    "category": "JS 库",
+    "matchers": [
+      { "source": "scriptSrc", "type": "regex", "value": { "__regexp__": true, "source": "htmx(?:\\.org|\\.min\\.js)", "flags": "i" } },
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "\\bhx-(?:get|post|trigger)=", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Stimulus",
+    "category": "JS 框架",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "data-controller=\"[a-z][a-z0-9_-]*\"", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Koa",
+    "category": "框架",
+    "matchers": [
+      { "source": "headers", "type": "regex", "value": { "__regexp__": true, "source": "x-powered-by: koa", "flags": "im" } }
+    ]
+  },
+  {
+    "name": "Egg.js",
+    "category": "框架",
+    "matchers": [
+      { "source": "headers", "type": "regex", "value": { "__regexp__": true, "source": "x-powered-by: egg|server: egg", "flags": "im" } }
+    ]
+  },
+  {
+    "name": "Beego",
+    "category": "框架",
+    "matchers": [
+      { "source": "headers", "type": "regex", "value": { "__regexp__": true, "source": "beego", "flags": "im" } }
+    ]
+  },
+  {
+    "name": "Symfony",
+    "category": "框架",
+    "matchers": [
+      { "source": "cookies", "type": "regex", "value": { "__regexp__": true, "source": "symfony", "flags": "i" } },
+      { "source": "headers", "type": "regex", "value": { "__regexp__": true, "source": "x-debug-token(?:-link)?", "flags": "im" } }
+    ]
+  },
+  {
+    "name": "Yii",
+    "category": "框架",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "name=\"_csrf-[a-z-]+\"", "flags": "i" } },
+      { "source": "headers", "type": "regex", "value": { "__regexp__": true, "source": "x-powered-by: yii", "flags": "im" } }
+    ]
+  },
+  {
+    "name": "CodeIgniter",
+    "category": "框架",
+    "matchers": [
+      { "source": "cookies", "type": "regex", "value": { "__regexp__": true, "source": "ci_session", "flags": "i" } },
+      { "source": "headers", "type": "regex", "value": { "__regexp__": true, "source": "x-powered-by: codeigniter", "flags": "im" } }
+    ]
+  },
+  {
+    "name": "Jenkins",
+    "category": "其他",
+    "matchers": [
+      { "source": "headers", "type": "regex", "value": { "__regexp__": true, "source": "x-jenkins(?:-session)?", "flags": "im" } },
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "Jenkins-Version|jenkins-artifact", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "GitLab",
+    "category": "其他",
+    "matchers": [
+      { "source": "cookies", "type": "regex", "value": { "__regexp__": true, "source": "_gitlab_session", "flags": "i" } },
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "gitlab", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Nacos",
+    "category": "其他",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "nacos", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Grafana",
+    "category": "其他",
+    "matchers": [
+      { "source": "cookies", "type": "regex", "value": { "__regexp__": true, "source": "grafana_session", "flags": "i" } },
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "grafana", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Kibana",
+    "category": "其他",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "kibana", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Harbor",
+    "category": "其他",
+    "matchers": [
+      { "source": "cookies", "type": "regex", "value": { "__regexp__": true, "source": "harbor", "flags": "i" } },
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "<harbor|harbor-app", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "XXL-JOB",
+    "category": "其他",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "xxl-job", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Druid Console",
+    "category": "其他",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "Druid Stat|apache druid|druid/index", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "Hugo",
+    "category": "构建工具",
+    "matchers": [
+      { "source": "meta", "type": "regex", "value": { "__regexp__": true, "source": "generator.*hugo", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "VitePress",
+    "category": "构建工具",
+    "matchers": [
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "vitepress", "flags": "i" } },
+      { "source": "scriptSrc", "type": "regex", "value": { "__regexp__": true, "source": "vitepress", "flags": "i" } }
+    ]
+  },
+  {
+    "name": "docsify",
+    "category": "构建工具",
+    "matchers": [
+      { "source": "scriptSrc", "type": "regex", "value": { "__regexp__": true, "source": "docsify", "flags": "i" } },
+      { "source": "body", "type": "regex", "value": { "__regexp__": true, "source": "window\\.(?:\\$docsify|docsify)", "flags": "i" } }
     ]
   }
 ]

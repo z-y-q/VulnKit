@@ -7,6 +7,8 @@ import {
   dbLabel,
   SQLI_ERROR_PAYLOADS,
   SQLI_SORT_FNS,
+  buildBooleanBlindPair,
+  analyzeBooleanBlind,
   type SqlDb,
   type SqliFinding,
 } from '@/lib/scanners/sqli-engine';
@@ -224,6 +226,48 @@ describe('sqli-engine', () => {
     it('param 字母序', () => {
       const sorted = [...findings].sort(SQLI_SORT_FNS.param);
       expect(sorted[0].param).toBe('a');
+    });
+  });
+
+  describe('buildBooleanBlindPair', () => {
+    it('纯数字参数走数字型变体', () => {
+      const p = buildBooleanBlindPair('42');
+      expect(p.truthy).toBe('42 AND 1=1');
+      expect(p.falsy).toBe('42 AND 1=2');
+    });
+    it('字符串参数走引号闭合变体', () => {
+      const p = buildBooleanBlindPair('news');
+      expect(p.truthy).toBe("news' AND '1'='1");
+      expect(p.falsy).toBe("news' AND '1'='2");
+    });
+    it('空值按字符串型处理', () => {
+      const p = buildBooleanBlindPair('');
+      expect(p.truthy).toBe("' AND '1'='1");
+    });
+  });
+
+  describe('analyzeBooleanBlind', () => {
+    it('恒真/恒假长度差显著 → 疑似', () => {
+      const r = analyzeBooleanBlind(5000, 5200, 4620);
+      expect(r.suspected).toBe(true);
+      expect(r.lengthDiff).toBe(580);
+    });
+    it('长度差在动态渲染抖动范围内 → 不报', () => {
+      const r = analyzeBooleanBlind(5000, 5020, 4990);
+      expect(r.suspected).toBe(false);
+    });
+    it('长度差占比过小 → 不报', () => {
+      const r = analyzeBooleanBlind(30000, 30080, 30000);
+      expect(r.suspected).toBe(false);
+    });
+    it('空响应（探测失败）不误判', () => {
+      const r = analyzeBooleanBlind(0, 0, 0);
+      expect(r.suspected).toBe(false);
+    });
+    it('truthyBaselineDiff 记录恒真与基线的接近程度', () => {
+      const r = analyzeBooleanBlind(5000, 5005, 4600);
+      expect(r.truthyBaselineDiff).toBe(5);
+      expect(r.suspected).toBe(true);
     });
   });
 });

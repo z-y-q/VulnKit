@@ -29,24 +29,33 @@
     sqlSeverityLabel,
     dbLabel,
     SQLI_SORT_FNS,
+    buildBooleanBlindPair,
+    analyzeBooleanBlind,
     type SqliFinding,
   } from '@/lib/scanners/sqli-engine';
 
   // ===== 注入点 =====
-  type ParamSource = 'url' | 'form';
+  type ParamSource = 'url' | 'form' | 'header';
   interface InjectPoint {
     id: string; // 去重键: source|url|param|method
     source: ParamSource;
     url: string;
     param: string;
     method: 'GET' | 'POST';
+    /** URL 参数的原始值（布尔盲注构造恒真/恒假变体用） */
+    originalValue?: string;
   }
+
+  /** HTTP 头注入点：日志型注入（Referer/XFF 入库回显）的高频入口 */
+  const HEADER_INJECT_POINTS = ['Referer', 'X-Forwarded-For', 'User-Agent'] as const;
 
   // ===== 状态 =====
   let targetUrl = $state('');
   let findings = $state<SqliFinding[]>([]);
   let pointCount = $state(0);
   let query = $state<ResultQuery>({ search: '', filters: {}, sort: { key: 'severity', direction: 'asc' } });
+  // 布尔盲注（恒真/恒假响应差异对比）：请求为正常语义变体，风险与普通访问相当
+  let useBooleanBlind = $state(true);
 
   const adapter: ResultAdapter<SqliFinding> = {
     apply(items, q) {
@@ -90,10 +99,15 @@
     const pts: InjectPoint[] = [];
     const baseUrl = base.origin + base.pathname;
 
-    // 1. URL query params (GET)
-    base.searchParams.forEach((_, k) => {
-      pts.push({ id: `url|${baseUrl}|${k}|GET`, source: 'url', url: baseUrl, param: k, method: 'GET' });
+    // 1. URL query params (GET)——记录原始值供布尔盲注使用
+    base.searchParams.forEach((v, k) => {
+      pts.push({ id: `url|${baseUrl}|${k}|GET`, source: 'url', url: baseUrl, param: k, method: 'GET', originalValue: v });
     });
+
+    // 1.5 HTTP 头注入点（GET，头值带 payload，URL 不变）
+    for (const h of HEADER_INJECT_POINTS) {
+      pts.push({ id: `header|${baseUrl}|${h}|GET`, source: 'header', url: baseUrl, param: h, method: 'GET' });
+    }
 
     // 2. 表单字段（execInTab 注入；仅当当前 tab 同源时，避免跨站注入）
     const tab = await getActiveTab();
@@ -145,34 +159,49 @@
   }
 
   // ===== 探测 =====
-  async function fetchBody(pt: InjectPoint, value: string): Promise<string> {
+  interface ProbeOutcome {
+    body: string;
+    status: number;
+  }
+
+  /** 统一探测：url/form 点改参数值，header 点改请求头值 */
+  async function probePointValue(pt: InjectPoint, value: string): Promise<ProbeOutcome> {
     let url = pt.url;
     let body: string | undefined;
-    if (pt.method === 'POST') {
+    let headers: Record<string, string> | undefined;
+    if (pt.source === 'header') {
+      headers = { [pt.param]: value };
+    } else if (pt.method === 'POST') {
       body = `${encodeURIComponent(pt.param)}=${encodeURIComponent(value)}`;
+      headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     } else {
       try {
         const u = new URL(pt.url);
         u.searchParams.set(pt.param, value);
         url = u.href;
       } catch {
-        return '';
+        return { body: '', status: 0 };
       }
     }
     try {
       const res = await sendMessage({
         type: 'FETCH_PROBE',
         url,
-        method: pt.method,
+        method: pt.method === 'POST' ? 'POST' : 'GET',
         body,
-        headers: pt.method === 'POST' ? { 'Content-Type': 'application/x-www-form-urlencoded' } : undefined,
+        headers,
         includeBody: true,
         timeout: $scanSettingsStore.requestTimeoutMs,
       });
-      return (res as ProbeResult).body ?? '';
+      const r = res as ProbeResult;
+      return { body: r.body ?? '', status: r.status ?? 0 };
     } catch {
-      return '';
+      return { body: '', status: 0 };
     }
+  }
+
+  async function fetchBody(pt: InjectPoint, value: string): Promise<string> {
+    return (await probePointValue(pt, value)).body;
   }
 
   async function probePoint(pt: InjectPoint, payload: string, baseline: string): Promise<SqliFinding | null> {
@@ -256,13 +285,56 @@
         );
 
         const sorted = collected.sort(SQLI_SORT_FNS.severity);
-        findings = sorted;
+
+        // Phase 3：布尔盲注（仅 URL 参数点，需原始值构造恒真/恒假变体）
+        if (useBooleanBlind && !ctx.signal.aborted) {
+          const blindPoints = points.filter((p) => p.source === 'url' && p.originalValue !== undefined);
+          if (blindPoints.length > 0) {
+            ctx.reportProgress({ phase: '布尔盲注探测', total: blindPoints.length, completed: 0 });
+            let p3 = 0;
+            const blindFindings: SqliFinding[] = [];
+            await runConcurrent(
+              blindPoints,
+              async (pt) => {
+                if (ctx.signal.aborted) return;
+                const pair = buildBooleanBlindPair(pt.originalValue!);
+                const [truthyRes, falsyRes] = await Promise.all([
+                  probePointValue(pt, pair.truthy),
+                  probePointValue(pt, pair.falsy),
+                ]);
+                // 两个响应都拿到且均为 200 才参与对比（错误页走报错注入通道）
+                if (truthyRes.body && falsyRes.body && truthyRes.status === 200 && falsyRes.status === 200) {
+                  const baseline = baselines.get(pt.id) ?? '';
+                  const r = analyzeBooleanBlind(baseline.length, truthyRes.body.length, falsyRes.body.length);
+                  if (r.suspected) {
+                    blindFindings.push({
+                      param: pt.param,
+                      payload: `${pair.truthy}  /  ${pair.falsy}`,
+                      db: 'unknown',
+                      evidence: `布尔盲注（${pair.desc}）：恒真 ${truthyRes.body.length}B / 恒假 ${falsyRes.body.length}B，长度差 ${r.lengthDiff}B（占比 ${(r.ratio * 100).toFixed(1)}%）`,
+                      url: pt.url,
+                      method: pt.method,
+                      source: pt.source,
+                      severity: 'medium',
+                    });
+                  }
+                }
+                p3++;
+                ctx.reportProgress({ completed: p3 });
+              },
+              { concurrency: $scanSettingsStore.concurrency, cancelled: () => ctx.signal.aborted },
+            );
+            collected.push(...blindFindings);
+          }
+        }
+
+        findings = collected.sort(SQLI_SORT_FNS.severity);
         try {
-          await scanHistoryStore.addScan({ url: input.url, module: 'sqliscan', findings: mapToFindings(sorted) });
+          await scanHistoryStore.addScan({ url: input.url, module: 'sqliscan', findings: mapToFindings(findings) });
         } catch {
           /* store failure must not break scan */
         }
-        return sorted;
+        return findings;
       },
     },
     { centerPanel: 'sqliscan', centerLabel: 'SQLi 检测' },
@@ -334,7 +406,7 @@
     return [
       { label: '参数', value: i.param, mono: true },
       { label: '方法', value: i.method },
-      { label: '来源', value: i.source === 'form' ? '表单' : 'URL 参数' },
+      { label: '来源', value: i.source === 'form' ? '表单' : i.source === 'header' ? '请求头' : 'URL 参数' },
       { label: '数据库', value: dbLabel(i.db) },
       { label: 'URL', value: i.url, mono: true },
       { label: 'Payload', value: i.payload, mono: true },
@@ -358,8 +430,12 @@
         <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
-    <div class="text-xs text-gray-500">
-      报错注入：URL 参数 + 表单字段 × {SQLI_ERROR_PAYLOADS.length} payload，基线对比防误报
+    <div class="flex items-center gap-2 flex-wrap text-xs text-gray-500">
+      <span>报错注入 + 布尔盲注：URL 参数/HTTP 头/表单字段 × {SQLI_ERROR_PAYLOADS.length} payload，基线对比防误报</span>
+      <label class="flex items-center gap-1 cursor-pointer" title="恒真/恒假响应差异对比，请求为正常语义变体">
+        <input type="checkbox" class="checkbox checkbox-xs" bind:checked={useBooleanBlind} />
+        布尔盲注
+      </label>
     </div>
     <ScanProgress scanned={cs.completed} total={cs.total ?? 0} scanning={scanning} phase={cs.phase} label="SQLi 探测" />
   </div>
@@ -404,7 +480,7 @@
         >
           <div class="flex items-center gap-2 flex-wrap">
             <SeverityBadge severity={f.severity} />
-            <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{f.source === 'form' ? '表单' : 'URL'}</span>
+            <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{f.source === 'form' ? '表单' : f.source === 'header' ? '请求头' : 'URL'}</span>
             <span class="text-xs font-mono text-gray-700 dark:text-gray-300">{f.param}</span>
             <span class="badge text-xs bg-gray-200 dark:bg-gray-700">{f.method}</span>
             <span class="badge text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">{dbLabel(f.db)}</span>

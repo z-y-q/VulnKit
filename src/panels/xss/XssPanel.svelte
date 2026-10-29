@@ -43,24 +43,28 @@
   } from '@/lib/scanners/xss-engine';
 
   // ===== 注入点（结构化，带来源/URL/method）=====
-  type ParamSource = 'url' | 'link' | 'form' | 'ajax';
+  type ParamSource = 'url' | 'link' | 'form' | 'ajax' | 'header';
   interface InjectPoint {
     id: string;          // 去重键: source|url|param|method
     source: ParamSource;
     url: string;         // 该注入点的基础 URL
-    param: string;
+    param: string;       // header 来源时为请求头名
     method: 'GET' | 'POST';
     selected: boolean;
   }
 
+  /** HTTP 头注入点：日志型存储 XSS（Referer/XFF 入库回显）的高频入口 */
+  const HEADER_INJECT_POINTS = ['Referer', 'X-Forwarded-For', 'User-Agent'] as const;
+
   const SOURCE_LABEL: Record<ParamSource, string> = {
-    url: 'URL', link: '链接', form: '表单', ajax: 'AJAX',
+    url: 'URL', link: '链接', form: '表单', ajax: 'AJAX', header: '请求头',
   };
   const SOURCE_CLASS: Record<ParamSource, string> = {
     url: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
     link: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
     form: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
     ajax: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+    header: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
   };
 
   // ===== 状态 =====
@@ -266,6 +270,10 @@
       for (const param of urlQueryParams(targetUrl)) {
         add({ id: makeId('url', baseUrl, param, 'GET'), source: 'url', url: baseUrl, param, method: 'GET', selected: true });
       }
+      // 1.5) HTTP 头注入点（GET，头值带探针，URL 不变）
+      for (const h of HEADER_INJECT_POINTS) {
+        add({ id: makeId('header', baseUrl, h, 'GET'), source: 'header', url: baseUrl, param: h, method: 'GET', selected: true });
+      }
     }
     // 2) DOM 收割
     if (useHarvest) for (const p of await harvestDomPoints()) add(p);
@@ -442,8 +450,13 @@
       const enc = encodePayload(payload, encoding);
       let probeUrl = point.url;
       let postBody: string | undefined;
-      if (point.method === 'POST') {
+      let probeHeaders: Record<string, string> | undefined;
+      if (point.source === 'header') {
+        // 头注入：探针放请求头，URL 不变
+        probeHeaders = { [point.param]: enc };
+      } else if (point.method === 'POST') {
         postBody = `${encodeURIComponent(point.param)}=${encodeURIComponent(enc)}`;
+        probeHeaders = { 'Content-Type': 'application/x-www-form-urlencoded' };
       } else {
         probeUrl = buildTestUrl(point.url, point.param, enc);
         if (!probeUrl) return null;
@@ -453,7 +466,7 @@
         url: probeUrl,
         method: point.method,
         body: postBody,
-        headers: point.method === 'POST' ? { 'Content-Type': 'application/x-www-form-urlencoded' } : undefined,
+        headers: probeHeaders,
         includeBody: true,
         timeout: $scanSettingsStore.requestTimeoutMs,
       });
@@ -491,8 +504,12 @@
     try {
       let probeUrl = point.url;
       let body: string | undefined;
-      if (point.method === 'POST') {
+      let probeHeaders: Record<string, string> | undefined;
+      if (point.source === 'header') {
+        probeHeaders = { [point.param]: REFLECTION_PROBE };
+      } else if (point.method === 'POST') {
         body = `${encodeURIComponent(point.param)}=${encodeURIComponent(REFLECTION_PROBE)}`;
+        probeHeaders = { 'Content-Type': 'application/x-www-form-urlencoded' };
       } else {
         const u = new URL(point.url);
         u.searchParams.set(point.param, REFLECTION_PROBE);
@@ -503,7 +520,7 @@
         url: probeUrl,
         method: point.method,
         body,
-        headers: point.method === 'POST' ? { 'Content-Type': 'application/x-www-form-urlencoded' } : undefined,
+        headers: probeHeaders,
         includeBody: true,
         timeout: $scanSettingsStore.requestTimeoutMs,
       });

@@ -183,6 +183,64 @@ export function dbLabel(db: SqlDb): string {
   return DB_LABELS[db] ?? db;
 }
 
+// ====== 布尔盲注 ======
+
+/**
+ * 布尔盲注 payload 对 —— 基于原始参数值构造恒真/恒假变体。
+ * 只追加到原值之后，保持请求语义正常（风险与普通访问相当）。
+ */
+export interface BooleanBlindPair {
+  truthy: string;
+  falsy: string;
+  desc: string;
+}
+
+export function buildBooleanBlindPair(originalValue: string): BooleanBlindPair {
+  if (/^\d+$/.test(originalValue)) {
+    return {
+      truthy: `${originalValue} AND 1=1`,
+      falsy: `${originalValue} AND 1=2`,
+      desc: '数字型布尔盲注',
+    };
+  }
+  return {
+    truthy: `${originalValue}' AND '1'='1`,
+    falsy: `${originalValue}' AND '1'='2`,
+    desc: '字符型布尔盲注',
+  };
+}
+
+export interface BooleanBlindAssessment {
+  suspected: boolean;
+  /** 恒真/恒假响应长度差（字节） */
+  lengthDiff: number;
+  /** 长度差相对较大响应的占比 */
+  ratio: number;
+  /** 原始值响应与恒真响应的长度差（越小说明恒真回到正常语义） */
+  truthyBaselineDiff: number;
+}
+
+/**
+ * 布尔盲注判定 —— 恒真与恒假响应长度差异显著、且恒真响应接近基线时疑似注入。
+ * 阈值：长度差 ≥ minDiff 且占比 ≥ minRatio（动态页面每次渲染有几十字节抖动，双阈值过滤）。
+ * 纯函数，无副作用。
+ */
+export function analyzeBooleanBlind(
+  baselineLen: number,
+  truthyLen: number,
+  falsyLen: number,
+  opts?: { minDiff?: number; minRatio?: number },
+): BooleanBlindAssessment {
+  const minDiff = opts?.minDiff ?? 60;
+  const minRatio = opts?.minRatio ?? 0.05;
+  const lengthDiff = Math.abs(truthyLen - falsyLen);
+  const maxLen = Math.max(truthyLen, falsyLen, 1);
+  const ratio = lengthDiff / maxLen;
+  const truthyBaselineDiff = Math.abs(truthyLen - baselineLen);
+  const suspected = lengthDiff >= minDiff && ratio >= minRatio;
+  return { suspected, lengthDiff, ratio, truthyBaselineDiff };
+}
+
 // ====== 排序 ======
 
 export const SQLI_SORT_FNS: Record<string, (a: SqliFinding, b: SqliFinding) => number> = {
