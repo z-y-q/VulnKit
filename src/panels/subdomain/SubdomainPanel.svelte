@@ -5,6 +5,8 @@
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore, autoRunStore } from '@/stores/ui';
+  import { confirmStore } from '@/stores/confirm';
+
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
   import { runConcurrent } from '@/lib/core/concurrency';
@@ -217,6 +219,13 @@
   let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
 
   async function handleScan() {
+    const confirmed = await confirmStore.ask({
+      title: '子域名枚举',
+      message: '子域名枚举将调用外部测绘接口查询目标域名，请确认目标在授权范围内。',
+      confirmLabel: '开始扫描',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     const r = await controller.start({ url: targetUrl });
     if (r.status === 'succeeded') {
       const aliveCount = results.filter(r => r.status === 'alive').length;

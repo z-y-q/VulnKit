@@ -6,7 +6,9 @@
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
-  import { toastStore } from '@/stores/ui';
+  import { toastStore, autoRunStore } from '@/stores/ui';
+  import { confirmStore } from '@/stores/confirm';
+
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
   import { analysisContextStore } from '@/stores/analysis-context';
@@ -91,6 +93,16 @@
 
   $effect(() => {
     getActiveTabUrl().then(u => { if (u) targetUrl = u; });
+  });
+
+  // 一键操作（右键菜单 / Popup）：命中本面板则自动填充并扫描
+  $effect(() => {
+    const sig = $autoRunStore;
+    if (sig && sig.panel === 'fuzz') {
+      autoRunStore.clear();
+      if (sig.url) targetUrl = sig.url;
+      handleScan();
+    }
   });
 
   // 消费跨面板 handoff（paths 来自 Wayback；targetUrl 由 UrlInput 统一回填）
@@ -192,6 +204,13 @@
   }
 
   async function handleScan() {
+    const confirmed = await confirmStore.ask({
+      title: '目录扫描',
+      message: '目录扫描将向目标发送批量路径探测请求，请确认目标在授权范围内。',
+      confirmLabel: '开始扫描',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const r = await controller.start({ targetUrl, wordlistKey, customPaths });
       if (r.status === 'succeeded') {

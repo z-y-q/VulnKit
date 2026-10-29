@@ -7,8 +7,8 @@
   <img alt="wxt" src="https://img.shields.io/badge/WXT-0.20-purple">
   <img alt="svelte" src="https://img.shields.io/badge/Svelte-5-ff3e00">
   <img alt="ts" src="https://img.shields.io/badge/TypeScript-5.9-3178c6">
-  <img alt="tests" src="https://img.shields.io/badge/tests-821-brightgreen">
-  <img alt="ci" src="https://github.com/z-y-q/VulnKit/actions/workflows/ci.yml/badge.svg?branch=v7">
+  <img alt="tests" src="https://img.shields.io/badge/tests-904-brightgreen">
+  <img alt="ci" src="https://github.com/z-y-q/VulnKit/actions/workflows/ci.yml/badge.svg?branch=main">
 </p>
 
 ---
@@ -37,7 +37,7 @@
 - **🔬 框架级页面感知** — Vue / React / Angular / Svelte / RuoYi 路由遍历 + 状态树探测，MAIN world 注入直达框架运行时
 - **🧪 主动验证引擎** — XSS 两阶段验证（反射过滤 + Payload 矩阵 + 净化检测 + 上下文分级）+ SQLi 报错注入（基线对比防误报、识别 DB 类型），不止“发现可疑”，自动“证明可利用”
 - **🇨🇳 国产生态** — SM2/SM4 国密算法、RuoYi（若依）后台框架专项检测、内置 SRC 脱敏规则
-- **🏗️ 现代工程栈** — WXT + Svelte 5 runes + TypeScript，821 个单测 + 覆盖率门禁 + CI + ESLint + 任务状态机 + 并发池
+- **🏗️ 现代工程栈** — WXT + Svelte 5 runes + TypeScript，904 个单测 + 覆盖率门禁 + CI + ESLint + 任务状态机 + 并发池
 - **🛡️ MV3 合规** — `declarativeNetRequest`（非已弃用的 webRequest），改 UA / 请求头 / 阻断 JS
 - **🔒 默认安全** — 全量抓取走 background 代理 + `url-guard` SSRF 防护 + `sender-guard` 来源校验；无 `{@html}`，文本自动转义。详见 [权限矩阵](docs/权限矩阵.md)
 - **⏸️ 可取消的批量任务** — 并发池（`runConcurrent`）+ 任务状态机（`TaskController`），支持限流 / 暂停 / 取消，符合“控制测试强度”的合规底线

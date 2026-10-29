@@ -7,6 +7,8 @@
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore, autoRunStore } from '@/stores/ui';
+  import { confirmStore } from '@/stores/confirm';
+
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
   import { runConcurrent } from '@/lib/core/concurrency';
@@ -138,6 +140,13 @@
   let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
 
   async function handleScan() {
+    const confirmed = await confirmStore.ask({
+      title: 'CORS 检测',
+      message: 'CORS 检测将向目标发送跨源探测请求，请确认目标在授权范围内。',
+      confirmLabel: '开始扫描',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     const r = await controller.start({ url: targetUrl });
     if (r.status === 'succeeded') {
       if (vulnCount > 0) {

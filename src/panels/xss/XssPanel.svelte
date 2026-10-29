@@ -5,7 +5,8 @@
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
-  import { toastStore } from '@/stores/ui';
+  import { toastStore, autoRunStore } from '@/stores/ui';
+  import { confirmStore } from '@/stores/confirm';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanSettingsStore } from '@/stores/settings';
   import { runConcurrent } from '@/lib/core/concurrency';
@@ -639,11 +640,28 @@
   $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
   let archiving = $derived(cs.status === 'running' || cs.status === 'validating' || cs.status === 'paused');
 
+  // 一键操作（右键菜单 / Popup）：命中本面板则自动填充并扫描
+  $effect(() => {
+    const sig = $autoRunStore;
+    if (sig && sig.panel === 'xssscan') {
+      autoRunStore.clear();
+      if (sig.url) targetUrl = sig.url;
+      handleScan();
+    }
+  });
+
   async function handleScan() {
     if (points.length > 0 && points.filter((p) => p.selected).length === 0) {
       toastStore.show('请至少勾选一个注入点', 'warning');
       return;
     }
+    const confirmed = await confirmStore.ask({
+      title: 'XSS 检测',
+      message: 'XSS 扫描将向目标发送注入探针与 payload 矩阵，请确认目标在授权范围内。',
+      confirmLabel: '开始检测',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     findings = [];
     try {
       const r = await controller.start({ targetUrl, useCustom, customPayload });
@@ -791,7 +809,7 @@
             Object.defineProperty(w.Element.prototype, prop, {
               configurable: true,
               get: d.get,
-              set: function (this: any, v: string) { rec(prop, v); return d.set!.call(this, v); },
+              set: function (this: any, v: string) { rec(prop, v); d.set!.call(this, v); },
             });
           }
         });

@@ -4,7 +4,9 @@
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
-  import { toastStore } from '@/stores/ui';
+  import { toastStore, autoRunStore } from '@/stores/ui';
+  import { confirmStore } from '@/stores/confirm';
+
   import type { ProbeResult } from '@/lib/types/messaging';
   import {
     COMMON_GRAPHQL_PATHS,
@@ -48,6 +50,16 @@
     getActiveTabUrl().then(u => {
       if (u) targetUrl = u;
     });
+  });
+
+  // 一键操作（右键菜单 / Popup）：命中本面板则自动填充并扫描
+  $effect(() => {
+    const sig = $autoRunStore;
+    if (sig && sig.panel === 'graphql') {
+      autoRunStore.clear();
+      if (sig.url) targetUrl = sig.url;
+      handleScan();
+    }
   });
 
   // ===== 派生：结果（统一 ResultAdapter，供 ResultToolbar/ExportMenu 消费）=====
@@ -227,6 +239,13 @@
   let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
 
   async function handleScan() {
+    const confirmed = await confirmStore.ask({
+      title: 'GraphQL 检测',
+      message: 'GraphQL 检测将向目标发送内省与探测请求，请确认目标在授权范围内。',
+      confirmLabel: '开始扫描',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     const r = await controller.start({ url: targetUrl, customPath });
     if (r.status === 'succeeded') {
       if (vulnCount > 0) {

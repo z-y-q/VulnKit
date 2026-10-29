@@ -24,6 +24,11 @@ const MENUS: MenuSpec[] = [
   { id: 'vulnkit-waf-scan', parentId: PAGE_PARENT, title: 'WAF 指纹', contexts: ['page'] },
   { id: 'vulnkit-headers-scan', parentId: PAGE_PARENT, title: '安全头分析', contexts: ['page'] },
   { id: 'vulnkit-subdomain-scan', parentId: PAGE_PARENT, title: '子域名收集', contexts: ['page'] },
+  { id: 'vulnkit-sqli-scan', parentId: PAGE_PARENT, title: 'SQL 注入检测', contexts: ['page'] },
+  { id: 'vulnkit-xss-scan', parentId: PAGE_PARENT, title: 'XSS 检测', contexts: ['page'] },
+  { id: 'vulnkit-fuzz-scan', parentId: PAGE_PARENT, title: '目录扫描', contexts: ['page'] },
+  { id: 'vulnkit-graphql-scan', parentId: PAGE_PARENT, title: 'GraphQL 检测', contexts: ['page'] },
+  { id: 'vulnkit-leakscan', parentId: PAGE_PARENT, title: '敏感信息扫描', contexts: ['page'] },
   // 选区上下文
   { id: SELECTION_PARENT, title: '灵眸', contexts: ['selection'] },
   { id: 'vulnkit-encode', parentId: SELECTION_PARENT, title: 'URL 编码', contexts: ['selection'] },
@@ -109,6 +114,11 @@ const SCAN_MODULE_MAP: Record<string, string> = {
   'vulnkit-waf-scan': 'waf',
   'vulnkit-headers-scan': 'headers',
   'vulnkit-subdomain-scan': 'subdomain',
+  'vulnkit-sqli-scan': 'sqliscan',
+  'vulnkit-xss-scan': 'xssscan',
+  'vulnkit-fuzz-scan': 'fuzz',
+  'vulnkit-graphql-scan': 'graphql',
+  'vulnkit-leakscan': 'leakscan',
 };
 
 const LINK_MODULE_MAP: Record<string, string> = {

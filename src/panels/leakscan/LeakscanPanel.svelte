@@ -3,7 +3,10 @@
   // 采集当前页 DOM + localStorage + sessionStorage + 全局变量，用 90 条泄露规则引擎扫描。
   import { sendToContent, sendMessage } from '@/lib/core/messaging';
   import { getActiveTab, getActiveTabUrl, execInTab } from '@/lib/core/tabs';
-  import { toastStore } from '@/stores/ui';
+  import { toastStore, autoRunStore } from '@/stores/ui';
+  import { confirmStore } from '@/stores/confirm';
+  import { scanSettingsStore } from '@/stores/settings';
+
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
   import { scanLeaks, severityRank, type LeakFinding, type LeakSeverity } from '@/lib/scanners/leak-scanner';
   import UrlInput from '@/components/scanner/UrlInput.svelte';
@@ -21,6 +24,16 @@
 
   $effect(() => {
     getActiveTabUrl().then(u => { if (u) targetUrl = u; });
+  });
+
+  // 一键操作（右键菜单 / Popup）：命中本面板则自动填充并扫描
+  $effect(() => {
+    const sig = $autoRunStore;
+    if (sig && sig.panel === 'leakscan') {
+      autoRunStore.clear();
+      if (sig.url) targetUrl = sig.url;
+      handleScan();
+    }
   });
 
   let sevCounts = $derived.by(() => {
@@ -74,7 +87,7 @@
       });
       if (scriptUrls && scriptUrls.length) {
         const results = await Promise.allSettled(
-          scriptUrls.slice(0, 15).map(u => sendMessage({ type: 'FETCH_URL', url: u, tailOnly: true })),
+          scriptUrls.slice(0, 15).map(u => sendMessage({ type: 'FETCH_URL', url: u, tailOnly: true, timeout: $scanSettingsStore.requestTimeoutMs })),
         );
         for (const r of results) {
           if (r.status === 'fulfilled') {
@@ -114,6 +127,13 @@
   let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
 
   async function handleScan() {
+    const confirmed = await confirmStore.ask({
+      title: '敏感信息扫描',
+      message: '深度扫描将抓取页面与 JS 资产并匹配敏感信息规则，请确认目标在授权范围内。',
+      confirmLabel: '开始扫描',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     const r = await controller.start({ url: targetUrl });
     if (r.status === 'succeeded') {
       if (findings.length > 0) {

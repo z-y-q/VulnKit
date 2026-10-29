@@ -4,10 +4,12 @@
   import { sendMessage } from '@/lib/core/messaging';
   import { getActiveTabUrl } from '@/lib/core/tabs';
   import { toastStore, autoRunStore } from '@/stores/ui';
+  import { confirmStore } from '@/stores/confirm';
+  import { scanSettingsStore } from '@/stores/settings';
+  import UrlInput from '@/components/scanner/UrlInput.svelte';
   import type { ProbeResult } from '@/lib/types/messaging';
   import { analyzeResponse, type WafDetection } from '@/lib/scanners/waf-engine';
   import { scanHistoryStore, type ScanFinding } from '@/stores/scan-history';
-  import { confirmStore } from '@/stores/confirm';
   import ExportMenu from '@/components/results/ExportMenu.svelte';
   import ErrorState from '@/components/feedback/ErrorState.svelte';
   import { createTaskController, IDLE, type TaskState } from '@/lib/tasks/task-controller';
@@ -134,15 +136,7 @@
 
   // —— 扫描流程 ——（签名匹配核心在 lib/scanners/waf-engine.ts，模块级预编译）
 
-  // —— 扫描流程 ——
-
-  /** 自动填充当前页 URL */
-  async function autoFill() {
-    const url = await getActiveTabUrl();
-    if (url) targetUrl = url;
-  }
-
-  /** 发起一次探测请求 */
+  /** 发起一次探测请求（超时走统一扫描设置） */
   async function fetchProbe(url: string): Promise<ProbeResult | null> {
     try {
       const r = await sendMessage({
@@ -150,7 +144,7 @@
         url,
         method: 'GET',
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-        timeout: 8000,
+        timeout: $scanSettingsStore.requestTimeoutMs,
       });
       if ((r as any).error) return null;
       return r as ProbeResult;
@@ -226,25 +220,13 @@
 </script>
 
 <div class="space-y-3">
-  <!-- URL 输入 -->
+  <!-- URL 输入（统一 UrlInput：校验 / 目标记录 / Enter 提交） -->
   <div class="card p-3 space-y-2">
     <div class="flex gap-1">
-      <input
-        class="input text-xs font-mono flex-1"
-        placeholder="https://target.example.com"
-        bind:value={targetUrl}
-      />
-      <button class="btn btn-sm btn-ghost text-xs" onclick={autoFill}>自动填充</button>
-    </div>
-
-    <div class="flex gap-1">
-      <button
-        class="btn btn-sm {archiving ? 'btn-danger' : 'btn-primary'} flex-1"
-        disabled={!archiving && !targetUrl.trim()}
-        onclick={handleScan}
-      >
-        {archiving ? '停止扫描' : 'WAF 指纹检测'}
-      </button>
+      <UrlInput bind:value={targetUrl} scanning={archiving} buttonText="WAF 指纹检测" onscan={handleScan} recordTarget />
+      {#if archiving}
+        <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
+      {/if}
     </div>
 
     {#if archiving}
