@@ -299,13 +299,13 @@
               async (pt) => {
                 if (ctx.signal.aborted) return;
                 const pair = buildBooleanBlindPair(pt.originalValue!);
-                // 基线用「原始值响应」而非空值响应：恒真/恒假变体基于原值构造，
-                // 空值基线在正常站点可能就是另一个页面，长度参照会失真
-                const [originalRes, truthyRes, falsyRes] = await Promise.all([
-                  probePointValue(pt, pt.originalValue!),
-                  probePointValue(pt, pair.truthy),
-                  probePointValue(pt, pair.falsy),
-                ]);
+                // 点内串行：runConcurrent 限的是并发「点」数，点内并行会把
+                // 实际请求并发放大 3 倍，绕过用户配置的测试强度
+                const originalRes = await probePointValue(pt, pt.originalValue!);
+                if (ctx.signal.aborted) return;
+                const truthyRes = await probePointValue(pt, pair.truthy);
+                if (ctx.signal.aborted) return;
+                const falsyRes = await probePointValue(pt, pair.falsy);
                 // 三个响应都拿到且均为 200 才参与对比（错误页走报错注入通道）
                 if (
                   originalRes.body && truthyRes.body && falsyRes.body &&
