@@ -100,6 +100,10 @@
   $effect(() => controller.state.subscribe((v: TaskState) => { cs = v; }));
   let archiving = $derived(cs.status === 'running' || cs.status === 'paused' || cs.status === 'validating');
 
+  $effect(() => {
+    getActiveTabUrl().then(u => { if (u) targetUrl = u; });
+  });
+
   /** 主扫描入口：先 confirm 再启动 controller */
   async function handleScan() {
     if (archiving) {

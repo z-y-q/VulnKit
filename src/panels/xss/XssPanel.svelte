@@ -845,7 +845,7 @@
     const tab = await getActiveTab();
     if (!tab?.id) { toastStore.show('无可用标签页', 'error'); return; }
     runtimeLoading = true;
-    const data = await execInTab<{ events: RuntimeSinkEvent[]; sources: string[] } | null>(tab.id, function () {
+    const data = await execInTab<{ installed: boolean; events: RuntimeSinkEvent[]; sources: string[] } | null>(tab.id, function () {
       const rt = (window as any).__vkJSSRuntime;
       const events = rt ? rt.events.slice() : [];
       const sources: string[] = [];
@@ -854,10 +854,17 @@
       } catch (e) { /* */ }
       if (location.hash && location.hash.length >= 4) sources.push(location.hash.slice(1));
       if (document.referrer && document.referrer.length >= 4) sources.push(document.referrer);
-      return { events: events, sources: sources };
+      return { installed: !!rt, events: events, sources: sources };
     }, { world: 'MAIN' });
     runtimeLoading = false;
-    if (!data) { toastStore.show('Hook 未安装，请先安装 Hook', 'warning'); return; }
+    if (!data) { toastStore.show('无法连接页面，请刷新后重试', 'error'); return; }
+    // 页面导航会销毁 MAIN world Hook：面板状态复位并提示重装
+    if (!data.installed) {
+      runtimeActive = false;
+      runtimeRows = [];
+      toastStore.show('Hook 未安装（页面刷新/跳转会销毁 Hook），请重新安装', 'warning');
+      return;
+    }
     runtimeRows = classifyRuntimeSinks(data.events || [], data.sources || []);
     const confirmed = runtimeRows.filter((r) => r.confirmed).length;
     toastStore.show(

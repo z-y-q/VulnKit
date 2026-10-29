@@ -299,20 +299,25 @@
               async (pt) => {
                 if (ctx.signal.aborted) return;
                 const pair = buildBooleanBlindPair(pt.originalValue!);
-                const [truthyRes, falsyRes] = await Promise.all([
+                // 基线用「原始值响应」而非空值响应：恒真/恒假变体基于原值构造，
+                // 空值基线在正常站点可能就是另一个页面，长度参照会失真
+                const [originalRes, truthyRes, falsyRes] = await Promise.all([
+                  probePointValue(pt, pt.originalValue!),
                   probePointValue(pt, pair.truthy),
                   probePointValue(pt, pair.falsy),
                 ]);
-                // 两个响应都拿到且均为 200 才参与对比（错误页走报错注入通道）
-                if (truthyRes.body && falsyRes.body && truthyRes.status === 200 && falsyRes.status === 200) {
-                  const baseline = baselines.get(pt.id) ?? '';
-                  const r = analyzeBooleanBlind(baseline.length, truthyRes.body.length, falsyRes.body.length);
+                // 三个响应都拿到且均为 200 才参与对比（错误页走报错注入通道）
+                if (
+                  originalRes.body && truthyRes.body && falsyRes.body &&
+                  originalRes.status === 200 && truthyRes.status === 200 && falsyRes.status === 200
+                ) {
+                  const r = analyzeBooleanBlind(originalRes.body.length, truthyRes.body.length, falsyRes.body.length);
                   if (r.suspected) {
                     blindFindings.push({
                       param: pt.param,
                       payload: `${pair.truthy}  /  ${pair.falsy}`,
                       db: 'unknown',
-                      evidence: `布尔盲注（${pair.desc}）：恒真 ${truthyRes.body.length}B / 恒假 ${falsyRes.body.length}B，长度差 ${r.lengthDiff}B（占比 ${(r.ratio * 100).toFixed(1)}%）`,
+                      evidence: `布尔盲注（${pair.desc}）：恒真 ${truthyRes.body.length}B / 恒假 ${falsyRes.body.length}B，长度差 ${r.lengthDiff}B（占比 ${(r.ratio * 100).toFixed(1)}%），原值基线 ${originalRes.body.length}B`,
                       url: pt.url,
                       method: pt.method,
                       source: pt.source,
