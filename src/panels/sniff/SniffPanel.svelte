@@ -120,9 +120,12 @@
         ctx.reportProgress({ phase: '扫描同源 JS/CSS 内容' });
         try {
           const origin = new URL(v.parsed.href).origin;
+          // getAttribute 取到的是相对路径（lib/xxx.js），必须转绝对——
+          // background service worker 的 fetch 会把相对路径解析到扩展 origin，全部静默失败
+          const abs = (s: string) => { try { return new URL(s, v.parsed.href).href; } catch { return ''; } };
           const sameOrigin = (s: string) => { try { return new URL(s, v.parsed.href).origin === origin; } catch { return false; } };
-          const jsUrls = [...new Set(scriptSrcs)].filter(sameOrigin).slice(0, 5);
-          const cssUrls = [...new Set(styleHrefs)].filter(sameOrigin).slice(0, 3);
+          const jsUrls = [...new Set(scriptSrcs)].filter(sameOrigin).map(abs).filter(Boolean).slice(0, 5);
+          const cssUrls = [...new Set(styleHrefs)].filter(sameOrigin).map(abs).filter(Boolean).slice(0, 3);
           const texts = await Promise.allSettled(
             [...jsUrls, ...cssUrls].map((u) => sendMessage({ type: 'FETCH_URL', url: u, maxBytes: 300000, timeout: $scanSettingsStore.requestTimeoutMs })),
           );
