@@ -124,7 +124,10 @@
   function analyzeFingerprint(
     fp: DomFingerprint,
     inspectResult: { globals?: string[]; versions?: Record<string, string> | string[]; cookies?: string[] } | null,
-    leakResult: { storage?: Record<string, string>; globals?: string[] } | null,
+    leakResult: {
+      storage?: { store: string; key: string; value: string | null }[];
+      globals?: { name: string; type: string; value: string }[] | string[];
+    } | null,
     patterns: typeof patternsData,
   ): { tech: Finding[]; resources: Finding[]; leaks: Finding[] } {
     const tech: Finding[] = [];
@@ -215,18 +218,24 @@
       }
     }
 
-    // 6. 泄露检测
+    // 6. 泄露检测（leak-scan 返回对象数组形状：storage=[{store,key,value}]，globals=[{name,type,value}]）
     if (leakResult) {
       // Storage 泄露
-      if (leakResult.storage) {
+      if (Array.isArray(leakResult.storage)) {
+        for (const s of leakResult.storage) {
+          add('leaks', `Storage ${s.store || ''}`, `${s.key}: ${truncate(String(s.value ?? ''))}`, 'yellow');
+        }
+      } else if (leakResult.storage && typeof leakResult.storage === 'object') {
+        // 兼容历史 Record<string,string> 形状
         for (const [key, val] of Object.entries(leakResult.storage)) {
-          add('leaks', 'Storage', `${key}: ${truncate(val)}`, 'yellow');
+          add('leaks', 'Storage', `${key}: ${truncate(String(val))}`, 'yellow');
         }
       }
       // 敏感全局变量
-      if (leakResult.globals) {
+      if (Array.isArray(leakResult.globals)) {
         for (const g of leakResult.globals) {
-          add('leaks', '敏感全局变量', truncate(g), 'yellow');
+          if (typeof g === 'string') { add('leaks', '敏感全局变量', g, 'yellow'); continue; }
+          add('leaks', '敏感全局变量', `${g.name}: ${g.value}`, 'yellow');
         }
       }
     }

@@ -16,12 +16,8 @@
     /* ignore */
   }
 
-  const guardKey = '__VK_PI_' + action;
-  if ((window as any)[guardKey]) {
-    postResult({ error: 'Already scanned for: ' + action });
-    return;
-  }
-  (window as any)[guardKey] = true;
+  // 不做一次性守卫：采集是只读操作，幂等可重入。守卫会让同页面第二次
+  // 采集直接返回 error，Gather/Sniff 面板静默丢失全局变量与泄露数据。
 
   function postResult(result: any) {
     try {
