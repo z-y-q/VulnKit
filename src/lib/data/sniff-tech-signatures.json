@@ -1200,6 +1200,15 @@
         "source": "globals",
         "type": "equals",
         "value": "Lodash (_)"
+      },
+      {
+        "source": "body",
+        "type": "regex",
+        "value": {
+          "__regexp__": true,
+          "source": "lodash[.@/]|__lodashHashUndefined__|Lodash v[0-9]",
+          "flags": "i"
+        }
       }
     ]
   },
@@ -1357,6 +1366,44 @@
         "source": "globals",
         "type": "equals",
         "value": "antd"
+      },
+      {
+        "source": "classNames",
+        "type": "regex",
+        "value": {
+          "__regexp__": true,
+          "source": "ant-(?:btn|form|input|layout|card|table|modal|menu|select|tabs)",
+          "flags": "i"
+        }
+      },
+      {
+        "source": "body",
+        "type": "regex",
+        "value": {
+          "__regexp__": true,
+          "source": "class=\"[^\"]*ant-(?:btn|form|input|layout|card|table|modal)",
+          "flags": "i"
+        }
+      }
+    ]
+  },
+  {
+    "name": "core-js",
+    "category": "JS 库",
+    "matchers": [
+      {
+        "source": "globals",
+        "type": "equals",
+        "value": "core-js"
+      },
+      {
+        "source": "body",
+        "type": "regex",
+        "value": {
+          "__regexp__": true,
+          "source": "core-js(?:@[0-9.]+)?|__core-js_shared__",
+          "flags": "i"
+        }
       }
     ]
   },

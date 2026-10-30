@@ -41,6 +41,8 @@
   let results = $state<SniffMatch[]>([]);
   let filter = $state('all');
   let expandedName = $state<string | null>(null);
+  // JS 内容扫描：SPA 的技术特征大多在同源 bundle 里（Wappalyzer 同款思路），默认开启
+  let useJsScan = $state(true);
 
   // 自动填充当前页 URL
   $effect(() => {
@@ -88,6 +90,7 @@
       let classNames: string[] = [];
       let ids: string[] = [];
       let versions: Record<string, string> = {};
+      let domHtml = '';
       const cookieMap: Record<string, string> = {};
       try {
         const fp = await sendToContent({ type: 'VK_PAGE_INSPECT', action: 'fingerprint' }) as any;
@@ -105,8 +108,31 @@
           }
           if (Array.isArray(fp.ids)) ids = fp.ids;
           else if (typeof fp.ids === 'string' && fp.ids) ids = fp.ids.split(',').map((s: string) => s.trim()).filter(Boolean);
+          if (typeof fp.domHtml === 'string') domHtml = fp.domHtml;
         }
       } catch { /* 非当前标签页或注入失败，降级为纯静态分析 */ }
+
+      // SPA 的响应 HTML 是空壳：运行时 DOM 与同源 JS 内容才是技术痕迹的主场
+      // （Wappalyzer 同款思路）。JS 内容扫描限同源前 5 个 bundle、单个 300KB。
+      if (useJsScan && scriptSrcs.length > 0) {
+        ctx.reportProgress({ phase: '扫描同源 JS 内容' });
+        try {
+          const origin = new URL(v.parsed.href).origin;
+          const jsUrls = [...new Set(scriptSrcs)]
+            .filter((s) => { try { return new URL(s, v.parsed.href).origin === origin; } catch { return false; } })
+            .slice(0, 5);
+          const texts = await Promise.allSettled(
+            jsUrls.map((u) => sendMessage({ type: 'FETCH_URL', url: u, maxBytes: 300000, timeout: $scanSettingsStore.requestTimeoutMs })),
+          );
+          for (const r of texts) {
+            if (r.status === 'fulfilled') {
+              const res = r.value as any;
+              if (res && res.success && typeof res.data === 'string') html += '\n' + res.data;
+            }
+          }
+        } catch { /* JS 内容扫描失败不阻断主流程 */ }
+      }
+      if (domHtml) html += '\n' + domHtml;
 
       ctx.reportProgress({ phase: '匹配规则' });
       const sniffInput: SniffInput = { html, headers, scriptSrcs, cookies: cookieMap, meta, globals, classNames, ids, versions };
@@ -266,6 +292,10 @@
         <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
+    <label class="text-xs text-gray-500 flex items-center gap-1 cursor-pointer" title="抓取同源前 5 个 bundle 扫描技术特征，SPA 检出率的关键">
+      <input type="checkbox" class="checkbox checkbox-xs" bind:checked={useJsScan} />
+      JS 内容扫描
+    </label>
     {#if archiving}
       <div class="text-xs text-gray-500">{cs.phase || '扫描中...'}</div>
     {/if}

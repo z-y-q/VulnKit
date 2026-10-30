@@ -153,8 +153,37 @@
       { name: 'Vue Router', prop: '__VUE_ROUTER__' },
       // React
       { name: 'React', prop: 'React' },
-      { name: 'ReactDOM', prop: 'ReactDOM' },
+      {
+        name: 'ReactDOM',
+        prop: 'ReactDOM',
+        version: function () {
+          try {
+            const rd = (window as any).ReactDOM;
+            // React 16/17/18 生产构建暴露 ReactDOM.version
+            return rd && rd.version ? String(rd.version) : null;
+          } catch {
+            return null;
+          }
+        },
+      },
       { name: 'React DevTools', prop: '__REACT_DEVTOOLS_GLOBAL_HOOK__' },
+      {
+        name: 'core-js',
+        prop: '__core-js_shared__',
+        version: function () {
+          try {
+            const shared = (window as any).__core_js_shared__;
+            const versions = shared && shared.versions;
+            if (Array.isArray(versions) && versions.length > 0) {
+              const v = versions[versions.length - 1];
+              return v && v.version ? String(v.version) : null;
+            }
+            return null;
+          } catch {
+            return null;
+          }
+        },
+      },
       // Angular
       { name: 'Angular (ng)', prop: 'ng' },
       { name: 'Angular', prop: 'angular' },
@@ -441,10 +470,35 @@
       /* ignore */
     }
 
-    // body className
-    let classNames = '';
+    // body className（UI 框架特征类如 ant-btn/ant-form 在子元素上，须全 DOM 采集）
+    const classNames: string[] = [];
     try {
-      if (document.body) classNames = document.body.className || '';
+      if (document.body) {
+        const own = (document.body.className || '').split(/\s+/);
+        for (const c of own) if (c && classNames.indexOf(c) === -1) classNames.push(c);
+        const classEls = document.body.querySelectorAll('[class]');
+        const seenCls: Record<string, boolean> = {};
+        for (let ci = 0; ci < classEls.length && classNames.length < 300; ci++) {
+          const cl = (classEls[ci] as HTMLElement).className;
+          if (typeof cl !== 'string' || !cl) continue;
+          const parts = cl.split(/\s+/);
+          for (const p of parts) {
+            if (p && !seenCls[p]) {
+              seenCls[p] = true;
+              classNames.push(p);
+              if (classNames.length >= 300) break;
+            }
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
+    // 运行时 DOM 序列化（SPA 响应 HTML 是空壳，React/antd/core-js 痕迹在渲染后的 DOM 里）
+    let domHtml = '';
+    try {
+      if (document.body) domHtml = document.body.innerHTML.substring(0, 200000);
     } catch {
       /* ignore */
     }
@@ -471,6 +525,7 @@
       cookies: cookies,
       classNames: classNames,
       ids: ids.join(','),
+      domHtml: domHtml,
     });
     return;
   }
