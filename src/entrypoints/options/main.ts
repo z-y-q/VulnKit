@@ -1,4 +1,5 @@
 import { mount, unmount } from 'svelte';
+import 'virtual:uno.css';
 import '../../styles/shared.css';
 import App from './App.svelte';
 
