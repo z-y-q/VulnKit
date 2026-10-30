@@ -2,7 +2,7 @@
   // 网站嗅探面板
   // 流程：自动填充 URL → FETCH_URL 获取 HTML + FETCH_PROBE 获取 headers → 解析 meta/scriptSrc → scan() 匹配 → 分类标签展示
   import { sendMessage, sendToContent } from '@/lib/core/messaging';
-  import { getActiveTabUrl } from '@/lib/core/tabs';
+  import { getActiveTabUrl, getActiveTab, execInTab } from '@/lib/core/tabs';
   import { validateProbeUrl } from '@/lib/core/url-guard';
   import { toastStore, autoRunStore } from '@/stores/ui';
   import type { FetchResult, ProbeResult } from '@/lib/types/messaging';
@@ -41,8 +41,10 @@
   let results = $state<SniffMatch[]>([]);
   let filter = $state('all');
   let expandedName = $state<string | null>(null);
-  // JS 内容扫描：SPA 的技术特征大多在同源 bundle 里（Wappalyzer 同款思路），默认开启
+  // JS 内容扫描：SPA 的技术特征大多在同源 bundle/CSS 里（Wappalyzer 同款思路），默认开启
   let useJsScan = $state(true);
+  // 内容抓取诊断（每次扫描后更新，显示在统计摘要下方）
+  let contentScanDiag = $state('');
 
   // 自动填充当前页 URL
   $effect(() => {
@@ -113,21 +115,79 @@
       } catch { /* 非当前标签页或注入失败，降级为纯静态分析 */ }
 
       // SPA 的响应 HTML 是空壳：运行时 DOM 与同源 JS/CSS 内容才是技术痕迹的主场
-      // （Wappalyzer 同款思路）。JS 内容扫描限同源前 5 个 bundle + 3 个样式表、
-      // 单个 300KB——混淆 bundle 的字符串是密文，但 UI 框架的 CSS 特征选择器
-      // （.ant-* 等）混淆器碰不到，是最可靠的载体。
+      // （Wappalyzer 同款思路）。限同源前 5 个 bundle + 3 个样式表、单个 300KB——
+      // 混淆 bundle 的字符串是密文，但 UI 框架的 CSS 特征选择器（.ant-* 等）
+      // 混淆器碰不到，是最可靠的载体。
+      //
+      // 抓取位置必须优先页面自身（execInTab）：带瑞数/账号通这类动态防护的站点，
+      // background 的 fetch 没有 cookie 和验证上下文，拿到的是 412 挑战页而非真内容；
+      // 页面内同源 fetch 与页面自己加载资源的行为完全一致，不会被拦。
       if (useJsScan && (scriptSrcs.length > 0 || styleHrefs.length > 0)) {
         ctx.reportProgress({ phase: '扫描同源 JS/CSS 内容' });
-        try {
-          const origin = new URL(v.parsed.href).origin;
-          // getAttribute 取到的是相对路径（lib/xxx.js），必须转绝对——
-          // background service worker 的 fetch 会把相对路径解析到扩展 origin，全部静默失败
-          const abs = (s: string) => { try { return new URL(s, v.parsed.href).href; } catch { return ''; } };
-          const sameOrigin = (s: string) => { try { return new URL(s, v.parsed.href).origin === origin; } catch { return false; } };
-          const jsUrls = [...new Set(scriptSrcs)].filter(sameOrigin).map(abs).filter(Boolean).slice(0, 5);
-          const cssUrls = [...new Set(styleHrefs)].filter(sameOrigin).map(abs).filter(Boolean).slice(0, 3);
+        const abs = (s: string) => { try { return new URL(s, v.parsed.href).href; } catch { return ''; } };
+        const origin = new URL(v.parsed.href).origin;
+        const sameOrigin = (s: string) => { try { return new URL(s, v.parsed.href).origin === origin; } catch { return false; } };
+        const jsUrls = [...new Set(scriptSrcs)].filter(sameOrigin).map(abs).filter(Boolean).slice(0, 5);
+        const cssUrls = [...new Set(styleHrefs)].filter(sameOrigin).map(abs).filter(Boolean).slice(0, 3);
+        const targets = [...jsUrls, ...cssUrls];
+
+        // 首选：页面内抓取（同源 + 页面 cookie + 已通过的防护验证上下文）。
+        // 两阶段设计（kick off 同步启动 fetch → 轮询读取），不依赖
+        // executeScript 对注入函数返回 Promise 的等待行为（各 Chrome 版本不一致）。
+        // 每个资源保留「头 500KB + 尾 400KB」两段——UI 框架的 CSS 规则可能
+        // 排在整个文件的任何位置（aaas 实测 .ant-btn 在 1.9MB CSS 的末尾 5KB 处）。
+        const fetched: Record<string, string> = {};
+        let pageOk = false;
+        const tab = await getActiveTab();
+        if (tab?.id && targets.length > 0) {
+          try {
+            const kicked = await execInTab<boolean>(tab.id, function (urls: string[]) {
+              const w = window as any;
+              const st = (w.__vkSniffGrab = { out: {} as Record<string, string>, done: false });
+              Promise.all(
+                urls.map(function (u: string) {
+                  return fetch(u, { credentials: 'include' })
+                    .then(function (r: any) { return r.ok ? r.text() : ''; })
+                    .catch(function () { return ''; });
+                }),
+              ).then(function (texts: string[]) {
+                urls.forEach(function (u: string, i: number) {
+                  const t = String(texts[i] || '');
+                  if (!t) return;
+                  const head = t.slice(0, 500000);
+                  const tail = t.length > 600000 ? '\n[...尾部...] ' + t.slice(-400000) : '';
+                  st.out[u] = head + tail;
+                });
+                st.done = true;
+              });
+              return true;
+            }, { world: 'ISOLATED', args: [targets] });
+            if (kicked) {
+              pageOk = true;
+              // 轮询读取结果（最多 6 秒）
+              for (let pi = 0; pi < 20; pi++) {
+                if (ctx.signal.aborted) break;
+                await new Promise((r) => setTimeout(r, 300));
+                const st = await execInTab<{ done: boolean; out: Record<string, string> } | null>(tab.id, function () {
+                  const s = (window as any).__vkSniffGrab;
+                  return s ? { done: !!s.done, out: s.out } : null;
+                }, { world: 'ISOLATED' });
+                if (st?.done) {
+                  Object.assign(fetched, st.out || {});
+                  break;
+                }
+              }
+            }
+          } catch { /* 页面内抓取失败（无 tab / 跨域 tab），走 background 降级 */ }
+        }
+
+        // 降级：页面内没抓到的走 background；CSS 补尾部通道
+        // （fetchUrl tailOnly: Range 206 直达尾部；服务器不支持 Range 时降级全文）
+        const pending = targets.filter((u) => !fetched[u]);
+        const pendingCss = pending.filter((u) => /\.css(\?|$)/i.test(u));
+        if (pendingCss.length > 0) {
           const texts = await Promise.allSettled(
-            [...jsUrls, ...cssUrls].map((u) => sendMessage({ type: 'FETCH_URL', url: u, maxBytes: 300000, timeout: $scanSettingsStore.requestTimeoutMs })),
+            pendingCss.map((u) => sendMessage({ type: 'FETCH_URL', url: u, tailOnly: 400000, maxBytes: 400000, timeout: $scanSettingsStore.requestTimeoutMs })),
           );
           for (const r of texts) {
             if (r.status === 'fulfilled') {
@@ -135,7 +195,12 @@
               if (res && res.success && typeof res.data === 'string') html += '\n' + res.data;
             }
           }
-        } catch { /* JS 内容扫描失败不阻断主流程 */ }
+        }
+        let totalBytes = 0;
+        for (const u of targets) {
+          if (fetched[u]) { html += '\n' + fetched[u]; totalBytes += fetched[u].length; }
+        }
+        contentScanDiag = `页面内通道 ${pageOk ? '启动' : '未启动'} · 抓取 ${Object.keys(fetched).length}/${targets.length} · 注入 ${totalBytes} 字节`;
       }
       if (domHtml) html += '\n' + domHtml;
 
@@ -325,6 +390,9 @@
           <ExportMenu items={results} module="sniff" serializers={{ json: sniffJson, markdown: sniffMd, text: sniffText }} />
         </div>
       </div>
+      {#if contentScanDiag}
+        <div class="text-[10px] text-gray-400 mt-1.5 font-mono">内容抓取: {contentScanDiag}</div>
+      {/if}
     </div>
   {/if}
 
