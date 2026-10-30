@@ -306,18 +306,11 @@
       </span>
     </button>
     {#if panel.id === 'sniff' && sniffBadge.items.length > 0}
-      <!-- 徽标限宽：完整清单在 title 悬停提示里；不限宽会把左侧图标+标题挤扁 -->
+      <!-- 徽标只显示识别数量，技术明细只在嗅探面板结果区展示 -->
       <span
-        class="shrink-0 flex items-center gap-0.5 mr-1 min-w-0"
-        title="最近嗅探: {sniffBadge.items.map((i) => i.name + (i.version ? ' v' + i.version : '')).join(', ')}"
-      >
-        <span class="text-[9px] font-mono px-1 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300 leading-tight max-w-[56px] truncate">
-          {sniffBadge.items[0].name}{#if sniffBadge.items[0].version}{sniffBadge.items[0].version}{/if}
-        </span>
-        {#if sniffBadge.items.length > 1}
-          <span class="text-[9px] font-mono px-1 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300 leading-tight shrink-0">+{sniffBadge.items.length - 1}</span>
-        {/if}
-      </span>
+        class="shrink-0 text-[9px] font-mono px-1 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300 leading-tight"
+        title="最近嗅探识别 {sniffBadge.items.length} 项技术: {sniffBadge.items.map((i) => i.name + (i.version ? ' v' + i.version : '')).join(', ')}"
+      >{sniffBadge.items.length}</span>
     {/if}
     <!-- 收藏：仅悬停浮现；已收藏项已在顶部「收藏」区聚合，行内不留常驻星标（展开态不再满屏星） -->
     <button
