@@ -1344,6 +1344,15 @@
         "source": "globals",
         "type": "equals",
         "value": "ELEMENT"
+      },
+      {
+        "source": "body",
+        "type": "regex",
+        "value": {
+          "__regexp__": true,
+          "source": "\\.el-(?:icon-|form-item__|table__|dialog__|select-dropdown__|menu-item__)",
+          "flags": "i"
+        }
       }
     ]
   },
@@ -1381,7 +1390,7 @@
         "type": "regex",
         "value": {
           "__regexp__": true,
-          "source": "class=\"[^\"]*ant-(?:btn|form|input|layout|card|table|modal)",
+          "source": "class=\"[^\"]*ant-(?:btn|form|input|layout|card|table|modal)|\\.ant-(?:btn|form|input|layout|card|table|modal|tabs|drawer|message|notification|popover|tooltip|spin|steps|tag|descriptions)[a-z-]*\\s*[,{:\\[.]",
           "flags": "i"
         }
       }

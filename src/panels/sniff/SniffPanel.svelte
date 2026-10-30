@@ -84,7 +84,7 @@
       }
 
       ctx.reportProgress({ phase: '解析页面信号' });
-      const { scriptSrcs, meta } = parseHtml(html);
+      const { scriptSrcs, styleHrefs, meta } = parseHtml(html);
 
       let globals: string[] = [];
       let classNames: string[] = [];
@@ -112,17 +112,19 @@
         }
       } catch { /* 非当前标签页或注入失败，降级为纯静态分析 */ }
 
-      // SPA 的响应 HTML 是空壳：运行时 DOM 与同源 JS 内容才是技术痕迹的主场
-      // （Wappalyzer 同款思路）。JS 内容扫描限同源前 5 个 bundle、单个 300KB。
-      if (useJsScan && scriptSrcs.length > 0) {
-        ctx.reportProgress({ phase: '扫描同源 JS 内容' });
+      // SPA 的响应 HTML 是空壳：运行时 DOM 与同源 JS/CSS 内容才是技术痕迹的主场
+      // （Wappalyzer 同款思路）。JS 内容扫描限同源前 5 个 bundle + 3 个样式表、
+      // 单个 300KB——混淆 bundle 的字符串是密文，但 UI 框架的 CSS 特征选择器
+      // （.ant-* 等）混淆器碰不到，是最可靠的载体。
+      if (useJsScan && (scriptSrcs.length > 0 || styleHrefs.length > 0)) {
+        ctx.reportProgress({ phase: '扫描同源 JS/CSS 内容' });
         try {
           const origin = new URL(v.parsed.href).origin;
-          const jsUrls = [...new Set(scriptSrcs)]
-            .filter((s) => { try { return new URL(s, v.parsed.href).origin === origin; } catch { return false; } })
-            .slice(0, 5);
+          const sameOrigin = (s: string) => { try { return new URL(s, v.parsed.href).origin === origin; } catch { return false; } };
+          const jsUrls = [...new Set(scriptSrcs)].filter(sameOrigin).slice(0, 5);
+          const cssUrls = [...new Set(styleHrefs)].filter(sameOrigin).slice(0, 3);
           const texts = await Promise.allSettled(
-            jsUrls.map((u) => sendMessage({ type: 'FETCH_URL', url: u, maxBytes: 300000, timeout: $scanSettingsStore.requestTimeoutMs })),
+            [...jsUrls, ...cssUrls].map((u) => sendMessage({ type: 'FETCH_URL', url: u, maxBytes: 300000, timeout: $scanSettingsStore.requestTimeoutMs })),
           );
           for (const r of texts) {
             if (r.status === 'fulfilled') {
@@ -222,7 +224,7 @@
   }
 
   /** 从 HTML 中提取 script src 和 meta 标签 */
-  function parseHtml(html: string): { scriptSrcs: string[]; meta: { name: string; content: string }[] } {
+  function parseHtml(html: string): { scriptSrcs: string[]; styleHrefs: string[]; meta: { name: string; content: string }[] } {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
@@ -233,6 +235,14 @@
       if (src) scriptSrcs.push(src);
     }
 
+    // 提取样式表（UI 框架的编译产物 CSS 含 .ant-* / .el-* 等特征选择器，
+    // 混淆器不碰 CSS —— 这是混淆 SPA 上 UI 框架最可靠的指纹载体）
+    const styleHrefs: string[] = [];
+    for (const l of doc.querySelectorAll('link[rel="stylesheet"]')) {
+      const href = l.getAttribute('href');
+      if (href) styleHrefs.push(href);
+    }
+
     // 提取 meta 标签
     const meta: { name: string; content: string }[] = [];
     for (const m of doc.querySelectorAll('meta')) {
@@ -241,7 +251,7 @@
       if (name) meta.push({ name, content });
     }
 
-    return { scriptSrcs, meta };
+    return { scriptSrcs, styleHrefs, meta };
   }
 
   function toggleExpand(name: string) {
@@ -292,9 +302,9 @@
         <button class="btn btn-sm btn-danger shrink-0" onclick={() => controller.cancel()} disabled={!cs.canCancel}>取消</button>
       {/if}
     </div>
-    <label class="text-xs text-gray-500 flex items-center gap-1 cursor-pointer" title="抓取同源前 5 个 bundle 扫描技术特征，SPA 检出率的关键">
+    <label class="text-xs text-gray-500 flex items-center gap-1 cursor-pointer" title="抓取同源前 5 个 bundle + 3 个样式表扫描技术特征，SPA 检出率的关键">
       <input type="checkbox" class="checkbox checkbox-xs" bind:checked={useJsScan} />
-      JS 内容扫描
+      内容扫描
     </label>
     {#if archiving}
       <div class="text-xs text-gray-500">{cs.phase || '扫描中...'}</div>
